@@ -1,0 +1,21 @@
+{
+  "name": "leadflow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Leadflow monorepo foundation",
+  "packageManager": "pnpm@10.6.5",
+  "engines": {
+    "node": ">=20.16.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "format": "turbo run format"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.3"
+  }
+}
