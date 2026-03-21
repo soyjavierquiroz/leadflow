@@ -6,7 +6,7 @@ Leadflow es una plataforma SaaS para captacion, asignacion y automatizacion de l
 La base del monorepo ya incluye:
 - Shell funcional de `web` (site, members, admin).
 - Shell funcional de `api` (NestJS + Fastify + health).
-- Configuracion por entorno para dominios objetivo.
+- Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
 
@@ -18,11 +18,21 @@ No hay deploy aplicado en esta fase.
 - Monorepo: pnpm workspaces + Turborepo.
 - Ejecucion: Docker + Docker Compose (dev) + Docker Swarm stack.
 
-## Dominios objetivo (planeados)
-- `https://exitosos.com` -> sitio publico.
-- `https://members.exitosos.com` -> panel sponsors.
-- `https://admin.exitosos.com` -> panel admin.
-- `https://api.exitosos.com` -> API publica controlada.
+## Estrategia de dominio
+- `exitosos.com` es dominio temporal de staging.
+- El dominio de lanzamiento sera distinto y se definira en ventana de release.
+- El codigo de aplicacion debe ser domain-agnostic.
+- El dominio vive solo en configuracion centralizada (`*.env.example`, variables de stack) y documentacion de staging.
+
+Hosts funcionales esperados por convencion:
+- `SITE_URL`
+- `MEMBERS_URL`
+- `ADMIN_URL`
+- `API_URL`
+
+Variables transversales:
+- `APP_ENV`
+- `APP_BASE_DOMAIN`
 
 ## Rutas de infraestructura
 - Dockerfile web: `apps/web/Dockerfile`
@@ -86,6 +96,7 @@ Validacion de stacks:
 - `docs/tls-verification-v1.md`
 - `docs/deploy-checklist-v1.md`
 - `docs/domain-strategy-v1.md`
+- `docs/domain-lifecycle-v1.md`
 - `docs/environment-v1.md`
 
 ## Estado de despliegue

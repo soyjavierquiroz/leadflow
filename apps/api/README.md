@@ -10,6 +10,8 @@ Backend base de Leadflow con NestJS + Fastify.
 Definida en `src/config/runtime.ts`.
 
 Variables soportadas:
+- `APP_ENV`
+- `APP_BASE_DOMAIN`
 - `API_NAME`
 - `API_VERSION`
 - `API_HOST`
@@ -21,5 +23,5 @@ Variables soportadas:
 - `ADMIN_URL`
 - `CORS_ALLOWED_ORIGINS`
 
-CORS queda preparado para `exitosos.com`, `members.exitosos.com` y
-`admin.exitosos.com` via variables de entorno.
+`APP_BASE_DOMAIN` permite derivar defaults de `site/members/admin/api` cuando
+no se pasan URLs explicitas por entorno.

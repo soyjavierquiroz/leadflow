@@ -4,11 +4,13 @@ services:
   web:
     image: ghcr.io/soyjavierquiroz/leadflow-web:latest
     environment:
+      NEXT_PUBLIC_APP_ENV: ${APP_ENV:-staging}
+      NEXT_PUBLIC_APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-staging.example.com}
       NEXT_PUBLIC_APP_NAME: Leadflow
-      NEXT_PUBLIC_SITE_URL: https://${LEADFLOW_SITE_HOST:-exitosos.com}
-      NEXT_PUBLIC_MEMBERS_URL: https://${LEADFLOW_MEMBERS_HOST:-members.exitosos.com}
-      NEXT_PUBLIC_ADMIN_URL: https://${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}
-      NEXT_PUBLIC_API_URL: https://${LEADFLOW_API_HOST:-api.exitosos.com}
+      NEXT_PUBLIC_SITE_URL: ${SITE_URL:-https://staging.example.com}
+      NEXT_PUBLIC_MEMBERS_URL: ${MEMBERS_URL:-https://members.staging.example.com}
+      NEXT_PUBLIC_ADMIN_URL: ${ADMIN_URL:-https://admin.staging.example.com}
+      NEXT_PUBLIC_API_URL: ${API_URL:-https://api.staging.example.com}
     networks:
       - traefik_public
       - leadflow_core
@@ -27,18 +29,18 @@ services:
         - traefik.enable=true
         - traefik.docker.network=traefik_public
         - traefik.http.services.leadflow-web.loadbalancer.server.port=3000
-        # exitosos.com -> web
-        - traefik.http.routers.leadflow-site.rule=Host(`${LEADFLOW_SITE_HOST:-exitosos.com}`)
+        # site host -> web
+        - traefik.http.routers.leadflow-site.rule=Host(`${LEADFLOW_SITE_HOST:-staging.example.com}`)
         - traefik.http.routers.leadflow-site.entrypoints=websecure
         - traefik.http.routers.leadflow-site.tls=true
         - traefik.http.routers.leadflow-site.service=leadflow-web
-        # members.exitosos.com -> web
-        - traefik.http.routers.leadflow-members.rule=Host(`${LEADFLOW_MEMBERS_HOST:-members.exitosos.com}`)
+        # members host -> web
+        - traefik.http.routers.leadflow-members.rule=Host(`${LEADFLOW_MEMBERS_HOST:-members.staging.example.com}`)
         - traefik.http.routers.leadflow-members.entrypoints=websecure
         - traefik.http.routers.leadflow-members.tls=true
         - traefik.http.routers.leadflow-members.service=leadflow-web
-        # admin.exitosos.com -> web
-        - traefik.http.routers.leadflow-admin.rule=Host(`${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}`)
+        # admin host -> web
+        - traefik.http.routers.leadflow-admin.rule=Host(`${LEADFLOW_ADMIN_HOST:-admin.staging.example.com}`)
         - traefik.http.routers.leadflow-admin.entrypoints=websecure
         - traefik.http.routers.leadflow-admin.tls=true
         - traefik.http.routers.leadflow-admin.service=leadflow-web
@@ -53,16 +55,18 @@ services:
     image: ghcr.io/soyjavierquiroz/leadflow-api:latest
     environment:
       NODE_ENV: production
+      APP_ENV: ${APP_ENV:-staging}
+      APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-staging.example.com}
       API_NAME: leadflow-api
       API_VERSION: 0.2.0
       API_HOST: 0.0.0.0
       API_PORT: 3001
       API_GLOBAL_PREFIX: v1
-      API_BASE_URL: https://${LEADFLOW_API_HOST:-api.exitosos.com}
-      SITE_URL: https://${LEADFLOW_SITE_HOST:-exitosos.com}
-      MEMBERS_URL: https://${LEADFLOW_MEMBERS_HOST:-members.exitosos.com}
-      ADMIN_URL: https://${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}
-      CORS_ALLOWED_ORIGINS: https://${LEADFLOW_SITE_HOST:-exitosos.com},https://${LEADFLOW_MEMBERS_HOST:-members.exitosos.com},https://${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}
+      API_BASE_URL: ${API_URL:-https://api.staging.example.com}
+      SITE_URL: ${SITE_URL:-https://staging.example.com}
+      MEMBERS_URL: ${MEMBERS_URL:-https://members.staging.example.com}
+      ADMIN_URL: ${ADMIN_URL:-https://admin.staging.example.com}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://staging.example.com,https://members.staging.example.com,https://admin.staging.example.com}
     networks:
       - traefik_public
       - leadflow_core
@@ -82,8 +86,8 @@ services:
         - traefik.enable=true
         - traefik.docker.network=traefik_public
         - traefik.http.services.leadflow-api.loadbalancer.server.port=3001
-        # api.exitosos.com -> api
-        - traefik.http.routers.leadflow-api.rule=Host(`${LEADFLOW_API_HOST:-api.exitosos.com}`)
+        # api host -> api
+        - traefik.http.routers.leadflow-api.rule=Host(`${LEADFLOW_API_HOST:-api.staging.example.com}`)
         - traefik.http.routers.leadflow-api.entrypoints=websecure
         - traefik.http.routers.leadflow-api.tls=true
         - traefik.http.routers.leadflow-api.service=leadflow-api
