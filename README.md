@@ -70,11 +70,21 @@ Desde la raiz del repo:
 - `docs/architecture-v1.md`
 - `docs/infrastructure-v1.md`
 - `docs/deployment-v1.md`
+- `docs/deploy-checklist-v1.md`
 - `docs/domain-strategy-v1.md`
 - `docs/environment-v1.md`
 
 ## Nota operativa
 Esta fase prepara ejecucion y despliegue futuro, pero no realiza deploy ni modifica infraestructura productiva del servidor.
+
+## Estado de despliegue (preflight)
+- Stack `leadflow` validado a nivel de sintaxis y routing.
+- Imagenes objetivo fijadas en GHCR:
+  - `ghcr.io/soyjavierquiroz/leadflow-web:latest`
+  - `ghcr.io/soyjavierquiroz/leadflow-api:latest`
+- Estado de publicacion de imagenes: pendiente de validar/publicar con credenciales GHCR.
+- Checklist operativo final disponible en `docs/deploy-checklist-v1.md`.
+- Deploy aun no ejecutado.
 
 ## Portainer (stack `leadflow`)
 - Imagen web esperada: `ghcr.io/soyjavierquiroz/leadflow-web:latest`
