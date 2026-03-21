@@ -1,28 +1,47 @@
-import Link from 'next/link';
-import { webPublicConfig } from '@/lib/public-env';
+import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
+import { getAppShellSnapshot } from "@/lib/app-shell/data";
 
-export default function AdminLayout({
+const adminNav = [
+  {
+    href: "/admin",
+    label: "Dashboard",
+    description: "Salud de la plataforma y panorama general.",
+  },
+  {
+    href: "/admin/teams",
+    label: "Teams",
+    description: "Ownership operativo y capacidad instalada.",
+  },
+  {
+    href: "/admin/templates",
+    label: "Templates",
+    description: "Supervisión del catálogo JSON-driven.",
+  },
+  {
+    href: "/admin/publications",
+    label: "Publicaciones",
+    description: "Bindings activos por host y path.",
+  },
+];
+
+export default async function AdminLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const snapshot = await getAppShellSnapshot();
+
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">
-              Admin
-            </p>
-            <p className="text-sm text-slate-500">{webPublicConfig.urls.admin}</p>
-          </div>
-          <Link className="rounded-md px-3 py-2 text-sm hover:bg-slate-100" href="/">
-            Volver al sitio
-          </Link>
-        </div>
-      </header>
+    <AppShellLayout
+      areaLabel="Super Admin"
+      areaDescription="Gobierno estructural de templates, equipos, publicaciones y rollout operativo."
+      topBarTitle="Plataforma Leadflow"
+      personaLabel="Super Admin"
+      workspaceName={snapshot.workspace.name}
+      sourceMode={snapshot.sourceMode}
+      nav={adminNav}
+    >
       {children}
-    </div>
+    </AppShellLayout>
   );
 }
-

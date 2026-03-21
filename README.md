@@ -12,6 +12,7 @@ La base del monorepo ya incluye:
 - Public Funnel Runtime v1 en `apps/web` y `apps/api`.
 - Lead Capture & Assignment Flows v1 conectados al runtime publico.
 - Tracking Events v1 sobre runtime, capture y assignment.
+- App Shells + UI Base v1 para `Super Admin`, `Team Admin` y `Sponsor / Member`.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -94,6 +95,7 @@ Validacion de stacks:
 - `docs/public-funnel-runtime-v1.md`
 - `docs/lead-capture-assignment-flows-v1.md`
 - `docs/tracking-events-v1.md`
+- `docs/app-shells-ui-base-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -216,6 +218,51 @@ Modulos disponibles:
   - `GET /v1/events?leadId=...`
   - `GET /v1/events?funnelPublicationId=...`
 
+## App Shells + UI Base v1
+- Superficies visibles implementadas en `apps/web`:
+  - `/admin`
+  - `/admin/teams`
+  - `/admin/templates`
+  - `/admin/publications`
+  - `/team`
+  - `/team/funnels`
+  - `/team/publications`
+  - `/team/sponsors`
+  - `/team/pools`
+  - `/team/leads`
+  - `/member`
+  - `/member/leads`
+  - `/member/profile`
+- Componentes UI base creados:
+  - `app-shell-layout`
+  - `app-sidebar`
+  - `top-bar`
+  - `section-header`
+  - `kpi-card`
+  - `data-table`
+  - `empty-state`
+  - `status-badge`
+  - `sponsor-card`
+  - `publication-card`
+- Datos reales conectados cuando la API esta disponible:
+  - `workspaces`
+  - `funnel-templates`
+  - `funnel-instances`
+  - `funnel-publications`
+  - `domains`
+  - `sponsors`
+  - `rotation-pools`
+  - `leads`
+  - `assignments`
+  - `events`
+- Fallbacks mock temporales y aislados:
+  - metadata de `teams` por falta de endpoint HTTP dedicado
+  - preferencias del `member profile`
+  - datasets de respaldo para que `build` y shell funcionen aun sin API en runtime
+- Auth real sigue fuera de alcance:
+  - no se bloquean rutas todavia
+  - los layouts y surfaces ya quedan listos para insertar guards, session y permisos sin rehacer UI
+
 ## Compatibilidad actual
 - `Workspace` sigue como frontera tenant.
 - `Team` es el owner operativo real.
@@ -235,4 +282,4 @@ Modulos disponibles:
 - Deploy aun no ejecutado.
 
 ## Nota operativa
-Esta fase ya conecta runtime publico, captura, assignment y tracking events v1, sin deploy ni cambios de infraestructura productiva.
+Esta fase ya conecta runtime publico, captura, assignment, tracking events y las primeras superficies visibles del SaaS, sin deploy ni cambios de infraestructura productiva.

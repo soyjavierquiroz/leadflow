@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates y un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, y las primeras superficies privadas visibles del SaaS, sin tocar produccion.
 
 ## Componentes
 
@@ -9,8 +9,10 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Next.js App Router.
 - Segmentos:
   - `/(site)`
-  - `/(members)`
   - `/(admin)`
+  - `/(team)`
+  - `/(member)`
+  - `/(members)` solo como redirect legacy hacia `/member`
 - Runtime publico en `/(site)/[[...slug]]`.
 - Resolucion de host por request y preview opcional con `?previewHost=...` solo en desarrollo.
 - Renderer JSON-driven MVP para bloques de funnel:
@@ -24,15 +26,30 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `sponsor_reveal_placeholder`
 - `not-found` limpio para funnels/publicaciones no resueltos.
 - Config publica centralizada en `apps/web/lib/public-env.ts`.
+- Capa server-side para app shells en `apps/web/lib/app-shell`.
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
+- App shells visibles para:
+  - `Super Admin`
+  - `Team Admin`
+  - `Sponsor / Member`
+- Componentes UI reutilizables base:
+  - sidebar
+  - top bar
+  - section header
+  - KPI cards
+  - data tables
+  - empty states
+  - status badges
+  - cards de sponsor y publicacion
 - Capa browser-side de tracking para:
   - vistas de funnel y step
   - clicks de CTA
   - inicio y submit del formulario
   - entrada al thank-you con assignment
 - Build preparado para contenedor con `output: standalone`.
+- Fetch real a API cuando existe backend disponible y fallback controlado a mocks aislados para evitar romper shells en `build` o preview local.
 
 ### Backend (`apps/api`)
 - NestJS + Fastify.
@@ -192,6 +209,7 @@ Decision de transicion:
 - Redis, n8n o Evolution.
 - Auth real.
 - Logica compleja de asignacion.
+- Editor visual completo para teams.
 
 ## Estado
-Arquitectura lista para la siguiente fase de dispatch externo de tracking, handoff real, reglas avanzadas de routing y auth sobre el modelo consolidado, todavia sin cambios en produccion.
+Arquitectura lista para la siguiente fase de auth real, permisos por superficie, acciones mutativas sobre app shells y evolucion de los read models operativos, todavia sin cambios en produccion.
