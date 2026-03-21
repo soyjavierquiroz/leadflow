@@ -1,3 +1,8 @@
-# apps/web
+# @leadflow/web
 
-Placeholder para la app frontend (`Next.js`) que se scaffoldeara en la siguiente fase.
+Aplicacion frontend basada en Next.js App Router.
+
+Rutas iniciales:
+- `/` (site publico)
+- `/members` (placeholder area privada)
+- `/admin` (placeholder consola administrativa)
