@@ -1,4 +1,5 @@
 import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
+import { requireRole } from "@/lib/auth";
 import { getAppShellSnapshot } from "@/lib/app-shell/data";
 
 const teamNav = [
@@ -39,6 +40,7 @@ export default async function TeamLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await requireRole("TEAM_ADMIN");
   const snapshot = await getAppShellSnapshot();
 
   return (
@@ -49,6 +51,7 @@ export default async function TeamLayout({
       personaLabel="Team Admin"
       workspaceName={snapshot.workspace.name}
       sourceMode={snapshot.sourceMode}
+      currentUser={snapshot.currentUser}
       nav={teamNav}
     >
       {children}

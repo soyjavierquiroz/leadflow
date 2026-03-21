@@ -33,6 +33,15 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
     return records.map(mapAssignmentRecord);
   }
 
+  async findByTeamId(teamId: string): Promise<Assignment[]> {
+    const records = await this.prisma.assignment.findMany({
+      where: { teamId },
+      orderBy: { assignedAt: 'desc' },
+    });
+
+    return records.map(mapAssignmentRecord);
+  }
+
   async findBySponsorId(sponsorId: string): Promise<Assignment[]> {
     const records = await this.prisma.assignment.findMany({
       where: { sponsorId },

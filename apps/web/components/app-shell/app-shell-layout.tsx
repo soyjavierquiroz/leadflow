@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { TopBar } from "@/components/app-shell/top-bar";
+import type { AuthenticatedAppUser } from "@/lib/auth";
 import type { DataSourceMode, ShellNavItem } from "@/lib/app-shell/types";
 
 type AppShellLayoutProps = {
@@ -10,6 +11,7 @@ type AppShellLayoutProps = {
   personaLabel: string;
   workspaceName: string;
   sourceMode: DataSourceMode;
+  currentUser: AuthenticatedAppUser | null;
   nav: ShellNavItem[];
   children: ReactNode;
 };
@@ -21,6 +23,7 @@ export function AppShellLayout({
   personaLabel,
   workspaceName,
   sourceMode,
+  currentUser,
   nav,
   children,
 }: AppShellLayoutProps) {
@@ -38,6 +41,7 @@ export function AppShellLayout({
             workspaceName={workspaceName}
             personaLabel={personaLabel}
             sourceMode={sourceMode}
+            currentUser={currentUser}
           />
           <main className="px-5 py-6 md:px-8 md:py-8">{children}</main>
         </div>

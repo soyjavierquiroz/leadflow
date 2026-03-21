@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, y las primeras superficies privadas visibles del SaaS, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, las primeras superficies privadas visibles del SaaS y auth real base por rol, sin tocar produccion.
 
 ## Componentes
 
@@ -26,6 +26,13 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `sponsor_reveal_placeholder`
 - `not-found` limpio para funnels/publicaciones no resueltos.
 - Config publica centralizada en `apps/web/lib/public-env.ts`.
+- Login real en `/login`.
+- Capa auth server-first en `apps/web/lib/auth.ts`.
+- Proteccion de rutas privada por layout:
+  - `/admin/*` -> `SUPER_ADMIN`
+  - `/team/*` -> `TEAM_ADMIN`
+  - `/member/*` -> `MEMBER`
+- Redirects por rol despues de login y cuando un usuario intenta entrar a una superficie ajena.
 - Capa server-side para app shells en `apps/web/lib/app-shell`.
 - Islas cliente puntuales para:
   - `form_placeholder`
@@ -63,7 +70,9 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `PublicFunnelRuntimeModule` para lectura publica de funnels publicados.
 - `LeadCaptureAssignmentService` dentro del runtime publico para submit compuesto.
 - `TrackingEventsService` para tracking browser/server y utilidades operativas.
+- `AuthModule` con login, logout, `me`, sesiones persistidas y guards por rol.
 - Modulos disponibles:
+  - `auth`
   - `workspaces`
   - `teams`
   - `sponsors`
@@ -92,6 +101,10 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `POST /v1/public/funnel-runtime/submissions`
 - Endpoints publicos de tracking:
   - `POST /v1/public/funnel-runtime/events`
+- Endpoints auth:
+  - `POST /v1/auth/login`
+  - `POST /v1/auth/logout`
+  - `GET /v1/auth/me`
 - Endpoints minimos de validacion expuestos para `workspaces`, `sponsors`, `leads`, `rotation-pools`, `domains`, `funnel-templates`, `funnel-instances` y `funnel-publications`.
 - Endpoints de lectura ampliados para operacion:
   - `GET /v1/leads?sponsorId=...`
@@ -113,6 +126,8 @@ El dominio operativo actual se apoya en:
 - `Workspace`
 - `Team`
 - `Sponsor`
+- `User`
+- `AuthSession`
 - `RotationPool`
 - `RotationMember`
 - `Funnel` legacy
@@ -140,6 +155,8 @@ La arquitectura ya implementa:
 - runtime publico de solo lectura para resolver funnel publicado + step activo
 - captura publica v1 con visitor, lead, assignment y domain events
 - tracking events v1 con `eventId` y contexto de funnel/step
+- autenticacion real por cookie HttpOnly con sesiones persistidas en DB
+- autorizacion base por rol sobre API y superficies privadas
 
 ## Runtime publico v1
 
@@ -207,9 +224,10 @@ Decision de transicion:
 - Handoff real con WhatsApp.
 - Editor libre de templates para teams.
 - Redis, n8n o Evolution.
-- Auth real.
+- SSO, MFA, password reset y gestion avanzada de usuarios.
+- Permisos finos por recurso o policy engine.
 - Logica compleja de asignacion.
 - Editor visual completo para teams.
 
 ## Estado
-Arquitectura lista para la siguiente fase de auth real, permisos por superficie, acciones mutativas sobre app shells y evolucion de los read models operativos, todavia sin cambios en produccion.
+Arquitectura lista para la siguiente fase de acciones mutativas sobre app shells, invitaciones/gestion de usuarios, permisos mas finos por recurso y evolucion de los read models operativos, todavia sin cambios en produccion.

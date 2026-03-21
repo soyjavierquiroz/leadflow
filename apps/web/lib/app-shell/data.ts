@@ -1,5 +1,5 @@
 import { unstable_noStore as noStore } from "next/cache";
-import { webPublicConfig } from "@/lib/public-env";
+import { apiFetchWithSession, getSessionUser } from "@/lib/auth";
 import {
   mockAssignments,
   mockDomains,
@@ -17,11 +17,11 @@ import {
 import type {
   AppShellSnapshot,
   AssignmentRecord,
+  AuthenticatedAppUserRecord,
   CollectionSource,
   DataSourceMode,
   DerivedTeam,
   DomainRecord,
-  EventRecord,
   FunnelInstanceRecord,
   FunnelPublicationRecord,
   FunnelTemplateRecord,
@@ -34,8 +34,6 @@ import type {
   TeamMetadata,
   WorkspaceRecord,
 } from "@/lib/app-shell/types";
-
-const apiBaseUrl = `${webPublicConfig.urls.api}/v1`;
 
 const defaultSponsorId = "3be5f7f2-c6ae-47cb-a2bb-e1c869f7db11";
 
@@ -65,9 +63,7 @@ const fetchCollection = async <T>(
   fallback: T[],
 ): Promise<CollectionResult<T>> => {
   try {
-    const response = await fetch(`${apiBaseUrl}${path}`, {
-      cache: "no-store",
-    });
+    const response = await apiFetchWithSession(path);
 
     if (!response.ok) {
       throw new Error(`Request failed with status ${response.status}`);
@@ -261,9 +257,14 @@ const buildLeadViews = (input: {
 
 export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
   noStore();
+  const currentUser = (await getSessionUser()) as AuthenticatedAppUserRecord | null;
+
+  const canReadAdminCollections =
+    currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "TEAM_ADMIN";
 
   const [
     workspacesResult,
+    teamsResult,
     templatesResult,
     funnelInstancesResult,
     publicationsResult,
@@ -272,28 +273,104 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     rotationPoolsResult,
     leadsResult,
     assignmentsResult,
-    eventsResult,
   ] = await Promise.all([
-    fetchCollection<WorkspaceRecord>("/workspaces", [mockWorkspace]),
-    fetchCollection<FunnelTemplateRecord>("/funnel-templates", mockTemplates),
-    fetchCollection<FunnelInstanceRecord>(
-      "/funnel-instances",
-      mockFunnelInstances,
-    ),
-    fetchCollection<FunnelPublicationRecord>(
-      "/funnel-publications",
-      mockPublications,
-    ),
-    fetchCollection<DomainRecord>("/domains", mockDomains),
-    fetchCollection<SponsorRecord>("/sponsors", mockSponsors),
-    fetchCollection<RotationPoolRecord>("/rotation-pools", mockRotationPools),
+    currentUser?.role === "SUPER_ADMIN"
+      ? fetchCollection<WorkspaceRecord>("/workspaces", [mockWorkspace])
+      : Promise.resolve({
+          data: currentUser?.workspace
+            ? [
+                {
+                  ...mockWorkspace,
+                  id: currentUser.workspace.id,
+                  name: currentUser.workspace.name,
+                  slug: currentUser.workspace.slug,
+                  primaryDomain: currentUser.workspace.primaryDomain,
+                },
+              ]
+            : [mockWorkspace],
+          source: "live" as const,
+        }),
+    canReadAdminCollections
+      ? fetchCollection<TeamMetadata>("/teams", mockTeamMetadata)
+      : Promise.resolve({
+          data:
+            currentUser?.teamId && currentUser.team
+              ? [
+                  {
+                    id: currentUser.team.id,
+                    workspaceId: currentUser.workspaceId ?? mockWorkspace.id,
+                    name: currentUser.team.name,
+                    code: currentUser.team.code,
+                    status: "active",
+                    description:
+                      "Team resuelto desde la sesión autenticada del usuario.",
+                  },
+                ]
+              : mockTeamMetadata,
+          source: "live" as const,
+        }),
+    canReadAdminCollections
+      ? fetchCollection<FunnelTemplateRecord>("/funnel-templates", mockTemplates)
+      : Promise.resolve({
+          data: mockTemplates,
+          source: "mock" as const,
+        }),
+    canReadAdminCollections
+      ? fetchCollection<FunnelInstanceRecord>(
+          "/funnel-instances",
+          mockFunnelInstances,
+        )
+      : Promise.resolve({
+          data: mockFunnelInstances,
+          source: "mock" as const,
+        }),
+    canReadAdminCollections
+      ? fetchCollection<FunnelPublicationRecord>(
+          "/funnel-publications",
+          mockPublications,
+        )
+      : Promise.resolve({
+          data: mockPublications,
+          source: "mock" as const,
+        }),
+    canReadAdminCollections
+      ? fetchCollection<DomainRecord>("/domains", mockDomains)
+      : Promise.resolve({
+          data: mockDomains,
+          source: "mock" as const,
+        }),
+    canReadAdminCollections
+      ? fetchCollection<SponsorRecord>("/sponsors", mockSponsors)
+      : Promise.resolve({
+          data:
+            currentUser?.sponsorId && currentUser.sponsor
+              ? [
+                  {
+                    ...mockSponsors[0],
+                    id: currentUser.sponsor.id,
+                    workspaceId: currentUser.workspaceId ?? mockWorkspace.id,
+                    teamId: currentUser.teamId ?? mockTeamMetadata[0].id,
+                    displayName: currentUser.sponsor.displayName,
+                    email: currentUser.sponsor.email,
+                    availabilityStatus: currentUser.sponsor.availabilityStatus,
+                  },
+                ]
+              : mockSponsors,
+          source: currentUser?.role === "MEMBER" ? ("live" as const) : ("mock" as const),
+        }),
+    canReadAdminCollections
+      ? fetchCollection<RotationPoolRecord>("/rotation-pools", mockRotationPools)
+      : Promise.resolve({
+          data: mockRotationPools,
+          source: "mock" as const,
+        }),
     fetchCollection<LeadRecord>("/leads", mockLeads),
     fetchCollection<AssignmentRecord>("/assignments", mockAssignments),
-    fetchCollection<EventRecord>("/events", mockEvents),
   ]);
 
   const sources = {
     workspaces: workspacesResult.source,
+    teams: teamsResult.source,
     templates: templatesResult.source,
     funnelInstances: funnelInstancesResult.source,
     publications: publicationsResult.source,
@@ -302,11 +379,10 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     rotationPools: rotationPoolsResult.source,
     leads: leadsResult.source,
     assignments: assignmentsResult.source,
-    events: eventsResult.source,
   };
 
   const workspace = workspacesResult.data[0] ?? mockWorkspace;
-  const teams = buildDerivedTeams({
+  const derivedTeams = buildDerivedTeams({
     workspace,
     funnelInstances: funnelInstancesResult.data,
     publications: publicationsResult.data,
@@ -315,28 +391,28 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     rotationPools: rotationPoolsResult.data,
     leads: leadsResult.data,
     assignments: assignmentsResult.data,
+  }).map((team) => {
+    const liveTeam = teamsResult.data.find((item) => item.id === team.id);
+
+    return {
+      ...team,
+      name: liveTeam?.name ?? team.name,
+      code: liveTeam?.code ?? team.code,
+      status: liveTeam?.status ?? team.status,
+      description: liveTeam?.description ?? team.description,
+    };
   });
-  const currentTeam = teams[0] ?? {
-    ...mockTeamMetadata[0],
-    sponsorCount: mockSponsors.length,
-    funnelCount: mockFunnelInstances.length,
-    publicationCount: mockPublications.length,
-    domainCount: mockDomains.length,
-    poolCount: mockRotationPools.length,
-    leadCount: mockLeads.length,
-    assignmentCount: mockAssignments.length,
-  };
   const publicationViews = buildPublicationViews({
     publications: publicationsResult.data,
     domains: domainsResult.data,
     funnelInstances: funnelInstancesResult.data,
     templates: templatesResult.data,
-    teams,
+    teams: derivedTeams,
   });
   const funnelViews = buildFunnelViews({
     funnelInstances: funnelInstancesResult.data,
     templates: templatesResult.data,
-    teams,
+    teams: derivedTeams,
     publications: publicationsResult.data,
   });
   const leadViews = buildLeadViews({
@@ -345,21 +421,40 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     sponsors: sponsorsResult.data,
     publications: publicationViews,
     funnels: funnelViews,
-    teams,
+    teams: derivedTeams,
   });
 
+  const currentTeam =
+    (currentUser?.teamId
+      ? derivedTeams.find((item) => item.id === currentUser.teamId)
+      : null) ??
+    derivedTeams[0] ?? {
+      ...mockTeamMetadata[0],
+      sponsorCount: mockSponsors.length,
+      funnelCount: mockFunnelInstances.length,
+      publicationCount: mockPublications.length,
+      domainCount: mockDomains.length,
+      poolCount: mockRotationPools.length,
+      leadCount: mockLeads.length,
+      assignmentCount: mockAssignments.length,
+    };
+
   const currentSponsor =
+    (currentUser?.sponsorId
+      ? sponsorsResult.data.find((item) => item.id === currentUser.sponsorId)
+      : null) ??
     sponsorsResult.data.find((item) => item.id === defaultSponsorId) ??
     sponsorsResult.data.find((item) => item.memberPortalEnabled) ??
     sponsorsResult.data[0] ??
     mockSponsors[0];
 
   return {
+    currentUser,
     sourceMode: resolveSourceMode(sources),
     sources,
     workspaces: workspacesResult.data,
     workspace,
-    teams,
+    teams: derivedTeams,
     currentTeam,
     templates: templatesResult.data,
     funnelInstances: funnelInstancesResult.data,
@@ -373,7 +468,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     leads: leadsResult.data,
     leadViews,
     assignments: assignmentsResult.data,
-    events: eventsResult.data,
+    events: mockEvents,
     memberProfile: mockMemberProfile,
   };
 };

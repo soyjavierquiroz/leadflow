@@ -1,5 +1,9 @@
+import type { AuthenticatedAppUser } from "@/lib/auth";
+
 export type CollectionSource = "live" | "mock";
 export type DataSourceMode = "live" | "mock" | "hybrid";
+
+export type AuthenticatedAppUserRecord = AuthenticatedAppUser;
 
 export type WorkspaceRecord = {
   id: string;
@@ -231,6 +235,7 @@ export type ShellNavItem = {
 };
 
 export type AppShellSnapshot = {
+  currentUser: AuthenticatedAppUserRecord | null;
   sourceMode: DataSourceMode;
   sources: Record<string, CollectionSource>;
   workspaces: WorkspaceRecord[];

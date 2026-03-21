@@ -34,6 +34,7 @@ export class AssignmentsService {
 
   async list(filters?: {
     workspaceId?: string;
+    teamId?: string;
     sponsorId?: string;
     funnelPublicationId?: string;
   }): Promise<Assignment[]> {
@@ -47,6 +48,10 @@ export class AssignmentsService {
 
     if (filters?.funnelPublicationId) {
       return this.repository.findByPublicationId(filters.funnelPublicationId);
+    }
+
+    if (filters?.teamId) {
+      return this.repository.findByTeamId(filters.teamId);
     }
 
     if (filters?.workspaceId) {

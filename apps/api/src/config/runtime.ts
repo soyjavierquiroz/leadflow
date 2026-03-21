@@ -9,6 +9,10 @@ export type ApiRuntimeConfig = {
   globalPrefix: string;
   baseUrl: string;
   corsAllowedOrigins: string[];
+  authCookieName: string;
+  authCookieDomain?: string;
+  authCookieSecure: boolean;
+  authSessionTtlDays: number;
 };
 
 const parseCsv = (value: string | undefined) => {
@@ -65,6 +69,10 @@ export const getApiRuntimeConfig = (
     (baseDomain ? toHttpsUrl(`api.${baseDomain}`) : `http://localhost:${port}`);
   const explicitOrigins = parseCsv(env.CORS_ALLOWED_ORIGINS);
   const appEnv = env.APP_ENV ?? env.NODE_ENV ?? 'development';
+  const authCookieName = env.AUTH_COOKIE_NAME?.trim() || 'leadflow_session';
+  const authSessionTtlDays = parseNumber(env.AUTH_SESSION_TTL_DAYS, 7);
+  const authCookieSecure =
+    (env.NODE_ENV ?? 'development') === 'production' || Boolean(baseDomain);
 
   return {
     appName: env.API_NAME ?? 'leadflow-api',
@@ -80,5 +88,9 @@ export const getApiRuntimeConfig = (
       explicitOrigins.length > 0
         ? explicitOrigins
         : [siteUrl, membersUrl, adminUrl],
+    authCookieName,
+    authCookieDomain: baseDomain ?? undefined,
+    authCookieSecure,
+    authSessionTtlDays,
   };
 };

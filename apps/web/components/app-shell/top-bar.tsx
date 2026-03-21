@@ -1,3 +1,5 @@
+import { LogoutButton } from "@/components/auth/logout-button";
+import type { AuthenticatedAppUser } from "@/lib/auth";
 import type { DataSourceMode } from "@/lib/app-shell/types";
 
 type TopBarProps = {
@@ -5,6 +7,7 @@ type TopBarProps = {
   workspaceName: string;
   personaLabel: string;
   sourceMode: DataSourceMode;
+  currentUser: AuthenticatedAppUser | null;
 };
 
 const sourceLabel = {
@@ -18,6 +21,7 @@ export function TopBar({
   workspaceName,
   personaLabel,
   sourceMode,
+  currentUser,
 }: TopBarProps) {
   return (
     <header className="sticky top-0 z-20 border-b border-white/70 bg-white/80 px-5 py-4 backdrop-blur md:px-8">
@@ -31,11 +35,12 @@ export function TopBar({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
-            Auth lista para integrarse
+            {currentUser?.fullName ?? "Sin sesión"}
           </span>
           <span className="rounded-full border border-slate-200 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white">
             {sourceLabel[sourceMode]}
           </span>
+          <LogoutButton />
         </div>
       </div>
     </header>

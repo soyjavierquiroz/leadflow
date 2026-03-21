@@ -1,4 +1,5 @@
 import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
+import { requireRole } from "@/lib/auth";
 import { getAppShellSnapshot } from "@/lib/app-shell/data";
 
 const adminNav = [
@@ -29,6 +30,7 @@ export default async function AdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await requireRole("SUPER_ADMIN");
   const snapshot = await getAppShellSnapshot();
 
   return (
@@ -39,6 +41,7 @@ export default async function AdminLayout({
       personaLabel="Super Admin"
       workspaceName={snapshot.workspace.name}
       sourceMode={snapshot.sourceMode}
+      currentUser={snapshot.currentUser}
       nav={adminNav}
     >
       {children}

@@ -34,6 +34,7 @@ export interface LeadRepository extends RepositoryPort<Lead, CreateLeadDto> {
   findAll(): Promise<Lead[]>;
   findByVisitorId(visitorId: DomainId): Promise<Lead[]>;
   findByWorkspaceId(workspaceId: DomainId): Promise<Lead[]>;
+  findByTeamId(teamId: DomainId): Promise<Lead[]>;
   findBySponsorId(sponsorId: DomainId): Promise<Lead[]>;
   findByPublicationId(funnelPublicationId: DomainId): Promise<Lead[]>;
 }

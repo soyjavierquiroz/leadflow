@@ -3,24 +3,23 @@ import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
-import { FunnelTemplatesService } from './funnel-templates.service';
+import { TeamsService } from './teams.service';
 
-@Controller('funnel-templates')
+@Controller('teams')
 @RequireRoles(UserRole.SUPER_ADMIN, UserRole.TEAM_ADMIN)
-export class FunnelTemplatesController {
-  constructor(
-    private readonly funnelTemplatesService: FunnelTemplatesService,
-  ) {}
+export class TeamsController {
+  constructor(private readonly teamsService: TeamsService) {}
 
   @Get()
   findAll(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Query('workspaceId') workspaceId?: string,
   ) {
-    return this.funnelTemplatesService.list(
-      user.role === UserRole.SUPER_ADMIN
-        ? (workspaceId ?? user.workspaceId ?? undefined)
-        : (user.workspaceId ?? undefined),
-    );
+    return this.teamsService.list({
+      workspaceId:
+        user.role === UserRole.SUPER_ADMIN
+          ? (workspaceId ?? user.workspaceId ?? undefined)
+          : (user.workspaceId ?? undefined),
+    });
   }
 }

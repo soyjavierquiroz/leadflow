@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import cookie from '@fastify/cookie';
 import { AppModule } from './app.module';
 import { getApiRuntimeConfig } from './config/runtime';
 
@@ -13,6 +14,7 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter(),
   );
+  await app.register(cookie);
 
   app.setGlobalPrefix(runtimeConfig.globalPrefix, {
     exclude: [{ path: 'health', method: RequestMethod.GET }],

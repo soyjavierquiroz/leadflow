@@ -30,4 +30,16 @@ export class TeamsService {
       rotationPoolIds: [],
     });
   }
+
+  async list(filters?: { workspaceId?: string }): Promise<Team[]> {
+    if (!this.repository) {
+      throw new Error('TeamRepository provider is not configured.');
+    }
+
+    if (filters?.workspaceId) {
+      return this.repository.findByWorkspaceId(filters.workspaceId);
+    }
+
+    return this.repository.findAll();
+  }
 }

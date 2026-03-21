@@ -1,6 +1,17 @@
 const { PrismaClient } = require('@prisma/client');
+const { randomBytes, scryptSync } = require('crypto');
 
 const prisma = new PrismaClient();
+const DEFAULT_KEY_LENGTH = 64;
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString('hex');
+  const derivedKey = scryptSync(password, salt, DEFAULT_KEY_LENGTH).toString(
+    'hex',
+  );
+
+  return `scrypt$${salt}$${derivedKey}`;
+}
 
 async function main() {
   const workspace = await prisma.workspace.upsert({
@@ -92,6 +103,104 @@ async function main() {
       availabilityStatus: 'available',
       routingWeight: 1,
       memberPortalEnabled: true,
+    },
+  });
+
+  await prisma.authSession.deleteMany();
+
+  await prisma.user.upsert({
+    where: { email: 'admin@leadflow.local' },
+    update: {
+      workspaceId: workspace.id,
+      teamId: null,
+      sponsorId: null,
+      fullName: 'Leadflow Super Admin',
+      passwordHash: hashPassword('Admin123!'),
+      role: 'SUPER_ADMIN',
+      status: 'active',
+    },
+    create: {
+      workspaceId: workspace.id,
+      fullName: 'Leadflow Super Admin',
+      email: 'admin@leadflow.local',
+      passwordHash: hashPassword('Admin123!'),
+      role: 'SUPER_ADMIN',
+      status: 'active',
+    },
+  });
+
+  const teamAdminUser = await prisma.user.upsert({
+    where: { email: 'team@leadflow.local' },
+    update: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: null,
+      fullName: 'Leadflow Team Admin',
+      passwordHash: hashPassword('Team123!'),
+      role: 'TEAM_ADMIN',
+      status: 'active',
+    },
+    create: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      fullName: 'Leadflow Team Admin',
+      email: 'team@leadflow.local',
+      passwordHash: hashPassword('Team123!'),
+      role: 'TEAM_ADMIN',
+      status: 'active',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'ana.member@leadflow.local' },
+    update: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: sponsorA.id,
+      fullName: 'Ana Member',
+      passwordHash: hashPassword('Member123!'),
+      role: 'MEMBER',
+      status: 'active',
+    },
+    create: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: sponsorA.id,
+      fullName: 'Ana Member',
+      email: 'ana.member@leadflow.local',
+      passwordHash: hashPassword('Member123!'),
+      role: 'MEMBER',
+      status: 'active',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'bruno.member@leadflow.local' },
+    update: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: sponsorB.id,
+      fullName: 'Bruno Member',
+      passwordHash: hashPassword('Member456!'),
+      role: 'MEMBER',
+      status: 'active',
+    },
+    create: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: sponsorB.id,
+      fullName: 'Bruno Member',
+      email: 'bruno.member@leadflow.local',
+      passwordHash: hashPassword('Member456!'),
+      role: 'MEMBER',
+      status: 'active',
+    },
+  });
+
+  await prisma.team.update({
+    where: { id: team.id },
+    data: {
+      managerUserId: teamAdminUser.id,
     },
   });
 

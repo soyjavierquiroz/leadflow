@@ -13,6 +13,7 @@ La base del monorepo ya incluye:
 - Lead Capture & Assignment Flows v1 conectados al runtime publico.
 - Tracking Events v1 sobre runtime, capture y assignment.
 - App Shells + UI Base v1 para `Super Admin`, `Team Admin` y `Sponsor / Member`.
+- Roles & Auth v1 con login real, sesión segura y protección base por superficie.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -96,6 +97,7 @@ Validacion de stacks:
 - `docs/lead-capture-assignment-flows-v1.md`
 - `docs/tracking-events-v1.md`
 - `docs/app-shells-ui-base-v1.md`
+- `docs/roles-auth-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -112,6 +114,7 @@ Validacion de stacks:
 
 ## Dominio API
 Modulos disponibles:
+- `auth`
 - `workspaces`
 - `teams`
 - `sponsors`
@@ -133,9 +136,10 @@ Modulos disponibles:
 ## Persistencia implementada
 - Prisma integrado en `apps/api/prisma/schema.prisma`.
 - Migracion v2 aplicada para ownership/publicacion/templates.
-- Seed de desarrollo con workspace, team, domain, funnel template, funnel instance, funnel steps, publicaciones activas en `/` y `/oportunidad`, tracking profile, handoff strategy y compatibilidad con funnel legacy.
+- Seed de desarrollo con workspace, team, domain, funnel template, funnel instance, funnel steps, publicaciones activas en `/` y `/oportunidad`, tracking profile, handoff strategy, compatibilidad con funnel legacy y usuarios demo autenticables.
 - Endpoints de validacion expuestos:
   - `GET /v1/workspaces`
+  - `GET /v1/teams`
   - `GET /v1/sponsors`
   - `GET /v1/leads`
   - `GET /v1/rotation-pools`
@@ -217,6 +221,31 @@ Modulos disponibles:
   - `GET /v1/events`
   - `GET /v1/events?leadId=...`
   - `GET /v1/events?funnelPublicationId=...`
+
+## Roles & Auth v1
+- Roles base implementados:
+  - `SUPER_ADMIN`
+  - `TEAM_ADMIN`
+  - `MEMBER`
+- Modelo persistido:
+  - `User`
+  - `AuthSession`
+- Endpoints auth disponibles:
+  - `POST /v1/auth/login`
+  - `POST /v1/auth/logout`
+  - `GET /v1/auth/me`
+- Proteccion por superficie:
+  - `/admin/*` solo `SUPER_ADMIN`
+  - `/team/*` solo `TEAM_ADMIN`
+  - `/member/*` solo `MEMBER`
+- Guards backend:
+  - autenticacion por cookie HttpOnly
+  - autorizacion por rol sobre endpoints privados
+- Usuarios demo del seed:
+  - `admin@leadflow.local / Admin123!`
+  - `team@leadflow.local / Team123!`
+  - `ana.member@leadflow.local / Member123!`
+  - `bruno.member@leadflow.local / Member456!`
 
 ## App Shells + UI Base v1
 - Superficies visibles implementadas en `apps/web`:
