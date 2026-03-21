@@ -12,6 +12,7 @@ import {
   normalizePath,
   resolveRelativeStepPath,
 } from './public-funnel-runtime.utils';
+import { resolvePublicHandoffConfig } from './reveal-handoff.utils';
 
 const publicRuntimeInclude = {
   domain: true,
@@ -186,6 +187,7 @@ export class PublicFunnelRuntimeService {
       publication.trackingProfile ?? publication.funnelInstance.trackingProfile;
     const effectiveHandoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
+    const handoff = resolvePublicHandoffConfig(effectiveHandoffStrategy);
 
     return {
       request: {
@@ -255,6 +257,7 @@ export class PublicFunnelRuntimeService {
             settingsJson: effectiveHandoffStrategy.settingsJson,
           }
         : null,
+      handoff,
       currentStep,
       nextStep,
       previousStep,

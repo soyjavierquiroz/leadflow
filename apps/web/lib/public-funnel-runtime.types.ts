@@ -72,6 +72,14 @@ export type PublicFunnelRuntimePayload = {
     type: string;
     settingsJson: JsonValue;
   } | null;
+  handoff: {
+    mode: "thank_you_then_whatsapp" | "immediate_whatsapp" | null;
+    channel: "whatsapp" | null;
+    buttonLabel: string | null;
+    autoRedirect: boolean;
+    autoRedirectDelayMs: number | null;
+    messageTemplate: string | null;
+  };
   currentStep: {
     id: string;
     slug: string;

@@ -1,11 +1,13 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol y operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, sin tocar produccion.
+
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol y operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, sin tocar produccion.
 
 ## Componentes
 
 ### Frontend (`apps/web`)
+
 - Next.js App Router.
 - Segmentos:
   - `/(site)`
@@ -49,6 +51,10 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
+- Reveal & handoff v1 sobre el runtime publico:
+  - reveal del sponsor asignado en thank-you
+  - CTA a WhatsApp con mensaje prellenado
+  - redirect automatico cuando el handoff efectivo es `immediate_whatsapp`
 - App shells visibles para:
   - `Super Admin`
   - `Team Admin`
@@ -71,6 +77,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Fetch real a API cuando existe backend disponible y fallback controlado a mocks aislados para evitar romper shells en `build` o preview local.
 
 ### Backend (`apps/api`)
+
 - NestJS + Fastify.
 - Config runtime centralizada en `apps/api/src/config/runtime.ts`.
 - Prefijo global configurable (`API_GLOBAL_PREFIX`, default `v1`).
@@ -85,6 +92,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `AuthModule` con login, logout, `me`, sesiones persistidas y guards por rol.
 - Endpoints mutativos iniciales para operacion de `Team Admin`.
 - Endpoints privados adicionales para operacion de `Member`.
+- Contrato publico enriquecido para reveal/handoff en runtime y submit.
 - Modulos disponibles:
   - `auth`
   - `workspaces`
@@ -150,12 +158,15 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `GET /v1/events?funnelPublicationId=...`
 
 ### Shared packages
+
 - `packages/config`: helpers simples de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
 - `packages/types`: tipos base de dominio y de configuracion.
 - `packages/ui`: placeholder de componentes compartidos.
 
 ## Capa de dominio actual
+
 El dominio operativo actual se apoya en:
+
 - `Workspace`
 - `Team`
 - `Sponsor`
@@ -178,7 +189,9 @@ El dominio operativo actual se apoya en:
 - `DomainEvent`
 
 ## Expansion implementada
+
 La arquitectura ya implementa:
+
 - ownership operativo real en `Team`
 - publicacion por `host + path`
 - separacion entre `FunnelTemplate` y `FunnelInstance`
@@ -187,6 +200,7 @@ La arquitectura ya implementa:
 - compatibilidad transicional con `Funnel` legacy
 - runtime publico de solo lectura para resolver funnel publicado + step activo
 - captura publica v1 con visitor, lead, assignment y domain events
+- reveal y handoff visible a WhatsApp usando estrategia efectiva por funnel/publicacion
 - tracking events v1 con `eventId` y contexto de funnel/step
 - autenticacion real por cookie HttpOnly con sesiones persistidas en DB
 - autorizacion base por rol sobre API y superficies privadas
@@ -196,7 +210,9 @@ La arquitectura ya implementa:
 ## Runtime publico v1
 
 ### Resolucion `host + path`
+
 El runtime publico sigue estas reglas:
+
 - match exacto por `host`
 - normalizacion de path
 - solo publicaciones activas
@@ -204,12 +220,15 @@ El runtime publico sigue estas reglas:
 - fallback operativo a `/` si la publicacion root activa aplica
 
 ### Resolucion de step
+
 Una vez resuelta la `FunnelPublication`:
+
 - el path base de la publicacion carga el `entry step`
 - una subruta relativa dentro de esa publicacion intenta resolver `step.slug`
 - si el step no existe, la API responde `404`
 
 ### Contrato web/api
+
 - La web pide el runtime por `host + path`.
 - La API devuelve dominio, publicacion, funnel, template, tracking efectivo, handoff efectivo, step actual y navegacion de steps.
 - La web renderiza `blocks_json` del step actual.
@@ -217,11 +236,17 @@ Una vez resuelta la `FunnelPublication`:
   - registra o actualiza `Visitor`
   - crea o actualiza `Lead`
   - resuelve assignment simple por round robin
+  - devuelve contexto de reveal/handoff
   - guarda contexto local para el thank-you
+- Cuando el step contiene `sponsor_reveal_placeholder`, la web:
+  - revela el sponsor asignado con datos visibles seguros
+  - arma el CTA a WhatsApp
+  - redirige automaticamente si el handoff mode lo exige
 - La web emite eventos browser del runtime a la API.
 - La API persiste eventos browser y server sobre `DomainEvent`.
 
 Decision de transicion:
+
 - `Funnel` se mantiene para compatibilidad
 - `FunnelInstance.legacyFunnelId` enlaza el modelo nuevo con el anterior
 - `Lead` y `Assignment` conservan `funnelId` y agregan referencias opcionales a `funnelInstanceId` y `funnelPublicationId`
@@ -229,6 +254,7 @@ Decision de transicion:
 ## Infraestructura de ejecucion v1
 
 ### Desarrollo local con contenedores
+
 - Compose: `infra/docker/docker-compose.dev.yml`
 - Servicios:
   - `postgres`
@@ -238,6 +264,7 @@ Decision de transicion:
   - `leadflow_core`
 
 ### Baseline Swarm (futuro deploy)
+
 - Stack: `infra/swarm/docker-stack.yml`
 - Servicios:
   - `web`
@@ -253,10 +280,11 @@ Decision de transicion:
   - `api.exitosos.com` -> `api`
 
 ## Fuera de alcance en esta fase
+
 - Deploy real en servidor.
 - DNS real aplicado.
 - Integracion real con Meta o TikTok.
-- Handoff real con WhatsApp.
+- Integracion real con Evolution API, n8n o proveedores externos de WhatsApp.
 - Inbox conversacional para members.
 - Editor libre de templates para teams.
 - Redis, n8n o Evolution.
@@ -267,4 +295,5 @@ Decision de transicion:
 - Invites.
 
 ## Estado
+
 Arquitectura lista para la siguiente fase de handoff y seguimiento mas avanzado sobre leads/assignments, reveal operativo enriquecido para members, y luego invitaciones/gestion de usuarios y permisos mas finos por recurso, todavia sin cambios en produccion.

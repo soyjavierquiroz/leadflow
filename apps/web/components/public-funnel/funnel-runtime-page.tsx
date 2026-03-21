@@ -329,7 +329,7 @@ function BlockRenderer({
     case "sponsor_reveal_placeholder": {
       return (
         <AssignedSponsorReveal
-          publicationId={runtime.publication.id}
+          runtime={runtime}
           title={title || "Sponsor asignado"}
           description={description}
         />

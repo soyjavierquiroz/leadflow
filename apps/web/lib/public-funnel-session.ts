@@ -33,6 +33,22 @@ export type LeadCaptureSubmissionResponse = {
     path: string;
     stepType: string;
   } | null;
+  handoff: {
+    mode: "thank_you_then_whatsapp" | "immediate_whatsapp" | null;
+    channel: "whatsapp" | null;
+    buttonLabel: string | null;
+    autoRedirect: boolean;
+    autoRedirectDelayMs: number | null;
+    sponsor: {
+      id: string;
+      displayName: string;
+      email: string | null;
+      phone: string | null;
+    } | null;
+    whatsappPhone: string | null;
+    whatsappMessage: string | null;
+    whatsappUrl: string | null;
+  };
 };
 
 type StoredSubmissionContext = {
@@ -42,6 +58,7 @@ type StoredSubmissionContext = {
   leadId: string;
   assignment: LeadCaptureSubmissionResponse["assignment"];
   nextStep: LeadCaptureSubmissionResponse["nextStep"];
+  handoff: LeadCaptureSubmissionResponse["handoff"];
   capturedAt: string;
 };
 
@@ -88,6 +105,7 @@ export const persistSubmissionContext = (
     leadId: payload.lead.id,
     assignment: payload.assignment,
     nextStep: payload.nextStep,
+    handoff: payload.handoff,
     capturedAt: new Date().toISOString(),
   };
 

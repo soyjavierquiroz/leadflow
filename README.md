@@ -3,7 +3,9 @@
 Leadflow es una plataforma SaaS para captacion, asignacion y automatizacion de leads.
 
 ## Estado actual (v1 base)
+
 La base del monorepo ya incluye:
+
 - Shell funcional de `web` (site, members, admin).
 - Shell funcional de `api` (NestJS + Fastify + health).
 - Foundation de dominio v1 en `apps/api` con modulos, DTOs e interfaces.
@@ -16,6 +18,7 @@ La base del monorepo ya incluye:
 - Roles & Auth v1 con login real, sesión segura y protección base por superficie.
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
+- Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -23,28 +26,33 @@ La base del monorepo ya incluye:
 No hay deploy aplicado en esta fase.
 
 ## Stack tecnico
+
 - Frontend: Next.js + React + TypeScript + Tailwind.
 - Backend: NestJS + Fastify.
 - Monorepo: pnpm workspaces + Turborepo.
 - Ejecucion: Docker + Docker Compose (dev) + Docker Swarm stack.
 
 ## Estrategia de dominio
+
 - `exitosos.com` es dominio temporal de staging.
 - El dominio de lanzamiento sera distinto y se definira en ventana de release.
 - El codigo de aplicacion debe ser domain-agnostic.
 - El dominio vive solo en configuracion centralizada (`*.env.example`, variables de stack) y documentacion de staging.
 
 Hosts funcionales esperados por convencion:
+
 - `SITE_URL`
 - `MEMBERS_URL`
 - `ADMIN_URL`
 - `API_URL`
 
 Variables transversales:
+
 - `APP_ENV`
 - `APP_BASE_DOMAIN`
 
 ## Rutas de infraestructura
+
 - Dockerfile web: `apps/web/Dockerfile`
 - Dockerfile api: `apps/api/Dockerfile`
 - Docker Compose dev: `infra/docker/docker-compose.dev.yml`
@@ -54,44 +62,53 @@ Variables transversales:
 - Variables ejemplo swarm: `infra/swarm/.env.example`
 
 ## Redes objetivo
+
 - `traefik_public` (externa existente en servidor)
 - `leadflow_core` (interna del proyecto)
 - `leadflow_automation` (placeholder para integraciones futuras)
 
 ## Scripts utiles
+
 Desde la raiz del repo:
 
 Desarrollo app:
+
 - `pnpm dev`
 - `pnpm dev:web`
 - `pnpm dev:api`
 
 Base de datos:
+
 - `pnpm db:generate`
 - `pnpm db:migrate:dev`
 - `pnpm db:migrate:deploy`
 - `pnpm db:seed`
 
 Calidad:
+
 - `pnpm build`
 - `pnpm lint`
 - `pnpm test`
 
 Docker local:
+
 - `pnpm docker:dev:up`
 - `pnpm docker:dev:down`
 - `pnpm docker:dev:logs`
 
 Validacion de stacks:
+
 - `pnpm docker:stack:validate`
 - `pnpm docker:stack:validate:local`
 
 ## Variables de entorno
+
 - Web: `apps/web/.env.example`
 - API: `apps/api/.env.example`
 - Referencia completa: `docs/environment-v1.md`
 
 ## Documentacion clave
+
 - `docs/architecture-v1.md`
 - `docs/domain-model-v1.md`
 - `docs/persistence-v1.md`
@@ -102,6 +119,7 @@ Validacion de stacks:
 - `docs/roles-auth-v1.md`
 - `docs/team-operations-v1.md`
 - `docs/member-operations-v1.md`
+- `docs/reveal-handoff-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -117,7 +135,9 @@ Validacion de stacks:
 - `docs/environment-v1.md`
 
 ## Dominio API
+
 Modulos disponibles:
+
 - `auth`
 - `workspaces`
 - `teams`
@@ -138,6 +158,7 @@ Modulos disponibles:
 - `events`
 
 ## Persistencia implementada
+
 - Prisma integrado en `apps/api/prisma/schema.prisma`.
 - Migracion v2 aplicada para ownership/publicacion/templates.
 - Seed de desarrollo con workspace, team, domain, funnel template, funnel instance, funnel steps, publicaciones activas en `/` y `/oportunidad`, tracking profile, handoff strategy, compatibilidad con funnel legacy y usuarios demo autenticables.
@@ -153,12 +174,16 @@ Modulos disponibles:
   - `GET /v1/funnel-publications`
 
 ## Runtime publico v1
+
 - Resolucion publica implementada por `host + path` con match exacto de host, path normalizado y precedencia por ruta mas especifica.
 - Endpoints publicos disponibles:
   - `GET /v1/public/funnel-runtime/resolve?host=...&path=...`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`
   - `GET /v1/public/funnel-runtime/publications/:publicationId/steps/:stepSlug`
 - Web con ruta publica catch-all `/(site)/[[...slug]]` para root y subrutas limpias.
+- El payload publico ya devuelve handoff efectivo para el runtime:
+  - `thank_you_then_whatsapp`
+  - `immediate_whatsapp`
 - Renderer JSON-driven MVP con bloques:
   - `hero`
   - `text`
@@ -169,6 +194,8 @@ Modulos disponibles:
   - `thank_you`
   - `sponsor_reveal_placeholder`
 - Preview local en desarrollo con `?previewHost=...` si hace falta simular otro host.
+- Reveal operativo en el thank-you usando el assignment de la sesion.
+- CTA a WhatsApp con enlace `wa.me` y fallback limpio si falta telefono.
 - Rutas seed listas para probar:
   - `/`
   - `/gracias`
@@ -176,6 +203,7 @@ Modulos disponibles:
   - `/oportunidad/gracias`
 
 ## Lead Capture & Assignment v1
+
 - El bloque `form_placeholder` ahora envia un submit real al API publico.
 - Flujo compuesto disponible:
   - registrar `Visitor`
@@ -202,6 +230,7 @@ Modulos disponibles:
   - reutilizacion de asignacion abierta si el lead ya fue asignado
 
 ## Tracking Events v1
+
 - Persistencia interna de tracking sobre `DomainEvent`.
 - Campos nuevos de contexto:
   - `eventId`
@@ -227,6 +256,7 @@ Modulos disponibles:
   - `GET /v1/events?funnelPublicationId=...`
 
 ## Roles & Auth v1
+
 - Roles base implementados:
   - `SUPER_ADMIN`
   - `TEAM_ADMIN`
@@ -252,6 +282,7 @@ Modulos disponibles:
   - `bruno.member@leadflow.local / Member456!`
 
 ## Team Operations v1
+
 - Superficie `Team Admin` conectada con operaciones reales en:
   - `/team/funnels`
   - `/team/publications`
@@ -281,6 +312,7 @@ Modulos disponibles:
   - `Team Admin` no puede editar templates ni JSON estructural libre
 
 ## Member Operations v1
+
 - Superficie `Sponsor / Member` conectada con operación real en:
   - `/member`
   - `/member/leads`
@@ -305,7 +337,24 @@ Modulos disponibles:
   - sin WhatsApp, Evolution o n8n
   - sin notas avanzadas ni CRM completo
 
+## Reveal & Handoff v1
+
+- Reveal del sponsor asignado sobre el bloque `sponsor_reveal_placeholder`.
+- Handoff modes soportados:
+  - `thank_you_then_whatsapp`
+  - `immediate_whatsapp`
+- El submit publico devuelve `assignment`, `nextStep` y `handoff` para persistir el contexto del thank-you.
+- El runtime construye un enlace robusto a WhatsApp con:
+  - numero normalizado
+  - mensaje inicial prellenado
+  - fallback si falta sponsor o telefono
+- Tracking conectado:
+  - `handoff_started` desde API
+  - `cta_clicked` desde web
+  - `handoff_completed` cuando se dispara el click o redirect real
+
 ## App Shells + UI Base v1
+
 - Superficies visibles implementadas en `apps/web`:
   - `/admin`
   - `/admin/teams`
@@ -351,12 +400,14 @@ Modulos disponibles:
   - los layouts y surfaces ya quedan listos para insertar guards, session y permisos sin rehacer UI
 
 ## Compatibilidad actual
+
 - `Workspace` sigue como frontera tenant.
 - `Team` es el owner operativo real.
 - `Funnel` se mantiene como modelo legacy/transicional.
 - `Lead` y `Assignment` ya pueden enlazarse tambien a `FunnelInstance` y `FunnelPublication`.
 
 ## Estado de despliegue
+
 - Preparado para despliegue en Portainer con dos variantes de stack:
   - `infra/swarm/docker-stack.local.yml` (sin GHCR, primer despliegue en nodo unico)
   - `infra/swarm/docker-stack.yml` (con GHCR, ruta objetivo de escalado)
@@ -369,4 +420,5 @@ Modulos disponibles:
 - Deploy aun no ejecutado.
 
 ## Nota operativa
+
 Esta fase ya conecta runtime publico, captura, assignment, tracking events y las primeras superficies visibles del SaaS, sin deploy ni cambios de infraestructura productiva.

@@ -17,6 +17,13 @@ import type { AutoAssignPublicLeadDto } from './dto/auto-assign-public-lead.dto'
 import type { SubmitPublicLeadCaptureDto } from './dto/submit-public-lead-capture.dto';
 import { buildPublicationStepPath } from './public-funnel-runtime.utils';
 import { pickNextRotationMember } from './lead-capture-assignment.utils';
+import {
+  buildPublicWhatsappMessage,
+  buildPublicWhatsappUrl,
+  normalizeWhatsappPhone,
+  resolvePublicHandoffConfig,
+  toPublicVisibleSponsor,
+} from './reveal-handoff.utils';
 
 const eligibleMemberInclude = {
   sponsor: true,
@@ -24,9 +31,11 @@ const eligibleMemberInclude = {
 
 const flowPublicationInclude = {
   domain: true,
+  handoffStrategy: true,
   funnelInstance: {
     include: {
       legacyFunnel: true,
+      handoffStrategy: true,
       rotationPool: {
         include: {
           members: {
@@ -276,6 +285,31 @@ export class LeadCaptureAssignmentService {
           publication,
           dto.currentStepId,
         );
+        const effectiveHandoffStrategy =
+          publication.handoffStrategy ??
+          publication.funnelInstance.handoffStrategy;
+        const handoffConfig = resolvePublicHandoffConfig(
+          effectiveHandoffStrategy,
+        );
+        const sponsor = assignment?.sponsor
+          ? toPublicVisibleSponsor(assignment.sponsor)
+          : null;
+        const whatsappPhone = normalizeWhatsappPhone(sponsor?.phone ?? null);
+        const whatsappMessage = sponsor
+          ? buildPublicWhatsappMessage({
+              template: handoffConfig.messageTemplate,
+              sponsorName: sponsor.displayName,
+              leadName: leadResult.lead.fullName,
+              leadEmail: leadResult.lead.email,
+              leadPhone: leadResult.lead.phone,
+              funnelName: publication.funnelInstance.name,
+              publicationPath: nextStep?.path ?? publication.pathPrefix,
+            })
+          : null;
+        const whatsappUrl = buildPublicWhatsappUrl(
+          whatsappPhone,
+          whatsappMessage,
+        );
 
         failureContext = null;
 
@@ -284,6 +318,17 @@ export class LeadCaptureAssignmentService {
           lead: leadResult.lead,
           assignment,
           nextStep,
+          handoff: {
+            mode: handoffConfig.mode,
+            channel: handoffConfig.channel,
+            buttonLabel: handoffConfig.buttonLabel,
+            autoRedirect: handoffConfig.autoRedirect,
+            autoRedirectDelayMs: handoffConfig.autoRedirectDelayMs,
+            sponsor,
+            whatsappPhone,
+            whatsappMessage,
+            whatsappUrl,
+          },
         };
       });
     } catch (error) {
@@ -669,6 +714,8 @@ export class LeadCaptureAssignmentService {
     }
 
     const assignedAt = new Date();
+    const effectiveHandoffStrategy =
+      publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
     const assignment = await tx.assignment.create({
       data: {
         workspaceId: publication.workspaceId,
@@ -756,7 +803,7 @@ export class LeadCaptureAssignmentService {
         source: 'server',
         triggerEventId: input?.triggerEventId ?? null,
         sponsorId: assignment.sponsor.id,
-        handoffStrategyId: publication.handoffStrategyId,
+        handoffStrategyId: effectiveHandoffStrategy?.id ?? null,
       },
     });
 

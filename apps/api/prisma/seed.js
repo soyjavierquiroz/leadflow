@@ -64,6 +64,7 @@ async function main() {
       displayName: 'Ana Sponsor',
       status: 'active',
       email: 'ana@leadflow.local',
+      phone: '+52 55 5000 0099',
       availabilityStatus: 'available',
       routingWeight: 1,
       memberPortalEnabled: true,
@@ -75,6 +76,7 @@ async function main() {
       displayName: 'Ana Sponsor',
       status: 'active',
       email: 'ana@leadflow.local',
+      phone: '+52 55 5000 0099',
       availabilityStatus: 'available',
       routingWeight: 1,
       memberPortalEnabled: true,
@@ -89,6 +91,7 @@ async function main() {
       displayName: 'Bruno Sponsor',
       status: 'active',
       email: 'bruno@leadflow.local',
+      phone: '+52 55 5000 0199',
       availabilityStatus: 'available',
       routingWeight: 1,
       memberPortalEnabled: true,
@@ -100,6 +103,7 @@ async function main() {
       displayName: 'Bruno Sponsor',
       status: 'active',
       email: 'bruno@leadflow.local',
+      phone: '+52 55 5000 0199',
       availabilityStatus: 'available',
       routingWeight: 1,
       memberPortalEnabled: true,
@@ -273,31 +277,78 @@ async function main() {
     },
   });
 
-  const handoffStrategy = await prisma.handoffStrategy.upsert({
+  const thankYouHandoffStrategy = await prisma.handoffStrategy.upsert({
     where: {
       workspaceId_teamId_name: {
         workspaceId: workspace.id,
         teamId: team.id,
-        name: 'Deferred Queue Handoff',
+        name: 'Thank You WhatsApp Handoff',
       },
     },
     update: {
-      type: 'deferred_queue',
+      type: 'content_continuation',
       status: 'active',
       settingsJson: {
-        queue: 'sales-core',
-        notifySponsors: true,
+        mode: 'thank_you_then_whatsapp',
+        channel: 'whatsapp',
+        buttonLabel: 'Hablar por WhatsApp',
+        autoRedirect: false,
+        messageTemplate:
+          'Hola {{sponsorName}}, soy {{leadName}}. Acabo de completar {{funnelName}} y quiero continuar por WhatsApp.',
       },
     },
     create: {
       workspaceId: workspace.id,
       teamId: team.id,
-      name: 'Deferred Queue Handoff',
-      type: 'deferred_queue',
+      name: 'Thank You WhatsApp Handoff',
+      type: 'content_continuation',
       status: 'active',
       settingsJson: {
-        queue: 'sales-core',
-        notifySponsors: true,
+        mode: 'thank_you_then_whatsapp',
+        channel: 'whatsapp',
+        buttonLabel: 'Hablar por WhatsApp',
+        autoRedirect: false,
+        messageTemplate:
+          'Hola {{sponsorName}}, soy {{leadName}}. Acabo de completar {{funnelName}} y quiero continuar por WhatsApp.',
+      },
+    },
+  });
+
+  const immediateWhatsappHandoffStrategy = await prisma.handoffStrategy.upsert({
+    where: {
+      workspaceId_teamId_name: {
+        workspaceId: workspace.id,
+        teamId: team.id,
+        name: 'Immediate WhatsApp Handoff',
+      },
+    },
+    update: {
+      type: 'immediate_whatsapp',
+      status: 'active',
+      settingsJson: {
+        mode: 'immediate_whatsapp',
+        channel: 'whatsapp',
+        buttonLabel: 'Abrir WhatsApp ahora',
+        autoRedirect: true,
+        autoRedirectDelayMs: 1200,
+        messageTemplate:
+          'Hola {{sponsorName}}, soy {{leadName}}. Acabo de enviar mis datos en {{funnelName}} ({{publicationPath}}) y quiero continuar.',
+      },
+    },
+    create: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      name: 'Immediate WhatsApp Handoff',
+      type: 'immediate_whatsapp',
+      status: 'active',
+      settingsJson: {
+        mode: 'immediate_whatsapp',
+        channel: 'whatsapp',
+        buttonLabel: 'Abrir WhatsApp ahora',
+        autoRedirect: true,
+        autoRedirectDelayMs: 1200,
+        messageTemplate:
+          'Hola {{sponsorName}}, soy {{leadName}}. Acabo de enviar mis datos en {{funnelName}} ({{publicationPath}}) y quiero continuar.',
       },
     },
   });
@@ -379,8 +430,7 @@ async function main() {
             type: 'text',
             key: 'text-positioning',
             title: 'Base JSON-driven',
-            body:
-              'La estructura del funnel queda en manos de plataforma, mientras el team opera dominios, tracking, pools y publicaciones.',
+            body: 'La estructura del funnel queda en manos de plataforma, mientras el team opera dominios, tracking, pools y publicaciones.',
           },
           {
             type: 'form_placeholder',
@@ -403,7 +453,7 @@ async function main() {
       allowedOverridesJson: {
         editableFields: ['hero', 'text', 'faq', 'cta', 'media'],
       },
-      defaultHandoffStrategyId: handoffStrategy.id,
+      defaultHandoffStrategyId: thankYouHandoffStrategy.id,
     },
     create: {
       name: 'Leadflow Simple Capture v1',
@@ -425,8 +475,7 @@ async function main() {
             type: 'text',
             key: 'text-positioning',
             title: 'Base JSON-driven',
-            body:
-              'La estructura del funnel queda en manos de plataforma, mientras el team opera dominios, tracking, pools y publicaciones.',
+            body: 'La estructura del funnel queda en manos de plataforma, mientras el team opera dominios, tracking, pools y publicaciones.',
           },
           {
             type: 'form_placeholder',
@@ -449,7 +498,7 @@ async function main() {
       allowedOverridesJson: {
         editableFields: ['hero', 'text', 'faq', 'cta', 'media'],
       },
-      defaultHandoffStrategyId: handoffStrategy.id,
+      defaultHandoffStrategyId: thankYouHandoffStrategy.id,
     },
   });
 
@@ -468,7 +517,7 @@ async function main() {
       status: 'active',
       rotationPoolId: rotationPool.id,
       trackingProfileId: trackingProfile.id,
-      handoffStrategyId: handoffStrategy.id,
+      handoffStrategyId: thankYouHandoffStrategy.id,
       settingsJson: {
         theme: 'signal',
         locale: 'es',
@@ -491,7 +540,7 @@ async function main() {
       status: 'active',
       rotationPoolId: rotationPool.id,
       trackingProfileId: trackingProfile.id,
-      handoffStrategyId: handoffStrategy.id,
+      handoffStrategyId: thankYouHandoffStrategy.id,
       settingsJson: {
         theme: 'signal',
         locale: 'es',
@@ -536,8 +585,7 @@ async function main() {
               type: 'text',
               key: 'text-main',
               title: 'Que valida esta fase',
-              body:
-                'Resolucion de publicacion activa, renderer JSON-driven, captura de lead y assignment round robin simples sobre el pool operativo.',
+              body: 'Resolucion de publicacion activa, renderer JSON-driven, captura de lead y assignment round robin simples sobre el pool operativo.',
               items: [
                 'Runtime publico por host + path',
                 'Renderer extensible para bloques JSON',
@@ -613,14 +661,14 @@ async function main() {
               eyebrow: 'Lead capturado',
               title: 'Tu funnel ya completo captura y assignment v1',
               description:
-                'Este step puede leer el assignment resuelto en la sesion y preparar el handoff real en una fase posterior.',
+                'Este step revela el sponsor asignado y deja listo el CTA para continuar el handoff por WhatsApp.',
             },
             {
               type: 'sponsor_reveal_placeholder',
               key: 'sponsor-placeholder',
               title: 'Sponsor asignado en esta sesion',
               description:
-                'Aqui mostramos el sponsor asignado por round robin usando el contexto local del runtime.',
+                'Aqui mostramos el sponsor asignado y el siguiente paso operativo del handoff usando el contexto real de la sesion.',
             },
             {
               type: 'cta',
@@ -637,7 +685,7 @@ async function main() {
         },
         settingsJson: {
           title: 'Gracias por visitar el funnel',
-          nextAction: 'pending_handoff',
+          nextAction: 'whatsapp_handoff',
         },
       },
     ],
@@ -655,7 +703,7 @@ async function main() {
       teamId: team.id,
       funnelInstanceId: funnelInstance.id,
       trackingProfileId: trackingProfile.id,
-      handoffStrategyId: handoffStrategy.id,
+      handoffStrategyId: thankYouHandoffStrategy.id,
       status: 'active',
       isPrimary: true,
     },
@@ -665,7 +713,7 @@ async function main() {
       domainId: domain.id,
       funnelInstanceId: funnelInstance.id,
       trackingProfileId: trackingProfile.id,
-      handoffStrategyId: handoffStrategy.id,
+      handoffStrategyId: thankYouHandoffStrategy.id,
       pathPrefix: '/',
       status: 'active',
       isPrimary: true,
@@ -684,7 +732,7 @@ async function main() {
       teamId: team.id,
       funnelInstanceId: funnelInstance.id,
       trackingProfileId: trackingProfile.id,
-      handoffStrategyId: handoffStrategy.id,
+      handoffStrategyId: immediateWhatsappHandoffStrategy.id,
       status: 'active',
       isPrimary: false,
     },
@@ -694,7 +742,7 @@ async function main() {
       domainId: domain.id,
       funnelInstanceId: funnelInstance.id,
       trackingProfileId: trackingProfile.id,
-      handoffStrategyId: handoffStrategy.id,
+      handoffStrategyId: immediateWhatsappHandoffStrategy.id,
       pathPrefix: '/oportunidad',
       status: 'active',
       isPrimary: false,

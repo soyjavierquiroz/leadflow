@@ -2,10 +2,7 @@
 
 import { useEffect } from "react";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
-import {
-  getOrCreateAnonymousId,
-  readSubmissionContext,
-} from "@/lib/public-funnel-session";
+import { getOrCreateAnonymousId } from "@/lib/public-funnel-session";
 import {
   emitPublicRuntimeEvent,
   getOrCreateRuntimeSessionId,
@@ -67,36 +64,6 @@ export function PublicRuntimeTracker({
         currentPath: runtime.request.path,
         metadata: sharedMetadata,
       });
-    }
-
-    if (
-      runtime.currentStep.stepType === "thank_you" ||
-      runtime.currentStep.isConversionStep
-    ) {
-      const context = readSubmissionContext(runtime.publication.id);
-      if (context?.assignment) {
-        const handoffMarker = [
-          "handoff_completed",
-          runtime.publication.id,
-          runtime.currentStep.id,
-          context.assignment.id,
-        ].join(":");
-
-        if (!hasTrackedRuntimeEvent(handoffMarker)) {
-          markRuntimeEventTracked(handoffMarker);
-          void emitPublicRuntimeEvent({
-            eventName: "handoff_completed",
-            publicationId: runtime.publication.id,
-            stepId: runtime.currentStep.id,
-            anonymousId: context.anonymousId,
-            visitorId: context.visitorId,
-            leadId: context.leadId,
-            assignmentId: context.assignment.id,
-            currentPath: runtime.request.path,
-            metadata: sharedMetadata,
-          });
-        }
-      }
     }
   }, [previewHost, runtime]);
 

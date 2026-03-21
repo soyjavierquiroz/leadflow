@@ -75,6 +75,14 @@ export type PublicRuntimePayload = {
     type: string;
     settingsJson: RuntimeJsonValue;
   } | null;
+  handoff: {
+    mode: 'thank_you_then_whatsapp' | 'immediate_whatsapp' | null;
+    channel: 'whatsapp' | null;
+    buttonLabel: string | null;
+    autoRedirect: boolean;
+    autoRedirectDelayMs: number | null;
+    messageTemplate: string | null;
+  };
   currentStep: PublicRuntimeStep;
   nextStep: Pick<PublicRuntimeStep, 'id' | 'slug' | 'path' | 'stepType'> | null;
   previousStep: Pick<
