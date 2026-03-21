@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { webPublicConfig } from '@/lib/public-env';
 import './globals.css';
 
 const geistSans = Geist({
@@ -12,10 +13,22 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const metadataBase = (() => {
+  try {
+    return new URL(webPublicConfig.urls.site);
+  } catch {
+    return new URL('http://localhost:3000');
+  }
+})();
+
 export const metadata: Metadata = {
-  title: 'Leadflow',
+  metadataBase,
+  title: {
+    default: webPublicConfig.appName,
+    template: `%s | ${webPublicConfig.appName}`,
+  },
   description:
-    'SaaS de captacion, asignacion y automatizacion de leads para equipos comerciales.',
+    'Leadflow centraliza captacion, asignacion y automatizacion operativa de leads.',
 };
 
 export default function RootLayout({

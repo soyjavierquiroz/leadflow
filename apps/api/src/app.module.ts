@@ -9,6 +9,7 @@ import { LeadsModule } from './modules/leads/leads.module';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
+      envFilePath: ['.env.local', '.env'],
     }),
     HealthModule,
     LeadsModule,

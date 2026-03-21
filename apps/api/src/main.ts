@@ -1,23 +1,35 @@
-import { Logger } from '@nestjs/common';
+import { Logger, RequestMethod } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module';
+import { getApiRuntimeConfig } from './config/runtime';
 
 async function bootstrap() {
+  const runtimeConfig = getApiRuntimeConfig();
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
   );
 
-  app.enableCors();
+  app.setGlobalPrefix(runtimeConfig.globalPrefix, {
+    exclude: [{ path: 'health', method: RequestMethod.GET }],
+  });
 
-  const port = Number(process.env.PORT ?? 3001);
-  await app.listen(port, '0.0.0.0');
+  app.enableCors({
+    origin: runtimeConfig.corsAllowedOrigins,
+    credentials: true,
+  });
 
-  Logger.log(`Leadflow API running on http://localhost:${port}`, 'Bootstrap');
+  await app.listen(runtimeConfig.port, runtimeConfig.host);
+
+  Logger.log(
+    `${runtimeConfig.appName} running on http://${runtimeConfig.host}:${runtimeConfig.port}`,
+    'Bootstrap',
+  );
+  Logger.log(`Global prefix: /${runtimeConfig.globalPrefix}`, 'Bootstrap');
 }
 
 void bootstrap();

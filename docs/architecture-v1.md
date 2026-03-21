@@ -1,65 +1,58 @@
 # Architecture v1
 
-## Objetivo de esta fase
-Implementar el scaffold real del monorepo Leadflow con dos apps base:
-- `apps/web` en Next.js App Router.
-- `apps/api` en NestJS con Fastify.
+## Alcance de esta fase
+Convertir el scaffold inicial en una shell operativa de plataforma, con:
+- Segmentacion visual clara (`site`, `members`, `admin`) en frontend.
+- Configuracion centralizada por entorno para web y api.
+- Base de dominios objetivo documentada para despliegue posterior.
 
-Sin integrar aun logica de negocio completa ni dependencias de datos externas.
+## Vista de alto nivel
 
-## Arquitectura implementada
+### Frontend (`apps/web`)
+- Framework: Next.js App Router.
+- Segmentos actuales:
+  - `app/(site)` -> sitio publico.
+  - `app/(members)` -> shell members.
+  - `app/(admin)` -> shell admin.
+- Configuracion publica centralizada en `lib/public-env.ts`.
+- Variables `NEXT_PUBLIC_*` definidas en `apps/web/.env.example`.
 
-### 1) Monorepo y orquestacion
-- Gestor de workspaces: `pnpm`.
-- Orquestacion de tareas: `turbo`.
-- Layout:
-  - `apps/*` para aplicaciones desplegables.
-  - `packages/*` para modulos compartidos.
+### Backend (`apps/api`)
+- Framework: NestJS 11 con Fastify.
+- Configuracion centralizada en `src/config/runtime.ts`.
+- Prefijo global API configurable (`API_GLOBAL_PREFIX`, default `v1`).
+- `GET /health` se mantiene sin prefijo global.
+- CORS configurable y preparado para:
+  - `https://exitosos.com`
+  - `https://members.exitosos.com`
+  - `https://admin.exitosos.com`
 
-### 2) Frontend (`apps/web`)
-- Stack: Next.js 16 + React 19 + TypeScript + Tailwind CSS.
-- Router: App Router.
-- Estructura inicial de rutas:
-  - `app/(site)/page.tsx` -> landing temporal del producto.
-  - `app/(members)/members/page.tsx` -> placeholder area privada.
-  - `app/(admin)/admin/page.tsx` -> placeholder panel administrativo.
-- Se dejo base visual limpia y profesional orientada a SaaS.
+### Shared packages
+- `packages/types`: tipos base de dominio y configuracion.
+- `packages/config`: helpers pequenos de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
+- `packages/ui`: placeholder listo para evolucion.
 
-### 3) Backend (`apps/api`)
-- Stack: NestJS 11 + Fastify adapter.
-- Bootstrap Fastify en `src/main.ts`.
-- `ConfigModule` global habilitado en `AppModule` para crecimiento por entornos.
-- Endpoint de salud:
-  - `GET /health` -> estado, servicio y timestamp.
-- Estructura minima de modulos:
-  - `src/health/`
-  - `src/modules/leads/`
-  - `src/modules/assignment/`
+## Flujo de configuracion
+1. Web lee variables `NEXT_PUBLIC_*`.
+2. API lee variables `API_*` + dominios permitidos para CORS.
+3. Ambos shells muestran informacion coherente de entorno y endpoints.
 
-### 4) Shared packages base
-Se agregaron paquetes placeholders con `package.json` valido:
-- `@leadflow/ui`
-- `@leadflow/config`
-- `@leadflow/types`
+## Endpoints y rutas base
+- Web local: `http://localhost:3000`
+- API local: `http://localhost:3001`
+- Health: `http://localhost:3001/health`
+- Prefijo API para futuros recursos: `/v1` (configurable)
 
-Todos con estructura `src/` y scripts minimos para evolucion futura.
+## Dominios objetivo (planeado)
+- `exitosos.com` (site)
+- `members.exitosos.com` (members)
+- `admin.exitosos.com` (admin)
+- `api.exitosos.com` (api)
 
-## Decisiones tecnicas clave
-1. Nest vive como app estandar en `apps/api` y no como monorepo Nest.
-2. Se usa Fastify desde la base para mejor rendimiento y menor overhead.
-3. Se habilita `ConfigModule` global desde v1 para escalar configuracion.
-4. Se define segmentacion inicial de frontend (`site`, `members`, `admin`) desde el scaffold.
-5. Se preserva documentacion previa de inventario y baseline de infraestructura.
+## Fuera de alcance (aun)
+- Deploy a servidor.
+- DNS aplicado.
+- Integracion real de auth, PostgreSQL, Redis, n8n o Evolution.
 
-## Fuera de alcance en esta fase
-- Integracion con n8n/Evolution API.
-- Conexion a PostgreSQL/Redis.
-- Autenticacion, permisos y dominio completo de negocio.
-- Despliegue o cambios de stacks del servidor.
-
-## Validaciones esperadas de esta fase
-- `pnpm install`
-- `pnpm build`
-- `pnpm lint`
-
-Estas validaciones confirman estabilidad del scaffold inicial para continuar con desarrollo funcional en la siguiente etapa.
+## Nota explicita de estado
+Arquitectura lista para evolucion de producto, pero todavia sin deploy ni DNS aplicados.
