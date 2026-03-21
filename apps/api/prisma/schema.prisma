@@ -189,6 +189,7 @@ enum MessagingConnectionStatus {
   disconnected
   provisioning
   qr_ready
+  connecting
   connected
   error
 }

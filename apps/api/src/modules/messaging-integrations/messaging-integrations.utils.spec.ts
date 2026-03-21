@@ -43,5 +43,18 @@ describe('messaging integrations utils', () => {
         qrCodeData: 'abc123',
       }),
     ).toBe('qr_ready');
+
+    expect(
+      resolveMessagingConnectionStatus({
+        state: 'pairing',
+      }),
+    ).toBe('connecting');
+
+    expect(
+      resolveMessagingConnectionStatus({
+        state: null,
+        assumeProvisioning: true,
+      }),
+    ).toBe('provisioning');
   });
 });

@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  GatewayTimeoutException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -7,11 +8,12 @@ import {
 import {
   MessagingConnectionStatus,
   MessagingProvider,
-  type Prisma,
   type MessagingConnection,
+  type Prisma,
   type Sponsor,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { ConnectMemberMessagingDto } from './dto/connect-member-messaging.dto';
 import {
   EvolutionApiClient,
   EvolutionApiClientError,
@@ -27,12 +29,30 @@ import {
   resolveMessagingConnectionStatus,
   sanitizeNullableText,
 } from './messaging-integrations.utils';
-import type { ConnectMemberMessagingDto } from './dto/connect-member-messaging.dto';
 
 type MemberMessagingScope = {
   workspaceId: string;
   teamId: string;
   sponsorId: string;
+};
+
+type MemberScopedSponsor = Sponsor & {
+  team: {
+    code: string;
+  };
+};
+
+type PreparedConnectionInput = {
+  instanceId: string;
+  phone: string | null;
+  normalizedPhone: string | null;
+  automationWebhookUrl: string | null;
+  automationEnabled: boolean;
+};
+
+type ProvisionFlowOptions = {
+  fetchQr: boolean;
+  resetRemoteFirst?: boolean;
 };
 
 const toIso = (value: Date | null) => (value ? value.toISOString() : null);
@@ -58,120 +78,26 @@ export class MessagingIntegrationsService {
 
   async connectForMember(
     scope: MemberMessagingScope,
-    dto: ConnectMemberMessagingDto,
+    dto?: ConnectMemberMessagingDto,
   ): Promise<MessagingIntegrationSnapshot> {
-    if (!this.evolutionClient.isConfigured()) {
-      throw new ServiceUnavailableException({
-        code: 'EVOLUTION_NOT_CONFIGURED',
-        message:
-          'Evolution API is not configured yet. The WhatsApp fallback via wa.me remains active.',
-      });
-    }
+    this.ensureProviderConfigured();
 
     const sponsor = await this.requireMemberSponsor(scope);
     const existingConnection = await this.findConnection(scope);
-    const externalInstanceId =
-      existingConnection?.externalInstanceId ??
-      buildEvolutionInstanceId({
-        prefix: this.evolutionClient.getInstancePrefix(),
-        teamCode: sponsor.team.code,
-        sponsorDisplayName: sponsor.displayName,
-        sponsorId: sponsor.id,
-      });
-
-    const submittedPhone =
-      dto.phone !== undefined ? sanitizeNullableText(dto.phone) : undefined;
-    const phone =
-      submittedPhone !== undefined
-        ? submittedPhone
-        : (existingConnection?.phone ?? sponsor.phone ?? null);
-    const automationWebhookUrl = this.resolveAutomationWebhookUrl(
-      existingConnection,
-      dto,
-      externalInstanceId,
-    );
 
     try {
-      await this.evolutionClient.createInstance(externalInstanceId);
-      await this.evolutionClient.setWebhook(
-        externalInstanceId,
-        automationWebhookUrl,
+      const connection = await this.runProvisionFlow(
+        scope,
+        sponsor,
+        existingConnection,
+        dto,
+        {
+          fetchQr: true,
+        },
       );
 
-      const connectPayload =
-        await this.evolutionClient.connectInstance(externalInstanceId);
-      const statusPayload =
-        await this.evolutionClient.getConnectionState(externalInstanceId);
-      const status = resolveMessagingConnectionStatus({
-        state: statusPayload.state,
-        qrCodeData: connectPayload.qrCodeData,
-        pairingCode: connectPayload.pairingCode,
-      });
-
-      const connection = await this.prisma.messagingConnection.upsert({
-        where: {
-          sponsorId: sponsor.id,
-        },
-        update: {
-          provider: MessagingProvider.EVOLUTION,
-          status,
-          externalInstanceId,
-          phone,
-          normalizedPhone:
-            statusPayload.normalizedPhone ?? normalizeMessagingPhone(phone),
-          qrCodeData:
-            status === 'connected' ? null : (connectPayload.qrCodeData ?? null),
-          pairingCode:
-            status === 'connected'
-              ? null
-              : (connectPayload.pairingCode ?? null),
-          pairingExpiresAt: status === 'qr_ready' ? this.inFiveMinutes() : null,
-          automationWebhookUrl,
-          automationEnabled: Boolean(automationWebhookUrl),
-          metadataJson: {
-            lastKnownState: statusPayload.state,
-            lastConnectResponse: connectPayload.raw as Prisma.JsonValue,
-            lastStatusResponse: statusPayload.raw as Prisma.JsonValue,
-          },
-          lastSyncedAt: new Date(),
-          lastConnectedAt:
-            status === 'connected'
-              ? new Date()
-              : existingConnection?.lastConnectedAt,
-          lastErrorAt: null,
-          lastErrorMessage: null,
-        },
-        create: {
-          workspaceId: sponsor.workspaceId,
-          teamId: sponsor.teamId,
-          sponsorId: sponsor.id,
-          provider: MessagingProvider.EVOLUTION,
-          status,
-          externalInstanceId,
-          phone,
-          normalizedPhone:
-            statusPayload.normalizedPhone ?? normalizeMessagingPhone(phone),
-          qrCodeData:
-            status === 'connected' ? null : (connectPayload.qrCodeData ?? null),
-          pairingCode:
-            status === 'connected'
-              ? null
-              : (connectPayload.pairingCode ?? null),
-          pairingExpiresAt: status === 'qr_ready' ? this.inFiveMinutes() : null,
-          automationWebhookUrl,
-          automationEnabled: Boolean(automationWebhookUrl),
-          metadataJson: {
-            lastKnownState: statusPayload.state,
-            lastConnectResponse: connectPayload.raw as Prisma.JsonValue,
-            lastStatusResponse: statusPayload.raw as Prisma.JsonValue,
-          },
-          lastSyncedAt: new Date(),
-          lastConnectedAt: status === 'connected' ? new Date() : null,
-        },
-      });
-
       return this.buildSnapshot(connection, {
-        note: null,
+        note: 'Instancia lista para conectar por QR o pairing code.',
         sponsor,
       });
     } catch (error) {
@@ -179,9 +105,55 @@ export class MessagingIntegrationsService {
         scope,
         sponsor,
         existingConnection,
-        externalInstanceId,
-        phone,
-        automationWebhookUrl,
+        preparedInput: this.prepareConnectionInput(
+          sponsor,
+          existingConnection,
+          dto,
+        ),
+        message: this.extractErrorMessage(error),
+      });
+
+      throw this.toHttpException(error);
+    }
+  }
+
+  async getQrForMember(
+    scope: MemberMessagingScope,
+    dto?: ConnectMemberMessagingDto,
+  ): Promise<MessagingIntegrationSnapshot> {
+    this.ensureProviderConfigured();
+
+    const sponsor = await this.requireMemberSponsor(scope);
+    const existingConnection = await this.findConnection(scope);
+
+    try {
+      const connection = await this.runProvisionFlow(
+        scope,
+        sponsor,
+        existingConnection,
+        dto,
+        {
+          fetchQr: true,
+        },
+      );
+
+      return this.buildSnapshot(connection, {
+        note:
+          connection.status === MessagingConnectionStatus.qr_ready
+            ? 'QR actualizado correctamente.'
+            : 'El canal ya no requiere un QR nuevo.',
+        sponsor,
+      });
+    } catch (error) {
+      await this.persistProviderError({
+        scope,
+        sponsor,
+        existingConnection,
+        preparedInput: this.prepareConnectionInput(
+          sponsor,
+          existingConnection,
+          dto,
+        ),
         message: this.extractErrorMessage(error),
       });
 
@@ -236,26 +208,39 @@ export class MessagingIntegrationsService {
             existingConnection.normalizedPhone ??
             normalizeMessagingPhone(existingConnection.phone),
           qrCodeData:
-            status === 'connected' ? null : existingConnection.qrCodeData,
+            status === MessagingConnectionStatus.connected ||
+            status === MessagingConnectionStatus.disconnected
+              ? null
+              : existingConnection.qrCodeData,
           pairingCode:
-            status === 'connected' ? null : existingConnection.pairingCode,
-          pairingExpiresAt: status === 'qr_ready' ? this.inFiveMinutes() : null,
-          metadataJson: {
+            status === MessagingConnectionStatus.connected ||
+            status === MessagingConnectionStatus.disconnected
+              ? null
+              : existingConnection.pairingCode,
+          pairingExpiresAt:
+            status === MessagingConnectionStatus.qr_ready
+              ? (existingConnection.pairingExpiresAt ?? this.inFiveMinutes())
+              : null,
+          metadataJson: this.buildMetadata(existingConnection.metadataJson, {
             lastKnownState: statusPayload.state,
-            lastStatusResponse: statusPayload.raw as Prisma.JsonValue,
-          },
+            lastStatusResponse: statusPayload.raw,
+          }),
           lastSyncedAt: new Date(),
           lastConnectedAt:
-            status === 'connected'
+            status === MessagingConnectionStatus.connected
               ? (existingConnection.lastConnectedAt ?? new Date())
               : existingConnection.lastConnectedAt,
+          lastDisconnectedAt:
+            status === MessagingConnectionStatus.disconnected
+              ? new Date()
+              : existingConnection.lastDisconnectedAt,
           lastErrorAt: null,
           lastErrorMessage: null,
         },
       });
 
       return this.buildSnapshot(connection, {
-        note: null,
+        note: 'Estado del canal actualizado contra Evolution.',
         sponsor,
       });
     } catch (error) {
@@ -269,6 +254,48 @@ export class MessagingIntegrationsService {
           lastErrorAt: new Date(),
           lastErrorMessage: this.extractErrorMessage(error),
         },
+      });
+
+      throw this.toHttpException(error);
+    }
+  }
+
+  async resetForMember(
+    scope: MemberMessagingScope,
+    dto?: ConnectMemberMessagingDto,
+  ): Promise<MessagingIntegrationSnapshot> {
+    this.ensureProviderConfigured();
+
+    const sponsor = await this.requireMemberSponsor(scope);
+    const existingConnection = await this.findConnection(scope);
+
+    try {
+      const connection = await this.runProvisionFlow(
+        scope,
+        sponsor,
+        existingConnection,
+        dto,
+        {
+          fetchQr: true,
+          resetRemoteFirst: true,
+        },
+      );
+
+      return this.buildSnapshot(connection, {
+        note: 'Instancia reseteada y reprovisionada correctamente.',
+        sponsor,
+      });
+    } catch (error) {
+      await this.persistProviderError({
+        scope,
+        sponsor,
+        existingConnection,
+        preparedInput: this.prepareConnectionInput(
+          sponsor,
+          existingConnection,
+          dto,
+        ),
+        message: this.extractErrorMessage(error),
       });
 
       throw this.toHttpException(error);
@@ -326,6 +353,9 @@ export class MessagingIntegrationsService {
         qrCodeData: null,
         pairingCode: null,
         pairingExpiresAt: null,
+        metadataJson: this.buildMetadata(existingConnection.metadataJson, {
+          lastKnownState: 'disconnected',
+        }),
         lastSyncedAt: new Date(),
         lastDisconnectedAt: new Date(),
       },
@@ -334,6 +364,184 @@ export class MessagingIntegrationsService {
     return this.buildSnapshot(connection, {
       note,
       sponsor,
+    });
+  }
+
+  private async runProvisionFlow(
+    scope: MemberMessagingScope,
+    sponsor: MemberScopedSponsor,
+    existingConnection: MessagingConnection | null,
+    dto: ConnectMemberMessagingDto | undefined,
+    options: ProvisionFlowOptions,
+  ) {
+    const preparedInput = this.prepareConnectionInput(
+      sponsor,
+      existingConnection,
+      dto,
+    );
+
+    const baseConnection = await this.upsertBaseConnection(
+      scope,
+      sponsor,
+      existingConnection,
+      preparedInput,
+      options.resetRemoteFirst
+        ? MessagingConnectionStatus.provisioning
+        : MessagingConnectionStatus.provisioning,
+    );
+
+    if (options.resetRemoteFirst && preparedInput.instanceId) {
+      await this.evolutionClient.deleteInstance(preparedInput.instanceId);
+    }
+
+    await this.evolutionClient.ensureInstanceExists(preparedInput.instanceId);
+    await this.evolutionClient.setWebhook(
+      preparedInput.instanceId,
+      preparedInput.automationWebhookUrl,
+    );
+
+    const qrPayload = options.fetchQr
+      ? await this.evolutionClient.fetchQr(preparedInput.instanceId)
+      : {
+          qrCodeData: baseConnection.qrCodeData,
+          pairingCode: baseConnection.pairingCode,
+          raw: null,
+        };
+
+    const statusPayload = await this.evolutionClient.getConnectionState(
+      preparedInput.instanceId,
+    );
+    const status = statusPayload.exists
+      ? resolveMessagingConnectionStatus({
+          state: statusPayload.state,
+          qrCodeData: qrPayload.qrCodeData,
+          pairingCode: qrPayload.pairingCode,
+          assumeProvisioning: true,
+        })
+      : MessagingConnectionStatus.disconnected;
+
+    return await this.prisma.messagingConnection.update({
+      where: {
+        id: baseConnection.id,
+      },
+      data: {
+        status,
+        normalizedPhone:
+          statusPayload.normalizedPhone ?? preparedInput.normalizedPhone,
+        qrCodeData:
+          status === MessagingConnectionStatus.connected ||
+          status === MessagingConnectionStatus.disconnected
+            ? null
+            : qrPayload.qrCodeData,
+        pairingCode:
+          status === MessagingConnectionStatus.connected ||
+          status === MessagingConnectionStatus.disconnected
+            ? null
+            : qrPayload.pairingCode,
+        pairingExpiresAt:
+          status === MessagingConnectionStatus.qr_ready
+            ? this.inFiveMinutes()
+            : null,
+        metadataJson: this.buildMetadata(baseConnection.metadataJson, {
+          lastKnownState: statusPayload.state,
+          lastConnectResponse: qrPayload.raw,
+          lastStatusResponse: statusPayload.raw,
+          routingMode: this.evolutionClient.getRoutingMode(),
+        }),
+        lastSyncedAt: new Date(),
+        lastConnectedAt:
+          status === MessagingConnectionStatus.connected
+            ? new Date()
+            : baseConnection.lastConnectedAt,
+        lastDisconnectedAt:
+          status === MessagingConnectionStatus.disconnected
+            ? new Date()
+            : baseConnection.lastDisconnectedAt,
+        lastErrorAt: null,
+        lastErrorMessage: null,
+      },
+    });
+  }
+
+  private prepareConnectionInput(
+    sponsor: MemberScopedSponsor,
+    existingConnection: MessagingConnection | null,
+    dto?: ConnectMemberMessagingDto,
+  ): PreparedConnectionInput {
+    const instanceId =
+      existingConnection?.externalInstanceId ??
+      buildEvolutionInstanceId({
+        prefix: this.evolutionClient.getInstancePrefix(),
+        teamCode: sponsor.team.code,
+        sponsorDisplayName: sponsor.displayName,
+        sponsorId: sponsor.id,
+      });
+    const submittedPhone =
+      dto?.phone !== undefined ? sanitizeNullableText(dto.phone) : undefined;
+    const phone =
+      submittedPhone !== undefined
+        ? submittedPhone
+        : (existingConnection?.phone ?? sponsor.phone ?? null);
+    const automationWebhookUrl = this.resolveAutomationWebhookUrl(
+      existingConnection,
+      dto,
+      instanceId,
+    );
+
+    return {
+      instanceId,
+      phone,
+      normalizedPhone: normalizeMessagingPhone(phone),
+      automationWebhookUrl,
+      automationEnabled: Boolean(automationWebhookUrl),
+    };
+  }
+
+  private async upsertBaseConnection(
+    scope: MemberMessagingScope,
+    sponsor: MemberScopedSponsor,
+    existingConnection: MessagingConnection | null,
+    preparedInput: PreparedConnectionInput,
+    status: MessagingConnectionStatus,
+  ) {
+    return await this.prisma.messagingConnection.upsert({
+      where: {
+        sponsorId: sponsor.id,
+      },
+      update: {
+        provider: MessagingProvider.EVOLUTION,
+        status,
+        externalInstanceId: preparedInput.instanceId,
+        phone: preparedInput.phone,
+        normalizedPhone: preparedInput.normalizedPhone,
+        automationWebhookUrl: preparedInput.automationWebhookUrl,
+        automationEnabled: preparedInput.automationEnabled,
+        qrCodeData:
+          status === MessagingConnectionStatus.provisioning
+            ? null
+            : existingConnection?.qrCodeData,
+        pairingCode:
+          status === MessagingConnectionStatus.provisioning
+            ? null
+            : existingConnection?.pairingCode,
+        pairingExpiresAt: null,
+        lastSyncedAt: new Date(),
+        lastErrorAt: null,
+        lastErrorMessage: null,
+      },
+      create: {
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        sponsorId: sponsor.id,
+        provider: MessagingProvider.EVOLUTION,
+        status,
+        externalInstanceId: preparedInput.instanceId,
+        phone: preparedInput.phone,
+        normalizedPhone: preparedInput.normalizedPhone,
+        automationWebhookUrl: preparedInput.automationWebhookUrl,
+        automationEnabled: preparedInput.automationEnabled,
+        lastSyncedAt: new Date(),
+      },
     });
   }
 
@@ -364,7 +572,7 @@ export class MessagingIntegrationsService {
   }
 
   private async findConnection(scope: MemberMessagingScope) {
-    return this.prisma.messagingConnection.findFirst({
+    return await this.prisma.messagingConnection.findFirst({
       where: {
         sponsorId: scope.sponsorId,
         workspaceId: scope.workspaceId,
@@ -377,11 +585,7 @@ export class MessagingIntegrationsService {
     connection: MessagingConnection | null,
     input: {
       note: string | null;
-      sponsor: Sponsor & {
-        team: {
-          code: string;
-        };
-      };
+      sponsor: MemberScopedSponsor;
     },
   ): MessagingIntegrationSnapshot {
     return {
@@ -389,10 +593,15 @@ export class MessagingIntegrationsService {
       provider: {
         provider: MessagingProvider.EVOLUTION,
         configured: this.evolutionClient.isConfigured(),
+        internalConfigured: this.evolutionClient.hasInternalBaseUrl(),
+        publicFallbackConfigured:
+          this.evolutionClient.hasPublicFallbackBaseUrl(),
+        routingMode: this.evolutionClient.getRoutingMode(),
         instancePrefix: this.evolutionClient.getInstancePrefix(),
         automationBaseConfigured:
           this.evolutionClient.hasAutomationWebhookBaseUrl(),
         fallbackWaMeEnabled: true,
+        webhookEvent: this.evolutionClient.getWebhookEvent(),
         note: input.note,
       },
     };
@@ -408,6 +617,7 @@ export class MessagingIntegrationsService {
       sponsorId: connection.sponsorId,
       provider: connection.provider,
       status: connection.status,
+      instanceId: connection.externalInstanceId,
       externalInstanceId: connection.externalInstanceId,
       phone: connection.phone,
       normalizedPhone: connection.normalizedPhone,
@@ -429,10 +639,10 @@ export class MessagingIntegrationsService {
 
   private resolveAutomationWebhookUrl(
     existingConnection: MessagingConnection | null,
-    dto: ConnectMemberMessagingDto,
-    externalInstanceId: string,
+    dto: ConnectMemberMessagingDto | undefined,
+    instanceId: string,
   ) {
-    if (dto.automationWebhookUrl !== undefined) {
+    if (dto?.automationWebhookUrl !== undefined) {
       return sanitizeNullableText(dto.automationWebhookUrl);
     }
 
@@ -442,7 +652,7 @@ export class MessagingIntegrationsService {
 
     return buildAutomationWebhookUrl(
       this.evolutionClient.getAutomationWebhookBaseUrl(),
-      externalInstanceId,
+      instanceId,
     );
   }
 
@@ -453,16 +663,38 @@ export class MessagingIntegrationsService {
         : 'Evolution no está configurado en este entorno. El handoff sigue funcionando vía wa.me.';
     }
 
-    return null;
+    if (this.evolutionClient.getRoutingMode() === 'internal') {
+      return this.evolutionClient.hasPublicFallbackBaseUrl()
+        ? 'Evolution está configurado por red interna y mantiene fallback público solo como respaldo.'
+        : 'Evolution está configurado por red interna para operaciones de control.';
+    }
+
+    return 'Evolution solo tiene URL pública configurada en este entorno.';
+  }
+
+  private buildMetadata(
+    currentMetadata: Prisma.JsonValue | null,
+    patch: Record<string, unknown>,
+  ): Prisma.InputJsonValue {
+    const metadata =
+      currentMetadata &&
+      typeof currentMetadata === 'object' &&
+      !Array.isArray(currentMetadata)
+        ? ({ ...currentMetadata } as Record<string, unknown>)
+        : {};
+
+    return {
+      ...metadata,
+      ...patch,
+      updatedBy: 'leadflow-api',
+    } as Prisma.InputJsonValue;
   }
 
   private async persistProviderError(input: {
     scope: MemberMessagingScope;
     sponsor: Sponsor;
     existingConnection: MessagingConnection | null;
-    externalInstanceId: string;
-    phone: string | null;
-    automationWebhookUrl: string | null;
+    preparedInput: PreparedConnectionInput;
     message: string;
   }) {
     const data = {
@@ -471,11 +703,11 @@ export class MessagingIntegrationsService {
       sponsorId: input.scope.sponsorId,
       provider: MessagingProvider.EVOLUTION,
       status: MessagingConnectionStatus.error,
-      externalInstanceId: input.externalInstanceId,
-      phone: input.phone,
-      normalizedPhone: normalizeMessagingPhone(input.phone),
-      automationWebhookUrl: input.automationWebhookUrl,
-      automationEnabled: Boolean(input.automationWebhookUrl),
+      externalInstanceId: input.preparedInput.instanceId,
+      phone: input.preparedInput.phone,
+      normalizedPhone: input.preparedInput.normalizedPhone,
+      automationWebhookUrl: input.preparedInput.automationWebhookUrl,
+      automationEnabled: input.preparedInput.automationEnabled,
       lastSyncedAt: new Date(),
       lastErrorAt: new Date(),
       lastErrorMessage: input.message,
@@ -509,6 +741,18 @@ export class MessagingIntegrationsService {
     return 'Unknown messaging integration error.';
   }
 
+  private ensureProviderConfigured() {
+    if (this.evolutionClient.isConfigured()) {
+      return;
+    }
+
+    throw new ServiceUnavailableException({
+      code: 'EVOLUTION_NOT_CONFIGURED',
+      message:
+        'Evolution API is not configured yet. The WhatsApp fallback via wa.me remains active.',
+    });
+  }
+
   private toHttpException(error: unknown) {
     if (error instanceof EvolutionApiClientError) {
       if (error.status === 503) {
@@ -516,6 +760,15 @@ export class MessagingIntegrationsService {
           code: 'EVOLUTION_UNAVAILABLE',
           message:
             'Evolution API is unavailable or not configured. The commercial fallback via wa.me remains active.',
+          details: error.details ?? null,
+        });
+      }
+
+      if (error.status === 408 || error.status === 504) {
+        return new GatewayTimeoutException({
+          code: 'EVOLUTION_TIMEOUT',
+          message: error.message,
+          details: error.details ?? null,
         });
       }
 

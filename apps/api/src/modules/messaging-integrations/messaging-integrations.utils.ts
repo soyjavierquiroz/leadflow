@@ -87,6 +87,7 @@ export const resolveMessagingConnectionStatus = (input: {
   state?: string | null;
   qrCodeData?: string | null;
   pairingCode?: string | null;
+  assumeProvisioning?: boolean;
 }): MessagingConnectionStatus => {
   const state = input.state?.trim().toLowerCase() ?? null;
 
@@ -94,12 +95,28 @@ export const resolveMessagingConnectionStatus = (input: {
     return 'connected';
   }
 
-  if (state === 'connecting' || state === 'pairing' || state === 'startup') {
-    return 'provisioning';
-  }
-
   if (input.qrCodeData || input.pairingCode) {
     return 'qr_ready';
+  }
+
+  if (
+    state === 'connecting' ||
+    state === 'pairing' ||
+    state === 'syncing' ||
+    state === 'qrcode' ||
+    state === 'scan'
+  ) {
+    return 'connecting';
+  }
+
+  if (
+    state === 'startup' ||
+    state === 'initializing' ||
+    state === 'booting' ||
+    state === 'provisioning' ||
+    state === 'created'
+  ) {
+    return 'provisioning';
   }
 
   if (
@@ -112,8 +129,8 @@ export const resolveMessagingConnectionStatus = (input: {
   }
 
   if (!state) {
-    return 'disconnected';
+    return input.assumeProvisioning ? 'provisioning' : 'disconnected';
   }
 
-  return 'provisioning';
+  return input.assumeProvisioning ? 'provisioning' : 'connecting';
 };

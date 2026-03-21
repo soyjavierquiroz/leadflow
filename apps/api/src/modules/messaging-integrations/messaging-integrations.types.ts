@@ -11,6 +11,7 @@ export type MessagingConnectionView = {
   sponsorId: string;
   provider: MessagingProvider;
   status: MessagingConnectionStatus;
+  instanceId: string | null;
   externalInstanceId: string | null;
   phone: string | null;
   normalizedPhone: string | null;
@@ -32,9 +33,13 @@ export type MessagingConnectionView = {
 export type MessagingProviderState = {
   provider: MessagingProvider;
   configured: boolean;
+  internalConfigured: boolean;
+  publicFallbackConfigured: boolean;
+  routingMode: 'internal' | 'public' | 'unconfigured';
   instancePrefix: string;
   automationBaseConfigured: boolean;
   fallbackWaMeEnabled: boolean;
+  webhookEvent: string;
   note: string | null;
 };
 

@@ -108,16 +108,18 @@ Todos quedan scopeados a `MEMBER` y a su propio sponsor:
 
 En `apps/api/.env.example` quedaron documentadas:
 
-- `EVOLUTION_API_BASE_URL`
+- `EVOLUTION_API_INTERNAL_BASE_URL`
+- `EVOLUTION_API_PUBLIC_BASE_URL`
+- `EVOLUTION_API_BASE_URL` como fallback legacy
 - `EVOLUTION_API_KEY`
 - `EVOLUTION_INSTANCE_PREFIX`
-- `EVOLUTION_WEBHOOK_EVENT`
+- `EVOLUTION_WEBHOOK_EVENT` con valor recomendado `MESSAGES_UPSERT`
 - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
 
 Notas:
 
 - no hay secretos hardcodeados
-- `connect` exige `EVOLUTION_API_BASE_URL` y `EVOLUTION_API_KEY`
+- `connect` exige `EVOLUTION_API_INTERNAL_BASE_URL` o `EVOLUTION_API_PUBLIC_BASE_URL`, mas `EVOLUTION_API_KEY`
 - `refresh` y `disconnect` siguen siendo utiles aun si el entorno no tiene Evolution configurado
 - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL` es opcional y solo prepara el camino para n8n
 

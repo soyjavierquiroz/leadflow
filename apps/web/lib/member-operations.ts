@@ -13,7 +13,14 @@ export type MemberMessagingConnection = {
   teamId: string;
   sponsorId: string;
   provider: "EVOLUTION";
-  status: "disconnected" | "provisioning" | "qr_ready" | "connected" | "error";
+  status:
+    | "disconnected"
+    | "provisioning"
+    | "qr_ready"
+    | "connecting"
+    | "connected"
+    | "error";
+  instanceId: string | null;
   externalInstanceId: string | null;
   phone: string | null;
   normalizedPhone: string | null;
@@ -37,9 +44,13 @@ export type MemberMessagingSnapshot = {
   provider: {
     provider: "EVOLUTION";
     configured: boolean;
+    internalConfigured: boolean;
+    publicFallbackConfigured: boolean;
+    routingMode: "internal" | "public" | "unconfigured";
     instancePrefix: string;
     automationBaseConfigured: boolean;
     fallbackWaMeEnabled: boolean;
+    webhookEvent: string;
     note: string | null;
   };
 };

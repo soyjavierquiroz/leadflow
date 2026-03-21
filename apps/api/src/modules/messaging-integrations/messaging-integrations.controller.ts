@@ -46,6 +46,36 @@ export class MessagingIntegrationsController {
     });
   }
 
+  @Post('me/qr')
+  getQr(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Body() dto: ConnectMemberMessagingDto,
+  ) {
+    return this.messagingIntegrationsService.getQrForMember(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+        sponsorId: user.sponsorId!,
+      },
+      dto,
+    );
+  }
+
+  @Post('me/reset')
+  reset(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Body() dto: ConnectMemberMessagingDto,
+  ) {
+    return this.messagingIntegrationsService.resetForMember(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+        sponsorId: user.sponsorId!,
+      },
+      dto,
+    );
+  }
+
   @Post('me/disconnect')
   disconnect(@CurrentAuthUser() user: AuthenticatedUser) {
     return this.messagingIntegrationsService.disconnectForMember({

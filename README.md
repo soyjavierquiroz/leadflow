@@ -20,6 +20,7 @@ La base del monorepo ya incluye:
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
 - Messaging Integrations v1 con conexión individual de WhatsApp por sponsor/member vía Evolution API y base preparada para n8n.
+- Evolution QR Connect v1 con lifecycle real de instancia, QR, refresh, reset y disconnect por backend.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -122,6 +123,7 @@ Validacion de stacks:
 - `docs/member-operations-v1.md`
 - `docs/reveal-handoff-v1.md`
 - `docs/messaging-integrations-v1.md`
+- `docs/evolution-qr-connect-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -262,27 +264,34 @@ Modulos disponibles:
   - `disconnected`
   - `provisioning`
   - `qr_ready`
+  - `connecting`
   - `connected`
   - `error`
 - Endpoints member disponibles:
   - `GET /v1/messaging-integrations/me`
   - `POST /v1/messaging-integrations/me/connect`
+  - `POST /v1/messaging-integrations/me/qr`
   - `POST /v1/messaging-integrations/me/refresh`
+  - `POST /v1/messaging-integrations/me/reset`
   - `POST /v1/messaging-integrations/me/disconnect`
 - Superficie privada nueva:
   - `/member/channel`
 - Variables nuevas en `apps/api/.env.example`:
-  - `EVOLUTION_API_BASE_URL`
+  - `EVOLUTION_API_INTERNAL_BASE_URL`
+  - `EVOLUTION_API_PUBLIC_BASE_URL`
+  - `EVOLUTION_API_BASE_URL` como fallback legacy
   - `EVOLUTION_API_KEY`
   - `EVOLUTION_INSTANCE_PREFIX`
-  - `EVOLUTION_WEBHOOK_EVENT`
+  - `EVOLUTION_WEBHOOK_EVENT` con valor recomendado `MESSAGES_UPSERT`
   - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
+  - `EVOLUTION_REQUEST_TIMEOUT_MS`
+  - `EVOLUTION_REQUEST_RETRIES`
+  - `EVOLUTION_QR_POLL_ATTEMPTS`
+  - `EVOLUTION_QR_POLL_DELAY_MS`
 - Reveal & handoff actual sigue funcionando con fallback a `wa.me` mientras la conexión real se usa solo como base operativa y de futura automatización.
-- Endpoints disponibles:
-  - `POST /v1/public/funnel-runtime/events`
-  - `GET /v1/events`
-  - `GET /v1/events?leadId=...`
-  - `GET /v1/events?funnelPublicationId=...`
+- La ruta principal de control es:
+  - `Leadflow Web -> Leadflow API -> Evolution API por red interna`
+- La URL pública de Evolution queda solo como fallback opcional o referencia documental.
 
 ## Roles & Auth v1
 

@@ -2,7 +2,7 @@
 
 ## Objetivo de esta fase
 
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol, operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, y una primera capa real de mensajeria por sponsor/member sobre Evolution API, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol, operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, y una capa real de QR connect por sponsor/member sobre Evolution API usando backend e infraestructura interna como ruta principal, sin tocar produccion.
 
 ## Componentes
 
@@ -50,10 +50,13 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - revisar detalle basico del lead sin inbox
 - Messaging integrations v1 conectadas sobre `/member/channel` para:
   - ver estado actual de la conexion WhatsApp del sponsor
-  - crear o reintentar una instancia en Evolution
+  - conectar o reprovisionar una instancia en Evolution
+  - pedir y refrescar QR real
   - refrescar estado del canal
+  - resetear la conexión
   - desconectar el canal
   - preparar webhook base para futura orquestacion con n8n
+  - hacer polling simple mientras el estado esta en `provisioning`, `qr_ready` o `connecting`
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
@@ -98,7 +101,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `AuthModule` con login, logout, `me`, sesiones persistidas y guards por rol.
 - Endpoints mutativos iniciales para operacion de `Team Admin`.
 - Endpoints privados adicionales para operacion de `Member`.
-- `MessagingIntegrationsModule` con adaptador inicial hacia Evolution API.
+- `MessagingIntegrationsModule` con adaptador Evolution API usando URL interna como ruta principal y fallback público opcional.
 - Contrato publico enriquecido para reveal/handoff en runtime y submit.
 - Modulos disponibles:
   - `auth`
@@ -142,7 +145,9 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Endpoints messaging integrations:
   - `GET /v1/messaging-integrations/me`
   - `POST /v1/messaging-integrations/me/connect`
+  - `POST /v1/messaging-integrations/me/qr`
   - `POST /v1/messaging-integrations/me/refresh`
+  - `POST /v1/messaging-integrations/me/reset`
   - `POST /v1/messaging-integrations/me/disconnect`
 - Endpoints publicos de runtime:
   - `GET /v1/public/funnel-runtime/resolve`
@@ -221,7 +226,9 @@ La arquitectura ya implementa:
 - operacion mutativa inicial del team sin tocar templates ni JSON estructural
 - operacion mutativa inicial del member sobre sponsor, leads y assignments propios
 - canal de mensajeria real por sponsor para WhatsApp con estado persistido y ownership por member
-- adaptador v1 de Evolution API con webhook base opcional para futura orquestacion
+- adaptador v1 de Evolution API con retries, timeout y control de instancia por backend
+- routing interno preferente hacia Evolution con fallback público opcional
+- lifecycle completo de QR connect: ensure, create, webhook, qr, refresh, reset y disconnect
 
 ## Runtime publico v1
 
@@ -313,4 +320,4 @@ Decision de transicion:
 
 ## Estado
 
-Arquitectura lista para la siguiente fase de mensajeria operativa avanzada, ya sea `Messaging Automation / n8n v1` sobre este canal persistido por sponsor, o `Invites + User Management v1` sobre las superficies privadas ya protegidas y operativas.
+Arquitectura lista para la siguiente fase de `Messaging Automation / n8n v1` sobre este canal ya conectado por sponsor, o alternativamente para una fase posterior de mensajería activa sin rehacer el lifecycle base de Evolution.
