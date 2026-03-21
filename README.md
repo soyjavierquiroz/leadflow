@@ -19,6 +19,7 @@ La base del monorepo ya incluye:
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
+- Messaging Integrations v1 con conexión individual de WhatsApp por sponsor/member vía Evolution API y base preparada para n8n.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -120,6 +121,7 @@ Validacion de stacks:
 - `docs/team-operations-v1.md`
 - `docs/member-operations-v1.md`
 - `docs/reveal-handoff-v1.md`
+- `docs/messaging-integrations-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -156,6 +158,7 @@ Modulos disponibles:
 - `leads`
 - `assignments`
 - `events`
+- `messaging-integrations`
 
 ## Persistencia implementada
 
@@ -248,7 +251,33 @@ Modulos disponibles:
   - `lead_created`
   - `assignment_created`
   - `assignment_failed`
-  - `handoff_started`
+- `handoff_started`
+
+## Messaging Integrations v1
+
+- Modelo nuevo `MessagingConnection` ligado 1:1 a `Sponsor`.
+- Provider inicial soportado:
+  - `EVOLUTION`
+- Estados persistidos:
+  - `disconnected`
+  - `provisioning`
+  - `qr_ready`
+  - `connected`
+  - `error`
+- Endpoints member disponibles:
+  - `GET /v1/messaging-integrations/me`
+  - `POST /v1/messaging-integrations/me/connect`
+  - `POST /v1/messaging-integrations/me/refresh`
+  - `POST /v1/messaging-integrations/me/disconnect`
+- Superficie privada nueva:
+  - `/member/channel`
+- Variables nuevas en `apps/api/.env.example`:
+  - `EVOLUTION_API_BASE_URL`
+  - `EVOLUTION_API_KEY`
+  - `EVOLUTION_INSTANCE_PREFIX`
+  - `EVOLUTION_WEBHOOK_EVENT`
+  - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
+- Reveal & handoff actual sigue funcionando con fallback a `wa.me` mientras la conexión real se usa solo como base operativa y de futura automatización.
 - Endpoints disponibles:
   - `POST /v1/public/funnel-runtime/events`
   - `GET /v1/events`

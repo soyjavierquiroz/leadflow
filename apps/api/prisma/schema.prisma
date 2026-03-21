@@ -181,6 +181,18 @@ enum UserStatus {
   disabled
 }
 
+enum MessagingProvider {
+  EVOLUTION
+}
+
+enum MessagingConnectionStatus {
+  disconnected
+  provisioning
+  qr_ready
+  connected
+  error
+}
+
 enum EventActorType {
   system
   user
@@ -236,6 +248,7 @@ model Workspace {
   assignments        Assignment[]
   events             DomainEvent[]
   users              User[]
+  messagingConnections MessagingConnection[]
 }
 
 model Team {
@@ -260,6 +273,7 @@ model Team {
   rotationPools      RotationPool[]
   assignments        Assignment[]
   users              User[]
+  messagingConnections MessagingConnection[]
 
   @@unique([workspaceId, code])
 }
@@ -282,6 +296,7 @@ model Sponsor {
   rotationMembers     RotationMember[]
   assignments         Assignment[]
   user                User?
+  messagingConnection MessagingConnection?
 }
 
 model User {
@@ -320,6 +335,37 @@ model AuthSession {
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
+}
+
+model MessagingConnection {
+  id                   String                    @id @default(uuid())
+  workspaceId          String
+  teamId               String
+  sponsorId            String                    @unique
+  provider             MessagingProvider
+  status               MessagingConnectionStatus
+  externalInstanceId   String?                   @unique
+  phone                String?
+  normalizedPhone      String?
+  qrCodeData           String?
+  pairingCode          String?
+  pairingExpiresAt     DateTime?
+  automationWebhookUrl String?
+  automationEnabled    Boolean                   @default(false)
+  metadataJson         Json?
+  lastSyncedAt         DateTime?
+  lastConnectedAt      DateTime?
+  lastDisconnectedAt   DateTime?
+  lastErrorAt          DateTime?
+  lastErrorMessage     String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  workspace            Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                 Team                      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sponsor              Sponsor                   @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, provider, status])
+  @@index([teamId, provider, status])
 }
 
 model Funnel {

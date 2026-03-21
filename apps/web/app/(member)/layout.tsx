@@ -18,6 +18,11 @@ const memberNav = [
     label: "Perfil",
     description: "Datos operativos y preferencias futuras.",
   },
+  {
+    href: "/member/channel",
+    label: "Canal",
+    description: "Conexion WhatsApp individual y estado del provider.",
+  },
 ];
 
 export default async function MemberLayout({

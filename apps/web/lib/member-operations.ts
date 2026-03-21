@@ -7,6 +7,43 @@ type ErrorPayload = {
   error?: string;
 };
 
+export type MemberMessagingConnection = {
+  id: string;
+  workspaceId: string;
+  teamId: string;
+  sponsorId: string;
+  provider: "EVOLUTION";
+  status: "disconnected" | "provisioning" | "qr_ready" | "connected" | "error";
+  externalInstanceId: string | null;
+  phone: string | null;
+  normalizedPhone: string | null;
+  qrCodeData: string | null;
+  pairingCode: string | null;
+  pairingExpiresAt: string | null;
+  automationWebhookUrl: string | null;
+  automationEnabled: boolean;
+  metadata: unknown;
+  lastSyncedAt: string | null;
+  lastConnectedAt: string | null;
+  lastDisconnectedAt: string | null;
+  lastErrorAt: string | null;
+  lastErrorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MemberMessagingSnapshot = {
+  connection: MemberMessagingConnection | null;
+  provider: {
+    provider: "EVOLUTION";
+    configured: boolean;
+    instancePrefix: string;
+    automationBaseConfigured: boolean;
+    fallbackWaMeEnabled: boolean;
+    note: string | null;
+  };
+};
+
 export const memberOperationRequest = async <T>(
   path: string,
   init: RequestInit,
@@ -28,9 +65,7 @@ export const memberOperationRequest = async <T>(
       (typeof errorPayload.message === "string"
         ? errorPayload.message
         : null) ??
-      (typeof errorPayload.error === "string"
-        ? errorPayload.error
-        : null) ??
+      (typeof errorPayload.error === "string" ? errorPayload.error : null) ??
       "No pudimos completar la operación.";
 
     throw new Error(message);

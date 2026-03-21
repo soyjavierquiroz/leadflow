@@ -110,6 +110,61 @@ async function main() {
     },
   });
 
+  await prisma.messagingConnection.upsert({
+    where: { sponsorId: sponsorA.id },
+    update: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      provider: 'EVOLUTION',
+      status: 'connected',
+      externalInstanceId: 'leadflow-sales-core-ana-sponsor-3be5f7f2',
+      phone: sponsorA.phone,
+      normalizedPhone: '525550000099',
+      qrCodeData: null,
+      pairingCode: null,
+      pairingExpiresAt: null,
+      automationWebhookUrl:
+        'https://n8n.exitosos.com/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
+      automationEnabled: true,
+      metadataJson: {
+        seeded: true,
+        providerState: 'open',
+        note: 'Demo channel connection for Messaging Integrations v1.',
+      },
+      lastSyncedAt: new Date(),
+      lastConnectedAt: new Date(),
+      lastDisconnectedAt: null,
+      lastErrorAt: null,
+      lastErrorMessage: null,
+    },
+    create: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: sponsorA.id,
+      provider: 'EVOLUTION',
+      status: 'connected',
+      externalInstanceId: 'leadflow-sales-core-ana-sponsor-3be5f7f2',
+      phone: sponsorA.phone,
+      normalizedPhone: '525550000099',
+      qrCodeData: null,
+      pairingCode: null,
+      pairingExpiresAt: null,
+      automationWebhookUrl:
+        'https://n8n.exitosos.com/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
+      automationEnabled: true,
+      metadataJson: {
+        seeded: true,
+        providerState: 'open',
+        note: 'Demo channel connection for Messaging Integrations v1.',
+      },
+      lastSyncedAt: new Date(),
+      lastConnectedAt: new Date(),
+      lastDisconnectedAt: null,
+      lastErrorAt: null,
+      lastErrorMessage: null,
+    },
+  });
+
   await prisma.authSession.deleteMany();
 
   await prisma.user.upsert({

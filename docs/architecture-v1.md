@@ -2,7 +2,7 @@
 
 ## Objetivo de esta fase
 
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol y operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol, operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, y una primera capa real de mensajeria por sponsor/member sobre Evolution API, sin tocar produccion.
 
 ## Componentes
 
@@ -48,6 +48,12 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - editar perfil operativo del sponsor
   - pausar o reactivar disponibilidad
   - revisar detalle basico del lead sin inbox
+- Messaging integrations v1 conectadas sobre `/member/channel` para:
+  - ver estado actual de la conexion WhatsApp del sponsor
+  - crear o reintentar una instancia en Evolution
+  - refrescar estado del canal
+  - desconectar el canal
+  - preparar webhook base para futura orquestacion con n8n
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
@@ -92,6 +98,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `AuthModule` con login, logout, `me`, sesiones persistidas y guards por rol.
 - Endpoints mutativos iniciales para operacion de `Team Admin`.
 - Endpoints privados adicionales para operacion de `Member`.
+- `MessagingIntegrationsModule` con adaptador inicial hacia Evolution API.
 - Contrato publico enriquecido para reveal/handoff en runtime y submit.
 - Modulos disponibles:
   - `auth`
@@ -112,6 +119,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `leads`
   - `assignments`
   - `events`
+  - `messaging-integrations`
 - Endpoints auxiliares adicionales para UI operativa:
   - `GET /v1/tracking-profiles`
   - `GET /v1/handoff-strategies`
@@ -131,6 +139,11 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `PATCH /v1/leads/:id`
   - `GET /v1/assignments?status=...`
   - `PATCH /v1/assignments/:id`
+- Endpoints messaging integrations:
+  - `GET /v1/messaging-integrations/me`
+  - `POST /v1/messaging-integrations/me/connect`
+  - `POST /v1/messaging-integrations/me/refresh`
+  - `POST /v1/messaging-integrations/me/disconnect`
 - Endpoints publicos de runtime:
   - `GET /v1/public/funnel-runtime/resolve`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`
@@ -172,6 +185,7 @@ El dominio operativo actual se apoya en:
 - `Sponsor`
 - `User`
 - `AuthSession`
+- `MessagingConnection`
 - `RotationPool`
 - `RotationMember`
 - `Funnel` legacy
@@ -206,6 +220,8 @@ La arquitectura ya implementa:
 - autorizacion base por rol sobre API y superficies privadas
 - operacion mutativa inicial del team sin tocar templates ni JSON estructural
 - operacion mutativa inicial del member sobre sponsor, leads y assignments propios
+- canal de mensajeria real por sponsor para WhatsApp con estado persistido y ownership por member
+- adaptador v1 de Evolution API con webhook base opcional para futura orquestacion
 
 ## Runtime publico v1
 
@@ -284,10 +300,11 @@ Decision de transicion:
 - Deploy real en servidor.
 - DNS real aplicado.
 - Integracion real con Meta o TikTok.
-- Integracion real con Evolution API, n8n o proveedores externos de WhatsApp.
 - Inbox conversacional para members.
 - Editor libre de templates para teams.
-- Redis, n8n o Evolution.
+- Automatizacion avanzada con n8n, workers o routers complejos de webhook.
+- Respuestas automaticas avanzadas y logica de conversacion.
+- Redis o colas dedicadas para mensajeria.
 - SSO, MFA, password reset y gestion avanzada de usuarios.
 - Permisos finos por recurso o policy engine.
 - Logica compleja de asignacion.
@@ -296,4 +313,4 @@ Decision de transicion:
 
 ## Estado
 
-Arquitectura lista para la siguiente fase de handoff y seguimiento mas avanzado sobre leads/assignments, reveal operativo enriquecido para members, y luego invitaciones/gestion de usuarios y permisos mas finos por recurso, todavia sin cambios en produccion.
+Arquitectura lista para la siguiente fase de mensajeria operativa avanzada, ya sea `Messaging Automation / n8n v1` sobre este canal persistido por sponsor, o `Invites + User Management v1` sobre las superficies privadas ya protegidas y operativas.

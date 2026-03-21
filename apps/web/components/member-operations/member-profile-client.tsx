@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
@@ -126,92 +127,125 @@ export function MemberProfileClient({
           }
         />
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]"
-        >
-          <div>
-            <h2 className="text-xl font-semibold text-slate-950">
-              Datos visibles del sponsor
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Esta información quedará disponible para reveal y handoff en fases
-              siguientes, así que aquí cuidamos el perfil operativo básico.
-            </p>
-          </div>
+        <div className="space-y-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-950">
+                  Canal de mensajería
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  La conexión real de WhatsApp vive ahora en una superficie
+                  separada para que puedas gestionarla sin mezclarla con el
+                  resto del perfil operativo.
+                </p>
+              </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm">
-              <span className="font-medium text-slate-700">Nombre visible</span>
-              <input
-                value={formState.displayName}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    displayName: event.target.value,
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-              />
-            </label>
-
-            <label className="space-y-2 text-sm">
-              <span className="font-medium text-slate-700">Disponibilidad</span>
-              <select
-                value={formState.availabilityStatus}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    availabilityStatus: event.target.value,
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              <Link
+                href="/member/channel"
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                <option value="available">available</option>
-                <option value="paused">paused</option>
-                <option value="offline">offline</option>
-              </select>
-            </label>
-
-            <label className="space-y-2 text-sm">
-              <span className="font-medium text-slate-700">Email visible</span>
-              <input
-                value={formState.email}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    email: event.target.value,
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-              />
-            </label>
-
-            <label className="space-y-2 text-sm">
-              <span className="font-medium text-slate-700">Teléfono visible</span>
-              <input
-                value={formState.phone}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    phone: event.target.value,
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
-              />
-            </label>
+                Gestionar canal
+              </Link>
+            </div>
           </div>
 
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Guardar perfil operativo
-            </button>
-          </div>
-        </form>
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]"
+          >
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">
+                Datos visibles del sponsor
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Esta información quedará disponible para reveal y handoff en
+                fases siguientes, así que aquí cuidamos el perfil operativo
+                básico.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-slate-700">
+                  Nombre visible
+                </span>
+                <input
+                  value={formState.displayName}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      displayName: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                />
+              </label>
+
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-slate-700">
+                  Disponibilidad
+                </span>
+                <select
+                  value={formState.availabilityStatus}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      availabilityStatus: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                >
+                  <option value="available">available</option>
+                  <option value="paused">paused</option>
+                  <option value="offline">offline</option>
+                </select>
+              </label>
+
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-slate-700">
+                  Email visible
+                </span>
+                <input
+                  value={formState.email}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                />
+              </label>
+
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-slate-700">
+                  Teléfono visible
+                </span>
+                <input
+                  value={formState.phone}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Guardar perfil operativo
+              </button>
+            </div>
+          </form>
+        </div>
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
@@ -226,11 +260,15 @@ export function MemberProfileClient({
         <dl className="mt-6 grid gap-5 text-sm md:grid-cols-2">
           <div>
             <dt className="text-slate-500">Título</dt>
-            <dd className="mt-1 font-medium text-slate-900">{memberProfile.title}</dd>
+            <dd className="mt-1 font-medium text-slate-900">
+              {memberProfile.title}
+            </dd>
           </div>
           <div>
             <dt className="text-slate-500">Foco comercial</dt>
-            <dd className="mt-1 font-medium text-slate-900">{memberProfile.focus}</dd>
+            <dd className="mt-1 font-medium text-slate-900">
+              {memberProfile.focus}
+            </dd>
           </div>
           <div>
             <dt className="text-slate-500">Timezone</dt>
@@ -259,7 +297,9 @@ export function MemberProfileClient({
           </div>
           <div className="md:col-span-2">
             <dt className="text-slate-500">Notas</dt>
-            <dd className="mt-1 leading-6 text-slate-800">{memberProfile.notes}</dd>
+            <dd className="mt-1 leading-6 text-slate-800">
+              {memberProfile.notes}
+            </dd>
           </div>
         </dl>
       </section>
