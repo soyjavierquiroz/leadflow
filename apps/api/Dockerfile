@@ -19,19 +19,20 @@ FROM deps AS builder
 COPY . .
 RUN pnpm --filter @leadflow/api build
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-ENV API_HOST=0.0.0.0
-ENV API_PORT=3001
-COPY --from=deps /workspace/node_modules ./node_modules
-COPY --from=builder /workspace/apps/api/package.json ./apps/api/package.json
-COPY --from=builder /workspace/apps/api/dist ./apps/api/dist
-EXPOSE 3001
-CMD ["node", "apps/api/dist/main.js"]
-
 FROM deps AS dev
 ENV NODE_ENV=development
 WORKDIR /workspace
 EXPOSE 3001
 CMD ["pnpm", "--filter", "@leadflow/api", "dev"]
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV API_HOST=0.0.0.0
+ENV API_PORT=3001
+COPY --from=builder /workspace/apps/api/package.json ./apps/api/package.json
+COPY --from=builder /workspace/apps/api/dist ./apps/api/dist
+# Instala solo dependencias de runtime de la API en la imagen final.
+RUN cd apps/api && npm install --omit=dev --no-package-lock --no-audit --no-fund
+EXPOSE 3001
+CMD ["node", "apps/api/dist/main.js"]

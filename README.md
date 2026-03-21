@@ -60,6 +60,7 @@ Build imagenes locales (primer deploy):
 - `pnpm docker:build:web:local`
 - `pnpm docker:build:api:local`
 - `pnpm docker:build:local`
+- Estos builds usan runtime de produccion (`--target runner`), no modo `dev`.
 
 Build/publicacion GHCR (futuro):
 - `TAG=latest pnpm docker:ghcr:build:web`
@@ -90,6 +91,9 @@ Validacion de stacks:
 - Preparado para despliegue en Portainer con dos variantes de stack:
   - `infra/swarm/docker-stack.local.yml` (sin GHCR, primer despliegue en nodo unico)
   - `infra/swarm/docker-stack.yml` (con GHCR, ruta objetivo de escalado)
+- Runtime de contenedores para Swarm:
+  - Web: `node apps/web/server.js` (Next standalone, produccion)
+  - API: `node apps/api/dist/main.js` (Nest compilado, produccion)
 - Deploy aun no ejecutado.
 
 ## Nota operativa

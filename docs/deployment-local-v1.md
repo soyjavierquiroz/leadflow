@@ -20,11 +20,21 @@ pnpm docker:build:api:local
 # o build conjunto
 pnpm docker:build:local
 ```
+Los scripts construyen la etapa `runner` de cada Dockerfile (runtime de produccion).
 
 Opcional (tag distinto):
 ```bash
 TAG=0.1.1-local pnpm docker:build:local
 ```
+
+Verificacion de runtime esperado:
+```bash
+docker image inspect leadflow-web:0.1.0-local --format 'Cmd={{json .Config.Cmd}} Workdir={{.Config.WorkingDir}}'
+docker image inspect leadflow-api:0.1.0-local --format 'Cmd={{json .Config.Cmd}} Workdir={{.Config.WorkingDir}}'
+```
+Salida esperada:
+- Web: `["node","apps/web/server.js"]` con `Workdir=/app`
+- API: `["node","apps/api/dist/main.js"]` con `Workdir=/app`
 
 ## Stack para Portainer
 Usar:
