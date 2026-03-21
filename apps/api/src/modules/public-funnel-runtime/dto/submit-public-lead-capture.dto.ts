@@ -1,6 +1,7 @@
 import type { LeadSourceChannel } from '../../shared/domain.types';
 
 export class SubmitPublicLeadCaptureDto {
+  readonly submissionEventId?: string | null;
   readonly publicationId!: string;
   readonly currentStepId!: string;
   readonly anonymousId!: string;

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -8,6 +9,7 @@ import {
   LeadSourceChannel as PrismaLeadSourceChannel,
   Prisma,
 } from '@prisma/client';
+import { TrackingEventsService } from '../events/tracking-events.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto';
 import type { CapturePublicLeadDto } from './dto/capture-public-lead.dto';
@@ -83,9 +85,31 @@ type StepNavigation = {
   stepType: string;
 } | null;
 
+type LeadCaptureResult = {
+  lead: Prisma.LeadGetPayload<Record<string, never>>;
+  wasCreated: boolean;
+};
+
+type AssignmentResolution = {
+  assignment: AssignmentSummary;
+  wasCreated: boolean;
+};
+
+type AssignmentFailureTrackingContext = {
+  workspaceId: string;
+  publicationId: string;
+  funnelInstanceId: string;
+  funnelStepId?: string | null;
+  triggerEventId?: string | null;
+  leadId?: string | null;
+};
+
 @Injectable()
 export class LeadCaptureAssignmentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly trackingEventsService: TrackingEventsService,
+  ) {}
 
   async registerVisitor(dto: RegisterPublicVisitorDto) {
     return this.prisma.$transaction(async (tx) => {
@@ -112,106 +136,160 @@ export class LeadCaptureAssignmentService {
       );
 
       const visitor = await this.resolveVisitorForCapture(tx, publication, dto);
-      return this.captureLeadInTransaction(tx, publication, visitor, dto);
+      const result = await this.captureLeadInTransaction(
+        tx,
+        publication,
+        visitor,
+        dto,
+      );
+
+      return result.lead;
     });
   }
 
   async assignLeadToNextSponsor(dto: AutoAssignPublicLeadDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const publication = await this.getPublicationContextOrThrow(
-        tx,
-        dto.publicationId,
-      );
-      const lead = await tx.lead.findFirst({
-        where: {
-          id: dto.leadId,
-          workspaceId: publication.workspaceId,
-        },
-      });
+    let failureContext: AssignmentFailureTrackingContext | null = null;
 
-      if (!lead) {
-        throw new NotFoundException({
-          code: 'LEAD_NOT_FOUND',
-          message: `Lead ${dto.leadId} was not found for publication ${dto.publicationId}.`,
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const publication = await this.getPublicationContextOrThrow(
+          tx,
+          dto.publicationId,
+        );
+        const lead = await tx.lead.findFirst({
+          where: {
+            id: dto.leadId,
+            workspaceId: publication.workspaceId,
+          },
         });
-      }
 
-      const assignment = await this.assignLeadToNextSponsorInTransaction(
-        tx,
-        publication,
-        lead,
-      );
-      const nextStep = this.resolveNextStepAfterCaptureFromPublication(
-        publication,
-        publication.funnelInstance.steps[0]?.id,
-      );
+        if (!lead) {
+          throw new NotFoundException({
+            code: 'LEAD_NOT_FOUND',
+            message: `Lead ${dto.leadId} was not found for publication ${dto.publicationId}.`,
+          });
+        }
 
-      return {
-        assignment,
-        nextStep,
-      };
-    });
+        failureContext = {
+          workspaceId: publication.workspaceId,
+          publicationId: publication.id,
+          funnelInstanceId: publication.funnelInstanceId,
+          triggerEventId: dto.triggerEventId ?? null,
+          leadId: lead.id,
+        };
+
+        const { assignment } = await this.assignLeadToNextSponsorInTransaction(
+          tx,
+          publication,
+          lead,
+          {
+            triggerEventId: dto.triggerEventId ?? null,
+          },
+        );
+        const nextStep = this.resolveNextStepAfterCaptureFromPublication(
+          publication,
+          publication.funnelInstance.steps[0]?.id,
+        );
+
+        failureContext = null;
+
+        return {
+          assignment,
+          nextStep,
+        };
+      });
+    } catch (error) {
+      await this.recordAssignmentFailure(failureContext, error);
+      throw error;
+    }
   }
 
   async submitLeadCapture(dto: SubmitPublicLeadCaptureDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const publication = await this.getPublicationContextOrThrow(
-        tx,
-        dto.publicationId,
-      );
-      const currentStep = publication.funnelInstance.steps.find(
-        (step) => step.id === dto.currentStepId,
-      );
+    let failureContext: AssignmentFailureTrackingContext | null = null;
 
-      if (!currentStep) {
-        throw new NotFoundException({
-          code: 'STEP_NOT_FOUND',
-          message: `Step ${dto.currentStepId} does not belong to publication ${dto.publicationId}.`,
-        });
-      }
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const publication = await this.getPublicationContextOrThrow(
+          tx,
+          dto.publicationId,
+        );
+        const currentStep = publication.funnelInstance.steps.find(
+          (step) => step.id === dto.currentStepId,
+        );
 
-      const visitor = await this.registerVisitorInTransaction(tx, publication, {
-        anonymousId: dto.anonymousId,
-        kind: 'identified',
-        sourceChannel: dto.sourceChannel ?? 'form',
-        utmSource: dto.utmSource ?? null,
-        utmCampaign: dto.utmCampaign ?? null,
+        if (!currentStep) {
+          throw new NotFoundException({
+            code: 'STEP_NOT_FOUND',
+            message: `Step ${dto.currentStepId} does not belong to publication ${dto.publicationId}.`,
+          });
+        }
+
+        const visitor = await this.registerVisitorInTransaction(
+          tx,
+          publication,
+          {
+            anonymousId: dto.anonymousId,
+            kind: 'identified',
+            sourceChannel: dto.sourceChannel ?? 'form',
+            utmSource: dto.utmSource ?? null,
+            utmCampaign: dto.utmCampaign ?? null,
+          },
+        );
+
+        const leadResult = await this.captureLeadInTransaction(
+          tx,
+          publication,
+          visitor,
+          {
+            publicationId: dto.publicationId,
+            visitorId: visitor.id,
+            anonymousId: dto.anonymousId,
+            sourceChannel: dto.sourceChannel ?? 'form',
+            fullName: dto.fullName ?? null,
+            email: dto.email ?? null,
+            phone: dto.phone ?? null,
+            companyName: dto.companyName ?? null,
+            tags: dto.tags ?? [],
+            triggerEventId: dto.submissionEventId ?? null,
+          },
+        );
+
+        failureContext = {
+          workspaceId: publication.workspaceId,
+          publicationId: publication.id,
+          funnelInstanceId: publication.funnelInstanceId,
+          funnelStepId: dto.currentStepId,
+          triggerEventId: dto.submissionEventId ?? null,
+          leadId: leadResult.wasCreated ? null : leadResult.lead.id,
+        };
+
+        const { assignment } = await this.assignLeadToNextSponsorInTransaction(
+          tx,
+          publication,
+          leadResult.lead,
+          {
+            triggerEventId: dto.submissionEventId ?? null,
+            funnelStepId: dto.currentStepId,
+          },
+        );
+        const nextStep = this.resolveNextStepAfterCaptureFromPublication(
+          publication,
+          dto.currentStepId,
+        );
+
+        failureContext = null;
+
+        return {
+          visitor,
+          lead: leadResult.lead,
+          assignment,
+          nextStep,
+        };
       });
-
-      const lead = await this.captureLeadInTransaction(
-        tx,
-        publication,
-        visitor,
-        {
-          publicationId: dto.publicationId,
-          visitorId: visitor.id,
-          anonymousId: dto.anonymousId,
-          sourceChannel: dto.sourceChannel ?? 'form',
-          fullName: dto.fullName ?? null,
-          email: dto.email ?? null,
-          phone: dto.phone ?? null,
-          companyName: dto.companyName ?? null,
-          tags: dto.tags ?? [],
-        },
-      );
-
-      const assignment = await this.assignLeadToNextSponsorInTransaction(
-        tx,
-        publication,
-        lead,
-      );
-      const nextStep = this.resolveNextStepAfterCaptureFromPublication(
-        publication,
-        dto.currentStepId,
-      );
-
-      return {
-        visitor,
-        lead,
-        assignment,
-        nextStep,
-      };
-    });
+    } catch (error) {
+      await this.recordAssignmentFailure(failureContext, error);
+      throw error;
+    }
   }
 
   async listAssignments(filters?: {
@@ -397,6 +475,7 @@ export class LeadCaptureAssignmentService {
     await tx.domainEvent.create({
       data: {
         workspaceId: publication.workspaceId,
+        eventId: randomUUID(),
         aggregateType: 'visitor',
         aggregateId: visitor.id,
         eventName: existing ? 'visitor_seen' : 'visitor_registered',
@@ -408,6 +487,8 @@ export class LeadCaptureAssignmentService {
           sourceChannel: visitor.sourceChannel,
         },
         occurredAt: seenAt,
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
         visitorId: visitor.id,
       },
     });
@@ -420,7 +501,7 @@ export class LeadCaptureAssignmentService {
     publication: FlowPublicationRecord,
     visitor: { id: string },
     input: CapturePublicLeadDto,
-  ) {
+  ): Promise<LeadCaptureResult> {
     const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
 
     if (!legacyFunnelId) {
@@ -482,6 +563,7 @@ export class LeadCaptureAssignmentService {
     await tx.domainEvent.create({
       data: {
         workspaceId: publication.workspaceId,
+        eventId: randomUUID(),
         aggregateType: 'lead',
         aggregateId: lead.id,
         eventName: existing ? 'lead_updated' : 'lead_captured',
@@ -498,7 +580,32 @@ export class LeadCaptureAssignmentService {
       },
     });
 
-    return lead;
+    if (!existing) {
+      await this.trackingEventsService.recordTrackingEventInTransaction(tx, {
+        workspaceId: publication.workspaceId,
+        eventId: input.triggerEventId ?? undefined,
+        aggregateType: 'lead',
+        aggregateId: lead.id,
+        eventName: 'lead_created',
+        actorType: 'visitor',
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
+        visitorId: visitor.id,
+        leadId: lead.id,
+        payload: {
+          source: 'server',
+          triggerEventId: input.triggerEventId ?? null,
+          sourceChannel: lead.sourceChannel,
+          publicationId: publication.id,
+          funnelInstanceId: publication.funnelInstanceId,
+        },
+      });
+    }
+
+    return {
+      lead,
+      wasCreated: !existing,
+    };
   }
 
   private async assignLeadToNextSponsorInTransaction(
@@ -508,7 +615,11 @@ export class LeadCaptureAssignmentService {
       id: string;
       currentAssignmentId: string | null;
     },
-  ): Promise<AssignmentSummary> {
+    input?: {
+      triggerEventId?: string | null;
+      funnelStepId?: string | null;
+    },
+  ): Promise<AssignmentResolution> {
     const existingOpenAssignment = await tx.assignment.findFirst({
       where: {
         leadId: lead.id,
@@ -526,16 +637,19 @@ export class LeadCaptureAssignmentService {
 
     if (existingOpenAssignment) {
       return {
-        id: existingOpenAssignment.id,
-        status: existingOpenAssignment.status,
-        reason: existingOpenAssignment.reason,
-        assignedAt: existingOpenAssignment.assignedAt.toISOString(),
-        sponsor: {
-          id: existingOpenAssignment.sponsor.id,
-          displayName: existingOpenAssignment.sponsor.displayName,
-          email: existingOpenAssignment.sponsor.email,
-          phone: existingOpenAssignment.sponsor.phone,
+        assignment: {
+          id: existingOpenAssignment.id,
+          status: existingOpenAssignment.status,
+          reason: existingOpenAssignment.reason,
+          assignedAt: existingOpenAssignment.assignedAt.toISOString(),
+          sponsor: {
+            id: existingOpenAssignment.sponsor.id,
+            displayName: existingOpenAssignment.sponsor.displayName,
+            email: existingOpenAssignment.sponsor.email,
+            phone: existingOpenAssignment.sponsor.phone,
+          },
         },
+        wasCreated: false,
       };
     }
 
@@ -586,6 +700,7 @@ export class LeadCaptureAssignmentService {
     await tx.domainEvent.create({
       data: {
         workspaceId: publication.workspaceId,
+        eventId: randomUUID(),
         aggregateType: 'lead',
         aggregateId: lead.id,
         eventName: 'lead_assigned',
@@ -597,42 +712,104 @@ export class LeadCaptureAssignmentService {
           funnelPublicationId: publication.id,
         },
         occurredAt: assignedAt,
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
+        funnelStepId: input?.funnelStepId ?? null,
         leadId: lead.id,
         assignmentId: assignment.id,
       },
     });
 
-    await tx.domainEvent.create({
-      data: {
-        workspaceId: publication.workspaceId,
-        aggregateType: 'assignment',
-        aggregateId: assignment.id,
-        eventName: 'assignment_created',
-        actorType: 'system',
-        payload: {
-          leadId: lead.id,
-          sponsorId: assignment.sponsor.id,
-          rotationPoolId: rotationPool.id,
-          funnelPublicationId: publication.id,
-        },
-        occurredAt: assignedAt,
-        leadId: lead.id,
-        assignmentId: assignment.id,
+    await this.trackingEventsService.recordTrackingEventInTransaction(tx, {
+      workspaceId: publication.workspaceId,
+      aggregateType: 'assignment',
+      aggregateId: assignment.id,
+      eventName: 'assignment_created',
+      actorType: 'system',
+      occurredAt: assignedAt,
+      funnelInstanceId: publication.funnelInstanceId,
+      funnelPublicationId: publication.id,
+      funnelStepId: input?.funnelStepId ?? null,
+      leadId: lead.id,
+      assignmentId: assignment.id,
+      payload: {
+        source: 'server',
+        triggerEventId: input?.triggerEventId ?? null,
+        sponsorId: assignment.sponsor.id,
+        rotationPoolId: rotationPool.id,
+      },
+    });
+
+    await this.trackingEventsService.recordTrackingEventInTransaction(tx, {
+      workspaceId: publication.workspaceId,
+      aggregateType: 'assignment',
+      aggregateId: assignment.id,
+      eventName: 'handoff_started',
+      actorType: 'system',
+      occurredAt: assignedAt,
+      funnelInstanceId: publication.funnelInstanceId,
+      funnelPublicationId: publication.id,
+      funnelStepId: input?.funnelStepId ?? null,
+      leadId: lead.id,
+      assignmentId: assignment.id,
+      payload: {
+        source: 'server',
+        triggerEventId: input?.triggerEventId ?? null,
+        sponsorId: assignment.sponsor.id,
+        handoffStrategyId: publication.handoffStrategyId,
       },
     });
 
     return {
-      id: assignment.id,
-      status: assignment.status,
-      reason: assignment.reason,
-      assignedAt: assignment.assignedAt.toISOString(),
-      sponsor: {
-        id: assignment.sponsor.id,
-        displayName: assignment.sponsor.displayName,
-        email: assignment.sponsor.email,
-        phone: assignment.sponsor.phone,
+      assignment: {
+        id: assignment.id,
+        status: assignment.status,
+        reason: assignment.reason,
+        assignedAt: assignment.assignedAt.toISOString(),
+        sponsor: {
+          id: assignment.sponsor.id,
+          displayName: assignment.sponsor.displayName,
+          email: assignment.sponsor.email,
+          phone: assignment.sponsor.phone,
+        },
       },
+      wasCreated: true,
     };
+  }
+
+  private async recordAssignmentFailure(
+    context: AssignmentFailureTrackingContext | null,
+    error: unknown,
+  ) {
+    if (!context) {
+      return;
+    }
+
+    const message =
+      error instanceof Error ? error.message : 'Unknown assignment failure.';
+
+    try {
+      await this.trackingEventsService.recordTrackingEvent({
+        workspaceId: context.workspaceId,
+        aggregateType: context.leadId ? 'lead' : 'funnel-publication',
+        aggregateId: context.leadId ?? context.publicationId,
+        eventName: 'assignment_failed',
+        actorType: 'system',
+        funnelInstanceId: context.funnelInstanceId,
+        funnelPublicationId: context.publicationId,
+        funnelStepId: context.funnelStepId ?? null,
+        leadId: context.leadId ?? null,
+        payload: {
+          source: 'server',
+          triggerEventId: context.triggerEventId ?? null,
+          errorMessage: message,
+          publicationId: context.publicationId,
+          leadPersisted: Boolean(context.leadId),
+        },
+      });
+    } catch {
+      return;
+    }
   }
 
   private async resolveRotationPoolOrThrow(

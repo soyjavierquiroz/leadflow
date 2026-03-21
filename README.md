@@ -11,6 +11,7 @@ La base del monorepo ya incluye:
 - Expansion v2 implementada para ownership, publicacion, templates, tracking y handoff.
 - Public Funnel Runtime v1 en `apps/web` y `apps/api`.
 - Lead Capture & Assignment Flows v1 conectados al runtime publico.
+- Tracking Events v1 sobre runtime, capture y assignment.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -92,6 +93,7 @@ Validacion de stacks:
 - `docs/persistence-v1.md`
 - `docs/public-funnel-runtime-v1.md`
 - `docs/lead-capture-assignment-flows-v1.md`
+- `docs/tracking-events-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -189,6 +191,31 @@ Modulos disponibles:
   - seleccion del siguiente sponsor elegible por round robin simple
   - reutilizacion de asignacion abierta si el lead ya fue asignado
 
+## Tracking Events v1
+- Persistencia interna de tracking sobre `DomainEvent`.
+- Campos nuevos de contexto:
+  - `eventId`
+  - `funnelInstanceId`
+  - `funnelPublicationId`
+  - `funnelStepId`
+- Eventos browser registrados desde el runtime:
+  - `funnel_viewed`
+  - `step_viewed`
+  - `form_started`
+  - `form_submitted`
+  - `cta_clicked`
+  - `handoff_completed`
+- Eventos server registrados desde API:
+  - `lead_created`
+  - `assignment_created`
+  - `assignment_failed`
+  - `handoff_started`
+- Endpoints disponibles:
+  - `POST /v1/public/funnel-runtime/events`
+  - `GET /v1/events`
+  - `GET /v1/events?leadId=...`
+  - `GET /v1/events?funnelPublicationId=...`
+
 ## Compatibilidad actual
 - `Workspace` sigue como frontera tenant.
 - `Team` es el owner operativo real.
@@ -208,4 +235,4 @@ Modulos disponibles:
 - Deploy aun no ejecutado.
 
 ## Nota operativa
-Esta fase ya conecta runtime publico, captura y assignment v1, sin deploy ni cambios de infraestructura productiva.
+Esta fase ya conecta runtime publico, captura, assignment y tracking events v1, sin deploy ni cambios de infraestructura productiva.

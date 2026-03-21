@@ -10,12 +10,16 @@ import type {
 } from '../../shared/domain.types';
 
 export interface DomainEvent extends BaseDomainEntity, WorkspaceScoped {
+  eventId: DomainId;
   aggregateType: EventAggregateType;
   aggregateId: DomainId;
   eventName: string;
   actorType: EventActorType;
   payload: Record<string, unknown>;
   occurredAt: ISODateString;
+  funnelInstanceId: DomainId | null;
+  funnelPublicationId: DomainId | null;
+  funnelStepId: DomainId | null;
   visitorId: DomainId | null;
   leadId: DomainId | null;
   assignmentId: DomainId | null;
@@ -27,6 +31,8 @@ export interface DomainEventRepository extends RepositoryPort<
 > {
   findAll(): Promise<DomainEvent[]>;
   findByWorkspaceId(workspaceId: DomainId): Promise<DomainEvent[]>;
+  findByLeadId(leadId: DomainId): Promise<DomainEvent[]>;
+  findByPublicationId(funnelPublicationId: DomainId): Promise<DomainEvent[]>;
   findByAggregate(
     aggregateType: EventAggregateType,
     aggregateId: DomainId,

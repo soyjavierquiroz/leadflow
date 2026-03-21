@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import {
   EventAggregateType as PrismaEventAggregateType,
@@ -75,6 +76,26 @@ export class DomainEventPrismaRepository implements DomainEventRepository {
     return records.map(mapDomainEventRecord);
   }
 
+  async findByLeadId(leadId: string): Promise<DomainEvent[]> {
+    const records = await this.prisma.domainEvent.findMany({
+      where: { leadId },
+      orderBy: { occurredAt: 'desc' },
+    });
+
+    return records.map(mapDomainEventRecord);
+  }
+
+  async findByPublicationId(
+    funnelPublicationId: string,
+  ): Promise<DomainEvent[]> {
+    const records = await this.prisma.domainEvent.findMany({
+      where: { funnelPublicationId },
+      orderBy: { occurredAt: 'desc' },
+    });
+
+    return records.map(mapDomainEventRecord);
+  }
+
   async findByAggregate(
     aggregateType: DomainEvent['aggregateType'],
     aggregateId: string,
@@ -94,12 +115,16 @@ export class DomainEventPrismaRepository implements DomainEventRepository {
     const record = await this.prisma.domainEvent.create({
       data: {
         workspaceId: data.workspaceId,
+        eventId: data.eventId ?? randomUUID(),
         aggregateType: toDbAggregateType(data.aggregateType),
         aggregateId: data.aggregateId,
         eventName: data.eventName,
         actorType: data.actorType,
         payload: toInputJson(data.payload ?? {}),
         occurredAt: new Date(),
+        funnelInstanceId: data.funnelInstanceId ?? null,
+        funnelPublicationId: data.funnelPublicationId ?? null,
+        funnelStepId: data.funnelStepId ?? null,
         visitorId: data.visitorId ?? null,
         leadId: data.leadId ?? null,
         assignmentId: data.assignmentId ?? null,
@@ -115,12 +140,16 @@ export class DomainEventPrismaRepository implements DomainEventRepository {
       create: {
         id: entity.id,
         workspaceId: entity.workspaceId,
+        eventId: entity.eventId,
         aggregateType: toDbAggregateType(entity.aggregateType),
         aggregateId: entity.aggregateId,
         eventName: entity.eventName,
         actorType: entity.actorType,
         payload: toInputJson(entity.payload),
         occurredAt: new Date(entity.occurredAt),
+        funnelInstanceId: entity.funnelInstanceId,
+        funnelPublicationId: entity.funnelPublicationId,
+        funnelStepId: entity.funnelStepId,
         visitorId: entity.visitorId,
         leadId: entity.leadId,
         assignmentId: entity.assignmentId,
@@ -128,12 +157,16 @@ export class DomainEventPrismaRepository implements DomainEventRepository {
         updatedAt: new Date(entity.updatedAt),
       },
       update: {
+        eventId: entity.eventId,
         aggregateType: toDbAggregateType(entity.aggregateType),
         aggregateId: entity.aggregateId,
         eventName: entity.eventName,
         actorType: entity.actorType,
         payload: toInputJson(entity.payload),
         occurredAt: new Date(entity.occurredAt),
+        funnelInstanceId: entity.funnelInstanceId,
+        funnelPublicationId: entity.funnelPublicationId,
+        funnelStepId: entity.funnelStepId,
         visitorId: entity.visitorId,
         leadId: entity.leadId,
         assignmentId: entity.assignmentId,

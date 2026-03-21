@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates y un runtime publico JSON-driven ya conectado a captura y assignment v1, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates y un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, sin tocar produccion.
 
 ## Componentes
 
@@ -27,6 +27,11 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
+- Capa browser-side de tracking para:
+  - vistas de funnel y step
+  - clicks de CTA
+  - inicio y submit del formulario
+  - entrada al thank-you con assignment
 - Build preparado para contenedor con `output: standalone`.
 
 ### Backend (`apps/api`)
@@ -40,6 +45,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `DomainModule` como agregador de dominio.
 - `PublicFunnelRuntimeModule` para lectura publica de funnels publicados.
 - `LeadCaptureAssignmentService` dentro del runtime publico para submit compuesto.
+- `TrackingEventsService` para tracking browser/server y utilidades operativas.
 - Modulos disponibles:
   - `workspaces`
   - `teams`
@@ -67,6 +73,8 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `POST /v1/public/funnel-runtime/leads`
   - `POST /v1/public/funnel-runtime/assignments/auto`
   - `POST /v1/public/funnel-runtime/submissions`
+- Endpoints publicos de tracking:
+  - `POST /v1/public/funnel-runtime/events`
 - Endpoints minimos de validacion expuestos para `workspaces`, `sponsors`, `leads`, `rotation-pools`, `domains`, `funnel-templates`, `funnel-instances` y `funnel-publications`.
 - Endpoints de lectura ampliados para operacion:
   - `GET /v1/leads?sponsorId=...`
@@ -74,6 +82,9 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `GET /v1/assignments`
   - `GET /v1/assignments?sponsorId=...`
   - `GET /v1/assignments?funnelPublicationId=...`
+  - `GET /v1/events`
+  - `GET /v1/events?leadId=...`
+  - `GET /v1/events?funnelPublicationId=...`
 
 ### Shared packages
 - `packages/config`: helpers simples de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
@@ -111,6 +122,7 @@ La arquitectura ya implementa:
 - compatibilidad transicional con `Funnel` legacy
 - runtime publico de solo lectura para resolver funnel publicado + step activo
 - captura publica v1 con visitor, lead, assignment y domain events
+- tracking events v1 con `eventId` y contexto de funnel/step
 
 ## Runtime publico v1
 
@@ -137,6 +149,8 @@ Una vez resuelta la `FunnelPublication`:
   - crea o actualiza `Lead`
   - resuelve assignment simple por round robin
   - guarda contexto local para el thank-you
+- La web emite eventos browser del runtime a la API.
+- La API persiste eventos browser y server sobre `DomainEvent`.
 
 Decision de transicion:
 - `Funnel` se mantiene para compatibilidad
@@ -180,4 +194,4 @@ Decision de transicion:
 - Logica compleja de asignacion.
 
 ## Estado
-Arquitectura lista para la siguiente fase de tracking operativo, handoff real, reglas avanzadas de routing y auth sobre el modelo consolidado, todavia sin cambios en produccion.
+Arquitectura lista para la siguiente fase de dispatch externo de tracking, handoff real, reglas avanzadas de routing y auth sobre el modelo consolidado, todavia sin cambios en produccion.

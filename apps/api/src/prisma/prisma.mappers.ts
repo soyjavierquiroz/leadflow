@@ -369,6 +369,7 @@ export const mapDomainEventRecord = (
 ): DomainEvent => ({
   id: record.id,
   workspaceId: record.workspaceId,
+  eventId: record.eventId,
   aggregateType:
     record.aggregateType === 'rotation_pool'
       ? 'rotation-pool'
@@ -397,6 +398,9 @@ export const mapDomainEventRecord = (
       ? (record.payload as Record<string, unknown>)
       : {},
   occurredAt: toIso(record.occurredAt),
+  funnelInstanceId: record.funnelInstanceId,
+  funnelPublicationId: record.funnelPublicationId,
+  funnelStepId: record.funnelStepId,
   visitorId: record.visitorId,
   leadId: record.leadId,
   assignmentId: record.assignmentId,

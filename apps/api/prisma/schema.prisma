@@ -574,12 +574,16 @@ model Assignment {
 model DomainEvent {
   id            String             @id @default(uuid())
   workspaceId   String
+  eventId       String
   aggregateType EventAggregateType
   aggregateId   String
   eventName     String
   actorType     EventActorType
   payload       Json
   occurredAt    DateTime
+  funnelInstanceId    String?
+  funnelPublicationId String?
+  funnelStepId        String?
   visitorId     String?
   leadId        String?
   assignmentId  String?
@@ -589,4 +593,11 @@ model DomainEvent {
   visitor       Visitor?           @relation(fields: [visitorId], references: [id], onDelete: SetNull)
   lead          Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
   assignment    Assignment?        @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([workspaceId, eventName, occurredAt])
+  @@index([leadId, occurredAt])
+  @@index([funnelPublicationId, occurredAt])
+  @@index([funnelInstanceId, occurredAt])
+  @@index([visitorId, occurredAt])
 }

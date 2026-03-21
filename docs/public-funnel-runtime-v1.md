@@ -15,6 +15,7 @@ Implementar el runtime publico minimo de Leadflow para resolver `host + path` ha
 - modo de preview local por query param en desarrollo
 - integracion del bloque `form_placeholder` con submit publico real
 - persistencia local de contexto de sesion para mostrar sponsor en el thank-you
+- emision browser-side de eventos clave del runtime
 
 ## Endpoints publicos implementados
 - `GET /v1/public/funnel-runtime/resolve?host=...&path=...`
@@ -48,6 +49,7 @@ Ejemplos con el seed actual:
 - Renderer MVP: `apps/web/components/public-funnel/funnel-runtime-page.tsx`
 - Cliente server-side hacia API: `apps/web/lib/funnel-runtime.ts`
 - Cliente browser-side para submit y sesion: `apps/web/lib/public-funnel-session.ts`
+- Cliente browser-side para tracking: `apps/web/lib/public-runtime-tracking.ts`
 
 El runtime en web:
 - detecta `host` desde headers del request
@@ -57,6 +59,7 @@ El runtime en web:
 - muestra `404` limpio si no hay publicacion o step valido
 - resuelve submit del formulario desde un componente cliente aislado
 - puede revelar sponsor asignado en el siguiente step usando contexto local de la sesion
+- emite `funnel_viewed`, `step_viewed`, `form_started`, `form_submitted`, `cta_clicked` y `handoff_completed`
 
 ## Preview local
 En desarrollo se puede usar:
@@ -94,7 +97,7 @@ El seed de desarrollo ahora deja:
 - no hay deduplicacion avanzada de browser/server
 
 ## Que queda listo para la siguiente fase
-- emitir tracking operativo real del submit y de la conversion
+- hacer dispatch real a Meta/TikTok
 - disparar handoff real posterior al assignment
 - introducir reglas avanzadas de routing y filtros
 - introducir permisos y auth sobre el modelo consolidado

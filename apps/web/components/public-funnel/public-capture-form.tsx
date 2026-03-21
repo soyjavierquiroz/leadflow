@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   getOrCreateAnonymousId,
+  readSubmissionContext,
   persistSubmissionContext,
   submitPublicLeadCapture,
-} from '@/lib/public-funnel-session';
+} from "@/lib/public-funnel-session";
+import {
+  createRuntimeEventId,
+  emitPublicRuntimeEvent,
+  getOrCreateRuntimeSessionId,
+} from "@/lib/public-runtime-tracking";
 
 type PublicCaptureFormProps = {
   publicationId: string;
@@ -16,12 +22,12 @@ type PublicCaptureFormProps = {
   description?: string;
 };
 
-type FormFieldKey = 'fullName' | 'phone' | 'email' | 'companyName';
+type FormFieldKey = "fullName" | "phone" | "email" | "companyName";
 
 type ResolvedField = {
   key: FormFieldKey;
   label: string;
-  type: 'text' | 'email' | 'tel';
+  type: "text" | "email" | "tel";
   placeholder: string;
 };
 
@@ -29,33 +35,33 @@ const detectFieldKey = (label: string): FormFieldKey | null => {
   const normalized = label.trim().toLowerCase();
 
   if (
-    normalized.includes('nombre') ||
-    normalized.includes('name') ||
-    normalized.includes('contacto')
+    normalized.includes("nombre") ||
+    normalized.includes("name") ||
+    normalized.includes("contacto")
   ) {
-    return 'fullName';
+    return "fullName";
   }
 
   if (
-    normalized.includes('whatsapp') ||
-    normalized.includes('telefono') ||
-    normalized.includes('teléfono') ||
-    normalized.includes('phone') ||
-    normalized.includes('celular')
+    normalized.includes("whatsapp") ||
+    normalized.includes("telefono") ||
+    normalized.includes("teléfono") ||
+    normalized.includes("phone") ||
+    normalized.includes("celular")
   ) {
-    return 'phone';
+    return "phone";
   }
 
-  if (normalized.includes('email') || normalized.includes('correo')) {
-    return 'email';
+  if (normalized.includes("email") || normalized.includes("correo")) {
+    return "email";
   }
 
   if (
-    normalized.includes('empresa') ||
-    normalized.includes('company') ||
-    normalized.includes('negocio')
+    normalized.includes("empresa") ||
+    normalized.includes("company") ||
+    normalized.includes("negocio")
   ) {
-    return 'companyName';
+    return "companyName";
   }
 
   return null;
@@ -72,8 +78,7 @@ const buildResolvedFields = (fields: string[]): ResolvedField[] => {
       return {
         key,
         label: field,
-        type:
-          key === 'email' ? 'email' : key === 'phone' ? 'tel' : 'text',
+        type: key === "email" ? "email" : key === "phone" ? "tel" : "text",
         placeholder: field,
       } satisfies ResolvedField;
     })
@@ -90,22 +95,22 @@ const buildResolvedFields = (fields: string[]): ResolvedField[] => {
 
   return [
     {
-      key: 'fullName',
-      label: 'Nombre completo',
-      type: 'text',
-      placeholder: 'Nombre completo',
+      key: "fullName",
+      label: "Nombre completo",
+      type: "text",
+      placeholder: "Nombre completo",
     },
     {
-      key: 'phone',
-      label: 'WhatsApp',
-      type: 'tel',
-      placeholder: 'WhatsApp',
+      key: "phone",
+      label: "WhatsApp",
+      type: "tel",
+      placeholder: "WhatsApp",
     },
     {
-      key: 'email',
-      label: 'Email',
-      type: 'email',
-      placeholder: 'Email',
+      key: "email",
+      label: "Email",
+      type: "email",
+      placeholder: "Email",
     },
   ];
 };
@@ -120,20 +125,46 @@ export function PublicCaptureForm({
   const router = useRouter();
   const resolvedFields = useMemo(() => buildResolvedFields(fields), [fields]);
   const [values, setValues] = useState<Record<FormFieldKey, string>>({
-    fullName: '',
-    phone: '',
-    email: '',
-    companyName: '',
+    fullName: "",
+    phone: "",
+    email: "",
+    companyName: "",
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasTrackedFormStart, setHasTrackedFormStart] = useState(false);
 
   const updateValue = (key: FormFieldKey, value: string) => {
     setValues((current) => ({
       ...current,
       [key]: value,
     }));
+  };
+
+  const trackFormStarted = (fieldKey: FormFieldKey) => {
+    if (hasTrackedFormStart) {
+      return;
+    }
+
+    setHasTrackedFormStart(true);
+    const anonymousId = getOrCreateAnonymousId(publicationId);
+    const submissionContext = readSubmissionContext(publicationId);
+
+    void emitPublicRuntimeEvent({
+      eventName: "form_started",
+      publicationId,
+      stepId: currentStepId,
+      anonymousId,
+      visitorId: submissionContext?.visitorId ?? null,
+      leadId: submissionContext?.leadId ?? null,
+      currentPath:
+        typeof window !== "undefined" ? window.location.pathname : null,
+      metadata: {
+        sessionId: getOrCreateRuntimeSessionId(),
+        firstField: fieldKey,
+      },
+    });
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -147,12 +178,12 @@ export function PublicCaptureForm({
     const companyName = values.companyName.trim();
 
     if (!fullName) {
-      setErrorMessage('Necesitamos al menos el nombre para capturar el lead.');
+      setErrorMessage("Necesitamos al menos el nombre para capturar el lead.");
       return;
     }
 
     if (!phone && !email) {
-      setErrorMessage('Incluye WhatsApp o email para poder enrutar el lead.');
+      setErrorMessage("Incluye WhatsApp o email para poder enrutar el lead.");
       return;
     }
 
@@ -160,10 +191,28 @@ export function PublicCaptureForm({
 
     try {
       const anonymousId = getOrCreateAnonymousId(publicationId);
+      const submissionEventId = createRuntimeEventId("form_submitted");
+
+      void emitPublicRuntimeEvent({
+        eventId: submissionEventId,
+        eventName: "form_submitted",
+        publicationId,
+        stepId: currentStepId,
+        anonymousId,
+        currentPath:
+          typeof window !== "undefined" ? window.location.pathname : null,
+        metadata: {
+          sessionId: getOrCreateRuntimeSessionId(),
+          hasPhone: Boolean(phone),
+          hasEmail: Boolean(email),
+        },
+      });
+
       const response = await submitPublicLeadCapture({
         publicationId,
         currentStepId,
         anonymousId,
+        submissionEventId,
         fullName,
         phone: phone || null,
         email: email || null,
@@ -174,7 +223,7 @@ export function PublicCaptureForm({
       setSuccessMessage(
         response.assignment?.sponsor.displayName
           ? `Lead capturado y asignado a ${response.assignment.sponsor.displayName}.`
-          : 'Lead capturado correctamente.',
+          : "Lead capturado correctamente.",
       );
 
       if (response.nextStep?.path) {
@@ -185,7 +234,7 @@ export function PublicCaptureForm({
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : 'No pudimos capturar el lead en este momento.',
+          : "No pudimos capturar el lead en este momento.",
       );
     } finally {
       setIsSubmitting(false);
@@ -197,7 +246,7 @@ export function PublicCaptureForm({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-            {title || 'Captura de lead'}
+            {title || "Captura de lead"}
           </h2>
           {description ? (
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-700">
@@ -223,15 +272,16 @@ export function PublicCaptureForm({
                 type={field.type}
                 value={values[field.key]}
                 onChange={(event) => updateValue(field.key, event.target.value)}
+                onFocus={() => trackFormStarted(field.key)}
                 placeholder={field.placeholder}
                 autoComplete={
-                  field.key === 'fullName'
-                    ? 'name'
-                    : field.key === 'phone'
-                      ? 'tel'
-                      : field.key === 'email'
-                        ? 'email'
-                        : 'organization'
+                  field.key === "fullName"
+                    ? "name"
+                    : field.key === "phone"
+                      ? "tel"
+                      : field.key === "email"
+                        ? "email"
+                        : "organization"
                 }
               />
             </label>
@@ -256,11 +306,11 @@ export function PublicCaptureForm({
             disabled={isSubmitting}
             className="inline-flex items-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? 'Enviando...' : 'Enviar y continuar'}
+            {isSubmitting ? "Enviando..." : "Enviar y continuar"}
           </button>
           <p className="text-sm text-slate-600">
-            Capturamos el lead, resolvemos assignment y avanzamos al siguiente step
-            si existe.
+            Capturamos el lead, resolvemos assignment y avanzamos al siguiente
+            step si existe.
           </p>
         </div>
       </form>

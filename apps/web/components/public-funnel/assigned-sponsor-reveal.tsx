@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { readSubmissionContext } from '@/lib/public-funnel-session';
+import { useEffect, useState } from "react";
+import { readSubmissionContext } from "@/lib/public-funnel-session";
 
 type AssignedSponsorRevealProps = {
   publicationId: string;
@@ -57,7 +57,7 @@ export function AssignedSponsorReveal({
                   Email
                 </p>
                 <p className="mt-2 text-sm font-semibold text-slate-900">
-                  {assignment.sponsor.email ?? 'Sin email'}
+                  {assignment.sponsor.email ?? "Sin email"}
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -65,13 +65,13 @@ export function AssignedSponsorReveal({
                   WhatsApp
                 </p>
                 <p className="mt-2 text-sm font-semibold text-slate-900">
-                  {assignment.sponsor.phone ?? 'Sin telefono'}
+                  {assignment.sponsor.phone ?? "Sin telefono"}
                 </p>
               </div>
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-600">
-              Este dato vive solo como contexto de la sesion del runtime v1.
-              Mas adelante lo conectaremos con handoff, seguimiento y tracking
+              Este dato vive solo como contexto de la sesion del runtime v1. Mas
+              adelante lo conectaremos con handoff, seguimiento y tracking
               reales.
             </p>
           </>

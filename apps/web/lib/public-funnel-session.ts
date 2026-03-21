@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { webPublicConfig } from '@/lib/public-env';
+import { webPublicConfig } from "@/lib/public-env";
 
 export type LeadCaptureSubmissionResponse = {
   visitor: {
@@ -40,8 +40,8 @@ type StoredSubmissionContext = {
   visitorId: string;
   anonymousId: string;
   leadId: string;
-  assignment: LeadCaptureSubmissionResponse['assignment'];
-  nextStep: LeadCaptureSubmissionResponse['nextStep'];
+  assignment: LeadCaptureSubmissionResponse["assignment"];
+  nextStep: LeadCaptureSubmissionResponse["nextStep"];
   capturedAt: string;
 };
 
@@ -51,7 +51,7 @@ const buildAnonymousIdKey = (publicationId: string) =>
 const buildSubmissionContextKey = (publicationId: string) =>
   `leadflow:publication:${publicationId}:submission-context`;
 
-const isBrowser = () => typeof window !== 'undefined';
+const isBrowser = () => typeof window !== "undefined";
 
 export const getOrCreateAnonymousId = (publicationId: string) => {
   if (!isBrowser()) {
@@ -65,7 +65,7 @@ export const getOrCreateAnonymousId = (publicationId: string) => {
   }
 
   const anonymousId =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `anon-${publicationId}-${Date.now()}`;
 
@@ -124,20 +124,20 @@ const parseErrorMessage = async (response: Response) => {
       error?: string;
     };
 
-    if (typeof payload.message === 'string') {
+    if (typeof payload.message === "string") {
       return payload.message;
     }
 
     if (
       payload.message &&
-      typeof payload.message === 'object' &&
-      'message' in payload.message &&
-      typeof payload.message.message === 'string'
+      typeof payload.message === "object" &&
+      "message" in payload.message &&
+      typeof payload.message.message === "string"
     ) {
       return payload.message.message;
     }
 
-    if (typeof payload.error === 'string') {
+    if (typeof payload.error === "string") {
       return payload.error;
     }
   } catch {
@@ -151,6 +151,7 @@ export const submitPublicLeadCapture = async (payload: {
   publicationId: string;
   currentStepId: string;
   anonymousId: string;
+  submissionEventId?: string | null;
   fullName?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -159,14 +160,14 @@ export const submitPublicLeadCapture = async (payload: {
   const response = await fetch(
     `${webPublicConfig.urls.api}/v1/public/funnel-runtime/submissions`,
     {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         ...payload,
-        sourceChannel: 'form',
-        tags: ['runtime-v1'],
+        sourceChannel: "form",
+        tags: ["runtime-v1"],
       }),
     },
   );
