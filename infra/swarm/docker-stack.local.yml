@@ -1,0 +1,108 @@
+version: '3.9'
+
+services:
+  web:
+    image: leadflow-web:0.1.0-local
+    environment:
+      NEXT_PUBLIC_APP_NAME: Leadflow
+      NEXT_PUBLIC_SITE_URL: https://${LEADFLOW_SITE_HOST:-exitosos.com}
+      NEXT_PUBLIC_MEMBERS_URL: https://${LEADFLOW_MEMBERS_HOST:-members.exitosos.com}
+      NEXT_PUBLIC_ADMIN_URL: https://${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}
+      NEXT_PUBLIC_API_URL: https://${LEADFLOW_API_HOST:-api.exitosos.com}
+    networks:
+      - traefik_public
+      - leadflow_core
+    deploy:
+      replicas: ${LEADFLOW_WEB_REPLICAS:-1}
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik_public
+        - traefik.http.services.leadflow-web.loadbalancer.server.port=3000
+        - traefik.http.routers.leadflow-site.rule=Host(`${LEADFLOW_SITE_HOST:-exitosos.com}`)
+        - traefik.http.routers.leadflow-site.entrypoints=websecure
+        - traefik.http.routers.leadflow-site.tls=true
+        - traefik.http.routers.leadflow-site.service=leadflow-web
+        - traefik.http.routers.leadflow-members.rule=Host(`${LEADFLOW_MEMBERS_HOST:-members.exitosos.com}`)
+        - traefik.http.routers.leadflow-members.entrypoints=websecure
+        - traefik.http.routers.leadflow-members.tls=true
+        - traefik.http.routers.leadflow-members.service=leadflow-web
+        - traefik.http.routers.leadflow-admin.rule=Host(`${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}`)
+        - traefik.http.routers.leadflow-admin.entrypoints=websecure
+        - traefik.http.routers.leadflow-admin.tls=true
+        - traefik.http.routers.leadflow-admin.service=leadflow-web
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  api:
+    image: leadflow-api:0.1.0-local
+    environment:
+      NODE_ENV: production
+      API_NAME: leadflow-api
+      API_VERSION: 0.2.0
+      API_HOST: 0.0.0.0
+      API_PORT: 3001
+      API_GLOBAL_PREFIX: v1
+      API_BASE_URL: https://${LEADFLOW_API_HOST:-api.exitosos.com}
+      SITE_URL: https://${LEADFLOW_SITE_HOST:-exitosos.com}
+      MEMBERS_URL: https://${LEADFLOW_MEMBERS_HOST:-members.exitosos.com}
+      ADMIN_URL: https://${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}
+      CORS_ALLOWED_ORIGINS: https://${LEADFLOW_SITE_HOST:-exitosos.com},https://${LEADFLOW_MEMBERS_HOST:-members.exitosos.com},https://${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}
+    networks:
+      - traefik_public
+      - leadflow_core
+      - leadflow_automation
+    deploy:
+      replicas: ${LEADFLOW_API_REPLICAS:-1}
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik_public
+        - traefik.http.services.leadflow-api.loadbalancer.server.port=3001
+        - traefik.http.routers.leadflow-api.rule=Host(`${LEADFLOW_API_HOST:-api.exitosos.com}`)
+        - traefik.http.routers.leadflow-api.entrypoints=websecure
+        - traefik.http.routers.leadflow-api.tls=true
+        - traefik.http.routers.leadflow-api.service=leadflow-api
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3001/health >/dev/null 2>&1 || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  traefik_public:
+    external: true
+  leadflow_core:
+    driver: overlay
+    attachable: true
+  # Placeholder para integraciones internas futuras (n8n/Evolution/workers)
+  leadflow_automation:
+    driver: overlay
+    attachable: true

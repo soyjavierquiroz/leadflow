@@ -18,6 +18,9 @@
     "format": "turbo run format",
     "docker:build:web": "docker build -f apps/web/Dockerfile -t leadflow-web:local .",
     "docker:build:api": "docker build -f apps/api/Dockerfile -t leadflow-api:local .",
+    "docker:build:web:local": "sh -c 'docker build -f apps/web/Dockerfile -t leadflow-web:${TAG:-0.1.0-local} .'",
+    "docker:build:api:local": "sh -c 'docker build -f apps/api/Dockerfile -t leadflow-api:${TAG:-0.1.0-local} .'",
+    "docker:build:local": "pnpm docker:build:web:local && pnpm docker:build:api:local",
     "docker:ghcr:build:web": "sh -c 'docker build -f apps/web/Dockerfile -t ghcr.io/soyjavierquiroz/leadflow-web:${TAG:-latest} .'",
     "docker:ghcr:build:api": "sh -c 'docker build -f apps/api/Dockerfile -t ghcr.io/soyjavierquiroz/leadflow-api:${TAG:-latest} .'",
     "docker:ghcr:push:web": "sh -c 'docker push ghcr.io/soyjavierquiroz/leadflow-web:${TAG:-latest}'",
@@ -26,7 +29,8 @@
     "docker:dev:up": "docker compose -f infra/docker/docker-compose.dev.yml --env-file infra/docker/.env.example up --build",
     "docker:dev:down": "docker compose -f infra/docker/docker-compose.dev.yml --env-file infra/docker/.env.example down",
     "docker:dev:logs": "docker compose -f infra/docker/docker-compose.dev.yml --env-file infra/docker/.env.example logs -f",
-    "docker:stack:validate": "docker stack config -c infra/swarm/docker-stack.yml"
+    "docker:stack:validate": "docker stack config -c infra/swarm/docker-stack.yml",
+    "docker:stack:validate:local": "docker stack config -c infra/swarm/docker-stack.local.yml"
   },
   "devDependencies": {
     "turbo": "^2.5.3"
