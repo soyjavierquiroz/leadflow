@@ -20,5 +20,6 @@ export interface Team extends BaseDomainEntity, WorkspaceScoped {
 }
 
 export interface TeamRepository extends RepositoryPort<Team, CreateTeamDto> {
+  findAll(): Promise<Team[]>;
   findByWorkspaceId(workspaceId: DomainId): Promise<Team[]>;
 }

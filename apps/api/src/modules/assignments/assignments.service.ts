@@ -1,10 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { buildEntity } from '../shared/domain.factory';
+import { ASSIGNMENT_REPOSITORY } from '../shared/domain.tokens';
 import type { CreateAssignmentDto } from './dto/create-assignment.dto';
-import type { Assignment } from './interfaces/assignment.interface';
+import type {
+  Assignment,
+  AssignmentRepository,
+} from './interfaces/assignment.interface';
 
 @Injectable()
 export class AssignmentsService {
+  constructor(
+    @Optional()
+    @Inject(ASSIGNMENT_REPOSITORY)
+    private readonly repository?: AssignmentRepository,
+  ) {}
+
   createDraft(dto: CreateAssignmentDto): Assignment {
     return buildEntity<Assignment>({
       workspaceId: dto.workspaceId,

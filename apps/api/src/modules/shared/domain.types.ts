@@ -12,6 +12,7 @@ export interface WorkspaceScoped {
 }
 
 export interface RepositoryPort<TEntity, TCreateDto> {
+  findAll(): Promise<TEntity[]>;
   findById(id: DomainId): Promise<TEntity | null>;
   save(entity: TEntity): Promise<TEntity>;
   create(data: TCreateDto): Promise<TEntity>;
@@ -36,6 +37,7 @@ export type EventAggregateType =
   | 'team'
   | 'sponsor'
   | 'rotation-pool'
+  | 'rotation-member'
   | 'funnel'
   | 'visitor'
   | 'lead'

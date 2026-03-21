@@ -32,5 +32,7 @@ export interface AssignmentRepository extends RepositoryPort<
   Assignment,
   CreateAssignmentDto
 > {
+  findAll(): Promise<Assignment[]>;
+  findByWorkspaceId(workspaceId: DomainId): Promise<Assignment[]>;
   findOpenByLeadId(leadId: DomainId): Promise<Assignment | null>;
 }

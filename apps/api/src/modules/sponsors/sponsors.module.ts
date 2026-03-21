@@ -1,8 +1,19 @@
 import { Module } from '@nestjs/common';
+import { SponsorPrismaRepository } from '../../prisma/repositories/sponsor-prisma.repository';
+import { SPONSOR_REPOSITORY } from '../shared/domain.tokens';
+import { SponsorsController } from './sponsors.controller';
 import { SponsorsService } from './sponsors.service';
 
 @Module({
-  providers: [SponsorsService],
-  exports: [SponsorsService],
+  controllers: [SponsorsController],
+  providers: [
+    SponsorsService,
+    SponsorPrismaRepository,
+    {
+      provide: SPONSOR_REPOSITORY,
+      useExisting: SponsorPrismaRepository,
+    },
+  ],
+  exports: [SponsorsService, SPONSOR_REPOSITORY],
 })
 export class SponsorsModule {}

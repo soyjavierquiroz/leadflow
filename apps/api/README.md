@@ -20,6 +20,16 @@ Modulos base disponibles:
 
 La fase actual deja contratos, DTOs y servicios draft listos para conectar persistencia despues.
 
+## Persistencia v1
+- Prisma integrado con schema en `prisma/schema.prisma`.
+- PostgreSQL como datasource objetivo.
+- Seed disponible en `prisma/seed.js`.
+- Endpoints minimos:
+  - `GET /v1/workspaces`
+  - `GET /v1/sponsors`
+  - `GET /v1/leads`
+  - `GET /v1/rotation-pools`
+
 ## Configuracion por entorno
 Definida en `src/config/runtime.ts`.
 

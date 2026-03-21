@@ -24,5 +24,7 @@ export interface SponsorRepository extends RepositoryPort<
   Sponsor,
   CreateSponsorDto
 > {
+  findAll(): Promise<Sponsor[]>;
   findByTeamId(teamId: DomainId): Promise<Sponsor[]>;
+  findByWorkspaceId(workspaceId: DomainId): Promise<Sponsor[]>;
 }

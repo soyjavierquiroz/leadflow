@@ -23,5 +23,6 @@ export interface FunnelRepository extends RepositoryPort<
   Funnel,
   CreateFunnelDto
 > {
+  findAll(): Promise<Funnel[]>;
   findByWorkspaceId(workspaceId: DomainId): Promise<Funnel[]>;
 }

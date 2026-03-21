@@ -1,0 +1,317 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceStatus {
+  draft
+  active
+  archived
+}
+
+enum TeamStatus {
+  draft
+  active
+  archived
+}
+
+enum SponsorStatus {
+  draft
+  active
+  paused
+  archived
+}
+
+enum AvailabilityStatus {
+  available
+  paused
+  offline
+}
+
+enum RotationStrategy {
+  round_robin
+  weighted
+  manual
+}
+
+enum RotationPoolStatus {
+  draft
+  active
+  archived
+}
+
+enum FunnelStatus {
+  draft
+  active
+  archived
+}
+
+enum LeadSourceChannel {
+  manual
+  form
+  landing_page
+  api
+  import
+  automation
+}
+
+enum VisitorKind {
+  anonymous
+  identified
+}
+
+enum VisitorStatus {
+  active
+  converted
+  archived
+}
+
+enum LeadStatus {
+  captured
+  qualified
+  assigned
+  nurturing
+  won
+  lost
+}
+
+enum AssignmentStatus {
+  pending
+  assigned
+  accepted
+  reassigned
+  closed
+}
+
+enum AssignmentReason {
+  rotation
+  manual
+  fallback
+  handoff
+}
+
+enum EventActorType {
+  system
+  user
+  visitor
+  integration
+}
+
+enum EventAggregateType {
+  workspace
+  team
+  sponsor
+  rotation_pool
+  rotation_member
+  funnel
+  visitor
+  lead
+  assignment
+  event
+}
+
+model Workspace {
+  id              String        @id @default(uuid())
+  name            String
+  slug            String        @unique
+  status          WorkspaceStatus
+  timezone        String
+  defaultCurrency String
+  primaryLocale   String
+  primaryDomain   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  teams           Team[]
+  sponsors        Sponsor[]
+  funnels         Funnel[]
+  rotationPools   RotationPool[]
+  visitors        Visitor[]
+  leads           Lead[]
+  assignments     Assignment[]
+  events          DomainEvent[]
+}
+
+model Team {
+  id              String      @id @default(uuid())
+  workspaceId     String
+  name            String
+  code            String
+  status          TeamStatus
+  description     String?
+  managerUserId   String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sponsors        Sponsor[]
+  funnels         Funnel[]    @relation("TeamDefaultFunnels")
+  rotationPools   RotationPool[]
+  assignments     Assignment[]
+
+  @@unique([workspaceId, code])
+}
+
+model Sponsor {
+  id                  String             @id @default(uuid())
+  workspaceId         String
+  teamId              String
+  displayName         String
+  status              SponsorStatus
+  email               String?
+  phone               String?
+  availabilityStatus  AvailabilityStatus
+  routingWeight       Int
+  memberPortalEnabled Boolean
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  rotationMembers     RotationMember[]
+  assignments         Assignment[]
+}
+
+model Funnel {
+  id                    String            @id @default(uuid())
+  workspaceId           String
+  name                  String
+  code                  String
+  status                FunnelStatus
+  stages                String[]
+  entrySources          LeadSourceChannel[]
+  defaultTeamId         String?
+  defaultRotationPoolId String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  workspace             Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  defaultTeam           Team?             @relation("TeamDefaultFunnels", fields: [defaultTeamId], references: [id], onDelete: SetNull)
+  defaultRotationPool   RotationPool?     @relation("PoolDefaultFunnels", fields: [defaultRotationPoolId], references: [id], onDelete: SetNull)
+  leads                 Lead[]
+  assignments           Assignment[]
+
+  @@unique([workspaceId, code])
+}
+
+model RotationPool {
+  id             String             @id @default(uuid())
+  workspaceId    String
+  teamId         String
+  name           String
+  status         RotationPoolStatus
+  strategy       RotationStrategy
+  isFallbackPool Boolean
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team           Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  members        RotationMember[]
+  defaultFunnels Funnel[]           @relation("PoolDefaultFunnels")
+  assignments    Assignment[]
+
+  @@unique([workspaceId, name])
+}
+
+model RotationMember {
+  id             String       @id @default(uuid())
+  rotationPoolId String
+  sponsorId      String
+  position       Int
+  weight         Int          @default(1)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  rotationPool   RotationPool @relation(fields: [rotationPoolId], references: [id], onDelete: Cascade)
+  sponsor        Sponsor      @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  @@unique([rotationPoolId, sponsorId])
+  @@unique([rotationPoolId, position])
+}
+
+model Visitor {
+  id            String            @id @default(uuid())
+  workspaceId   String
+  anonymousId   String
+  kind          VisitorKind
+  status        VisitorStatus
+  sourceChannel LeadSourceChannel
+  firstSeenAt   DateTime
+  lastSeenAt    DateTime
+  utmSource     String?
+  utmCampaign   String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  workspace     Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead          Lead?
+  events        DomainEvent[]
+
+  @@unique([workspaceId, anonymousId])
+}
+
+model Lead {
+  id                  String            @id @default(uuid())
+  workspaceId         String
+  funnelId            String
+  visitorId           String?           @unique
+  sourceChannel       LeadSourceChannel
+  fullName            String?
+  email               String?
+  phone               String?
+  companyName         String?
+  status              LeadStatus
+  currentAssignmentId String?           @unique
+  tags                String[]
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  workspace           Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  funnel              Funnel            @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  visitor             Visitor?          @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  assignments         Assignment[]      @relation("LeadAssignments")
+  currentAssignment   Assignment?       @relation("CurrentLeadAssignment", fields: [currentAssignmentId], references: [id], onDelete: SetNull)
+  events              DomainEvent[]
+}
+
+model Assignment {
+  id             String           @id @default(uuid())
+  workspaceId    String
+  leadId         String
+  sponsorId      String
+  teamId         String
+  funnelId       String
+  rotationPoolId String?
+  status         AssignmentStatus
+  reason         AssignmentReason
+  assignedAt     DateTime
+  resolvedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead           Lead             @relation("LeadAssignments", fields: [leadId], references: [id], onDelete: Cascade)
+  sponsor        Sponsor          @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  team           Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  funnel         Funnel           @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  rotationPool   RotationPool?    @relation(fields: [rotationPoolId], references: [id], onDelete: SetNull)
+  currentForLead Lead?            @relation("CurrentLeadAssignment")
+  events         DomainEvent[]
+}
+
+model DomainEvent {
+  id            String             @id @default(uuid())
+  workspaceId   String
+  aggregateType EventAggregateType
+  aggregateId   String
+  eventName     String
+  actorType     EventActorType
+  payload       Json
+  occurredAt    DateTime
+  visitorId     String?
+  leadId        String?
+  assignmentId  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  visitor       Visitor?           @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  lead          Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  assignment    Assignment?        @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+}

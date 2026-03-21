@@ -23,5 +23,7 @@ export interface RotationPoolRepository extends RepositoryPort<
   RotationPool,
   CreateRotationPoolDto
 > {
+  findAll(): Promise<RotationPool[]>;
   findByTeamId(teamId: DomainId): Promise<RotationPool[]>;
+  findByWorkspaceId(workspaceId: DomainId): Promise<RotationPool[]>;
 }

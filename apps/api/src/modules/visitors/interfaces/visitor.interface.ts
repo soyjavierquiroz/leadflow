@@ -27,6 +27,8 @@ export interface VisitorRepository extends RepositoryPort<
   Visitor,
   CreateVisitorDto
 > {
+  findAll(): Promise<Visitor[]>;
+  findByWorkspaceId(workspaceId: DomainId): Promise<Visitor[]>;
   findByAnonymousId(
     workspaceId: DomainId,
     anonymousId: string,

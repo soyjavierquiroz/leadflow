@@ -7,6 +7,7 @@ La base del monorepo ya incluye:
 - Shell funcional de `web` (site, members, admin).
 - Shell funcional de `api` (NestJS + Fastify + health).
 - Foundation de dominio v1 en `apps/api` con modulos, DTOs e interfaces.
+- Persistence Foundation v1 con PostgreSQL + Prisma en `apps/api`.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -92,6 +93,7 @@ Validacion de stacks:
 ## Documentacion clave
 - `docs/architecture-v1.md`
 - `docs/domain-model-v1.md`
+- `docs/persistence-v1.md`
 - `docs/infrastructure-v1.md`
 - `docs/deployment-v1.md`
 - `docs/deployment-local-v1.md`
@@ -114,6 +116,16 @@ Validacion de stacks:
   - `events`
 - La fase actual deja contratos, DTOs y servicios draft listos para conectar persistencia despues.
 - Persistencia real, auth y motor avanzado de asignacion siguen fuera de alcance por ahora.
+
+## Persistencia v1
+- Prisma integrado en `apps/api/prisma/schema.prisma`.
+- Migracion inicial creada para PostgreSQL.
+- Seed minimo de desarrollo con workspace, team, sponsors, funnel y rotation pool.
+- Endpoints de validacion expuestos:
+  - `GET /v1/workspaces`
+  - `GET /v1/sponsors`
+  - `GET /v1/leads`
+  - `GET /v1/rotation-pools`
 
 ## Estado de despliegue
 - Preparado para despliegue en Portainer con dos variantes de stack:

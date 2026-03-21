@@ -25,6 +25,8 @@ export interface DomainEventRepository extends RepositoryPort<
   DomainEvent,
   CreateEventDto
 > {
+  findAll(): Promise<DomainEvent[]>;
+  findByWorkspaceId(workspaceId: DomainId): Promise<DomainEvent[]>;
   findByAggregate(
     aggregateType: EventAggregateType,
     aggregateId: DomainId,

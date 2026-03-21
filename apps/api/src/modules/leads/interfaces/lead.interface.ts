@@ -29,5 +29,7 @@ export interface Lead extends BaseDomainEntity, WorkspaceScoped {
 }
 
 export interface LeadRepository extends RepositoryPort<Lead, CreateLeadDto> {
+  findAll(): Promise<Lead[]>;
   findByVisitorId(visitorId: DomainId): Promise<Lead[]>;
+  findByWorkspaceId(workspaceId: DomainId): Promise<Lead[]>;
 }

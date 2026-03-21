@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1, sin tocar produccion ni cerrar aun la capa de persistencia.
+Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1 mas una primera capa de persistencia real en PostgreSQL, sin tocar produccion.
 
 ## Componentes
 
@@ -20,6 +20,8 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
 - Prefijo global configurable (`API_GLOBAL_PREFIX`, default `v1`).
 - `GET /health` sin prefijo global.
 - CORS preparado para hosts web objetivo.
+- Prisma integrado como adapter de persistencia.
+- `PrismaModule` global con `PrismaService`.
 - `DomainModule` como agregador de dominio.
 - Modulos base:
   - `workspaces`
@@ -31,8 +33,8 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
   - `leads`
   - `assignments`
   - `events`
-- Cada modulo expone DTOs, interfaces de agregado y servicio base.
-- Persistencia real aun no conectada; los contratos quedan listos para adapters futuros.
+- Cada modulo expone DTOs, interfaces de agregado, servicio base y repository adapter Prisma.
+- Endpoints minimos de validacion expuestos para `workspaces`, `sponsors`, `leads` y `rotation-pools`.
 
 ### Shared packages
 - `packages/config`: helpers simples de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
@@ -44,6 +46,7 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
 ### Desarrollo local con contenedores
 - Compose: `infra/docker/docker-compose.dev.yml`
 - Servicios:
+  - `postgres`
   - `web`
   - `api`
 - Red:
@@ -67,9 +70,9 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
 ## Fuera de alcance en esta fase
 - Deploy real en servidor.
 - DNS real aplicado.
-- Integraciones con PostgreSQL, Redis, n8n o Evolution.
+- Redis, n8n o Evolution.
 - Auth real.
 - Logica compleja de asignacion.
 
 ## Estado
-Arquitectura lista para evolucionar el dominio y conectar persistencia en la siguiente fase, todavia sin cambios en produccion.
+Arquitectura lista para evolucionar el dominio sobre persistencia real y continuar con casos de uso en la siguiente fase, todavia sin cambios en produccion.

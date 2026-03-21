@@ -20,5 +20,6 @@ export interface WorkspaceRepository extends RepositoryPort<
   Workspace,
   CreateWorkspaceDto
 > {
+  findAll(): Promise<Workspace[]>;
   findBySlug(slug: string): Promise<Workspace | null>;
 }

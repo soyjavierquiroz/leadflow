@@ -19,6 +19,9 @@ Destino principal de asignacion comercial. Representa a la persona o cuenta que 
 ### `RotationPool`
 Grupo de sponsors listo para rotacion. Define el contenedor donde luego vivira la estrategia de round-robin, weighted o manual.
 
+### `RotationMember`
+Entidad de soporte para persistencia que materializa la membresia de sponsors dentro de un rotation pool, incluyendo posicion, peso y estado activo.
+
 ### `Funnel`
 Embudo operativo de captacion y avance comercial. Define stages base y defaults para team/pool.
 
@@ -38,7 +41,8 @@ Bitacora append-only de cambios relevantes sobre agregados del dominio para audi
 - Un `Workspace` contiene muchos `teams`, `sponsors`, `rotation-pools`, `funnels`, `visitors`, `leads`, `assignments` y `events`.
 - Un `Team` pertenece a un `Workspace` y agrupa varios `Sponsors`, `Funnels` y `RotationPools`.
 - Un `Sponsor` pertenece a un `Workspace` y a un `Team`.
-- Un `RotationPool` pertenece a un `Workspace` y a un `Team`, y referencia multiples `Sponsors` y opcionalmente `Funnels`.
+- Un `RotationPool` pertenece a un `Workspace` y a un `Team`.
+- Un `RotationMember` conecta `RotationPool` con `Sponsor` y conserva orden/peso de rotacion.
 - Un `Funnel` pertenece a un `Workspace` y puede definir `defaultTeamId` y `defaultRotationPoolId`.
 - Un `Visitor` pertenece a un `Workspace` y puede convertirse en un `Lead`.
 - Un `Lead` pertenece a un `Workspace`, vive en un `Funnel`, puede originarse desde un `Visitor` y puede tener un `currentAssignmentId`.
@@ -70,13 +74,9 @@ Bitacora append-only de cambios relevantes sobre agregados del dominio para audi
 - Proyecciones, analytics y read models especializados.
 
 ## Decision de persistencia
-En esta fase no se conecta PostgreSQL.
-
-Propuesta para la siguiente fase:
-- Mantener el dominio actual y agregar adapters de persistencia sobre interfaces `RepositoryPort`.
-- Introducir PostgreSQL con un ORM tipado y migraciones.
-- Opcion recomendada: `Prisma` como primer adapter por claridad de schema, tipado y ergonomia en NestJS.
+Persistencia v1 conectada con PostgreSQL + Prisma.
 
 Decision documentada:
-- Primero estabilizar agregados, relaciones y contratos.
-- Luego conectar persistencia sin mezclar diseño de dominio con detalles de infraestructura.
+- Mantener el dominio ya definido y conectar adapters de repositorio sin reescribir agregados.
+- Modelar `RotationMember` como tabla explicita para evitar arrays opacos y permitir estrategia futura.
+- Mantener la logica compleja de asignacion fuera del scope actual aunque la base relacional ya este lista.
