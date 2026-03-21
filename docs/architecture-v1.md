@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1, persistencia real en PostgreSQL y una propuesta estructural clara para funnels, tracking y handoff, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1, persistencia real en PostgreSQL y una propuesta estructural clara para ownership, publicacion, funnels, tracking y handoff, sin tocar produccion.
 
 ## Componentes
 
@@ -56,26 +56,32 @@ El dominio operativo actual se apoya en:
 
 Este modelo ya soporta la base multi-tenant y de asignacion, pero el area de funnel/tracking todavia esta en expansion conceptual.
 
-## Expansion estructural recomendada para funnel/tracking
+## Expansion estructural recomendada
 Para soportar SaaS multi-domain, multi-funnel y tracking por proveedor, la arquitectura recomienda evolucionar hacia:
 - `FunnelTemplate`
 - `FunnelInstance`
 - `FunnelStep`
+- `Domain`
+- `FunnelPublication`
 - `TrackingProfile`
 - `ConversionEventMapping`
 - `DomainBinding`
 - `HandoffStrategy`
 
 Objetivo de esa expansion:
+- mover ownership operativo real al `Team`
 - separar plantilla de despliegue operativo
 - modelar pasos con semantica real
 - desacoplar funnel de dominio/DNS
+- resolver publicacion por `host + path`
 - permitir tracking por perfil y proveedor
 - soportar handoff inmediato o diferido sin hardcodes
 
 Esta expansion queda documentada en:
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
+- `docs/ownership-publication-template-model-v1.md`
+- `docs/domain-persistence-expansion-v2.md`
 
 ## Infraestructura de ejecucion v1
 
@@ -111,7 +117,7 @@ Esta expansion queda documentada en:
 - Redis, n8n o Evolution.
 - Auth real.
 - Logica compleja de asignacion.
-- Cambios de persistencia para la expansion funnel/tracking.
+- Cambios de persistencia para la expansion propuesta.
 
 ## Estado
-Arquitectura lista para seguir con flows de captacion, tracking y handoff sobre una base documental mas fuerte, todavia sin cambios en produccion ni en la persistencia de la expansion propuesta.
+Arquitectura lista para seguir con la expansion de dominio/persistencia y luego auth/flows sobre una base documental mas fuerte, todavia sin cambios en produccion ni en la persistencia de la expansion propuesta.

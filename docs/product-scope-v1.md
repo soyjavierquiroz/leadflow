@@ -1,7 +1,7 @@
 # Product Scope v1
 
 ## Objetivo de la fase actual
-Definir la estructura de funnels, steps, tracking y handoff de Leadflow para soportar multi-domain y multi-funnel, sin implementar aun integraciones reales ni ampliar todavia la persistencia.
+Definir la estructura de ownership, publicacion, templates, funnels, tracking y handoff de Leadflow para soportar multi-domain y multi-funnel, sin implementar aun integraciones reales ni ampliar todavia la persistencia.
 
 ## Alcance funcional del dominio v1
 Leadflow v1 modela:
@@ -17,6 +17,9 @@ Leadflow v1 modela:
 
 ## Foco estructural de esta etapa
 Esta fase documenta y formaliza:
+- ownership por `Super Admin`, `Team Admin` y `Sponsor/Member`
+- al `Team` como owner operativo real
+- publicacion por `host + path`
 - diferencia entre `FunnelTemplate`, `FunnelInstance` y `FunnelStep`
 - tipos de funnel recomendados para v1
 - tipos de step recomendados para v1
@@ -28,6 +31,8 @@ Esta fase documenta y formaliza:
 ## MVP de esta etapa
 - Documento base de funnel y tracking en `docs/funnel-tracking-model-v1.md`.
 - Propuesta de expansion del dominio en `docs/funnel-domain-expansion-v1.md`.
+- Modelo de ownership, publicacion y templates en `docs/ownership-publication-template-model-v1.md`.
+- Propuesta concreta de expansion de dominio/persistencia en `docs/domain-persistence-expansion-v2.md`.
 - Alineacion de `README.md` y `docs/architecture-v1.md`.
 - Criterios claros para la siguiente fase de implementacion de application flows.
 
@@ -49,6 +54,6 @@ Esta fase documenta y formaliza:
 
 ## Criterios de avance a la siguiente fase
 1. Traducir la propuesta a entidades persistibles sin romper `Persistence Foundation v1`.
-2. Implementar el modelo expandido de funnels/steps/tracking de forma incremental.
-3. Exponer flows iniciales de captura y lectura por funnel.
-4. Preparar la capa de tracking y handoff reales sin hardcodes de proveedor.
+2. Implementar `Domain`, `FunnelTemplate`, `FunnelInstance` y `FunnelPublication`.
+3. Mover ownership operativo explicito al `Team`.
+4. Preparar auth y flows sobre el modelo consolidado, no sobre el modelo transitorio.

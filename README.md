@@ -9,6 +9,7 @@ La base del monorepo ya incluye:
 - Foundation de dominio v1 en `apps/api` con modulos, DTOs e interfaces.
 - Persistence Foundation v1 con PostgreSQL + Prisma en `apps/api`.
 - Diseno estructural inicial para funnels, tracking y handoff.
+- Consolidacion de ownership, publicacion y templates para la siguiente expansion.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -97,6 +98,8 @@ Validacion de stacks:
 - `docs/persistence-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
+- `docs/ownership-publication-template-model-v1.md`
+- `docs/domain-persistence-expansion-v2.md`
 - `docs/infrastructure-v1.md`
 - `docs/deployment-v1.md`
 - `docs/deployment-local-v1.md`
@@ -135,6 +138,12 @@ Validacion de stacks:
 - Se definen tipos base de funnel para captura simple, VSL, thank-you con WhatsApp y flujos de 3 pasos.
 - Se documentan estrategias de handoff inmediato y diferido.
 - Se propone una futura expansion del dominio sin aplicar aun cambios de persistencia.
+
+## Ownership, Publication & Templates
+- `Team` queda definido como owner operativo de funnel, dominio, pool y tracking.
+- `Super Admin` controla templates, bloques, JSON y estructura.
+- `Sponsor` queda como actor comercial y no como owner del funnel.
+- La publicacion publica se recomienda por `host + path` con precedencia de la ruta mas especifica.
 
 ## Estado de despliegue
 - Preparado para despliegue en Portainer con dos variantes de stack:
