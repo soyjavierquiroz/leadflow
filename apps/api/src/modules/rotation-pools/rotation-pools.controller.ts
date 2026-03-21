@@ -1,8 +1,9 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
+import type { UpdateRotationMemberDto } from './dto/update-rotation-member.dto';
 import { RotationPoolsService } from './rotation-pools.service';
 
 @Controller('rotation-pools')
@@ -26,5 +27,35 @@ export class RotationPoolsController {
           ? teamId
           : (user.teamId ?? undefined),
     });
+  }
+
+  @Get('members')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  findMembers(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Query('rotationPoolId') rotationPoolId?: string,
+  ) {
+    return this.rotationPoolsService.listMembers({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+      rotationPoolId,
+    });
+  }
+
+  @Patch('members/:memberId')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  updateMember(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('memberId') memberId: string,
+    @Body() dto: UpdateRotationMemberDto,
+  ) {
+    return this.rotationPoolsService.updateMemberForTeam(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+      },
+      memberId,
+      dto,
+    );
   }
 }

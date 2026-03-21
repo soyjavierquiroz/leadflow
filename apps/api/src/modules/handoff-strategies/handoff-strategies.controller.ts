@@ -1,15 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
-import type { UpdateTeamSponsorDto } from './dto/update-team-sponsor.dto';
-import { SponsorsService } from './sponsors.service';
+import { HandoffStrategiesService } from './handoff-strategies.service';
 
-@Controller('sponsors')
+@Controller('handoff-strategies')
 @RequireRoles(UserRole.SUPER_ADMIN, UserRole.TEAM_ADMIN)
-export class SponsorsController {
-  constructor(private readonly sponsorsService: SponsorsService) {}
+export class HandoffStrategiesController {
+  constructor(
+    private readonly handoffStrategiesService: HandoffStrategiesService,
+  ) {}
 
   @Get()
   findAll(
@@ -17,7 +18,7 @@ export class SponsorsController {
     @Query('workspaceId') workspaceId?: string,
     @Query('teamId') teamId?: string,
   ) {
-    return this.sponsorsService.list({
+    return this.handoffStrategiesService.list({
       workspaceId:
         user.role === UserRole.SUPER_ADMIN
           ? (workspaceId ?? user.workspaceId ?? undefined)
@@ -27,22 +28,5 @@ export class SponsorsController {
           ? teamId
           : (user.teamId ?? undefined),
     });
-  }
-
-  @Patch(':id')
-  @RequireRoles(UserRole.TEAM_ADMIN)
-  update(
-    @CurrentAuthUser() user: AuthenticatedUser,
-    @Param('id') sponsorId: string,
-    @Body() dto: UpdateTeamSponsorDto,
-  ) {
-    return this.sponsorsService.updateForTeam(
-      {
-        workspaceId: user.workspaceId!,
-        teamId: user.teamId!,
-      },
-      sponsorId,
-      dto,
-    );
   }
 }

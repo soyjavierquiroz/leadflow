@@ -14,6 +14,7 @@ La base del monorepo ya incluye:
 - Tracking Events v1 sobre runtime, capture y assignment.
 - App Shells + UI Base v1 para `Super Admin`, `Team Admin` y `Sponsor / Member`.
 - Roles & Auth v1 con login real, sesión segura y protección base por superficie.
+- Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -98,6 +99,7 @@ Validacion de stacks:
 - `docs/tracking-events-v1.md`
 - `docs/app-shells-ui-base-v1.md`
 - `docs/roles-auth-v1.md`
+- `docs/team-operations-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -246,6 +248,35 @@ Modulos disponibles:
   - `team@leadflow.local / Team123!`
   - `ana.member@leadflow.local / Member123!`
   - `bruno.member@leadflow.local / Member456!`
+
+## Team Operations v1
+- Superficie `Team Admin` conectada con operaciones reales en:
+  - `/team/funnels`
+  - `/team/publications`
+  - `/team/sponsors`
+  - `/team/pools`
+  - `/team/leads`
+- Endpoints operativos agregados o ampliados:
+  - `GET /v1/tracking-profiles`
+  - `GET /v1/handoff-strategies`
+  - `POST /v1/funnel-instances`
+  - `PATCH /v1/funnel-instances/:id`
+  - `POST /v1/funnel-publications`
+  - `PATCH /v1/funnel-publications/:id`
+  - `PATCH /v1/sponsors/:id`
+  - `GET /v1/rotation-pools/members`
+  - `PATCH /v1/rotation-pools/members/:memberId`
+- Operaciones habilitadas:
+  - crear funnel instances desde templates aprobados
+  - activar o pausar funnels operativos
+  - crear publicaciones y validar conflictos `host + path`
+  - activar o pausar publications
+  - activar o pausar sponsors
+  - actualizar disponibilidad operativa
+  - ver y reordenar miembros de pools
+  - consultar leads del team con filtros básicos
+- Restricción mantenida:
+  - `Team Admin` no puede editar templates ni JSON estructural libre
 
 ## App Shells + UI Base v1
 - Superficies visibles implementadas en `apps/web`:

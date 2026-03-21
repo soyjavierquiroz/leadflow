@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { buildInitials } from "@/lib/app-shell/utils";
 import { StatusBadge } from "@/components/app-shell/status-badge";
 import type { SponsorRecord } from "@/lib/app-shell/types";
@@ -6,12 +7,14 @@ type SponsorCardProps = {
   sponsor: SponsorRecord;
   leadCount: number;
   assignmentCount: number;
+  actions?: ReactNode;
 };
 
 export function SponsorCard({
   sponsor,
   leadCount,
   assignmentCount,
+  actions,
 }: SponsorCardProps) {
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
@@ -45,6 +48,7 @@ export function SponsorCard({
           </dd>
         </div>
       </dl>
+      {actions ? <div className="mt-5 flex flex-wrap gap-2">{actions}</div> : null}
     </article>
   );
 }

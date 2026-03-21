@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, las primeras superficies privadas visibles del SaaS y auth real base por rol, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol y operaciones mutativas iniciales para `Team Admin`, sin tocar produccion.
 
 ## Componentes
 
@@ -34,6 +34,12 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `/member/*` -> `MEMBER`
 - Redirects por rol despues de login y cuando un usuario intenta entrar a una superficie ajena.
 - Capa server-side para app shells en `apps/web/lib/app-shell`.
+- Team operations v1 conectadas sobre `/team/*` con formularios y acciones para:
+  - funnel instances
+  - funnel publications
+  - sponsors
+  - rotation pool members
+  - leads con filtros basicos
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
@@ -71,6 +77,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `LeadCaptureAssignmentService` dentro del runtime publico para submit compuesto.
 - `TrackingEventsService` para tracking browser/server y utilidades operativas.
 - `AuthModule` con login, logout, `me`, sesiones persistidas y guards por rol.
+- Endpoints mutativos iniciales para operacion de `Team Admin`.
 - Modulos disponibles:
   - `auth`
   - `workspaces`
@@ -90,6 +97,17 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `leads`
   - `assignments`
   - `events`
+- Endpoints auxiliares adicionales para UI operativa:
+  - `GET /v1/tracking-profiles`
+  - `GET /v1/handoff-strategies`
+  - `GET /v1/rotation-pools/members`
+- Endpoints mutativos iniciales de team operations:
+  - `POST /v1/funnel-instances`
+  - `PATCH /v1/funnel-instances/:id`
+  - `POST /v1/funnel-publications`
+  - `PATCH /v1/funnel-publications/:id`
+  - `PATCH /v1/sponsors/:id`
+  - `PATCH /v1/rotation-pools/members/:memberId`
 - Endpoints publicos de runtime:
   - `GET /v1/public/funnel-runtime/resolve`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`
@@ -157,6 +175,7 @@ La arquitectura ya implementa:
 - tracking events v1 con `eventId` y contexto de funnel/step
 - autenticacion real por cookie HttpOnly con sesiones persistidas en DB
 - autorizacion base por rol sobre API y superficies privadas
+- operacion mutativa inicial del team sin tocar templates ni JSON estructural
 
 ## Runtime publico v1
 
@@ -228,6 +247,7 @@ Decision de transicion:
 - Permisos finos por recurso o policy engine.
 - Logica compleja de asignacion.
 - Editor visual completo para teams.
+- Invites.
 
 ## Estado
-Arquitectura lista para la siguiente fase de acciones mutativas sobre app shells, invitaciones/gestion de usuarios, permisos mas finos por recurso y evolucion de los read models operativos, todavia sin cambios en produccion.
+Arquitectura lista para la siguiente fase de operaciones avanzadas sobre leads y assignments, mejoras de dominios y read models operativos, y luego invitaciones/gestion de usuarios y permisos mas finos por recurso, todavia sin cambios en produccion.

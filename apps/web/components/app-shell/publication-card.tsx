@@ -1,11 +1,16 @@
+import type { ReactNode } from "react";
 import { StatusBadge } from "@/components/app-shell/status-badge";
 import type { PublicationView } from "@/lib/app-shell/types";
 
 type PublicationCardProps = {
   publication: PublicationView;
+  actions?: ReactNode;
 };
 
-export function PublicationCard({ publication }: PublicationCardProps) {
+export function PublicationCard({
+  publication,
+  actions,
+}: PublicationCardProps) {
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
       <div className="flex items-start justify-between gap-3">
@@ -37,6 +42,7 @@ export function PublicationCard({ publication }: PublicationCardProps) {
           <dd className="font-medium text-slate-800">{publication.handoffLabel}</dd>
         </div>
       </dl>
+      {actions ? <div className="mt-5 flex flex-wrap gap-2">{actions}</div> : null}
     </article>
   );
 }

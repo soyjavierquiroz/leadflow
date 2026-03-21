@@ -25,4 +25,23 @@ export class HandoffStrategiesService {
       settingsJson: dto.settingsJson,
     });
   }
+
+  async list(filters?: {
+    workspaceId?: string;
+    teamId?: string;
+  }): Promise<HandoffStrategy[]> {
+    if (!this.repository) {
+      throw new Error('HandoffStrategyRepository provider is not configured.');
+    }
+
+    if (filters?.teamId) {
+      return this.repository.findByTeamId(filters.teamId);
+    }
+
+    if (filters?.workspaceId) {
+      return this.repository.findByWorkspaceId(filters.workspaceId);
+    }
+
+    return this.repository.findAll();
+  }
 }

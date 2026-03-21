@@ -120,6 +120,21 @@ export type RotationPoolRecord = {
   updatedAt: string;
 };
 
+export type RotationPoolMemberRecord = {
+  id: string;
+  rotationPoolId: string;
+  poolName: string;
+  sponsorId: string;
+  sponsorName: string;
+  sponsorStatus: string;
+  sponsorAvailabilityStatus: string;
+  position: number;
+  weight: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type LeadRecord = {
   id: string;
   workspaceId: string;
@@ -173,6 +188,32 @@ export type EventRecord = {
   visitorId: string | null;
   leadId: string | null;
   assignmentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TrackingProfileRecord = {
+  id: string;
+  workspaceId: string;
+  teamId: string;
+  name: string;
+  provider: string;
+  status: string;
+  configJson: unknown;
+  deduplicationMode: string;
+  conversionEventMappingIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type HandoffStrategyRecord = {
+  id: string;
+  workspaceId: string;
+  teamId: string | null;
+  name: string;
+  type: string;
+  status: string;
+  settingsJson: unknown;
   createdAt: string;
   updatedAt: string;
 };
@@ -251,6 +292,9 @@ export type AppShellSnapshot = {
   sponsors: SponsorRecord[];
   currentSponsor: SponsorRecord;
   rotationPools: RotationPoolRecord[];
+  rotationPoolMembers: RotationPoolMemberRecord[];
+  trackingProfiles: TrackingProfileRecord[];
+  handoffStrategies: HandoffStrategyRecord[];
   leads: LeadRecord[];
   leadViews: LeadView[];
   assignments: AssignmentRecord[];

@@ -26,12 +26,15 @@ import type {
   FunnelPublicationRecord,
   FunnelTemplateRecord,
   FunnelView,
+  HandoffStrategyRecord,
   LeadRecord,
   LeadView,
   PublicationView,
   RotationPoolRecord,
+  RotationPoolMemberRecord,
   SponsorRecord,
   TeamMetadata,
+  TrackingProfileRecord,
   WorkspaceRecord,
 } from "@/lib/app-shell/types";
 
@@ -255,6 +258,32 @@ const buildLeadViews = (input: {
   });
 };
 
+const buildMockRotationPoolMembers = (input: {
+  rotationPools: RotationPoolRecord[];
+  sponsors: SponsorRecord[];
+}): RotationPoolMemberRecord[] => {
+  return input.rotationPools.flatMap((pool) =>
+    pool.sponsorIds.map((sponsorId, index) => {
+      const sponsor = input.sponsors.find((item) => item.id === sponsorId);
+
+      return {
+        id: `${pool.id}:${sponsorId}`,
+        rotationPoolId: pool.id,
+        poolName: pool.name,
+        sponsorId,
+        sponsorName: sponsor?.displayName ?? "Sponsor pendiente",
+        sponsorStatus: sponsor?.status ?? "draft",
+        sponsorAvailabilityStatus: sponsor?.availabilityStatus ?? "paused",
+        position: index + 1,
+        weight: 1,
+        isActive: true,
+        createdAt: pool.createdAt,
+        updatedAt: pool.updatedAt,
+      };
+    }),
+  );
+};
+
 export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
   noStore();
   const currentUser = (await getSessionUser()) as AuthenticatedAppUserRecord | null;
@@ -271,6 +300,9 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     domainsResult,
     sponsorsResult,
     rotationPoolsResult,
+    rotationPoolMembersResult,
+    trackingProfilesResult,
+    handoffStrategiesResult,
     leadsResult,
     assignmentsResult,
   ] = await Promise.all([
@@ -364,6 +396,30 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           data: mockRotationPools,
           source: "mock" as const,
         }),
+    canReadAdminCollections
+      ? fetchCollection<RotationPoolMemberRecord>(
+          "/rotation-pools/members",
+          buildMockRotationPoolMembers({
+            rotationPools: mockRotationPools,
+            sponsors: mockSponsors,
+          }),
+        )
+      : Promise.resolve({
+          data: [],
+          source: "mock" as const,
+        }),
+    canReadAdminCollections
+      ? fetchCollection<TrackingProfileRecord>("/tracking-profiles", [])
+      : Promise.resolve({
+          data: [],
+          source: "mock" as const,
+        }),
+    canReadAdminCollections
+      ? fetchCollection<HandoffStrategyRecord>("/handoff-strategies", [])
+      : Promise.resolve({
+          data: [],
+          source: "mock" as const,
+        }),
     fetchCollection<LeadRecord>("/leads", mockLeads),
     fetchCollection<AssignmentRecord>("/assignments", mockAssignments),
   ]);
@@ -377,6 +433,9 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     domains: domainsResult.source,
     sponsors: sponsorsResult.source,
     rotationPools: rotationPoolsResult.source,
+    rotationPoolMembers: rotationPoolMembersResult.source,
+    trackingProfiles: trackingProfilesResult.source,
+    handoffStrategies: handoffStrategiesResult.source,
     leads: leadsResult.source,
     assignments: assignmentsResult.source,
   };
@@ -465,6 +524,9 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     sponsors: sponsorsResult.data,
     currentSponsor,
     rotationPools: rotationPoolsResult.data,
+    rotationPoolMembers: rotationPoolMembersResult.data,
+    trackingProfiles: trackingProfilesResult.data,
+    handoffStrategies: handoffStrategiesResult.data,
     leads: leadsResult.data,
     leadViews,
     assignments: assignmentsResult.data,
