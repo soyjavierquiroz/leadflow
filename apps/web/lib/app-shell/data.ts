@@ -45,6 +45,11 @@ type CollectionResult<T> = {
   source: CollectionSource;
 };
 
+type SingletonResult<T> = {
+  data: T;
+  source: CollectionSource;
+};
+
 const resolveSourceMode = (
   sources: Record<string, CollectionSource>,
 ): DataSourceMode => {
@@ -80,6 +85,35 @@ const fetchCollection = async <T>(
 
     return {
       data: payload as T[],
+      source: "live",
+    };
+  } catch {
+    return {
+      data: fallback,
+      source: "mock",
+    };
+  }
+};
+
+const fetchSingleton = async <T>(
+  path: string,
+  fallback: T,
+): Promise<SingletonResult<T>> => {
+  try {
+    const response = await apiFetchWithSession(path);
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+
+    const payload = (await response.json()) as unknown;
+
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+      throw new Error("The API payload is not an object.");
+    }
+
+    return {
+      data: payload as T,
       source: "live",
     };
   } catch {
@@ -290,6 +324,18 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
 
   const canReadAdminCollections =
     currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "TEAM_ADMIN";
+  const memberSponsorFallback =
+    currentUser?.sponsorId && currentUser.sponsor
+      ? {
+          ...mockSponsors[0],
+          id: currentUser.sponsor.id,
+          workspaceId: currentUser.workspaceId ?? mockWorkspace.id,
+          teamId: currentUser.teamId ?? mockTeamMetadata[0].id,
+          displayName: currentUser.sponsor.displayName,
+          email: currentUser.sponsor.email,
+          availabilityStatus: currentUser.sponsor.availabilityStatus,
+        }
+      : mockSponsors[0];
 
   const [
     workspacesResult,
@@ -371,25 +417,19 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           data: mockDomains,
           source: "mock" as const,
         }),
-    canReadAdminCollections
-      ? fetchCollection<SponsorRecord>("/sponsors", mockSponsors)
-      : Promise.resolve({
-          data:
-            currentUser?.sponsorId && currentUser.sponsor
-              ? [
-                  {
-                    ...mockSponsors[0],
-                    id: currentUser.sponsor.id,
-                    workspaceId: currentUser.workspaceId ?? mockWorkspace.id,
-                    teamId: currentUser.teamId ?? mockTeamMetadata[0].id,
-                    displayName: currentUser.sponsor.displayName,
-                    email: currentUser.sponsor.email,
-                    availabilityStatus: currentUser.sponsor.availabilityStatus,
-                  },
-                ]
-              : mockSponsors,
-          source: currentUser?.role === "MEMBER" ? ("live" as const) : ("mock" as const),
-        }),
+    currentUser?.role === "MEMBER"
+      ? fetchSingleton<SponsorRecord>("/sponsors/me", memberSponsorFallback).then(
+          (result) => ({
+            data: [result.data],
+            source: result.source,
+          }),
+        )
+      : canReadAdminCollections
+        ? fetchCollection<SponsorRecord>("/sponsors", mockSponsors)
+        : Promise.resolve({
+            data: mockSponsors,
+            source: "mock" as const,
+          }),
     canReadAdminCollections
       ? fetchCollection<RotationPoolRecord>("/rotation-pools", mockRotationPools)
       : Promise.resolve({

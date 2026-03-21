@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol y operaciones mutativas iniciales para `Team Admin`, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol y operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, sin tocar produccion.
 
 ## Componentes
 
@@ -40,6 +40,12 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - sponsors
   - rotation pool members
   - leads con filtros basicos
+- Member operations v1 conectadas sobre `/member/*` con acciones para:
+  - aceptar handoffs
+  - mover estado simple de leads
+  - editar perfil operativo del sponsor
+  - pausar o reactivar disponibilidad
+  - revisar detalle basico del lead sin inbox
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
@@ -78,6 +84,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `TrackingEventsService` para tracking browser/server y utilidades operativas.
 - `AuthModule` con login, logout, `me`, sesiones persistidas y guards por rol.
 - Endpoints mutativos iniciales para operacion de `Team Admin`.
+- Endpoints privados adicionales para operacion de `Member`.
 - Modulos disponibles:
   - `auth`
   - `workspaces`
@@ -108,6 +115,14 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `PATCH /v1/funnel-publications/:id`
   - `PATCH /v1/sponsors/:id`
   - `PATCH /v1/rotation-pools/members/:memberId`
+- Endpoints member operations:
+  - `GET /v1/sponsors/me`
+  - `PATCH /v1/sponsors/me`
+  - `GET /v1/leads?status=...`
+  - `GET /v1/leads/:id`
+  - `PATCH /v1/leads/:id`
+  - `GET /v1/assignments?status=...`
+  - `PATCH /v1/assignments/:id`
 - Endpoints publicos de runtime:
   - `GET /v1/public/funnel-runtime/resolve`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`
@@ -176,6 +191,7 @@ La arquitectura ya implementa:
 - autenticacion real por cookie HttpOnly con sesiones persistidas en DB
 - autorizacion base por rol sobre API y superficies privadas
 - operacion mutativa inicial del team sin tocar templates ni JSON estructural
+- operacion mutativa inicial del member sobre sponsor, leads y assignments propios
 
 ## Runtime publico v1
 
@@ -241,6 +257,7 @@ Decision de transicion:
 - DNS real aplicado.
 - Integracion real con Meta o TikTok.
 - Handoff real con WhatsApp.
+- Inbox conversacional para members.
 - Editor libre de templates para teams.
 - Redis, n8n o Evolution.
 - SSO, MFA, password reset y gestion avanzada de usuarios.
@@ -250,4 +267,4 @@ Decision de transicion:
 - Invites.
 
 ## Estado
-Arquitectura lista para la siguiente fase de operaciones avanzadas sobre leads y assignments, mejoras de dominios y read models operativos, y luego invitaciones/gestion de usuarios y permisos mas finos por recurso, todavia sin cambios en produccion.
+Arquitectura lista para la siguiente fase de handoff y seguimiento mas avanzado sobre leads/assignments, reveal operativo enriquecido para members, y luego invitaciones/gestion de usuarios y permisos mas finos por recurso, todavia sin cambios en produccion.

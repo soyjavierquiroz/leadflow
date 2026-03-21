@@ -10,6 +10,7 @@ import { SPONSOR_REPOSITORY } from '../shared/domain.tokens';
 import { mapSponsorRecord } from '../../prisma/prisma.mappers';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateSponsorDto } from './dto/create-sponsor.dto';
+import type { UpdateMemberSponsorDto } from './dto/update-member-sponsor.dto';
 import type { UpdateTeamSponsorDto } from './dto/update-team-sponsor.dto';
 import type {
   Sponsor,
@@ -58,6 +59,29 @@ export class SponsorsService {
     return this.repository.findAll();
   }
 
+  async findForMember(scope: {
+    workspaceId: string;
+    teamId: string;
+    sponsorId: string;
+  }): Promise<Sponsor> {
+    const sponsor = await this.prisma.sponsor.findFirst({
+      where: {
+        id: scope.sponsorId,
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+      },
+    });
+
+    if (!sponsor) {
+      throw new NotFoundException({
+        code: 'SPONSOR_NOT_FOUND',
+        message: 'The requested sponsor was not found for this member.',
+      });
+    }
+
+    return mapSponsorRecord(sponsor);
+  }
+
   async updateForTeam(
     scope: {
       workspaceId: string;
@@ -95,6 +119,85 @@ export class SponsorsService {
         availabilityStatus:
           dto.availabilityStatus ??
           (dto.status === 'paused' ? 'paused' : sponsor.availabilityStatus),
+      },
+    });
+
+    return mapSponsorRecord(record);
+  }
+
+  async updateForMember(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+      sponsorId: string;
+    },
+    dto: UpdateMemberSponsorDto,
+  ): Promise<Sponsor> {
+    if (
+      dto.displayName === undefined &&
+      dto.email === undefined &&
+      dto.phone === undefined &&
+      dto.availabilityStatus === undefined
+    ) {
+      throw new BadRequestException({
+        code: 'SPONSOR_UPDATE_EMPTY',
+        message: 'At least one sponsor profile field is required.',
+      });
+    }
+
+    const sponsor = await this.prisma.sponsor.findFirst({
+      where: {
+        id: scope.sponsorId,
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+      },
+    });
+
+    if (!sponsor) {
+      throw new NotFoundException({
+        code: 'SPONSOR_NOT_FOUND',
+        message: 'The requested sponsor was not found for this member.',
+      });
+    }
+
+    const displayName =
+      dto.displayName !== undefined
+        ? dto.displayName.trim()
+        : sponsor.displayName;
+
+    if (!displayName) {
+      throw new BadRequestException({
+        code: 'SPONSOR_DISPLAY_NAME_REQUIRED',
+        message: 'Sponsor display name is required.',
+      });
+    }
+
+    const normalizeNullable = (
+      value: string | null | undefined,
+    ): string | null | undefined => {
+      if (value === undefined) {
+        return undefined;
+      }
+
+      if (value === null) {
+        return null;
+      }
+
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    };
+
+    const nextEmail = normalizeNullable(dto.email);
+    const nextPhone = normalizeNullable(dto.phone);
+
+    const record = await this.prisma.sponsor.update({
+      where: { id: sponsor.id },
+      data: {
+        displayName,
+        email: nextEmail !== undefined ? nextEmail : sponsor.email,
+        phone: nextPhone !== undefined ? nextPhone : sponsor.phone,
+        availabilityStatus:
+          dto.availabilityStatus ?? sponsor.availabilityStatus,
       },
     });
 

@@ -15,6 +15,7 @@ La base del monorepo ya incluye:
 - App Shells + UI Base v1 para `Super Admin`, `Team Admin` y `Sponsor / Member`.
 - Roles & Auth v1 con login real, sesión segura y protección base por superficie.
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
+- Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -100,6 +101,7 @@ Validacion de stacks:
 - `docs/app-shells-ui-base-v1.md`
 - `docs/roles-auth-v1.md`
 - `docs/team-operations-v1.md`
+- `docs/member-operations-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -277,6 +279,31 @@ Modulos disponibles:
   - consultar leads del team con filtros básicos
 - Restricción mantenida:
   - `Team Admin` no puede editar templates ni JSON estructural libre
+
+## Member Operations v1
+- Superficie `Sponsor / Member` conectada con operación real en:
+  - `/member`
+  - `/member/leads`
+  - `/member/profile`
+- Endpoints operativos agregados o ampliados:
+  - `GET /v1/sponsors/me`
+  - `PATCH /v1/sponsors/me`
+  - `GET /v1/leads?status=...`
+  - `GET /v1/leads/:id`
+  - `PATCH /v1/leads/:id`
+  - `GET /v1/assignments?status=...`
+  - `PATCH /v1/assignments/:id`
+- Operaciones habilitadas:
+  - ver leads asignados reales
+  - aceptar leads nuevos desde el member
+  - mover estado simple del lead
+  - cerrar assignments
+  - editar perfil visible del sponsor
+  - pausar o reactivar disponibilidad para recibir nuevos handoffs
+- Restricciones mantenidas:
+  - sin inbox conversacional
+  - sin WhatsApp, Evolution o n8n
+  - sin notas avanzadas ni CRM completo
 
 ## App Shells + UI Base v1
 - Superficies visibles implementadas en `apps/web`:

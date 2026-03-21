@@ -1,8 +1,9 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
+import type { UpdateMemberAssignmentDto } from './dto/update-member-assignment.dto';
 import { AssignmentsService } from './assignments.service';
 
 @Controller('assignments')
@@ -16,6 +17,7 @@ export class AssignmentsController {
     @Query('workspaceId') workspaceId?: string,
     @Query('sponsorId') sponsorId?: string,
     @Query('funnelPublicationId') funnelPublicationId?: string,
+    @Query('status') status?: string,
   ) {
     return this.assignmentsService.list({
       workspaceId:
@@ -33,6 +35,25 @@ export class AssignmentsController {
           ? (user.sponsorId ?? undefined)
           : sponsorId,
       funnelPublicationId,
+      status,
     });
+  }
+
+  @Patch(':id')
+  @RequireRoles(UserRole.MEMBER)
+  updateForMember(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') assignmentId: string,
+    @Body() dto: UpdateMemberAssignmentDto,
+  ) {
+    return this.assignmentsService.updateForMember(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+        sponsorId: user.sponsorId!,
+      },
+      assignmentId,
+      dto,
+    );
   }
 }
