@@ -83,6 +83,7 @@ Validacion de stacks:
 - `docs/infrastructure-v1.md`
 - `docs/deployment-v1.md`
 - `docs/deployment-local-v1.md`
+- `docs/tls-verification-v1.md`
 - `docs/deploy-checklist-v1.md`
 - `docs/domain-strategy-v1.md`
 - `docs/environment-v1.md`
@@ -97,6 +98,8 @@ Validacion de stacks:
 - TLS para Cloudflare Full (strict) en stack local:
   - Routers `site`, `members`, `admin`, `api` con `tls.certresolver=le`.
   - Dominio principal y SANs explicitos en `leadflow-site` para cubrir apex y subdominios operativos.
+- Verificacion post-fix TLS:
+  - Checklist y comandos OpenSSL en `docs/tls-verification-v1.md`.
 - Deploy aun no ejecutado.
 
 ## Nota operativa
