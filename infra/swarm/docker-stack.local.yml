@@ -33,14 +33,19 @@ services:
         - traefik.http.routers.leadflow-site.rule=Host(`${LEADFLOW_SITE_HOST:-exitosos.com}`)
         - traefik.http.routers.leadflow-site.entrypoints=websecure
         - traefik.http.routers.leadflow-site.tls=true
+        - traefik.http.routers.leadflow-site.tls.certresolver=le
+        - traefik.http.routers.leadflow-site.tls.domains[0].main=${LEADFLOW_SITE_HOST:-exitosos.com}
+        - traefik.http.routers.leadflow-site.tls.domains[0].sans=${LEADFLOW_MEMBERS_HOST:-members.exitosos.com},${LEADFLOW_ADMIN_HOST:-admin.exitosos.com},${LEADFLOW_API_HOST:-api.exitosos.com}
         - traefik.http.routers.leadflow-site.service=leadflow-web
         - traefik.http.routers.leadflow-members.rule=Host(`${LEADFLOW_MEMBERS_HOST:-members.exitosos.com}`)
         - traefik.http.routers.leadflow-members.entrypoints=websecure
         - traefik.http.routers.leadflow-members.tls=true
+        - traefik.http.routers.leadflow-members.tls.certresolver=le
         - traefik.http.routers.leadflow-members.service=leadflow-web
         - traefik.http.routers.leadflow-admin.rule=Host(`${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}`)
         - traefik.http.routers.leadflow-admin.entrypoints=websecure
         - traefik.http.routers.leadflow-admin.tls=true
+        - traefik.http.routers.leadflow-admin.tls.certresolver=le
         - traefik.http.routers.leadflow-admin.service=leadflow-web
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1']
@@ -88,6 +93,7 @@ services:
         - traefik.http.routers.leadflow-api.rule=Host(`${LEADFLOW_API_HOST:-api.exitosos.com}`)
         - traefik.http.routers.leadflow-api.entrypoints=websecure
         - traefik.http.routers.leadflow-api.tls=true
+        - traefik.http.routers.leadflow-api.tls.certresolver=le
         - traefik.http.routers.leadflow-api.service=leadflow-api
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3001/health >/dev/null 2>&1 || exit 1']

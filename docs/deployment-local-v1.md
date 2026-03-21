@@ -71,6 +71,18 @@ Cargar en Portainer (o usar defaults) segun `infra/swarm/.env.example`:
   - `https://members.exitosos.com`
   - `https://admin.exitosos.com`
 
+## Nota TLS para Cloudflare Full (strict)
+- Se agrego `tls.certresolver=le` en los routers:
+  - `leadflow-site`
+  - `leadflow-members`
+  - `leadflow-admin`
+  - `leadflow-api`
+- Se definio en `leadflow-site`:
+  - `tls.domains[0].main=exitosos.com`
+  - `tls.domains[0].sans=members.exitosos.com,admin.exitosos.com,api.exitosos.com`
+- Motivo: evitar fallback a `TRAEFIK DEFAULT CERT`, que provoca error 526 en Cloudflare strict cuando el host no esta cubierto por un certificado valido en origen.
+- Nota: wildcard real (`*.exitosos.com`) requiere DNS challenge en ACME. Con la configuracion actual de Traefik (`http/tls challenge`), se usa cobertura explicita por host.
+
 ## Riesgos y limitaciones
 - Las imagenes locales no se distribuyen automaticamente entre nodos Swarm.
 - Si el scheduler mueve tareas a otro nodo sin imagen local, el contenedor falla.

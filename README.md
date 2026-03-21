@@ -94,6 +94,9 @@ Validacion de stacks:
 - Runtime de contenedores para Swarm:
   - Web: `node apps/web/server.js` (Next standalone, produccion)
   - API: `node apps/api/dist/main.js` (Nest compilado, produccion)
+- TLS para Cloudflare Full (strict) en stack local:
+  - Routers `site`, `members`, `admin`, `api` con `tls.certresolver=le`.
+  - Dominio principal y SANs explicitos en `leadflow-site` para cubrir apex y subdominios operativos.
 - Deploy aun no ejecutado.
 
 ## Nota operativa
