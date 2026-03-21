@@ -9,6 +9,7 @@ import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type { SponsorRecord } from "@/lib/app-shell/types";
 import {
   memberOperationRequest,
+  type MemberMessagingAutomationSnapshot,
   type MemberMessagingSnapshot,
 } from "@/lib/member-operations";
 
@@ -58,10 +59,24 @@ const routingModeLabel: Record<
   unconfigured: "Sin configurar",
 };
 
+const automationDispatchStatusLabel: Record<
+  NonNullable<
+    MemberMessagingAutomationSnapshot["latestDispatches"][number]
+  >["status"],
+  string
+> = {
+  pending: "Pendiente",
+  skipped: "Skipped",
+  dispatched: "Enviado",
+  failed: "Falló",
+};
+
 export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
   const [snapshot, setSnapshot] = useState<MemberMessagingSnapshot | null>(
     null,
   );
+  const [automationSnapshot, setAutomationSnapshot] =
+    useState<MemberMessagingAutomationSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [action, setAction] = useState<ChannelAction>(null);
   const [feedback, setFeedback] = useState<{
@@ -116,8 +131,25 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
     },
   );
 
+  const loadAutomation = async () => {
+    try {
+      const nextSnapshot =
+        await memberOperationRequest<MemberMessagingAutomationSnapshot>(
+          "/messaging-automation/me",
+          {
+            method: "GET",
+          },
+        );
+
+      setAutomationSnapshot(nextSnapshot);
+    } catch {
+      return;
+    }
+  };
+
   useEffect(() => {
     void loadSnapshot();
+    void loadAutomation();
   }, []);
 
   const currentStatus = snapshot?.connection?.status ?? null;
@@ -154,6 +186,7 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
         });
 
       setSnapshot(nextSnapshot);
+      await loadAutomation();
       setFeedback({
         tone: "success",
         message: params.successMessage(nextSnapshot),
@@ -233,6 +266,7 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
 
   const connection = snapshot?.connection ?? null;
   const provider = snapshot?.provider ?? null;
+  const automationReadiness = automationSnapshot?.readiness ?? null;
   const isPolling = currentStatus
     ? POLLABLE_STATUSES.has(currentStatus)
     : false;
@@ -249,7 +283,7 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
         <OperationBanner tone={feedback.tone} message={feedback.message} />
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           label="Estado del canal"
           value={
@@ -273,6 +307,11 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
           label="Fallback actual"
           value={provider?.fallbackWaMeEnabled ? "wa.me activo" : "Desactivado"}
           hint="Reveal & Handoff no se rompe aunque la conexión real todavía no exista."
+        />
+        <KpiCard
+          label="Automation n8n"
+          value={automationReadiness?.canDispatch ? "Ready" : "Bloqueado"}
+          hint="El bridge a n8n es sidecar: si no está listo, el funnel público sigue funcionando igual."
         />
       </section>
 
@@ -519,6 +558,92 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
               con `wa.me` como fallback hasta que llegue la fase de mensajería
               activa.
             </p>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="font-medium text-slate-900">Bridge n8n</p>
+              <StatusBadge
+                value={automationReadiness?.canDispatch ? "ready" : "blocked"}
+              />
+            </div>
+            <p className="mt-2">
+              {automationReadiness?.note ??
+                "El bridge a n8n despacha contexto estructurado cuando existe un canal connected y un webhook objetivo configurado."}
+            </p>
+            <p className="mt-3 break-all text-xs uppercase tracking-[0.18em] text-slate-500">
+              Target: {automationReadiness?.targetWebhookUrl ?? "Pendiente"}
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-950">
+                  Dispatches recientes
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Historial mínimo del bridge a n8n para saber si el sponsor ya
+                  está listo y si el webhook respondió.
+                </p>
+              </div>
+            </div>
+
+            {automationSnapshot?.latestDispatches.length ? (
+              <div className="mt-4 space-y-3">
+                {automationSnapshot.latestDispatches.map((dispatch) => (
+                  <article
+                    key={dispatch.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {dispatch.lead.fullName ?? "Lead sin nombre"}
+                        </p>
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                          {dispatch.triggerType}
+                        </p>
+                      </div>
+                      <StatusBadge value={dispatch.status} />
+                    </div>
+                    <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                      <div>
+                        <dt className="text-slate-500">Estado</dt>
+                        <dd className="font-medium text-slate-900">
+                          {automationDispatchStatusLabel[dispatch.status]}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-500">Queued</dt>
+                        <dd className="font-medium text-slate-900">
+                          {formatDateTime(dispatch.queuedAt)}
+                        </dd>
+                      </div>
+                      <div className="md:col-span-2">
+                        <dt className="text-slate-500">Webhook</dt>
+                        <dd className="break-all font-medium text-slate-900">
+                          {dispatch.targetWebhookUrl ?? "Pendiente"}
+                        </dd>
+                      </div>
+                      {dispatch.errorMessage ? (
+                        <div className="md:col-span-2">
+                          <dt className="text-slate-500">Resultado</dt>
+                          <dd className="leading-6 text-rose-700">
+                            {dispatch.errorMessage}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm leading-6 text-slate-600">
+                Aún no hay dispatches persistidos. El primer assignment nuevo
+                del runtime público creará el snapshot del bridge hacia n8n.
+              </div>
+            )}
           </div>
         </div>
       </section>

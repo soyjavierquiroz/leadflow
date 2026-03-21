@@ -55,6 +55,51 @@ export type MemberMessagingSnapshot = {
   };
 };
 
+export type MemberAutomationDispatch = {
+  id: string;
+  assignmentId: string;
+  leadId: string;
+  sponsorId: string;
+  triggerType: string;
+  status: "pending" | "skipped" | "dispatched" | "failed";
+  targetWebhookUrl: string | null;
+  responseStatusCode: number | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  queuedAt: string;
+  dispatchedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lead: {
+    id: string;
+    fullName: string | null;
+    email: string | null;
+    phone: string | null;
+    status: string;
+  };
+};
+
+export type MemberMessagingAutomationSnapshot = {
+  readiness: {
+    canDispatch: boolean;
+    status: "ready" | "blocked";
+    blockingReason: string | null;
+    targetWebhookUrl: string | null;
+    defaultWebhookBaseUrlConfigured: boolean;
+    connectionStatus:
+      | "disconnected"
+      | "provisioning"
+      | "qr_ready"
+      | "connecting"
+      | "connected"
+      | "error"
+      | null;
+    note: string | null;
+  };
+  latestDispatches: MemberAutomationDispatch[];
+};
+
 export const memberOperationRequest = async <T>(
   path: string,
   init: RequestInit,

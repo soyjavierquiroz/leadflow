@@ -10,6 +10,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { TrackingEventsService } from '../events/tracking-events.service';
+import { MessagingAutomationService } from '../messaging-automation/messaging-automation.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto';
 import type { CapturePublicLeadDto } from './dto/capture-public-lead.dto';
@@ -118,6 +119,7 @@ export class LeadCaptureAssignmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly trackingEventsService: TrackingEventsService,
+    private readonly messagingAutomationService: MessagingAutomationService,
   ) {}
 
   async registerVisitor(dto: RegisterPublicVisitorDto) {
@@ -160,7 +162,7 @@ export class LeadCaptureAssignmentService {
     let failureContext: AssignmentFailureTrackingContext | null = null;
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const publication = await this.getPublicationContextOrThrow(
           tx,
           dto.publicationId,
@@ -187,14 +189,15 @@ export class LeadCaptureAssignmentService {
           leadId: lead.id,
         };
 
-        const { assignment } = await this.assignLeadToNextSponsorInTransaction(
-          tx,
-          publication,
-          lead,
-          {
-            triggerEventId: dto.triggerEventId ?? null,
-          },
-        );
+        const { assignment, wasCreated } =
+          await this.assignLeadToNextSponsorInTransaction(
+            tx,
+            publication,
+            lead,
+            {
+              triggerEventId: dto.triggerEventId ?? null,
+            },
+          );
         const nextStep = this.resolveNextStepAfterCaptureFromPublication(
           publication,
           publication.funnelInstance.steps[0]?.id,
@@ -205,8 +208,24 @@ export class LeadCaptureAssignmentService {
         return {
           assignment,
           nextStep,
+          assignmentWasCreated: wasCreated,
         };
       });
+
+      if (result.assignmentWasCreated) {
+        void this.messagingAutomationService
+          .dispatchAssignmentAutomation({
+            assignmentId: result.assignment.id,
+            triggerType: 'public_auto_assignment_created',
+            triggerEventId: dto.triggerEventId ?? null,
+          })
+          .catch(() => undefined);
+      }
+
+      return {
+        assignment: result.assignment,
+        nextStep: result.nextStep,
+      };
     } catch (error) {
       await this.recordAssignmentFailure(failureContext, error);
       throw error;
@@ -217,7 +236,7 @@ export class LeadCaptureAssignmentService {
     let failureContext: AssignmentFailureTrackingContext | null = null;
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const publication = await this.getPublicationContextOrThrow(
           tx,
           dto.publicationId,
@@ -272,15 +291,16 @@ export class LeadCaptureAssignmentService {
           leadId: leadResult.wasCreated ? null : leadResult.lead.id,
         };
 
-        const { assignment } = await this.assignLeadToNextSponsorInTransaction(
-          tx,
-          publication,
-          leadResult.lead,
-          {
-            triggerEventId: dto.submissionEventId ?? null,
-            funnelStepId: dto.currentStepId,
-          },
-        );
+        const { assignment, wasCreated } =
+          await this.assignLeadToNextSponsorInTransaction(
+            tx,
+            publication,
+            leadResult.lead,
+            {
+              triggerEventId: dto.submissionEventId ?? null,
+              funnelStepId: dto.currentStepId,
+            },
+          );
         const nextStep = this.resolveNextStepAfterCaptureFromPublication(
           publication,
           dto.currentStepId,
@@ -317,6 +337,7 @@ export class LeadCaptureAssignmentService {
           visitor,
           lead: leadResult.lead,
           assignment,
+          assignmentWasCreated: wasCreated,
           nextStep,
           handoff: {
             mode: handoffConfig.mode,
@@ -331,6 +352,27 @@ export class LeadCaptureAssignmentService {
           },
         };
       });
+
+      if (result.assignmentWasCreated) {
+        void this.messagingAutomationService
+          .dispatchAssignmentAutomation({
+            assignmentId: result.assignment.id,
+            triggerType: 'public_submission_assignment_created',
+            triggerEventId: dto.submissionEventId ?? null,
+            anonymousId: dto.anonymousId,
+            currentStepId: dto.currentStepId,
+            nextStepPath: result.nextStep?.path ?? null,
+          })
+          .catch(() => undefined);
+      }
+
+      return {
+        visitor: result.visitor,
+        lead: result.lead,
+        assignment: result.assignment,
+        nextStep: result.nextStep,
+        handoff: result.handoff,
+      };
     } catch (error) {
       await this.recordAssignmentFailure(failureContext, error);
       throw error;

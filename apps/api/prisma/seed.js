@@ -166,6 +166,7 @@ async function main() {
   });
 
   await prisma.authSession.deleteMany();
+  await prisma.automationDispatch.deleteMany();
 
   await prisma.user.upsert({
     where: { email: 'admin@leadflow.local' },

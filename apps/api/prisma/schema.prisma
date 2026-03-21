@@ -194,6 +194,13 @@ enum MessagingConnectionStatus {
   error
 }
 
+enum AutomationDispatchStatus {
+  pending
+  skipped
+  dispatched
+  failed
+}
+
 enum EventActorType {
   system
   user
@@ -250,6 +257,7 @@ model Workspace {
   events             DomainEvent[]
   users              User[]
   messagingConnections MessagingConnection[]
+  automationDispatches AutomationDispatch[]
 }
 
 model Team {
@@ -275,6 +283,7 @@ model Team {
   assignments        Assignment[]
   users              User[]
   messagingConnections MessagingConnection[]
+  automationDispatches AutomationDispatch[]
 
   @@unique([workspaceId, code])
 }
@@ -298,6 +307,7 @@ model Sponsor {
   assignments         Assignment[]
   user                User?
   messagingConnection MessagingConnection?
+  automationDispatches AutomationDispatch[]
 }
 
 model User {
@@ -364,6 +374,7 @@ model MessagingConnection {
   workspace            Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team                 Team                      @relation(fields: [teamId], references: [id], onDelete: Cascade)
   sponsor              Sponsor                   @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  automationDispatches AutomationDispatch[]
 
   @@index([workspaceId, provider, status])
   @@index([teamId, provider, status])
@@ -453,6 +464,7 @@ model FunnelInstance {
   publications       FunnelPublication[]
   leads              Lead[]
   assignments        Assignment[]
+  automationDispatches AutomationDispatch[]
 
   @@unique([teamId, code])
 }
@@ -501,6 +513,7 @@ model FunnelPublication {
   handoffStrategy   HandoffStrategy?         @relation("PublicationHandoffStrategy", fields: [handoffStrategyId], references: [id], onDelete: SetNull)
   leads             Lead[]
   assignments       Assignment[]
+  automationDispatches AutomationDispatch[]
 
   @@unique([domainId, pathPrefix])
 }
@@ -640,6 +653,7 @@ model Lead {
   assignments         Assignment[]        @relation("LeadAssignments")
   currentAssignment   Assignment?         @relation("CurrentLeadAssignment", fields: [currentAssignmentId], references: [id], onDelete: SetNull)
   events              DomainEvent[]
+  automationDispatches AutomationDispatch[]
 }
 
 model Assignment {
@@ -668,6 +682,45 @@ model Assignment {
   rotationPool        RotationPool?       @relation(fields: [rotationPoolId], references: [id], onDelete: SetNull)
   currentForLead      Lead?               @relation("CurrentLeadAssignment")
   events              DomainEvent[]
+  automationDispatches AutomationDispatch[]
+}
+
+model AutomationDispatch {
+  id                  String                   @id @default(uuid())
+  workspaceId         String
+  teamId              String
+  sponsorId           String
+  leadId              String
+  assignmentId        String
+  funnelInstanceId    String?
+  funnelPublicationId String?
+  messagingConnectionId String?
+  triggerType         String
+  status              AutomationDispatchStatus
+  targetWebhookUrl    String?
+  payloadSnapshot     Json
+  responseSnapshot    Json?
+  responseStatusCode  Int?
+  errorCode           String?
+  errorMessage        String?
+  queuedAt            DateTime                 @default(now())
+  dispatchedAt        DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  workspace           Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                Team                     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sponsor             Sponsor                  @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  lead                Lead                     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignment          Assignment               @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  funnelInstance      FunnelInstance?          @relation(fields: [funnelInstanceId], references: [id], onDelete: SetNull)
+  funnelPublication   FunnelPublication?       @relation(fields: [funnelPublicationId], references: [id], onDelete: SetNull)
+  messagingConnection MessagingConnection?     @relation(fields: [messagingConnectionId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, status, createdAt])
+  @@index([sponsorId, createdAt])
+  @@index([assignmentId, createdAt])
+  @@index([messagingConnectionId, createdAt])
 }
 
 model DomainEvent {

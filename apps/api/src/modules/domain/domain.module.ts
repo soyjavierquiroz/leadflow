@@ -10,6 +10,7 @@ import { FunnelTemplatesModule } from '../funnel-templates/funnel-templates.modu
 import { FunnelsModule } from '../funnels/funnels.module';
 import { HandoffStrategiesModule } from '../handoff-strategies/handoff-strategies.module';
 import { LeadsModule } from '../leads/leads.module';
+import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { MessagingIntegrationsModule } from '../messaging-integrations/messaging-integrations.module';
 import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
 import { RotationPoolsModule } from '../rotation-pools/rotation-pools.module';
@@ -37,6 +38,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     RotationPoolsModule,
     VisitorsModule,
     LeadsModule,
+    MessagingAutomationModule,
     MessagingIntegrationsModule,
     AssignmentsModule,
     EventsModule,
@@ -58,6 +60,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     RotationPoolsModule,
     VisitorsModule,
     LeadsModule,
+    MessagingAutomationModule,
     MessagingIntegrationsModule,
     AssignmentsModule,
     EventsModule,

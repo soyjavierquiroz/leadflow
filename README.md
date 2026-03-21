@@ -21,6 +21,7 @@ La base del monorepo ya incluye:
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
 - Messaging Integrations v1 con conexión individual de WhatsApp por sponsor/member vía Evolution API y base preparada para n8n.
 - Evolution QR Connect v1 con lifecycle real de instancia, QR, refresh, reset y disconnect por backend.
+- Messaging Automation / n8n v1 con bridge real por webhook, payload estructurado y persistencia de dispatch por assignment.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -124,6 +125,7 @@ Validacion de stacks:
 - `docs/reveal-handoff-v1.md`
 - `docs/messaging-integrations-v1.md`
 - `docs/evolution-qr-connect-v1.md`
+- `docs/messaging-automation-n8n-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -161,6 +163,7 @@ Modulos disponibles:
 - `assignments`
 - `events`
 - `messaging-integrations`
+- `messaging-automation`
 
 ## Persistencia implementada
 
@@ -258,6 +261,18 @@ Modulos disponibles:
 ## Messaging Integrations v1
 
 - Modelo nuevo `MessagingConnection` ligado 1:1 a `Sponsor`.
+- Bridge de automation preparado por `AutomationDispatch` para despachar contexto estructurado hacia n8n sin romper el fallback comercial actual.
+- Endpoint privado disponible para visibilidad del member:
+  - `GET /v1/messaging-automation/me`
+- Variables nuevas de automation:
+  - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
+  - `MESSAGING_AUTOMATION_WEBHOOK_TOKEN`
+  - `MESSAGING_AUTOMATION_DISPATCH_TIMEOUT_MS`
+  - `MESSAGING_AUTOMATION_DISPATCH_RETRIES`
+- Trigger v1 del bridge:
+  - se dispara al crearse una asignacion nueva desde el runtime publico
+  - persiste `pending`, `skipped`, `dispatched` o `failed`
+  - no bloquea el submit publico ni el fallback `wa.me` si n8n no esta disponible
 - Provider inicial soportado:
   - `EVOLUTION`
 - Estados persistidos:
