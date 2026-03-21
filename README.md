@@ -1,81 +1,72 @@
 # Leadflow
 
-Leadflow es un SaaS para captacion, asignacion y automatizacion de leads.
+Leadflow es una plataforma SaaS para captacion, asignacion y automatizacion de leads.
 
-## Estado de esta fase
-Se implemento una shell operativa inicial de plataforma sobre monorepo, con:
-- `apps/web`: shell visual en Next.js App Router con segmentos `site`, `members`, `admin`.
-- `apps/api`: shell backend en NestJS + Fastify con configuracion centralizada por entorno.
-- Configuracion de dominios y URLs base mediante variables de entorno.
+## Estado actual (v1 base)
+La base del monorepo ya incluye:
+- Shell funcional de `web` (site, members, admin).
+- Shell funcional de `api` (NestJS + Fastify + health).
+- Configuracion por entorno para dominios objetivo.
+- Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm inicial.
 
-No hay deploy en esta fase.
+No hay deploy aplicado en esta fase.
 
 ## Stack tecnico
 - Frontend: Next.js + React + TypeScript + Tailwind.
 - Backend: NestJS + Fastify.
 - Monorepo: pnpm workspaces + Turborepo.
-- Integraciones futuras (no implementadas aun): n8n, Evolution API, PostgreSQL, Redis.
+- Ejecucion: Docker + Docker Compose (dev) + Docker Swarm stack (baseline).
 
-## Estructura principal
-```text
-leadflow/
-├── apps/
-│   ├── web/
-│   │   ├── app/(site)/
-│   │   ├── app/(members)/
-│   │   ├── app/(admin)/
-│   │   ├── lib/public-env.ts
-│   │   └── .env.example
-│   └── api/
-│       ├── src/config/runtime.ts
-│       ├── src/health/
-│       ├── src/modules/
-│       └── .env.example
-├── packages/
-│   ├── config/
-│   ├── types/
-│   └── ui/
-├── docs/
-│   ├── architecture-v1.md
-│   ├── domain-strategy-v1.md
-│   ├── environment-v1.md
-│   ├── infrastructure-baseline-v1.md
-│   ├── cleanup-plan-v1.md
-│   └── server-inventory.md
-└── infra/
-```
-
-## Dominio y subdominios objetivo (planeado)
+## Dominios objetivo (planeados)
 - `https://exitosos.com` -> sitio publico.
 - `https://members.exitosos.com` -> panel sponsors.
 - `https://admin.exitosos.com` -> panel admin.
 - `https://api.exitosos.com` -> API publica controlada.
 
-## Scripts del workspace
-Desde la raiz:
-- `pnpm dev`
-- `pnpm dev:web`
-- `pnpm dev:api`
-- `pnpm build`
-- `pnpm lint`
-- `pnpm test`
+## Rutas de infraestructura
+- Dockerfile web: `apps/web/Dockerfile`
+- Dockerfile api: `apps/api/Dockerfile`
+- Docker Compose dev: `infra/docker/docker-compose.dev.yml`
+- Stack Swarm base: `infra/swarm/docker-stack.yml`
+- Variables ejemplo compose: `infra/docker/.env.example`
+- Variables ejemplo swarm: `infra/swarm/.env.example`
+
+## Redes objetivo
+- `traefik_public` (externa existente en servidor)
+- `leadflow_core` (interna del proyecto)
+- `leadflow_automation` (placeholder para integraciones futuras)
+
+## Scripts utiles
+Desde la raiz del repo:
+- Desarrollo app:
+  - `pnpm dev`
+  - `pnpm dev:web`
+  - `pnpm dev:api`
+- Calidad:
+  - `pnpm build`
+  - `pnpm lint`
+  - `pnpm test`
+- Docker local:
+  - `pnpm docker:dev:up`
+  - `pnpm docker:dev:down`
+  - `pnpm docker:dev:logs`
+- Imagenes:
+  - `pnpm docker:build:web`
+  - `pnpm docker:build:api`
+- Stack validation:
+  - `pnpm docker:stack:validate`
 
 ## Variables de entorno
-Revisar:
-- `apps/web/.env.example`
-- `apps/api/.env.example`
-- `docs/environment-v1.md`
+- Web: `apps/web/.env.example`
+- API: `apps/api/.env.example`
+- Referencia completa: `docs/environment-v1.md`
 
-## Documentacion relacionada
-- `README_INIT.md`
+## Documentacion clave
 - `docs/architecture-v1.md`
+- `docs/infrastructure-v1.md`
+- `docs/deployment-v1.md`
 - `docs/domain-strategy-v1.md`
 - `docs/environment-v1.md`
-- `docs/product-scope-v1.md`
-- `docs/infrastructure-baseline-v1.md`
-- `docs/cleanup-plan-v1.md`
-- `docs/server-inventory.md`
 
 ## Nota operativa
-En esta fase no se aplicaron cambios de infraestructura, DNS ni despliegues.
-Todo se mantuvo dentro del repositorio local en `/opt/projects/leadflow`.
+Esta fase prepara ejecucion y despliegue futuro, pero no realiza deploy ni modifica infraestructura productiva del servidor.

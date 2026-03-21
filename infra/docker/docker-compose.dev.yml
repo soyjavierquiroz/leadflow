@@ -1,0 +1,66 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    container_name: leadflow-api-dev
+    command: >
+      sh -c "pnpm install --frozen-lockfile && pnpm --filter @leadflow/api dev"
+    env_file:
+      - ../../apps/api/.env.example
+    environment:
+      NODE_ENV: development
+      API_NAME: leadflow-api
+      API_VERSION: 0.2.0
+      API_HOST: 0.0.0.0
+      API_PORT: 3001
+      API_GLOBAL_PREFIX: v1
+      API_BASE_URL: http://localhost:3001
+      SITE_URL: http://localhost:3000
+      MEMBERS_URL: http://localhost:3000/members
+      ADMIN_URL: http://localhost:3000/admin
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      - ../../:/workspace
+      - leadflow_node_modules:/workspace/node_modules
+      - leadflow_pnpm_store:/pnpm/store
+    networks:
+      - leadflow_core
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    container_name: leadflow-web-dev
+    command: >
+      sh -c "pnpm install --frozen-lockfile && pnpm --filter @leadflow/web dev"
+    env_file:
+      - ../../apps/web/.env.example
+    environment:
+      NEXT_PUBLIC_APP_NAME: Leadflow
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_MEMBERS_URL: http://localhost:3000/members
+      NEXT_PUBLIC_ADMIN_URL: http://localhost:3000/admin
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - ../../:/workspace
+      - leadflow_node_modules:/workspace/node_modules
+      - leadflow_pnpm_store:/pnpm/store
+    networks:
+      - leadflow_core
+
+networks:
+  leadflow_core:
+    name: leadflow_core
+
+volumes:
+  leadflow_node_modules:
+  leadflow_pnpm_store:

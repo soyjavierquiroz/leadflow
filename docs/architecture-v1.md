@@ -1,58 +1,61 @@
 # Architecture v1
 
-## Alcance de esta fase
-Convertir el scaffold inicial en una shell operativa de plataforma, con:
-- Segmentacion visual clara (`site`, `members`, `admin`) en frontend.
-- Configuracion centralizada por entorno para web y api.
-- Base de dominios objetivo documentada para despliegue posterior.
+## Objetivo de esta fase
+Dejar Leadflow listo para ejecutarse en contenedores y prepararlo para deploy futuro en Swarm, sin tocar produccion.
 
-## Vista de alto nivel
+## Componentes
 
 ### Frontend (`apps/web`)
-- Framework: Next.js App Router.
-- Segmentos actuales:
-  - `app/(site)` -> sitio publico.
-  - `app/(members)` -> shell members.
-  - `app/(admin)` -> shell admin.
-- Configuracion publica centralizada en `lib/public-env.ts`.
-- Variables `NEXT_PUBLIC_*` definidas en `apps/web/.env.example`.
+- Next.js App Router.
+- Segmentos:
+  - `/(site)`
+  - `/(members)`
+  - `/(admin)`
+- Config publica centralizada en `apps/web/lib/public-env.ts`.
+- Build preparado para contenedor con `output: standalone`.
 
 ### Backend (`apps/api`)
-- Framework: NestJS 11 con Fastify.
-- Configuracion centralizada en `src/config/runtime.ts`.
-- Prefijo global API configurable (`API_GLOBAL_PREFIX`, default `v1`).
-- `GET /health` se mantiene sin prefijo global.
-- CORS configurable y preparado para:
-  - `https://exitosos.com`
-  - `https://members.exitosos.com`
-  - `https://admin.exitosos.com`
+- NestJS + Fastify.
+- Config runtime centralizada en `apps/api/src/config/runtime.ts`.
+- Prefijo global configurable (`API_GLOBAL_PREFIX`, default `v1`).
+- `GET /health` sin prefijo global.
+- CORS preparado para hosts web objetivo.
 
 ### Shared packages
-- `packages/types`: tipos base de dominio y configuracion.
-- `packages/config`: helpers pequenos de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
-- `packages/ui`: placeholder listo para evolucion.
+- `packages/config`: helpers simples de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
+- `packages/types`: tipos base de dominio y de configuracion.
+- `packages/ui`: placeholder de componentes compartidos.
 
-## Flujo de configuracion
-1. Web lee variables `NEXT_PUBLIC_*`.
-2. API lee variables `API_*` + dominios permitidos para CORS.
-3. Ambos shells muestran informacion coherente de entorno y endpoints.
+## Infraestructura de ejecucion v1
 
-## Endpoints y rutas base
-- Web local: `http://localhost:3000`
-- API local: `http://localhost:3001`
-- Health: `http://localhost:3001/health`
-- Prefijo API para futuros recursos: `/v1` (configurable)
+### Desarrollo local con contenedores
+- Compose: `infra/docker/docker-compose.dev.yml`
+- Servicios:
+  - `web`
+  - `api`
+- Red:
+  - `leadflow_core`
 
-## Dominios objetivo (planeado)
-- `exitosos.com` (site)
-- `members.exitosos.com` (members)
-- `admin.exitosos.com` (admin)
-- `api.exitosos.com` (api)
+### Baseline Swarm (futuro deploy)
+- Stack: `infra/swarm/docker-stack.yml`
+- Servicios:
+  - `web`
+  - `api`
+- Redes:
+  - `traefik_public` (externa)
+  - `leadflow_core`
+  - `leadflow_automation` (placeholder)
+- Routing Traefik por host:
+  - `exitosos.com` -> `web`
+  - `members.exitosos.com` -> `web`
+  - `admin.exitosos.com` -> `web`
+  - `api.exitosos.com` -> `api`
 
-## Fuera de alcance (aun)
-- Deploy a servidor.
-- DNS aplicado.
-- Integracion real de auth, PostgreSQL, Redis, n8n o Evolution.
+## Fuera de alcance en esta fase
+- Deploy real en servidor.
+- DNS real aplicado.
+- Integraciones con PostgreSQL, Redis, n8n o Evolution.
+- Auth real.
 
-## Nota explicita de estado
-Arquitectura lista para evolucion de producto, pero todavia sin deploy ni DNS aplicados.
+## Estado
+Arquitectura lista para evolucion y primer ciclo de despliegue futuro, todavia sin cambios en produccion.

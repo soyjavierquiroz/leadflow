@@ -46,6 +46,29 @@ Valores de referencia en esta fase:
 - `ADMIN_URL=https://admin.exitosos.com`
 - `CORS_ALLOWED_ORIGINS=https://exitosos.com,https://members.exitosos.com,https://admin.exitosos.com`
 
+## Infraestructura (`infra/*/.env.example`)
+
+### Compose local (`infra/docker/.env.example`)
+- `COMPOSE_PROJECT_NAME`
+- `WEB_PORT`
+- `API_PORT`
+
+### Swarm futuro (`infra/swarm/.env.example`)
+- `LEADFLOW_WEB_IMAGE`
+- `LEADFLOW_API_IMAGE`
+- `LEADFLOW_SITE_HOST`
+- `LEADFLOW_MEMBERS_HOST`
+- `LEADFLOW_ADMIN_HOST`
+- `LEADFLOW_API_HOST`
+- `LEADFLOW_WEB_REPLICAS`
+- `LEADFLOW_API_REPLICAS`
+
+## Variables que Javier debera definir antes de deploy real
+1. `LEADFLOW_WEB_IMAGE` y `LEADFLOW_API_IMAGE` con tags versionados reales.
+2. Hosts finales en caso de cambio de dominio/subdominios.
+3. Cantidad de replicas por servicio segun capacidad esperada.
+4. Valores de entorno productivo para web/api en Swarm (si difieren de ejemplos).
+
 ## Notas
 - `GET /health` se mantiene accesible sin prefijo global.
 - El prefijo global (`v1`) aplica a endpoints futuros de API.

@@ -38,7 +38,7 @@ export const getApiRuntimeConfig = (
 
   return {
     appName: env.API_NAME ?? 'leadflow-api',
-    appVersion: env.API_VERSION ?? '0.1.0',
+    appVersion: env.API_VERSION ?? '0.2.0',
     environment: env.NODE_ENV ?? 'development',
     host: env.API_HOST ?? '0.0.0.0',
     port: parseNumber(env.API_PORT, 3001),

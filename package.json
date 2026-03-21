@@ -15,7 +15,13 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "format": "turbo run format"
+    "format": "turbo run format",
+    "docker:build:web": "docker build -f apps/web/Dockerfile -t leadflow-web:local .",
+    "docker:build:api": "docker build -f apps/api/Dockerfile -t leadflow-api:local .",
+    "docker:dev:up": "docker compose -f infra/docker/docker-compose.dev.yml --env-file infra/docker/.env.example up --build",
+    "docker:dev:down": "docker compose -f infra/docker/docker-compose.dev.yml --env-file infra/docker/.env.example down",
+    "docker:dev:logs": "docker compose -f infra/docker/docker-compose.dev.yml --env-file infra/docker/.env.example logs -f",
+    "docker:stack:validate": "docker stack config -c infra/swarm/docker-stack.yml"
   },
   "devDependencies": {
     "turbo": "^2.5.3"
