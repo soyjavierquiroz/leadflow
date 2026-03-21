@@ -17,6 +17,8 @@ export type LeadStatus =
 
 export interface Lead extends BaseDomainEntity, WorkspaceScoped {
   funnelId: DomainId;
+  funnelInstanceId: DomainId | null;
+  funnelPublicationId: DomainId | null;
   visitorId: DomainId | null;
   sourceChannel: LeadSourceChannel;
   fullName: string | null;

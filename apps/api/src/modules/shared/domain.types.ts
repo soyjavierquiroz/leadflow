@@ -1,5 +1,10 @@
 export type DomainId = string;
 export type ISODateString = string;
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue =
+  | JsonPrimitive
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
 export interface BaseDomainEntity {
   id: DomainId;
@@ -9,6 +14,10 @@ export interface BaseDomainEntity {
 
 export interface WorkspaceScoped {
   workspaceId: DomainId;
+}
+
+export interface TeamScoped {
+  teamId: DomainId;
 }
 
 export interface RepositoryPort<TEntity, TCreateDto> {
@@ -39,7 +48,40 @@ export type EventAggregateType =
   | 'rotation-pool'
   | 'rotation-member'
   | 'funnel'
+  | 'domain'
+  | 'funnel-template'
+  | 'funnel-instance'
+  | 'funnel-step'
+  | 'funnel-publication'
+  | 'tracking-profile'
+  | 'conversion-event-mapping'
+  | 'handoff-strategy'
   | 'visitor'
   | 'lead'
   | 'assignment'
   | 'event';
+
+export type DomainKind = 'apex' | 'subdomain' | 'custom';
+export type TrackingProvider = 'meta' | 'tiktok' | 'custom';
+export type DeduplicationMode =
+  | 'browser_server'
+  | 'browser_only'
+  | 'server_only';
+export type HandoffStrategyType =
+  | 'immediate_whatsapp'
+  | 'immediate_internal_assignment'
+  | 'deferred_queue'
+  | 'deferred_review'
+  | 'scheduled_followup'
+  | 'content_continuation';
+export type FunnelStepType =
+  | 'landing'
+  | 'lead_capture'
+  | 'thank_you'
+  | 'vsl'
+  | 'presentation'
+  | 'qualification'
+  | 'cta_bridge'
+  | 'handoff'
+  | 'confirmation'
+  | 'redirect';

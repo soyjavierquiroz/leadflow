@@ -17,6 +17,7 @@ const toDbAggregateType = (value: string): PrismaEventAggregateType => {
     case 'team':
     case 'sponsor':
     case 'funnel':
+    case 'domain':
     case 'visitor':
     case 'lead':
     case 'assignment':
@@ -26,6 +27,20 @@ const toDbAggregateType = (value: string): PrismaEventAggregateType => {
       return 'rotation_pool';
     case 'rotation-member':
       return 'rotation_member';
+    case 'funnel-template':
+      return 'funnel_template';
+    case 'funnel-instance':
+      return 'funnel_instance';
+    case 'funnel-step':
+      return 'funnel_step';
+    case 'funnel-publication':
+      return 'funnel_publication';
+    case 'tracking-profile':
+      return 'tracking_profile';
+    case 'conversion-event-mapping':
+      return 'conversion_event_mapping';
+    case 'handoff-strategy':
+      return 'handoff_strategy';
     default:
       return 'event';
   }
@@ -61,7 +76,7 @@ export class DomainEventPrismaRepository implements DomainEventRepository {
   }
 
   async findByAggregate(
-    aggregateType: string,
+    aggregateType: DomainEvent['aggregateType'],
     aggregateId: string,
   ): Promise<DomainEvent[]> {
     const records = await this.prisma.domainEvent.findMany({

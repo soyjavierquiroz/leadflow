@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1, persistencia real en PostgreSQL y una propuesta estructural clara para ownership, publicacion, funnels, tracking y handoff, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1, persistencia real en PostgreSQL y expansion implementada para ownership, publicacion, funnels, tracking y handoff, sin tocar produccion.
 
 ## Componentes
 
@@ -23,18 +23,25 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
 - Prisma integrado como adapter de persistencia.
 - `PrismaModule` global con `PrismaService`.
 - `DomainModule` como agregador de dominio.
-- Modulos base:
+- Modulos disponibles:
   - `workspaces`
   - `teams`
   - `sponsors`
-  - `rotation-pools`
   - `funnels`
+  - `domains`
+  - `funnel-templates`
+  - `funnel-instances`
+  - `funnel-steps`
+  - `funnel-publications`
+  - `tracking-profiles`
+  - `handoff-strategies`
+  - `conversion-event-mappings`
+  - `rotation-pools`
   - `visitors`
   - `leads`
   - `assignments`
   - `events`
-- Cada modulo expone DTOs, interfaces de agregado, servicio base y repository adapter Prisma.
-- Endpoints minimos de validacion expuestos para `workspaces`, `sponsors`, `leads` y `rotation-pools`.
+- Endpoints minimos de validacion expuestos para `workspaces`, `sponsors`, `leads`, `rotation-pools`, `domains`, `funnel-templates`, `funnel-instances` y `funnel-publications`.
 
 ### Shared packages
 - `packages/config`: helpers simples de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
@@ -48,40 +55,33 @@ El dominio operativo actual se apoya en:
 - `Sponsor`
 - `RotationPool`
 - `RotationMember`
-- `Funnel`
+- `Funnel` legacy
+- `Domain`
+- `FunnelTemplate`
+- `FunnelInstance`
+- `FunnelStep`
+- `FunnelPublication`
+- `TrackingProfile`
+- `ConversionEventMapping`
+- `HandoffStrategy`
 - `Visitor`
 - `Lead`
 - `Assignment`
 - `DomainEvent`
 
-Este modelo ya soporta la base multi-tenant y de asignacion, pero el area de funnel/tracking todavia esta en expansion conceptual.
+## Expansion implementada
+La arquitectura ya implementa:
+- ownership operativo real en `Team`
+- publicacion por `host + path`
+- separacion entre `FunnelTemplate` y `FunnelInstance`
+- modelado de steps tipados para runtime JSON-driven
+- configuracion declarativa de tracking y handoff
+- compatibilidad transicional con `Funnel` legacy
 
-## Expansion estructural recomendada
-Para soportar SaaS multi-domain, multi-funnel y tracking por proveedor, la arquitectura recomienda evolucionar hacia:
-- `FunnelTemplate`
-- `FunnelInstance`
-- `FunnelStep`
-- `Domain`
-- `FunnelPublication`
-- `TrackingProfile`
-- `ConversionEventMapping`
-- `DomainBinding`
-- `HandoffStrategy`
-
-Objetivo de esa expansion:
-- mover ownership operativo real al `Team`
-- separar plantilla de despliegue operativo
-- modelar pasos con semantica real
-- desacoplar funnel de dominio/DNS
-- resolver publicacion por `host + path`
-- permitir tracking por perfil y proveedor
-- soportar handoff inmediato o diferido sin hardcodes
-
-Esta expansion queda documentada en:
-- `docs/funnel-tracking-model-v1.md`
-- `docs/funnel-domain-expansion-v1.md`
-- `docs/ownership-publication-template-model-v1.md`
-- `docs/domain-persistence-expansion-v2.md`
+Decision de transicion:
+- `Funnel` se mantiene para compatibilidad
+- `FunnelInstance.legacyFunnelId` enlaza el modelo nuevo con el anterior
+- `Lead` y `Assignment` conservan `funnelId` y agregan referencias opcionales a `funnelInstanceId` y `funnelPublicationId`
 
 ## Infraestructura de ejecucion v1
 
@@ -114,10 +114,10 @@ Esta expansion queda documentada en:
 - DNS real aplicado.
 - Integracion real con Meta o TikTok.
 - Handoff real con WhatsApp.
+- Editor libre de templates para teams.
 - Redis, n8n o Evolution.
 - Auth real.
 - Logica compleja de asignacion.
-- Cambios de persistencia para la expansion propuesta.
 
 ## Estado
-Arquitectura lista para seguir con la expansion de dominio/persistencia y luego auth/flows sobre una base documental mas fuerte, todavia sin cambios en produccion ni en la persistencia de la expansion propuesta.
+Arquitectura lista para la siguiente fase de runtime publico, flows de captura/asignacion y auth sobre el modelo consolidado, todavia sin cambios en produccion.

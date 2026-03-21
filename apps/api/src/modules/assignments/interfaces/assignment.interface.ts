@@ -21,6 +21,8 @@ export interface Assignment extends BaseDomainEntity, WorkspaceScoped {
   sponsorId: DomainId;
   teamId: DomainId;
   funnelId: DomainId;
+  funnelInstanceId: DomainId | null;
+  funnelPublicationId: DomainId | null;
   rotationPoolId: DomainId | null;
   status: AssignmentStatus;
   reason: AssignmentReason;

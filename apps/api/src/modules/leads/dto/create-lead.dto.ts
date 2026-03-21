@@ -3,6 +3,8 @@ import type { LeadSourceChannel } from '../../shared/domain.types';
 export class CreateLeadDto {
   readonly workspaceId!: string;
   readonly funnelId!: string;
+  readonly funnelInstanceId?: string | null;
+  readonly funnelPublicationId?: string | null;
   readonly visitorId?: string | null;
   readonly sourceChannel!: LeadSourceChannel;
   readonly fullName?: string | null;

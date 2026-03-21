@@ -1,47 +1,33 @@
 # Product Scope v1
 
 ## Objetivo de la fase actual
-Definir la estructura de ownership, publicacion, templates, funnels, tracking y handoff de Leadflow para soportar multi-domain y multi-funnel, sin implementar aun integraciones reales ni ampliar todavia la persistencia.
+Implementar la expansion v2 de ownership, publicacion, templates, funnels y tracking en dominio y persistencia, manteniendo compatibilidad con el modelo previo y sin tocar produccion.
 
 ## Alcance funcional del dominio v1
-Leadflow v1 modela:
+Leadflow v1 ya modela:
 - `workspaces` como frontera tenant/operativa.
-- `teams` para ownership comercial.
+- `teams` como unidad operativa principal.
 - `sponsors` como destinatarios de asignacion.
 - `rotation-pools` como contenedores de estrategia futura.
-- `funnels` para contexto operativo de captacion.
-- `visitors` para trazabilidad previa al lead.
-- `leads` como prospectos del negocio.
-- `assignments` como contrato de asignacion.
-- `events` como timeline y auditoria.
-
-## Foco estructural de esta etapa
-Esta fase documenta y formaliza:
-- ownership por `Super Admin`, `Team Admin` y `Sponsor/Member`
-- al `Team` como owner operativo real
-- publicacion por `host + path`
-- diferencia entre `FunnelTemplate`, `FunnelInstance` y `FunnelStep`
-- tipos de funnel recomendados para v1
-- tipos de step recomendados para v1
-- estrategias de handoff inmediato o diferido
-- taxonomia de eventos de tracking
-- mapeo recomendado para Meta y TikTok
-- expansion de dominio sugerida para una fase posterior
+- `funnels` legacy para compatibilidad.
+- `domains` y `funnel-publications` para publicacion por `host + path`.
+- `funnel-templates`, `funnel-instances` y `funnel-steps` para runtime JSON-driven.
+- `tracking-profiles`, `conversion-event-mappings` y `handoff-strategies` para configuracion declarativa.
+- `visitors`, `leads`, `assignments` y `events` para operacion comercial y trazabilidad.
 
 ## MVP de esta etapa
-- Documento base de funnel y tracking en `docs/funnel-tracking-model-v1.md`.
-- Propuesta de expansion del dominio en `docs/funnel-domain-expansion-v1.md`.
-- Modelo de ownership, publicacion y templates en `docs/ownership-publication-template-model-v1.md`.
-- Propuesta concreta de expansion de dominio/persistencia en `docs/domain-persistence-expansion-v2.md`.
-- Alineacion de `README.md` y `docs/architecture-v1.md`.
-- Criterios claros para la siguiente fase de implementacion de application flows.
+- Schema Prisma expandido y migracion aplicada.
+- Seed de desarrollo actualizado con dominio, template, instance, steps, publication, tracking y handoff.
+- Repositorios/adapters Prisma para la expansion.
+- Endpoints minimos de lectura para validar el modelo expandido.
+- Documentacion de implementacion en `docs/domain-persistence-expansion-implemented-v2.md`.
 
 ## Fuera de alcance en esta etapa
 - Integracion real con `Meta`.
 - Integracion real con `TikTok`.
 - Handoff real con WhatsApp.
 - Auth real.
-- Cambios de persistencia para las nuevas entidades sugeridas.
+- Editor de templates para teams.
 - Motor complejo de asignacion.
 - Migraciones desde WordPress.
 - Funcionalidades avanzadas de BI/ML.
@@ -53,7 +39,7 @@ Esta fase documenta y formaliza:
 - Infra objetivo: Docker Swarm + Traefik + PostgreSQL + Redis.
 
 ## Criterios de avance a la siguiente fase
-1. Traducir la propuesta a entidades persistibles sin romper `Persistence Foundation v1`.
-2. Implementar `Domain`, `FunnelTemplate`, `FunnelInstance` y `FunnelPublication`.
-3. Mover ownership operativo explicito al `Team`.
-4. Preparar auth y flows sobre el modelo consolidado, no sobre el modelo transitorio.
+1. Resolver runtime publico por `host + path`.
+2. Implementar flows iniciales de captura sobre `FunnelInstance` y `FunnelPublication`.
+3. Preparar auth y permisos sobre ownership real de `Team`.
+4. Empezar a desacoplar consumers del `Funnel` legacy.

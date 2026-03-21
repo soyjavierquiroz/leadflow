@@ -6,29 +6,40 @@ Backend base de Leadflow con NestJS + Fastify.
 - `GET /health` (sin prefijo global)
 - Prefijo global para modulos de API: `/<API_GLOBAL_PREFIX>` (default `v1`)
 
-## Dominio v1
-Modulos base disponibles:
+## Modulos disponibles
 - `workspaces`
 - `teams`
 - `sponsors`
-- `rotation-pools`
 - `funnels`
+- `domains`
+- `funnel-templates`
+- `funnel-instances`
+- `funnel-steps`
+- `funnel-publications`
+- `tracking-profiles`
+- `handoff-strategies`
+- `conversion-event-mappings`
+- `rotation-pools`
 - `visitors`
 - `leads`
 - `assignments`
 - `events`
 
-La fase actual deja contratos, DTOs y servicios draft listos para conectar persistencia despues.
-
-## Persistencia v1
+## Persistencia actual
 - Prisma integrado con schema en `prisma/schema.prisma`.
 - PostgreSQL como datasource objetivo.
 - Seed disponible en `prisma/seed.js`.
-- Endpoints minimos:
-  - `GET /v1/workspaces`
-  - `GET /v1/sponsors`
-  - `GET /v1/leads`
-  - `GET /v1/rotation-pools`
+- Compatibilidad transicional con `Funnel` legacy.
+
+## Endpoints minimos
+- `GET /v1/workspaces`
+- `GET /v1/sponsors`
+- `GET /v1/leads`
+- `GET /v1/rotation-pools`
+- `GET /v1/domains`
+- `GET /v1/funnel-templates`
+- `GET /v1/funnel-instances`
+- `GET /v1/funnel-publications`
 
 ## Configuracion por entorno
 Definida en `src/config/runtime.ts`.
@@ -42,10 +53,8 @@ Variables soportadas:
 - `API_PORT`
 - `API_GLOBAL_PREFIX`
 - `API_BASE_URL`
+- `DATABASE_URL`
 - `SITE_URL`
 - `MEMBERS_URL`
 - `ADMIN_URL`
 - `CORS_ALLOWED_ORIGINS`
-
-`APP_BASE_DOMAIN` permite derivar defaults de `site/members/admin/api` cuando
-no se pasan URLs explicitas por entorno.

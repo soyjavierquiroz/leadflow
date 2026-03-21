@@ -4,6 +4,8 @@ export class CreateAssignmentDto {
   readonly sponsorId!: string;
   readonly teamId!: string;
   readonly funnelId!: string;
+  readonly funnelInstanceId?: string | null;
+  readonly funnelPublicationId?: string | null;
   readonly rotationPoolId?: string | null;
   readonly reason?: 'rotation' | 'manual' | 'fallback' | 'handoff';
 }

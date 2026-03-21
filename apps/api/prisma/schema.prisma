@@ -50,6 +50,82 @@ enum FunnelStatus {
   archived
 }
 
+enum DomainStatus {
+  draft
+  active
+  archived
+}
+
+enum DomainKind {
+  apex
+  subdomain
+  custom
+}
+
+enum FunnelTemplateStatus {
+  draft
+  active
+  archived
+}
+
+enum FunnelInstanceStatus {
+  draft
+  active
+  archived
+}
+
+enum FunnelStepType {
+  landing
+  lead_capture
+  thank_you
+  vsl
+  presentation
+  qualification
+  cta_bridge
+  handoff
+  confirmation
+  redirect
+}
+
+enum FunnelPublicationStatus {
+  draft
+  active
+  archived
+}
+
+enum TrackingProvider {
+  meta
+  tiktok
+  custom
+}
+
+enum TrackingProfileStatus {
+  draft
+  active
+  archived
+}
+
+enum DeduplicationMode {
+  browser_server
+  browser_only
+  server_only
+}
+
+enum HandoffStrategyStatus {
+  draft
+  active
+  archived
+}
+
+enum HandoffStrategyType {
+  immediate_whatsapp
+  immediate_internal_assignment
+  deferred_queue
+  deferred_review
+  scheduled_followup
+  content_continuation
+}
+
 enum LeadSourceChannel {
   manual
   form
@@ -108,6 +184,14 @@ enum EventAggregateType {
   rotation_pool
   rotation_member
   funnel
+  domain
+  funnel_template
+  funnel_instance
+  funnel_step
+  funnel_publication
+  tracking_profile
+  conversion_event_mapping
+  handoff_strategy
   visitor
   lead
   assignment
@@ -115,41 +199,54 @@ enum EventAggregateType {
 }
 
 model Workspace {
-  id              String        @id @default(uuid())
-  name            String
-  slug            String        @unique
-  status          WorkspaceStatus
-  timezone        String
-  defaultCurrency String
-  primaryLocale   String
-  primaryDomain   String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  teams           Team[]
-  sponsors        Sponsor[]
-  funnels         Funnel[]
-  rotationPools   RotationPool[]
-  visitors        Visitor[]
-  leads           Lead[]
-  assignments     Assignment[]
-  events          DomainEvent[]
+  id                 String            @id @default(uuid())
+  name               String
+  slug               String            @unique
+  status             WorkspaceStatus
+  timezone           String
+  defaultCurrency    String
+  primaryLocale      String
+  primaryDomain      String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  teams              Team[]
+  sponsors           Sponsor[]
+  funnels            Funnel[]
+  domains            Domain[]
+  funnelTemplates    FunnelTemplate[]
+  funnelInstances    FunnelInstance[]
+  funnelSteps        FunnelStep[]
+  funnelPublications FunnelPublication[]
+  trackingProfiles   TrackingProfile[]
+  handoffStrategies  HandoffStrategy[]
+  rotationPools      RotationPool[]
+  visitors           Visitor[]
+  leads              Lead[]
+  assignments        Assignment[]
+  events             DomainEvent[]
 }
 
 model Team {
-  id              String      @id @default(uuid())
-  workspaceId     String
-  name            String
-  code            String
-  status          TeamStatus
-  description     String?
-  managerUserId   String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sponsors        Sponsor[]
-  funnels         Funnel[]    @relation("TeamDefaultFunnels")
-  rotationPools   RotationPool[]
-  assignments     Assignment[]
+  id                 String              @id @default(uuid())
+  workspaceId        String
+  name               String
+  code               String
+  status             TeamStatus
+  description        String?
+  managerUserId      String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sponsors           Sponsor[]
+  funnels            Funnel[]            @relation("TeamDefaultFunnels")
+  domains            Domain[]
+  funnelInstances    FunnelInstance[]
+  funnelSteps        FunnelStep[]
+  funnelPublications FunnelPublication[]
+  trackingProfiles   TrackingProfile[]
+  handoffStrategies  HandoffStrategy[]
+  rotationPools      RotationPool[]
+  assignments        Assignment[]
 
   @@unique([workspaceId, code])
 }
@@ -188,27 +285,197 @@ model Funnel {
   workspace             Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   defaultTeam           Team?             @relation("TeamDefaultFunnels", fields: [defaultTeamId], references: [id], onDelete: SetNull)
   defaultRotationPool   RotationPool?     @relation("PoolDefaultFunnels", fields: [defaultRotationPoolId], references: [id], onDelete: SetNull)
+  funnelInstanceBridge  FunnelInstance?   @relation("LegacyFunnelLink")
   leads                 Lead[]
   assignments           Assignment[]
 
   @@unique([workspaceId, code])
 }
 
+model Domain {
+  id                 String              @id @default(uuid())
+  workspaceId        String
+  teamId             String
+  host               String              @unique
+  status             DomainStatus
+  kind               DomainKind
+  isPrimary          Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team               Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  funnelPublications FunnelPublication[]
+}
+
+model FunnelTemplate {
+  id                       String               @id @default(uuid())
+  workspaceId              String?
+  name                     String
+  code                     String               @unique
+  status                   FunnelTemplateStatus
+  version                  Int                  @default(1)
+  funnelType               String
+  blocksJson               Json
+  mediaMap                 Json
+  settingsJson             Json
+  allowedOverridesJson     Json
+  defaultHandoffStrategyId String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  workspace                Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  defaultHandoffStrategy   HandoffStrategy?     @relation("TemplateDefaultHandoffStrategy", fields: [defaultHandoffStrategyId], references: [id], onDelete: SetNull)
+  funnelInstances          FunnelInstance[]
+}
+
+model FunnelInstance {
+  id                 String               @id @default(uuid())
+  workspaceId        String
+  teamId             String
+  templateId         String
+  legacyFunnelId     String?              @unique
+  name               String
+  code               String
+  status             FunnelInstanceStatus
+  rotationPoolId     String?
+  trackingProfileId  String?
+  handoffStrategyId  String?
+  settingsJson       Json
+  mediaMap           Json
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team               Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  template           FunnelTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  legacyFunnel       Funnel?              @relation("LegacyFunnelLink", fields: [legacyFunnelId], references: [id], onDelete: SetNull)
+  rotationPool       RotationPool?        @relation(fields: [rotationPoolId], references: [id], onDelete: SetNull)
+  trackingProfile    TrackingProfile?     @relation(fields: [trackingProfileId], references: [id], onDelete: SetNull)
+  handoffStrategy    HandoffStrategy?     @relation("InstanceHandoffStrategy", fields: [handoffStrategyId], references: [id], onDelete: SetNull)
+  steps              FunnelStep[]
+  publications       FunnelPublication[]
+  leads              Lead[]
+  assignments        Assignment[]
+
+  @@unique([teamId, code])
+}
+
+model FunnelStep {
+  id               String          @id @default(uuid())
+  workspaceId      String
+  teamId           String
+  funnelInstanceId String
+  stepType         FunnelStepType
+  slug             String
+  position         Int
+  isEntryStep      Boolean         @default(false)
+  isConversionStep Boolean         @default(false)
+  blocksJson       Json
+  mediaMap         Json
+  settingsJson     Json
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team             Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  funnelInstance   FunnelInstance  @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
+
+  @@unique([funnelInstanceId, position])
+  @@unique([funnelInstanceId, slug])
+}
+
+model FunnelPublication {
+  id                String                   @id @default(uuid())
+  workspaceId       String
+  teamId            String
+  domainId          String
+  funnelInstanceId  String
+  trackingProfileId String?
+  handoffStrategyId String?
+  pathPrefix        String
+  status            FunnelPublicationStatus
+  isPrimary         Boolean                  @default(false)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  workspace         Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team              Team                     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  domain            Domain                   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  funnelInstance    FunnelInstance           @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
+  trackingProfile   TrackingProfile?         @relation(fields: [trackingProfileId], references: [id], onDelete: SetNull)
+  handoffStrategy   HandoffStrategy?         @relation("PublicationHandoffStrategy", fields: [handoffStrategyId], references: [id], onDelete: SetNull)
+  leads             Lead[]
+  assignments       Assignment[]
+
+  @@unique([domainId, pathPrefix])
+}
+
+model TrackingProfile {
+  id                     String                   @id @default(uuid())
+  workspaceId            String
+  teamId                 String
+  name                   String
+  provider               TrackingProvider
+  status                 TrackingProfileStatus
+  configJson             Json
+  deduplicationMode      DeduplicationMode
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  workspace              Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                   Team                     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  funnelInstances        FunnelInstance[]
+  funnelPublications     FunnelPublication[]
+  conversionEventMappings ConversionEventMapping[]
+
+  @@unique([teamId, name])
+}
+
+model ConversionEventMapping {
+  id                  String           @id @default(uuid())
+  trackingProfileId   String
+  internalEventName   String
+  providerEventName   String
+  isBrowserSide       Boolean          @default(true)
+  isServerSide        Boolean          @default(false)
+  isCriticalConversion Boolean         @default(false)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  trackingProfile     TrackingProfile  @relation(fields: [trackingProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([trackingProfileId, internalEventName, providerEventName])
+}
+
+model HandoffStrategy {
+  id                     String               @id @default(uuid())
+  workspaceId            String
+  teamId                 String?
+  name                   String
+  type                   HandoffStrategyType
+  status                 HandoffStrategyStatus
+  settingsJson           Json
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  workspace              Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                   Team?                @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  templateDefaults       FunnelTemplate[]     @relation("TemplateDefaultHandoffStrategy")
+  funnelInstances        FunnelInstance[]     @relation("InstanceHandoffStrategy")
+  funnelPublications     FunnelPublication[]  @relation("PublicationHandoffStrategy")
+
+  @@unique([workspaceId, teamId, name])
+}
+
 model RotationPool {
-  id             String             @id @default(uuid())
-  workspaceId    String
-  teamId         String
-  name           String
-  status         RotationPoolStatus
-  strategy       RotationStrategy
-  isFallbackPool Boolean
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  team           Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  members        RotationMember[]
-  defaultFunnels Funnel[]           @relation("PoolDefaultFunnels")
-  assignments    Assignment[]
+  id              String             @id @default(uuid())
+  workspaceId     String
+  teamId          String
+  name            String
+  status          RotationPoolStatus
+  strategy        RotationStrategy
+  isFallbackPool  Boolean
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team            Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  members         RotationMember[]
+  defaultFunnels  Funnel[]           @relation("PoolDefaultFunnels")
+  funnelInstances FunnelInstance[]
+  assignments     Assignment[]
 
   @@unique([workspaceId, name])
 }
@@ -250,50 +517,58 @@ model Visitor {
 }
 
 model Lead {
-  id                  String            @id @default(uuid())
+  id                  String              @id @default(uuid())
   workspaceId         String
   funnelId            String
-  visitorId           String?           @unique
+  funnelInstanceId    String?
+  funnelPublicationId String?
+  visitorId           String?             @unique
   sourceChannel       LeadSourceChannel
   fullName            String?
   email               String?
   phone               String?
   companyName         String?
   status              LeadStatus
-  currentAssignmentId String?           @unique
+  currentAssignmentId String?             @unique
   tags                String[]
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  workspace           Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  funnel              Funnel            @relation(fields: [funnelId], references: [id], onDelete: Cascade)
-  visitor             Visitor?          @relation(fields: [visitorId], references: [id], onDelete: SetNull)
-  assignments         Assignment[]      @relation("LeadAssignments")
-  currentAssignment   Assignment?       @relation("CurrentLeadAssignment", fields: [currentAssignmentId], references: [id], onDelete: SetNull)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  funnel              Funnel              @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  funnelInstance      FunnelInstance?     @relation(fields: [funnelInstanceId], references: [id], onDelete: SetNull)
+  funnelPublication   FunnelPublication?  @relation(fields: [funnelPublicationId], references: [id], onDelete: SetNull)
+  visitor             Visitor?            @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  assignments         Assignment[]        @relation("LeadAssignments")
+  currentAssignment   Assignment?         @relation("CurrentLeadAssignment", fields: [currentAssignmentId], references: [id], onDelete: SetNull)
   events              DomainEvent[]
 }
 
 model Assignment {
-  id             String           @id @default(uuid())
-  workspaceId    String
-  leadId         String
-  sponsorId      String
-  teamId         String
-  funnelId       String
-  rotationPoolId String?
-  status         AssignmentStatus
-  reason         AssignmentReason
-  assignedAt     DateTime
-  resolvedAt     DateTime?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  lead           Lead             @relation("LeadAssignments", fields: [leadId], references: [id], onDelete: Cascade)
-  sponsor        Sponsor          @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
-  team           Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  funnel         Funnel           @relation(fields: [funnelId], references: [id], onDelete: Cascade)
-  rotationPool   RotationPool?    @relation(fields: [rotationPoolId], references: [id], onDelete: SetNull)
-  currentForLead Lead?            @relation("CurrentLeadAssignment")
-  events         DomainEvent[]
+  id                  String              @id @default(uuid())
+  workspaceId         String
+  leadId              String
+  sponsorId           String
+  teamId              String
+  funnelId            String
+  funnelInstanceId    String?
+  funnelPublicationId String?
+  rotationPoolId      String?
+  status              AssignmentStatus
+  reason              AssignmentReason
+  assignedAt          DateTime
+  resolvedAt          DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead                Lead                @relation("LeadAssignments", fields: [leadId], references: [id], onDelete: Cascade)
+  sponsor             Sponsor             @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  team                Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  funnel              Funnel              @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  funnelInstance      FunnelInstance?     @relation(fields: [funnelInstanceId], references: [id], onDelete: SetNull)
+  funnelPublication   FunnelPublication?  @relation(fields: [funnelPublicationId], references: [id], onDelete: SetNull)
+  rotationPool        RotationPool?       @relation(fields: [rotationPoolId], references: [id], onDelete: SetNull)
+  currentForLead      Lead?               @relation("CurrentLeadAssignment")
+  events              DomainEvent[]
 }
 
 model DomainEvent {

@@ -63,6 +63,8 @@ export class LeadPrismaRepository implements LeadRepository {
       data: {
         workspaceId: data.workspaceId,
         funnelId: data.funnelId,
+        funnelInstanceId: data.funnelInstanceId ?? null,
+        funnelPublicationId: data.funnelPublicationId ?? null,
         visitorId: data.visitorId ?? null,
         sourceChannel: toDbSource(data.sourceChannel),
         fullName: data.fullName ?? null,
@@ -85,6 +87,8 @@ export class LeadPrismaRepository implements LeadRepository {
         id: entity.id,
         workspaceId: entity.workspaceId,
         funnelId: entity.funnelId,
+        funnelInstanceId: entity.funnelInstanceId,
+        funnelPublicationId: entity.funnelPublicationId,
         visitorId: entity.visitorId,
         sourceChannel: toDbSource(entity.sourceChannel),
         fullName: entity.fullName,
@@ -99,6 +103,8 @@ export class LeadPrismaRepository implements LeadRepository {
       },
       update: {
         funnelId: entity.funnelId,
+        funnelInstanceId: entity.funnelInstanceId,
+        funnelPublicationId: entity.funnelPublicationId,
         visitorId: entity.visitorId,
         sourceChannel: toDbSource(entity.sourceChannel),
         fullName: entity.fullName,

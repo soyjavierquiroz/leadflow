@@ -3,7 +3,7 @@
 Fecha: 2026-03-21 (UTC)
 
 ## Objetivo
-Conectar el dominio v1 de Leadflow a PostgreSQL usando Prisma, dejando una base de persistencia mantenible, migrable y lista para crecer sin rehacer el dominio.
+Conectar el dominio de Leadflow a PostgreSQL usando Prisma y dejar una base mantenible que soporte la expansion v2 de ownership, publicacion y templates sin romper la compatibilidad del modelo previo.
 
 ## Stack aplicado
 - PostgreSQL como base de datos objetivo.
@@ -17,6 +17,7 @@ Conectar el dominio v1 de Leadflow a PostgreSQL usando Prisma, dejando una base 
 - Capa Prisma Nest: `apps/api/src/prisma`
 
 ## Entidades persistidas
+Base original:
 - `Workspace`
 - `Team`
 - `Sponsor`
@@ -28,11 +29,24 @@ Conectar el dominio v1 de Leadflow a PostgreSQL usando Prisma, dejando una base 
 - `Assignment`
 - `DomainEvent`
 
+Expansion v2 implementada:
+- `Domain`
+- `FunnelTemplate`
+- `FunnelInstance`
+- `FunnelStep`
+- `FunnelPublication`
+- `TrackingProfile`
+- `ConversionEventMapping`
+- `HandoffStrategy`
+
 ## Decisiones de modelado
-- `RotationMember` materializa la pertenencia de sponsors a un pool con `position`, `weight` e `isActive`.
-- `Lead.visitorId` se modela como relacion uno-a-uno opcional para conservar la trazabilidad de conversion.
-- `Lead.currentAssignmentId` conserva la asignacion vigente sin eliminar el historial de `Assignment`.
-- `Funnel.defaultRotationPoolId` y `Funnel.defaultTeamId` cubren el default operativo sin sobre-modelar reglas.
+- `Workspace` se mantiene como tenant boundary.
+- `Team` pasa a ser el owner operativo real.
+- `Funnel` se mantiene como entidad legacy/transicional.
+- `FunnelInstance.legacyFunnelId` deja puente explicito hacia el modelo anterior.
+- `Lead` y `Assignment` conservan `funnelId` y agregan `funnelInstanceId` y `funnelPublicationId` opcionales.
+- `FunnelPublication` materializa resolucion publica por `host + path`.
+- `ConversionEventMapping` se asocia a `TrackingProfile`.
 - `DomainEvent.payload` se persiste como `Json`.
 
 ## Repositorios y adapters
@@ -41,6 +55,14 @@ Repositorios Prisma implementados para:
 - `TeamRepository`
 - `SponsorRepository`
 - `FunnelRepository`
+- `DomainRepository`
+- `FunnelTemplateRepository`
+- `FunnelInstanceRepository`
+- `FunnelStepRepository`
+- `FunnelPublicationRepository`
+- `TrackingProfileRepository`
+- `HandoffStrategyRepository`
+- `ConversionEventMappingRepository`
 - `RotationPoolRepository`
 - `VisitorRepository`
 - `LeadRepository`
@@ -52,15 +74,27 @@ Repositorios Prisma implementados para:
 - `GET /v1/sponsors`
 - `GET /v1/leads`
 - `GET /v1/rotation-pools`
+- `GET /v1/domains`
+- `GET /v1/funnel-templates`
+- `GET /v1/funnel-instances`
+- `GET /v1/funnel-publications`
 
 ## Seed de desarrollo
 El seed crea:
 - 1 workspace
 - 1 team
+- 1 domain
+- 1 funnel template
+- 1 funnel instance
+- 2 funnel steps
+- 1 funnel publication
+- 1 tracking profile
+- 1 handoff strategy
+- 2 conversion event mappings
 - 2 sponsors
-- 1 funnel
 - 1 rotation pool
-- 2 rotation members asociados
+- 2 rotation members
+- 1 funnel legacy enlazado para compatibilidad
 
 ## Scripts utiles
 En raiz del repo:
@@ -76,10 +110,10 @@ En `apps/api`:
 - `pnpm prisma:seed`
 
 ## Desarrollo local
-- `infra/docker/docker-compose.dev.yml` ahora incluye `postgres` para desarrollo local solamente.
+- `infra/docker/docker-compose.dev.yml` incluye `postgres` para desarrollo local solamente.
 - No se tocaron Traefik, Cloudflare ni infraestructura productiva del servidor.
 
 ## Siguiente fase recomendada
-- CRUDs iniciales y comandos de escritura.
-- Primera estrategia simple de asignacion sobre `RotationPool`.
-- Auth y permisos por workspace/team.
+- runtime publico por `host + path`
+- flows iniciales de captura sobre `FunnelInstance` y `FunnelPublication`
+- auth y permisos sobre ownership real de `Team`

@@ -8,8 +8,7 @@ La base del monorepo ya incluye:
 - Shell funcional de `api` (NestJS + Fastify + health).
 - Foundation de dominio v1 en `apps/api` con modulos, DTOs e interfaces.
 - Persistence Foundation v1 con PostgreSQL + Prisma en `apps/api`.
-- Diseno estructural inicial para funnels, tracking y handoff.
-- Consolidacion de ownership, publicacion y templates para la siguiente expansion.
+- Expansion v2 implementada para ownership, publicacion, templates, tracking y handoff.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -60,6 +59,12 @@ Desarrollo app:
 - `pnpm dev:web`
 - `pnpm dev:api`
 
+Base de datos:
+- `pnpm db:generate`
+- `pnpm db:migrate:dev`
+- `pnpm db:migrate:deploy`
+- `pnpm db:seed`
+
 Calidad:
 - `pnpm build`
 - `pnpm lint`
@@ -69,19 +74,6 @@ Docker local:
 - `pnpm docker:dev:up`
 - `pnpm docker:dev:down`
 - `pnpm docker:dev:logs`
-
-Build imagenes locales (primer deploy):
-- `pnpm docker:build:web:local`
-- `pnpm docker:build:api:local`
-- `pnpm docker:build:local`
-- Estos builds usan runtime de produccion (`--target runner`), no modo `dev`.
-
-Build/publicacion GHCR (futuro):
-- `TAG=latest pnpm docker:ghcr:build:web`
-- `TAG=latest pnpm docker:ghcr:build:api`
-- `TAG=latest pnpm docker:ghcr:push:web`
-- `TAG=latest pnpm docker:ghcr:push:api`
-- `GHCR_USERNAME=<user> GHCR_TOKEN=<token> TAG=latest pnpm docker:ghcr:publish`
 
 Validacion de stacks:
 - `pnpm docker:stack:validate`
@@ -100,6 +92,7 @@ Validacion de stacks:
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
 - `docs/domain-persistence-expansion-v2.md`
+- `docs/domain-persistence-expansion-implemented-v2.md`
 - `docs/infrastructure-v1.md`
 - `docs/deployment-v1.md`
 - `docs/deployment-local-v1.md`
@@ -109,41 +102,45 @@ Validacion de stacks:
 - `docs/domain-lifecycle-v1.md`
 - `docs/environment-v1.md`
 
-## Dominio v1
-- Modulos base API:
-  - `workspaces`
-  - `teams`
-  - `sponsors`
-  - `rotation-pools`
-  - `funnels`
-  - `visitors`
-  - `leads`
-  - `assignments`
-  - `events`
-- La fase actual deja contratos, DTOs y servicios draft listos para conectar persistencia despues.
-- Persistencia real, auth y motor avanzado de asignacion siguen fuera de alcance por ahora.
+## Dominio API
+Modulos disponibles:
+- `workspaces`
+- `teams`
+- `sponsors`
+- `funnels`
+- `domains`
+- `funnel-templates`
+- `funnel-instances`
+- `funnel-steps`
+- `funnel-publications`
+- `tracking-profiles`
+- `handoff-strategies`
+- `conversion-event-mappings`
+- `rotation-pools`
+- `visitors`
+- `leads`
+- `assignments`
+- `events`
 
-## Persistencia v1
+## Persistencia implementada
 - Prisma integrado en `apps/api/prisma/schema.prisma`.
-- Migracion inicial creada para PostgreSQL.
-- Seed minimo de desarrollo con workspace, team, sponsors, funnel y rotation pool.
+- Migracion v2 aplicada para ownership/publicacion/templates.
+- Seed de desarrollo con workspace, team, domain, funnel template, funnel instance, funnel steps, funnel publication, tracking profile, handoff strategy y compatibilidad con funnel legacy.
 - Endpoints de validacion expuestos:
   - `GET /v1/workspaces`
   - `GET /v1/sponsors`
   - `GET /v1/leads`
   - `GET /v1/rotation-pools`
+  - `GET /v1/domains`
+  - `GET /v1/funnel-templates`
+  - `GET /v1/funnel-instances`
+  - `GET /v1/funnel-publications`
 
-## Funnel & Tracking v1
-- El modelo actual documenta separacion recomendada entre `FunnelTemplate`, `FunnelInstance` y `FunnelStep`.
-- Se definen tipos base de funnel para captura simple, VSL, thank-you con WhatsApp y flujos de 3 pasos.
-- Se documentan estrategias de handoff inmediato y diferido.
-- Se propone una futura expansion del dominio sin aplicar aun cambios de persistencia.
-
-## Ownership, Publication & Templates
-- `Team` queda definido como owner operativo de funnel, dominio, pool y tracking.
-- `Super Admin` controla templates, bloques, JSON y estructura.
-- `Sponsor` queda como actor comercial y no como owner del funnel.
-- La publicacion publica se recomienda por `host + path` con precedencia de la ruta mas especifica.
+## Compatibilidad actual
+- `Workspace` sigue como frontera tenant.
+- `Team` es el owner operativo real.
+- `Funnel` se mantiene como modelo legacy/transicional.
+- `Lead` y `Assignment` ya pueden enlazarse tambien a `FunnelInstance` y `FunnelPublication`.
 
 ## Estado de despliegue
 - Preparado para despliegue en Portainer con dos variantes de stack:
@@ -155,9 +152,7 @@ Validacion de stacks:
 - TLS para Cloudflare Full (strict) en stack local:
   - Routers `site`, `members`, `admin`, `api` con `tls.certresolver=le`.
   - Dominio principal y SANs explicitos en `leadflow-site` para cubrir apex y subdominios operativos.
-- Verificacion post-fix TLS:
-  - Checklist y comandos OpenSSL en `docs/tls-verification-v1.md`.
 - Deploy aun no ejecutado.
 
 ## Nota operativa
-Esta fase prepara ejecucion y despliegue futuro, pero no realiza deploy ni modifica infraestructura productiva del servidor.
+Esta fase prepara el runtime publico y los flows siguientes, pero no realiza deploy ni modifica infraestructura productiva del servidor.

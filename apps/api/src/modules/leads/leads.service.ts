@@ -16,6 +16,8 @@ export class LeadsService {
     return buildEntity<Lead>({
       workspaceId: dto.workspaceId,
       funnelId: dto.funnelId,
+      funnelInstanceId: dto.funnelInstanceId ?? null,
+      funnelPublicationId: dto.funnelPublicationId ?? null,
       visitorId: dto.visitorId ?? null,
       sourceChannel: dto.sourceChannel,
       fullName: dto.fullName ?? null,

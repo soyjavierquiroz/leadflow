@@ -22,6 +22,11 @@ export class TeamsService {
       managerUserId: dto.managerUserId ?? null,
       sponsorIds: [],
       funnelIds: [],
+      domainIds: [],
+      funnelInstanceIds: [],
+      funnelPublicationIds: [],
+      trackingProfileIds: [],
+      handoffStrategyIds: [],
       rotationPoolIds: [],
     });
   }

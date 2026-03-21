@@ -22,6 +22,8 @@ export class AssignmentsService {
       sponsorId: dto.sponsorId,
       teamId: dto.teamId,
       funnelId: dto.funnelId,
+      funnelInstanceId: dto.funnelInstanceId ?? null,
+      funnelPublicationId: dto.funnelPublicationId ?? null,
       rotationPoolId: dto.rotationPoolId ?? null,
       status: 'pending',
       reason: dto.reason ?? 'rotation',

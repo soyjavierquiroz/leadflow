@@ -16,6 +16,11 @@ export interface Team extends BaseDomainEntity, WorkspaceScoped {
   managerUserId: DomainId | null;
   sponsorIds: DomainId[];
   funnelIds: DomainId[];
+  domainIds: DomainId[];
+  funnelInstanceIds: DomainId[];
+  funnelPublicationIds: DomainId[];
+  trackingProfileIds: DomainId[];
+  handoffStrategyIds: DomainId[];
   rotationPoolIds: DomainId[];
 }
 
