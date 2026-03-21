@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1, persistencia real en PostgreSQL y expansion implementada para ownership, publicacion, funnels, tracking y handoff, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates y un runtime publico minimo JSON-driven, sin tocar produccion.
 
 ## Componentes
 
@@ -11,6 +11,18 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
   - `/(site)`
   - `/(members)`
   - `/(admin)`
+- Runtime publico en `/(site)/[[...slug]]`.
+- Resolucion de host por request y preview opcional con `?previewHost=...` solo en desarrollo.
+- Renderer JSON-driven MVP para bloques de funnel:
+  - `hero`
+  - `text`
+  - `video`
+  - `cta`
+  - `faq`
+  - `form_placeholder`
+  - `thank_you`
+  - `sponsor_reveal_placeholder`
+- `not-found` limpio para funnels/publicaciones no resueltos.
 - Config publica centralizada en `apps/web/lib/public-env.ts`.
 - Build preparado para contenedor con `output: standalone`.
 
@@ -23,6 +35,7 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
 - Prisma integrado como adapter de persistencia.
 - `PrismaModule` global con `PrismaService`.
 - `DomainModule` como agregador de dominio.
+- `PublicFunnelRuntimeModule` para lectura publica de funnels publicados.
 - Modulos disponibles:
   - `workspaces`
   - `teams`
@@ -41,6 +54,10 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
   - `leads`
   - `assignments`
   - `events`
+- Endpoints publicos de runtime:
+  - `GET /v1/public/funnel-runtime/resolve`
+  - `GET /v1/public/funnel-runtime/publications/:publicationId`
+  - `GET /v1/public/funnel-runtime/publications/:publicationId/steps/:stepSlug`
 - Endpoints minimos de validacion expuestos para `workspaces`, `sponsors`, `leads`, `rotation-pools`, `domains`, `funnel-templates`, `funnel-instances` y `funnel-publications`.
 
 ### Shared packages
@@ -77,6 +94,28 @@ La arquitectura ya implementa:
 - modelado de steps tipados para runtime JSON-driven
 - configuracion declarativa de tracking y handoff
 - compatibilidad transicional con `Funnel` legacy
+- runtime publico de solo lectura para resolver funnel publicado + step activo
+
+## Runtime publico v1
+
+### Resolucion `host + path`
+El runtime publico sigue estas reglas:
+- match exacto por `host`
+- normalizacion de path
+- solo publicaciones activas
+- gana la ruta mas especifica
+- fallback operativo a `/` si la publicacion root activa aplica
+
+### Resolucion de step
+Una vez resuelta la `FunnelPublication`:
+- el path base de la publicacion carga el `entry step`
+- una subruta relativa dentro de esa publicacion intenta resolver `step.slug`
+- si el step no existe, la API responde `404`
+
+### Contrato web/api
+- La web pide el runtime por `host + path`.
+- La API devuelve dominio, publicacion, funnel, template, tracking efectivo, handoff efectivo, step actual y navegacion de steps.
+- La web renderiza `blocks_json` del step actual sin captura ni assignment reales todavia.
 
 Decision de transicion:
 - `Funnel` se mantiene para compatibilidad
@@ -120,4 +159,4 @@ Decision de transicion:
 - Logica compleja de asignacion.
 
 ## Estado
-Arquitectura lista para la siguiente fase de runtime publico, flows de captura/asignacion y auth sobre el modelo consolidado, todavia sin cambios en produccion.
+Arquitectura lista para la siguiente fase de capture runtime, eventos/tracking operativo, flows de asignacion y auth sobre el modelo consolidado, todavia sin cambios en produccion.

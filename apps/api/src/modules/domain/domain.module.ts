@@ -10,6 +10,7 @@ import { FunnelTemplatesModule } from '../funnel-templates/funnel-templates.modu
 import { FunnelsModule } from '../funnels/funnels.module';
 import { HandoffStrategiesModule } from '../handoff-strategies/handoff-strategies.module';
 import { LeadsModule } from '../leads/leads.module';
+import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
 import { RotationPoolsModule } from '../rotation-pools/rotation-pools.module';
 import { SponsorsModule } from '../sponsors/sponsors.module';
 import { TeamsModule } from '../teams/teams.module';
@@ -31,6 +32,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     TrackingProfilesModule,
     HandoffStrategiesModule,
     ConversionEventMappingsModule,
+    PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,
     LeadsModule,
@@ -50,6 +52,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     TrackingProfilesModule,
     HandoffStrategiesModule,
     ConversionEventMappingsModule,
+    PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,
     LeadsModule,

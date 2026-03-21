@@ -257,21 +257,42 @@ async function main() {
       version: 1,
       funnelType: 'simple_capture',
       blocksJson: {
-        layout: 'stack',
         blocks: [
-          { type: 'hero', key: 'hero-main' },
-          { type: 'lead_form', key: 'lead-form-main' },
+          {
+            type: 'hero',
+            key: 'hero-main',
+            eyebrow: 'Leadflow Runtime',
+            title: 'Public funnel runtime listo para crecer',
+            description:
+              'Este template base publica funnels por host + path y renderiza bloques JSON-driven sin acoplar la experiencia a un dominio fijo.',
+          },
+          {
+            type: 'text',
+            key: 'text-positioning',
+            title: 'Base JSON-driven',
+            body:
+              'La estructura del funnel queda en manos de plataforma, mientras el team opera dominios, tracking, pools y publicaciones.',
+          },
+          {
+            type: 'form_placeholder',
+            key: 'form-placeholder',
+            title: 'Captura real en la siguiente fase',
+            description:
+              'Este bloque valida el runtime visual, pero todavia no persiste leads.',
+            fields: ['Nombre', 'Telefono', 'Email'],
+          },
         ],
       },
       mediaMap: {
-        heroImage: '/assets/hero-dev.jpg',
+        heroImage:
+          'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80',
       },
       settingsJson: {
-        title: 'Captura simple',
+        theme: 'runtime-v1',
         locale: 'es',
       },
       allowedOverridesJson: {
-        editableFields: ['title', 'subtitle', 'ctaLabel', 'heroImage'],
+        editableFields: ['hero', 'text', 'faq', 'cta', 'media'],
       },
       defaultHandoffStrategyId: handoffStrategy.id,
     },
@@ -282,21 +303,42 @@ async function main() {
       version: 1,
       funnelType: 'simple_capture',
       blocksJson: {
-        layout: 'stack',
         blocks: [
-          { type: 'hero', key: 'hero-main' },
-          { type: 'lead_form', key: 'lead-form-main' },
+          {
+            type: 'hero',
+            key: 'hero-main',
+            eyebrow: 'Leadflow Runtime',
+            title: 'Public funnel runtime listo para crecer',
+            description:
+              'Este template base publica funnels por host + path y renderiza bloques JSON-driven sin acoplar la experiencia a un dominio fijo.',
+          },
+          {
+            type: 'text',
+            key: 'text-positioning',
+            title: 'Base JSON-driven',
+            body:
+              'La estructura del funnel queda en manos de plataforma, mientras el team opera dominios, tracking, pools y publicaciones.',
+          },
+          {
+            type: 'form_placeholder',
+            key: 'form-placeholder',
+            title: 'Captura real en la siguiente fase',
+            description:
+              'Este bloque valida el runtime visual, pero todavia no persiste leads.',
+            fields: ['Nombre', 'Telefono', 'Email'],
+          },
         ],
       },
       mediaMap: {
-        heroImage: '/assets/hero-dev.jpg',
+        heroImage:
+          'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80',
       },
       settingsJson: {
-        title: 'Captura simple',
+        theme: 'runtime-v1',
         locale: 'es',
       },
       allowedOverridesJson: {
-        editableFields: ['title', 'subtitle', 'ctaLabel', 'heroImage'],
+        editableFields: ['hero', 'text', 'faq', 'cta', 'media'],
       },
       defaultHandoffStrategyId: handoffStrategy.id,
     },
@@ -319,12 +361,15 @@ async function main() {
       trackingProfileId: trackingProfile.id,
       handoffStrategyId: handoffStrategy.id,
       settingsJson: {
-        title: 'Descubre tu oportunidad',
-        subtitle: 'Deja tus datos y te contactamos.',
-        ctaLabel: 'Quiero informacion',
+        theme: 'signal',
+        locale: 'es',
+        badge: 'Equipo Sales Core',
       },
       mediaMap: {
-        heroImage: '/assets/hero-sales-core.jpg',
+        heroImage:
+          'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+        introVideo:
+          'https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-runtime-v1',
       },
     },
     create: {
@@ -339,12 +384,15 @@ async function main() {
       trackingProfileId: trackingProfile.id,
       handoffStrategyId: handoffStrategy.id,
       settingsJson: {
-        title: 'Descubre tu oportunidad',
-        subtitle: 'Deja tus datos y te contactamos.',
-        ctaLabel: 'Quiero informacion',
+        theme: 'signal',
+        locale: 'es',
+        badge: 'Equipo Sales Core',
       },
       mediaMap: {
-        heroImage: '/assets/hero-sales-core.jpg',
+        heroImage:
+          'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+        introVideo:
+          'https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-runtime-v1',
       },
     },
   });
@@ -366,16 +414,77 @@ async function main() {
         isConversionStep: false,
         blocksJson: {
           blocks: [
-            { type: 'hero', key: 'hero-main' },
-            { type: 'lead_form', key: 'lead-form-main' },
+            {
+              type: 'hero',
+              key: 'hero-main',
+              eyebrow: 'Leadflow Public Runtime',
+              title: 'Lanza funnels publicos por host + path',
+              description:
+                'Este funnel demuestra resolucion publica, renderer JSON-driven y compatibilidad con el modelo Team-owned aprobado.',
+              accent: 'Teal',
+            },
+            {
+              type: 'text',
+              key: 'text-main',
+              title: 'Que valida esta fase',
+              body:
+                'Resolucion de publicacion activa, carga del step correcto y renderizado inicial de bloques MVP sin captura real.',
+              items: [
+                'Runtime publico por host + path',
+                'Renderer extensible para bloques JSON',
+                'Fallback y not found limpios',
+              ],
+            },
+            {
+              type: 'video',
+              key: 'video-main',
+              title: 'Vista previa del runtime',
+              embedUrl:
+                'https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-runtime-v1',
+              caption:
+                'Video placeholder para validar el bloque visual antes de integrar media real.',
+            },
+            {
+              type: 'faq',
+              key: 'faq-main',
+              title: 'Preguntas rapidas',
+              items: [
+                {
+                  question: 'Se captura el lead en esta fase?',
+                  answer:
+                    'No todavia. Esta fase deja el runtime publico listo para conectar capture y assignment despues.',
+                },
+                {
+                  question: 'Se soportan subrutas?',
+                  answer:
+                    'Si. El runtime resuelve host + path y elige la publicacion mas especifica activa.',
+                },
+              ],
+            },
+            {
+              type: 'form_placeholder',
+              key: 'form-placeholder',
+              title: 'Formulario MVP',
+              description:
+                'La captura real se implementa en la siguiente fase. Por ahora este bloque valida estructura, layout y CTA.',
+              fields: ['Nombre completo', 'WhatsApp', 'Email'],
+            },
+            {
+              type: 'cta',
+              key: 'cta-next',
+              label: 'Continuar al thank you',
+              action: 'next_step',
+              variant: 'primary',
+            },
           ],
         },
         mediaMap: {
-          heroImage: '/assets/hero-sales-core.jpg',
+          heroImage:
+            'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
         },
         settingsJson: {
-          path: '/',
-          title: 'Descubre tu oportunidad',
+          title: 'Landing principal',
+          summary: 'Entrada del funnel publicado.',
         },
       },
       {
@@ -389,16 +498,36 @@ async function main() {
         isConversionStep: true,
         blocksJson: {
           blocks: [
-            { type: 'confirmation', key: 'thank-you-main' },
-            { type: 'cta', key: 'next-step-cta' },
+            {
+              type: 'thank_you',
+              key: 'thank-you-main',
+              eyebrow: 'Siguiente fase lista',
+              title: 'Tu runtime publico ya resolvio el funnel',
+              description:
+                'La captura real y el assignment se conectan despues sobre este mismo modelo.',
+            },
+            {
+              type: 'sponsor_reveal_placeholder',
+              key: 'sponsor-placeholder',
+              title: 'Revelacion de sponsor placeholder',
+              description:
+                'Aqui mas adelante podremos mostrar sponsor, asignacion o handoff segun la estrategia aprobada.',
+            },
+            {
+              type: 'cta',
+              key: 'cta-back-home',
+              label: 'Volver al inicio del funnel',
+              action: 'entry_step',
+              variant: 'secondary',
+            },
           ],
         },
         mediaMap: {
-          confirmationIllustration: '/assets/thank-you.jpg',
+          confirmationIllustration:
+            'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1200&q=80',
         },
         settingsJson: {
-          path: '/gracias',
-          title: 'Gracias por registrarte',
+          title: 'Gracias por visitar el funnel',
           nextAction: 'pending_handoff',
         },
       },
@@ -431,6 +560,35 @@ async function main() {
       pathPrefix: '/',
       status: 'active',
       isPrimary: true,
+    },
+  });
+
+  await prisma.funnelPublication.upsert({
+    where: {
+      domainId_pathPrefix: {
+        domainId: domain.id,
+        pathPrefix: '/oportunidad',
+      },
+    },
+    update: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      funnelInstanceId: funnelInstance.id,
+      trackingProfileId: trackingProfile.id,
+      handoffStrategyId: handoffStrategy.id,
+      status: 'active',
+      isPrimary: false,
+    },
+    create: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      domainId: domain.id,
+      funnelInstanceId: funnelInstance.id,
+      trackingProfileId: trackingProfile.id,
+      handoffStrategyId: handoffStrategy.id,
+      pathPrefix: '/oportunidad',
+      status: 'active',
+      isPrimary: false,
     },
   });
 

@@ -9,6 +9,7 @@ La base del monorepo ya incluye:
 - Foundation de dominio v1 en `apps/api` con modulos, DTOs e interfaces.
 - Persistence Foundation v1 con PostgreSQL + Prisma en `apps/api`.
 - Expansion v2 implementada para ownership, publicacion, templates, tracking y handoff.
+- Public Funnel Runtime v1 en `apps/web` y `apps/api`.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -88,6 +89,7 @@ Validacion de stacks:
 - `docs/architecture-v1.md`
 - `docs/domain-model-v1.md`
 - `docs/persistence-v1.md`
+- `docs/public-funnel-runtime-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -125,7 +127,7 @@ Modulos disponibles:
 ## Persistencia implementada
 - Prisma integrado en `apps/api/prisma/schema.prisma`.
 - Migracion v2 aplicada para ownership/publicacion/templates.
-- Seed de desarrollo con workspace, team, domain, funnel template, funnel instance, funnel steps, funnel publication, tracking profile, handoff strategy y compatibilidad con funnel legacy.
+- Seed de desarrollo con workspace, team, domain, funnel template, funnel instance, funnel steps, publicaciones activas en `/` y `/oportunidad`, tracking profile, handoff strategy y compatibilidad con funnel legacy.
 - Endpoints de validacion expuestos:
   - `GET /v1/workspaces`
   - `GET /v1/sponsors`
@@ -135,6 +137,29 @@ Modulos disponibles:
   - `GET /v1/funnel-templates`
   - `GET /v1/funnel-instances`
   - `GET /v1/funnel-publications`
+
+## Runtime publico v1
+- Resolucion publica implementada por `host + path` con match exacto de host, path normalizado y precedencia por ruta mas especifica.
+- Endpoints publicos disponibles:
+  - `GET /v1/public/funnel-runtime/resolve?host=...&path=...`
+  - `GET /v1/public/funnel-runtime/publications/:publicationId`
+  - `GET /v1/public/funnel-runtime/publications/:publicationId/steps/:stepSlug`
+- Web con ruta publica catch-all `/(site)/[[...slug]]` para root y subrutas limpias.
+- Renderer JSON-driven MVP con bloques:
+  - `hero`
+  - `text`
+  - `video`
+  - `cta`
+  - `faq`
+  - `form_placeholder`
+  - `thank_you`
+  - `sponsor_reveal_placeholder`
+- Preview local en desarrollo con `?previewHost=...` si hace falta simular otro host.
+- Rutas seed listas para probar:
+  - `/`
+  - `/gracias`
+  - `/oportunidad`
+  - `/oportunidad/gracias`
 
 ## Compatibilidad actual
 - `Workspace` sigue como frontera tenant.
@@ -155,4 +180,4 @@ Modulos disponibles:
 - Deploy aun no ejecutado.
 
 ## Nota operativa
-Esta fase prepara el runtime publico y los flows siguientes, pero no realiza deploy ni modifica infraestructura productiva del servidor.
+Esta fase implementa el runtime publico minimo y prepara capture/assignment para la siguiente iteracion, sin deploy ni cambios de infraestructura productiva.

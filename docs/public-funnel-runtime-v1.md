@@ -1,0 +1,95 @@
+# Public Funnel Runtime v1
+
+Fecha: 2026-03-21 (UTC)
+
+## Objetivo
+Implementar el runtime publico minimo de Leadflow para resolver `host + path` hacia una `FunnelPublication`, cargar la `FunnelInstance` correcta, seleccionar el `FunnelStep` actual y renderizar su `blocks_json` en `apps/web`.
+
+## Alcance implementado
+- resolucion publica por `host + path`
+- carga de publicacion activa
+- carga de `FunnelInstance` y `FunnelStep`
+- renderer JSON-driven inicial en `apps/web`
+- soporte para root `/`
+- soporte para subrutas limpias
+- modo de preview local por query param en desarrollo
+
+## Endpoints publicos implementados
+- `GET /v1/public/funnel-runtime/resolve?host=...&path=...`
+- `GET /v1/public/funnel-runtime/publications/:publicationId`
+- `GET /v1/public/funnel-runtime/publications/:publicationId/steps/:stepSlug`
+
+## Reglas de resolucion `host + path`
+1. `host` debe coincidir exactamente con un `Domain.host` activo.
+2. El `path` se normaliza antes de evaluar rutas.
+3. Solo participan `FunnelPublication` activas.
+4. Se consideran todas las publicaciones activas del host cuyo `pathPrefix` sea prefijo valido del request.
+5. Gana la ruta mas especifica.
+6. La publicacion root `/` funciona como fallback natural cuando ninguna ruta mas especifica gana.
+7. Si no existe publicacion valida, la API responde `404`.
+
+## Resolucion de step
+Una vez elegida la publicacion:
+- si el request coincide exactamente con `pathPrefix`, se carga el `entry step`
+- si el request agrega una subruta relativa, esa subruta intenta resolver `FunnelStep.slug`
+- si el slug no existe para esa instancia, la API responde `404`
+
+Ejemplos con el seed actual:
+- `localhost + /` -> publicacion `/`, entry step
+- `localhost + /gracias` -> publicacion `/`, step `gracias`
+- `localhost + /oportunidad` -> publicacion `/oportunidad`, entry step
+- `localhost + /oportunidad/gracias` -> publicacion `/oportunidad`, step `gracias`
+
+## Runtime web implementado
+- Ruta publica: `apps/web/app/(site)/[[...slug]]/page.tsx`
+- Not found limpio: `apps/web/app/(site)/not-found.tsx`
+- Renderer MVP: `apps/web/components/public-funnel/funnel-runtime-page.tsx`
+- Cliente server-side hacia API: `apps/web/lib/funnel-runtime.ts`
+
+El runtime en web:
+- detecta `host` desde headers del request
+- usa `path` desde la ruta actual
+- consulta la API server-side
+- renderiza el step actual con bloques JSON
+- muestra `404` limpio si no hay publicacion o step valido
+
+## Preview local
+En desarrollo se puede usar:
+- `?previewHost=localhost`
+- `?previewHost=exitosos.com`
+
+Regla:
+- solo se respeta en entornos no productivos
+- no reemplaza el modelo final basado en dominio; solo facilita pruebas locales
+
+## Bloques MVP implementados
+- `hero`
+- `text`
+- `video`
+- `cta`
+- `faq`
+- `form_placeholder`
+- `thank_you`
+- `sponsor_reveal_placeholder`
+
+## Seed ajustado para runtime
+El seed de desarrollo ahora deja:
+- `Domain` activo para `localhost`
+- una publicacion root `/`
+- una publicacion adicional en `/oportunidad`
+- steps renderizables con `blocks_json`
+- `media_map` y `settings_json` utiles para prueba visual
+
+## Limitaciones intencionales de esta fase
+- no hay captura real de leads
+- no hay assignment real
+- no hay tracking real a Meta/TikTok
+- no hay handoff real a WhatsApp
+- no hay editor visual de templates
+- no hay auth publica ni privada aplicada a este runtime
+
+## Que queda listo para la siguiente fase
+- conectar `form_placeholder` con capture real de `Visitor` y `Lead`
+- emitir eventos operativos/tracking desde el runtime
+- disparar assignment/handoff basados en `FunnelPublication`
+- introducir permisos y auth sobre el modelo consolidado

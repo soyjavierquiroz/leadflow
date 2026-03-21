@@ -1,0 +1,85 @@
+import type { Prisma } from '@prisma/client';
+
+type RuntimeJsonValue = Prisma.JsonValue;
+
+export type PublicRuntimeStep = {
+  id: string;
+  slug: string;
+  path: string;
+  stepType: string;
+  position: number;
+  isEntryStep: boolean;
+  isConversionStep: boolean;
+  blocksJson: RuntimeJsonValue;
+  mediaMap: RuntimeJsonValue;
+  settingsJson: RuntimeJsonValue;
+};
+
+export type PublicRuntimePayload = {
+  request: {
+    host: string;
+    path: string;
+    publicationPathPrefix: string;
+    relativeStepPath: string;
+  };
+  domain: {
+    id: string;
+    host: string;
+    kind: string;
+    isPrimary: boolean;
+  };
+  publication: {
+    id: string;
+    pathPrefix: string;
+    isPrimary: boolean;
+    trackingProfileId: string | null;
+    handoffStrategyId: string | null;
+  };
+  funnel: {
+    id: string;
+    name: string;
+    code: string;
+    status: string;
+    settingsJson: RuntimeJsonValue;
+    mediaMap: RuntimeJsonValue;
+    template: {
+      id: string;
+      code: string;
+      name: string;
+      version: number;
+      funnelType: string;
+      blocksJson: RuntimeJsonValue;
+      mediaMap: RuntimeJsonValue;
+      settingsJson: RuntimeJsonValue;
+      allowedOverridesJson: RuntimeJsonValue;
+    };
+  };
+  trackingProfile: {
+    id: string;
+    name: string;
+    provider: string;
+    deduplicationMode: string;
+    configJson: RuntimeJsonValue;
+    conversionEventMappings: {
+      id: string;
+      internalEventName: string;
+      providerEventName: string;
+      isBrowserSide: boolean;
+      isServerSide: boolean;
+      isCriticalConversion: boolean;
+    }[];
+  } | null;
+  handoffStrategy: {
+    id: string;
+    name: string;
+    type: string;
+    settingsJson: RuntimeJsonValue;
+  } | null;
+  currentStep: PublicRuntimeStep;
+  nextStep: Pick<PublicRuntimeStep, 'id' | 'slug' | 'path' | 'stepType'> | null;
+  previousStep: Pick<
+    PublicRuntimeStep,
+    'id' | 'slug' | 'path' | 'stepType'
+  > | null;
+  steps: PublicRuntimeStep[];
+};
