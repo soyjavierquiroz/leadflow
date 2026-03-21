@@ -84,22 +84,16 @@ container_id=$(docker ps --filter label=com.docker.swarm.service.name=postgres_p
 docker exec "$container_id" sh -lc "psql -U postgres -d postgres -c 'CREATE DATABASE leadflow;'"
 ```
 
-Despues del `Update the stack`, aplicar migraciones:
+Despues del `Update the stack`, aplicar migraciones sobre el contenedor real de `leadflow_api`:
 ```bash
-docker run --rm \
-  --network general_network \
-  -e DATABASE_URL='postgresql://postgres:<password real>@postgres:5432/leadflow?schema=public' \
-  leadflow-api:0.1.0-local \
-  sh -lc 'cd /app/apps/api && npx prisma migrate deploy'
+api_container=$(docker ps --filter label=com.docker.swarm.service.name=leadflow_api --format '{{.ID}}' | head -n1)
+docker exec "$api_container" sh -lc 'cd /app/apps/api && npx prisma migrate deploy'
 ```
 
 Seed de datos:
 ```bash
-docker run --rm \
-  --network general_network \
-  -e DATABASE_URL='postgresql://postgres:<password real>@postgres:5432/leadflow?schema=public' \
-  leadflow-api:0.1.0-local \
-  sh -lc 'cd /app/apps/api && node prisma/seed.js'
+api_container=$(docker ps --filter label=com.docker.swarm.service.name=leadflow_api --format '{{.ID}}' | head -n1)
+docker exec "$api_container" sh -lc 'cd /app/apps/api && node prisma/seed.js'
 ```
 
 ## Validaciones post-deploy esperadas
