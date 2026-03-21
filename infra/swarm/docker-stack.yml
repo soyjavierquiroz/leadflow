@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   web:
-    image: ${LEADFLOW_WEB_IMAGE:-ghcr.io/soyjavierquiroz/leadflow-web:latest}
+    image: ghcr.io/soyjavierquiroz/leadflow-web:latest
     environment:
       NEXT_PUBLIC_APP_NAME: Leadflow
       NEXT_PUBLIC_SITE_URL: https://${LEADFLOW_SITE_HOST:-exitosos.com}
@@ -27,14 +27,17 @@ services:
         - traefik.enable=true
         - traefik.docker.network=traefik_public
         - traefik.http.services.leadflow-web.loadbalancer.server.port=3000
+        # exitosos.com -> web
         - traefik.http.routers.leadflow-site.rule=Host(`${LEADFLOW_SITE_HOST:-exitosos.com}`)
         - traefik.http.routers.leadflow-site.entrypoints=websecure
         - traefik.http.routers.leadflow-site.tls=true
         - traefik.http.routers.leadflow-site.service=leadflow-web
+        # members.exitosos.com -> web
         - traefik.http.routers.leadflow-members.rule=Host(`${LEADFLOW_MEMBERS_HOST:-members.exitosos.com}`)
         - traefik.http.routers.leadflow-members.entrypoints=websecure
         - traefik.http.routers.leadflow-members.tls=true
         - traefik.http.routers.leadflow-members.service=leadflow-web
+        # admin.exitosos.com -> web
         - traefik.http.routers.leadflow-admin.rule=Host(`${LEADFLOW_ADMIN_HOST:-admin.exitosos.com}`)
         - traefik.http.routers.leadflow-admin.entrypoints=websecure
         - traefik.http.routers.leadflow-admin.tls=true
@@ -47,7 +50,7 @@ services:
       start_period: 20s
 
   api:
-    image: ${LEADFLOW_API_IMAGE:-ghcr.io/soyjavierquiroz/leadflow-api:latest}
+    image: ghcr.io/soyjavierquiroz/leadflow-api:latest
     environment:
       NODE_ENV: production
       API_NAME: leadflow-api
@@ -79,6 +82,7 @@ services:
         - traefik.enable=true
         - traefik.docker.network=traefik_public
         - traefik.http.services.leadflow-api.loadbalancer.server.port=3001
+        # api.exitosos.com -> api
         - traefik.http.routers.leadflow-api.rule=Host(`${LEADFLOW_API_HOST:-api.exitosos.com}`)
         - traefik.http.routers.leadflow-api.entrypoints=websecure
         - traefik.http.routers.leadflow-api.tls=true

@@ -53,6 +53,11 @@ Desde la raiz del repo:
 - Imagenes:
   - `pnpm docker:build:web`
   - `pnpm docker:build:api`
+  - `TAG=latest pnpm docker:ghcr:build:web`
+  - `TAG=latest pnpm docker:ghcr:build:api`
+  - `TAG=latest pnpm docker:ghcr:push:web`
+  - `TAG=latest pnpm docker:ghcr:push:api`
+  - `GHCR_USERNAME=<user> GHCR_TOKEN=<token> TAG=latest pnpm docker:ghcr:publish`
 - Stack validation:
   - `pnpm docker:stack:validate`
 
@@ -70,3 +75,15 @@ Desde la raiz del repo:
 
 ## Nota operativa
 Esta fase prepara ejecucion y despliegue futuro, pero no realiza deploy ni modifica infraestructura productiva del servidor.
+
+## Portainer (stack `leadflow`)
+- Imagen web esperada: `ghcr.io/soyjavierquiroz/leadflow-web:latest`
+- Imagen api esperada: `ghcr.io/soyjavierquiroz/leadflow-api:latest`
+- Archivo de stack: `infra/swarm/docker-stack.yml`
+- Variables de stack: `infra/swarm/.env.example`
+
+Pasos resumidos:
+1. Publicar imagenes en GHCR.
+2. En Portainer, crear/actualizar stack `leadflow` con `infra/swarm/docker-stack.yml`.
+3. Cargar variables del stack.
+4. Desplegar en ventana controlada.
