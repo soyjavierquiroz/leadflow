@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates y un runtime publico minimo JSON-driven, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates y un runtime publico JSON-driven ya conectado a captura y assignment v1, sin tocar produccion.
 
 ## Componentes
 
@@ -24,6 +24,9 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `sponsor_reveal_placeholder`
 - `not-found` limpio para funnels/publicaciones no resueltos.
 - Config publica centralizada en `apps/web/lib/public-env.ts`.
+- Islas cliente puntuales para:
+  - `form_placeholder`
+  - `sponsor_reveal_placeholder`
 - Build preparado para contenedor con `output: standalone`.
 
 ### Backend (`apps/api`)
@@ -36,6 +39,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `PrismaModule` global con `PrismaService`.
 - `DomainModule` como agregador de dominio.
 - `PublicFunnelRuntimeModule` para lectura publica de funnels publicados.
+- `LeadCaptureAssignmentService` dentro del runtime publico para submit compuesto.
 - Modulos disponibles:
   - `workspaces`
   - `teams`
@@ -58,7 +62,18 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `GET /v1/public/funnel-runtime/resolve`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`
   - `GET /v1/public/funnel-runtime/publications/:publicationId/steps/:stepSlug`
+- Endpoints publicos de captura:
+  - `POST /v1/public/funnel-runtime/visitors`
+  - `POST /v1/public/funnel-runtime/leads`
+  - `POST /v1/public/funnel-runtime/assignments/auto`
+  - `POST /v1/public/funnel-runtime/submissions`
 - Endpoints minimos de validacion expuestos para `workspaces`, `sponsors`, `leads`, `rotation-pools`, `domains`, `funnel-templates`, `funnel-instances` y `funnel-publications`.
+- Endpoints de lectura ampliados para operacion:
+  - `GET /v1/leads?sponsorId=...`
+  - `GET /v1/leads?funnelPublicationId=...`
+  - `GET /v1/assignments`
+  - `GET /v1/assignments?sponsorId=...`
+  - `GET /v1/assignments?funnelPublicationId=...`
 
 ### Shared packages
 - `packages/config`: helpers simples de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
@@ -95,6 +110,7 @@ La arquitectura ya implementa:
 - configuracion declarativa de tracking y handoff
 - compatibilidad transicional con `Funnel` legacy
 - runtime publico de solo lectura para resolver funnel publicado + step activo
+- captura publica v1 con visitor, lead, assignment y domain events
 
 ## Runtime publico v1
 
@@ -115,7 +131,12 @@ Una vez resuelta la `FunnelPublication`:
 ### Contrato web/api
 - La web pide el runtime por `host + path`.
 - La API devuelve dominio, publicacion, funnel, template, tracking efectivo, handoff efectivo, step actual y navegacion de steps.
-- La web renderiza `blocks_json` del step actual sin captura ni assignment reales todavia.
+- La web renderiza `blocks_json` del step actual.
+- Cuando el step contiene `form_placeholder`, la web ejecuta un submit publico que:
+  - registra o actualiza `Visitor`
+  - crea o actualiza `Lead`
+  - resuelve assignment simple por round robin
+  - guarda contexto local para el thank-you
 
 Decision de transicion:
 - `Funnel` se mantiene para compatibilidad
@@ -159,4 +180,4 @@ Decision de transicion:
 - Logica compleja de asignacion.
 
 ## Estado
-Arquitectura lista para la siguiente fase de capture runtime, eventos/tracking operativo, flows de asignacion y auth sobre el modelo consolidado, todavia sin cambios en produccion.
+Arquitectura lista para la siguiente fase de tracking operativo, handoff real, reglas avanzadas de routing y auth sobre el modelo consolidado, todavia sin cambios en produccion.

@@ -58,6 +58,28 @@ export class LeadPrismaRepository implements LeadRepository {
     return records.map(mapLeadRecord);
   }
 
+  async findBySponsorId(sponsorId: string): Promise<Lead[]> {
+    const records = await this.prisma.lead.findMany({
+      where: {
+        assignments: {
+          some: { sponsorId },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return records.map(mapLeadRecord);
+  }
+
+  async findByPublicationId(funnelPublicationId: string): Promise<Lead[]> {
+    const records = await this.prisma.lead.findMany({
+      where: { funnelPublicationId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return records.map(mapLeadRecord);
+  }
+
   async create(data: CreateLeadDto): Promise<Lead> {
     const record = await this.prisma.lead.create({
       data: {

@@ -31,4 +31,28 @@ export class AssignmentsService {
       resolvedAt: null,
     });
   }
+
+  async list(filters?: {
+    workspaceId?: string;
+    sponsorId?: string;
+    funnelPublicationId?: string;
+  }): Promise<Assignment[]> {
+    if (!this.repository) {
+      throw new Error('AssignmentRepository provider is not configured.');
+    }
+
+    if (filters?.sponsorId) {
+      return this.repository.findBySponsorId(filters.sponsorId);
+    }
+
+    if (filters?.funnelPublicationId) {
+      return this.repository.findByPublicationId(filters.funnelPublicationId);
+    }
+
+    if (filters?.workspaceId) {
+      return this.repository.findByWorkspaceId(filters.workspaceId);
+    }
+
+    return this.repository.findAll();
+  }
 }

@@ -1,9 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { LeadsService } from './leads.service';
+import { AssignmentsService } from './assignments.service';
 
-@Controller('leads')
-export class LeadsController {
-  constructor(private readonly leadsService: LeadsService) {}
+@Controller('assignments')
+export class AssignmentsController {
+  constructor(private readonly assignmentsService: AssignmentsService) {}
 
   @Get()
   findAll(
@@ -11,7 +11,7 @@ export class LeadsController {
     @Query('sponsorId') sponsorId?: string,
     @Query('funnelPublicationId') funnelPublicationId?: string,
   ) {
-    return this.leadsService.list({
+    return this.assignmentsService.list({
       workspaceId,
       sponsorId,
       funnelPublicationId,

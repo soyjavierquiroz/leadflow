@@ -10,6 +10,7 @@ La base del monorepo ya incluye:
 - Persistence Foundation v1 con PostgreSQL + Prisma en `apps/api`.
 - Expansion v2 implementada para ownership, publicacion, templates, tracking y handoff.
 - Public Funnel Runtime v1 en `apps/web` y `apps/api`.
+- Lead Capture & Assignment Flows v1 conectados al runtime publico.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -90,6 +91,7 @@ Validacion de stacks:
 - `docs/domain-model-v1.md`
 - `docs/persistence-v1.md`
 - `docs/public-funnel-runtime-v1.md`
+- `docs/lead-capture-assignment-flows-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -161,6 +163,32 @@ Modulos disponibles:
   - `/oportunidad`
   - `/oportunidad/gracias`
 
+## Lead Capture & Assignment v1
+- El bloque `form_placeholder` ahora envia un submit real al API publico.
+- Flujo compuesto disponible:
+  - registrar `Visitor`
+  - capturar `Lead`
+  - asignar sponsor por round robin simple
+  - persistir `Assignment`
+  - registrar `DomainEvent`
+  - navegar al siguiente step si existe
+- Endpoints publicos disponibles:
+  - `POST /v1/public/funnel-runtime/visitors`
+  - `POST /v1/public/funnel-runtime/leads`
+  - `POST /v1/public/funnel-runtime/assignments/auto`
+  - `POST /v1/public/funnel-runtime/submissions`
+- Endpoints de lectura ampliados:
+  - `GET /v1/leads?sponsorId=...`
+  - `GET /v1/leads?funnelPublicationId=...`
+  - `GET /v1/assignments`
+  - `GET /v1/assignments?sponsorId=...`
+  - `GET /v1/assignments?funnelPublicationId=...`
+- Estrategia de assignment v1:
+  - contexto principal `FunnelPublication` + `FunnelInstance`
+  - pool operativo de `RotationPool`
+  - seleccion del siguiente sponsor elegible por round robin simple
+  - reutilizacion de asignacion abierta si el lead ya fue asignado
+
 ## Compatibilidad actual
 - `Workspace` sigue como frontera tenant.
 - `Team` es el owner operativo real.
@@ -180,4 +208,4 @@ Modulos disponibles:
 - Deploy aun no ejecutado.
 
 ## Nota operativa
-Esta fase implementa el runtime publico minimo y prepara capture/assignment para la siguiente iteracion, sin deploy ni cambios de infraestructura productiva.
+Esta fase ya conecta runtime publico, captura y assignment v1, sin deploy ni cambios de infraestructura productiva.

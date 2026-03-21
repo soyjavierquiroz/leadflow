@@ -1,5 +1,12 @@
 import Link from 'next/link';
-import type { JsonValue, PublicFunnelRuntimePayload, RuntimeBlock } from '@/lib/funnel-runtime';
+import { AssignedSponsorReveal } from '@/components/public-funnel/assigned-sponsor-reveal';
+import { PublicCaptureForm } from '@/components/public-funnel/public-capture-form';
+import { webPublicConfig } from '@/lib/public-env';
+import type {
+  JsonValue,
+  PublicFunnelRuntimePayload,
+  RuntimeBlock,
+} from '@/lib/public-funnel-runtime.types';
 
 type FunnelRuntimePageProps = {
   runtime: PublicFunnelRuntimePayload;
@@ -99,7 +106,7 @@ function BlockRenderer({
   runtime,
 }: {
   block: RuntimeBlock;
-  runtime: PublicFunnelRuntimePayload;
+      runtime: PublicFunnelRuntimePayload;
 }) {
   const title = asString(block.title);
   const description = asString(block.description);
@@ -253,29 +260,13 @@ function BlockRenderer({
     case 'form_placeholder': {
       const fields = asStringArray(block.fields);
       return (
-        <section className="rounded-[1.75rem] border border-teal-200 bg-teal-50/90 p-8 shadow-[0_18px_50px_rgba(13,148,136,0.12)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{title || 'Formulario placeholder'}</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-700">{description}</p>
-            </div>
-            <div className="rounded-full border border-teal-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-teal-700">
-              Sin persistencia todavia
-            </div>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {fields.map((field) => (
-              <label key={field} className="grid gap-2 text-sm font-medium text-slate-700">
-                {field}
-                <input
-                  className="rounded-2xl border border-teal-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none"
-                  placeholder={field}
-                  disabled
-                />
-              </label>
-            ))}
-          </div>
-        </section>
+        <PublicCaptureForm
+          publicationId={runtime.publication.id}
+          currentStepId={runtime.currentStep.id}
+          fields={fields}
+          title={title || 'Formulario de captura'}
+          description={description}
+        />
       );
     }
 
@@ -293,16 +284,11 @@ function BlockRenderer({
 
     case 'sponsor_reveal_placeholder': {
       return (
-        <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-8 shadow-[0_18px_50px_rgba(245,158,11,0.12)]">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h2>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700">{description}</p>
-          <div className="mt-6 rounded-2xl border border-amber-200 bg-white p-5">
-            <p className="text-sm font-medium text-slate-700">Sponsor reveal placeholder</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Este espacio queda reservado para assignment, sponsor seleccionado o handoff segun la estrategia que conectemos despues.
-            </p>
-          </div>
-        </section>
+        <AssignedSponsorReveal
+          publicationId={runtime.publication.id}
+          title={title || 'Sponsor asignado'}
+          description={description}
+        />
       );
     }
 
@@ -340,6 +326,9 @@ export function FunnelRuntimePage({ runtime, previewHost }: FunnelRuntimePagePro
                 previewHost={previewHost}
               </span>
             ) : null}
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-700">
+              API {webPublicConfig.urls.api}
+            </span>
           </div>
         </section>
 

@@ -276,9 +276,9 @@ async function main() {
           {
             type: 'form_placeholder',
             key: 'form-placeholder',
-            title: 'Captura real en la siguiente fase',
+            title: 'Captura y assignment MVP',
             description:
-              'Este bloque valida el runtime visual, pero todavia no persiste leads.',
+              'Este bloque ya puede registrar visitante, capturar lead y ejecutar assignment simple por round robin.',
             fields: ['Nombre', 'Telefono', 'Email'],
           },
         ],
@@ -322,9 +322,9 @@ async function main() {
           {
             type: 'form_placeholder',
             key: 'form-placeholder',
-            title: 'Captura real en la siguiente fase',
+            title: 'Captura y assignment MVP',
             description:
-              'Este bloque valida el runtime visual, pero todavia no persiste leads.',
+              'Este bloque ya puede registrar visitante, capturar lead y ejecutar assignment simple por round robin.',
             fields: ['Nombre', 'Telefono', 'Email'],
           },
         ],
@@ -428,11 +428,11 @@ async function main() {
               key: 'text-main',
               title: 'Que valida esta fase',
               body:
-                'Resolucion de publicacion activa, carga del step correcto y renderizado inicial de bloques MVP sin captura real.',
+                'Resolucion de publicacion activa, renderer JSON-driven, captura de lead y assignment round robin simples sobre el pool operativo.',
               items: [
                 'Runtime publico por host + path',
                 'Renderer extensible para bloques JSON',
-                'Fallback y not found limpios',
+                'Lead capture y assignment v1 conectados',
               ],
             },
             {
@@ -452,7 +452,7 @@ async function main() {
                 {
                   question: 'Se captura el lead en esta fase?',
                   answer:
-                    'No todavia. Esta fase deja el runtime publico listo para conectar capture y assignment despues.',
+                    'Si. Esta fase registra visitor, captura lead y ejecuta assignment simple usando el rotation pool del funnel.',
                 },
                 {
                   question: 'Se soportan subrutas?',
@@ -466,7 +466,7 @@ async function main() {
               key: 'form-placeholder',
               title: 'Formulario MVP',
               description:
-                'La captura real se implementa en la siguiente fase. Por ahora este bloque valida estructura, layout y CTA.',
+                'Completa el formulario para registrar visitor, crear lead y asignarlo al siguiente sponsor elegible.',
               fields: ['Nombre completo', 'WhatsApp', 'Email'],
             },
             {
@@ -501,17 +501,17 @@ async function main() {
             {
               type: 'thank_you',
               key: 'thank-you-main',
-              eyebrow: 'Siguiente fase lista',
-              title: 'Tu runtime publico ya resolvio el funnel',
+              eyebrow: 'Lead capturado',
+              title: 'Tu funnel ya completo captura y assignment v1',
               description:
-                'La captura real y el assignment se conectan despues sobre este mismo modelo.',
+                'Este step puede leer el assignment resuelto en la sesion y preparar el handoff real en una fase posterior.',
             },
             {
               type: 'sponsor_reveal_placeholder',
               key: 'sponsor-placeholder',
-              title: 'Revelacion de sponsor placeholder',
+              title: 'Sponsor asignado en esta sesion',
               description:
-                'Aqui mas adelante podremos mostrar sponsor, asignacion o handoff segun la estrategia aprobada.',
+                'Aqui mostramos el sponsor asignado por round robin usando el contexto local del runtime.',
             },
             {
               type: 'cta',

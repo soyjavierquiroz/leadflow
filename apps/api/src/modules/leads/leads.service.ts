@@ -30,13 +30,25 @@ export class LeadsService {
     });
   }
 
-  async list(workspaceId?: string): Promise<Lead[]> {
+  async list(filters?: {
+    workspaceId?: string;
+    sponsorId?: string;
+    funnelPublicationId?: string;
+  }): Promise<Lead[]> {
     if (!this.repository) {
       throw new Error('LeadRepository provider is not configured.');
     }
 
-    if (workspaceId) {
-      return this.repository.findByWorkspaceId(workspaceId);
+    if (filters?.sponsorId) {
+      return this.repository.findBySponsorId(filters.sponsorId);
+    }
+
+    if (filters?.funnelPublicationId) {
+      return this.repository.findByPublicationId(filters.funnelPublicationId);
+    }
+
+    if (filters?.workspaceId) {
+      return this.repository.findByWorkspaceId(filters.workspaceId);
     }
 
     return this.repository.findAll();

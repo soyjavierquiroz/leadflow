@@ -13,6 +13,8 @@ Implementar el runtime publico minimo de Leadflow para resolver `host + path` ha
 - soporte para root `/`
 - soporte para subrutas limpias
 - modo de preview local por query param en desarrollo
+- integracion del bloque `form_placeholder` con submit publico real
+- persistencia local de contexto de sesion para mostrar sponsor en el thank-you
 
 ## Endpoints publicos implementados
 - `GET /v1/public/funnel-runtime/resolve?host=...&path=...`
@@ -45,6 +47,7 @@ Ejemplos con el seed actual:
 - Not found limpio: `apps/web/app/(site)/not-found.tsx`
 - Renderer MVP: `apps/web/components/public-funnel/funnel-runtime-page.tsx`
 - Cliente server-side hacia API: `apps/web/lib/funnel-runtime.ts`
+- Cliente browser-side para submit y sesion: `apps/web/lib/public-funnel-session.ts`
 
 El runtime en web:
 - detecta `host` desde headers del request
@@ -52,6 +55,8 @@ El runtime en web:
 - consulta la API server-side
 - renderiza el step actual con bloques JSON
 - muestra `404` limpio si no hay publicacion o step valido
+- resuelve submit del formulario desde un componente cliente aislado
+- puede revelar sponsor asignado en el siguiente step usando contexto local de la sesion
 
 ## Preview local
 En desarrollo se puede usar:
@@ -81,15 +86,15 @@ El seed de desarrollo ahora deja:
 - `media_map` y `settings_json` utiles para prueba visual
 
 ## Limitaciones intencionales de esta fase
-- no hay captura real de leads
-- no hay assignment real
 - no hay tracking real a Meta/TikTok
 - no hay handoff real a WhatsApp
 - no hay editor visual de templates
 - no hay auth publica ni privada aplicada a este runtime
+- no hay antifraude complejo ni sticky assignment
+- no hay deduplicacion avanzada de browser/server
 
 ## Que queda listo para la siguiente fase
-- conectar `form_placeholder` con capture real de `Visitor` y `Lead`
-- emitir eventos operativos/tracking desde el runtime
-- disparar assignment/handoff basados en `FunnelPublication`
+- emitir tracking operativo real del submit y de la conversion
+- disparar handoff real posterior al assignment
+- introducir reglas avanzadas de routing y filtros
 - introducir permisos y auth sobre el modelo consolidado

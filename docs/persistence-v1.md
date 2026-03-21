@@ -73,6 +73,11 @@ Repositorios Prisma implementados para:
 - `GET /v1/workspaces`
 - `GET /v1/sponsors`
 - `GET /v1/leads`
+- `GET /v1/leads?sponsorId=...`
+- `GET /v1/leads?funnelPublicationId=...`
+- `GET /v1/assignments`
+- `GET /v1/assignments?sponsorId=...`
+- `GET /v1/assignments?funnelPublicationId=...`
 - `GET /v1/rotation-pools`
 - `GET /v1/domains`
 - `GET /v1/funnel-templates`
@@ -114,6 +119,6 @@ En `apps/api`:
 - No se tocaron Traefik, Cloudflare ni infraestructura productiva del servidor.
 
 ## Siguiente fase recomendada
-- runtime publico por `host + path`
-- flows iniciales de captura sobre `FunnelInstance` y `FunnelPublication`
+- tracking operativo sobre capture/assignment
+- handoff real posterior al assignment
 - auth y permisos sobre ownership real de `Team`
