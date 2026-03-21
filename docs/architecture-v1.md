@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutarse en contenedores y prepararlo para deploy futuro en Swarm, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1, sin tocar produccion ni cerrar aun la capa de persistencia.
 
 ## Componentes
 
@@ -20,6 +20,19 @@ Dejar Leadflow listo para ejecutarse en contenedores y prepararlo para deploy fu
 - Prefijo global configurable (`API_GLOBAL_PREFIX`, default `v1`).
 - `GET /health` sin prefijo global.
 - CORS preparado para hosts web objetivo.
+- `DomainModule` como agregador de dominio.
+- Modulos base:
+  - `workspaces`
+  - `teams`
+  - `sponsors`
+  - `rotation-pools`
+  - `funnels`
+  - `visitors`
+  - `leads`
+  - `assignments`
+  - `events`
+- Cada modulo expone DTOs, interfaces de agregado y servicio base.
+- Persistencia real aun no conectada; los contratos quedan listos para adapters futuros.
 
 ### Shared packages
 - `packages/config`: helpers simples de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
@@ -56,6 +69,7 @@ Dejar Leadflow listo para ejecutarse en contenedores y prepararlo para deploy fu
 - DNS real aplicado.
 - Integraciones con PostgreSQL, Redis, n8n o Evolution.
 - Auth real.
+- Logica compleja de asignacion.
 
 ## Estado
-Arquitectura lista para evolucion y primer ciclo de despliegue futuro, todavia sin cambios en produccion.
+Arquitectura lista para evolucionar el dominio y conectar persistencia en la siguiente fase, todavia sin cambios en produccion.

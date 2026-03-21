@@ -6,6 +6,20 @@ Backend base de Leadflow con NestJS + Fastify.
 - `GET /health` (sin prefijo global)
 - Prefijo global para modulos de API: `/<API_GLOBAL_PREFIX>` (default `v1`)
 
+## Dominio v1
+Modulos base disponibles:
+- `workspaces`
+- `teams`
+- `sponsors`
+- `rotation-pools`
+- `funnels`
+- `visitors`
+- `leads`
+- `assignments`
+- `events`
+
+La fase actual deja contratos, DTOs y servicios draft listos para conectar persistencia despues.
+
 ## Configuracion por entorno
 Definida en `src/config/runtime.ts`.
 

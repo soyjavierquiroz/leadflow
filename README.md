@@ -6,6 +6,7 @@ Leadflow es una plataforma SaaS para captacion, asignacion y automatizacion de l
 La base del monorepo ya incluye:
 - Shell funcional de `web` (site, members, admin).
 - Shell funcional de `api` (NestJS + Fastify + health).
+- Foundation de dominio v1 en `apps/api` con modulos, DTOs e interfaces.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -90,6 +91,7 @@ Validacion de stacks:
 
 ## Documentacion clave
 - `docs/architecture-v1.md`
+- `docs/domain-model-v1.md`
 - `docs/infrastructure-v1.md`
 - `docs/deployment-v1.md`
 - `docs/deployment-local-v1.md`
@@ -98,6 +100,20 @@ Validacion de stacks:
 - `docs/domain-strategy-v1.md`
 - `docs/domain-lifecycle-v1.md`
 - `docs/environment-v1.md`
+
+## Dominio v1
+- Modulos base API:
+  - `workspaces`
+  - `teams`
+  - `sponsors`
+  - `rotation-pools`
+  - `funnels`
+  - `visitors`
+  - `leads`
+  - `assignments`
+  - `events`
+- La fase actual deja contratos, DTOs y servicios draft listos para conectar persistencia despues.
+- Persistencia real, auth y motor avanzado de asignacion siguen fuera de alcance por ahora.
 
 ## Estado de despliegue
 - Preparado para despliegue en Portainer con dos variantes de stack:

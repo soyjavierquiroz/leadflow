@@ -1,30 +1,43 @@
 # Product Scope v1
 
-## Alcance funcional inicial
-Leadflow v1 cubrira:
-- Ingestion de leads desde canales definidos.
-- Asignacion de leads por reglas configurables.
-- Automatizaciones operativas con `n8n`.
-- Integracion de mensajeria con `Evolution API`.
+## Objetivo de la fase actual
+Construir el nucleo del negocio de Leadflow dentro de `apps/api` sin implementar aun persistencia real, auth ni el motor avanzado de asignacion.
+
+## Alcance funcional del dominio v1
+Leadflow v1 modela:
+- `workspaces` como frontera tenant/operativa.
+- `teams` para ownership comercial.
+- `sponsors` como destinatarios de asignacion.
+- `rotation-pools` como contenedores de estrategia futura.
+- `funnels` para etapas y defaults operativos.
+- `visitors` para trazabilidad previa al lead.
+- `leads` como prospectos del negocio.
+- `assignments` como contrato de asignacion.
+- `events` como timeline y auditoria.
+
+## MVP de esta etapa
+- Modulos NestJS base por agregado.
+- DTOs iniciales.
+- Interfaces/tipos de dominio.
+- Servicios base para crear entidades draft.
+- Documentacion del modelo en `docs/domain-model-v1.md`.
 
 ## Fuera de alcance en esta etapa
-- Migraciones desde WordPress (el nuevo sistema no depende de WordPress).
-- Funcionalidades avanzadas de BI/ML no esenciales para v1.
-- Implementacion completa de front/back en esta fase de fundacion.
-
-## Entregables de fundacion (fase actual)
-- Repositorio inicializado y conectado a remoto oficial.
-- Monorepo base con `pnpm-workspace` + `turbo`.
-- Estructura `apps/` y `packages/` lista para scaffolding.
-- Documentacion de arquitectura y baseline operativo inicial.
+- Persistencia real en PostgreSQL.
+- Integracion con `n8n`.
+- Integracion con `Evolution API`.
+- Auth real.
+- Motor complejo de asignacion.
+- Migraciones desde WordPress.
+- Funcionalidades avanzadas de BI/ML.
 
 ## Dependencias tecnicas clave
 - Frontend: Next.js + Tailwind + TypeScript.
 - Backend: NestJS + Fastify + TypeScript.
-- Integraciones: n8n + Evolution API.
 - Infra objetivo: Docker Swarm + Traefik + PostgreSQL + Redis.
 
 ## Criterios de avance a la siguiente fase
-1. Definir contratos base API (dominio leads/asignacion).
-2. Scaffold de `apps/web` y `apps/api` sin romper estructura del monorepo.
-3. Definir estrategia de variables de entorno y configuracion por ambiente.
+1. Conectar persistencia real a los agregados del dominio.
+2. Exponer endpoints CRUD/controlados para modulos core.
+3. Implementar una primera estrategia simple de asignacion.
+4. Preparar integraciones externas sin romper el modelo base.
