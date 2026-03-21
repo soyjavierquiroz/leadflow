@@ -409,7 +409,7 @@ Modulos disponibles:
 ## Estado de despliegue
 
 - Preparado para despliegue en Portainer con dos variantes de stack:
-  - `infra/swarm/docker-stack.local.yml` (sin GHCR, primer despliegue en nodo unico)
+  - `infra/swarm/docker-stack.local.yml` (sin GHCR, primer despliegue en nodo unico, con Postgres dedicado del stack)
   - `infra/swarm/docker-stack.yml` (con GHCR, ruta objetivo de escalado)
 - Runtime de contenedores para Swarm:
   - Web: `node apps/web/server.js` (Next standalone, produccion)

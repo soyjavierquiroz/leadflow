@@ -51,39 +51,31 @@ Cargar en Portainer (o usar defaults) segun `infra/swarm/.env.example`:
 - `LEADFLOW_MEMBERS_HOST`
 - `LEADFLOW_ADMIN_HOST`
 - `LEADFLOW_API_HOST`
-- `DATABASE_URL`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
 - `LEADFLOW_WEB_REPLICAS`
 - `LEADFLOW_API_REPLICAS`
 
-Variables de base de datos recomendadas para staging sobre la infraestructura compartida:
-- `POSTGRES_HOST=postgres`
-- `POSTGRES_PORT=5432`
+Variables de base de datos recomendadas para staging con servicio dedicado en el stack:
 - `POSTGRES_DB=leadflow`
-- `POSTGRES_USER=postgres`
-- `POSTGRES_PASSWORD=<password real del servicio postgres_pgvector>`
-- `DATABASE_URL=postgresql://postgres:<password real del servicio postgres_pgvector>@postgres:5432/leadflow?schema=public`
+- `POSTGRES_USER=leadflow`
+- `POSTGRES_PASSWORD=<password fuerte>`
 
 Nota operativa:
-- el stack local de Leadflow no levanta un `postgres` propio en Swarm
-- reutiliza el servicio compartido `postgres_pgvector_postgres`
-- para eso, `leadflow_api` debe quedar unido a la red externa `general_network`
+- el stack local de Leadflow levanta un `db` propio en Swarm
+- `leadflow_api` usa `DATABASE_URL` interno hacia `db:5432`
+- la persistencia queda en el volumen `leadflow_postgres_data`
 
 ## Pasos en Portainer
 1. Validar que exista la red externa `traefik_public`.
-2. Validar que exista la red externa `general_network`.
-3. Portainer -> Stacks -> Add stack.
-4. Name: `leadflow`.
-5. Pegar contenido de `infra/swarm/docker-stack.local.yml`.
-6. Definir variables de entorno del stack.
-7. Deploy en ventana controlada.
+2. Portainer -> Stacks -> Add stack.
+3. Name: `leadflow`.
+4. Pegar contenido de `infra/swarm/docker-stack.local.yml`.
+5. Definir variables de entorno del stack.
+6. Deploy en ventana controlada.
 
 ## Bootstrap de base de datos
-Si la base `leadflow` aun no existe en el Postgres compartido:
-```bash
-container_id=$(docker ps --filter label=com.docker.swarm.service.name=postgres_pgvector_postgres --format '{{.ID}}' | head -n1)
-docker exec "$container_id" sh -lc "psql -U postgres -d postgres -c 'CREATE DATABASE leadflow;'"
-```
-
 Despues del `Update the stack`, aplicar migraciones sobre el contenedor real de `leadflow_api`:
 ```bash
 api_container=$(docker ps --filter label=com.docker.swarm.service.name=leadflow_api --format '{{.ID}}' | head -n1)
