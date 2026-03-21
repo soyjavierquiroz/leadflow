@@ -1,7 +1,7 @@
 # Product Scope v1
 
 ## Objetivo de la fase actual
-Materializar el dominio v1 de Leadflow sobre persistencia real en PostgreSQL usando Prisma, sin implementar aun auth ni el motor avanzado de asignacion.
+Definir la estructura de funnels, steps, tracking y handoff de Leadflow para soportar multi-domain y multi-funnel, sin implementar aun integraciones reales ni ampliar todavia la persistencia.
 
 ## Alcance funcional del dominio v1
 Leadflow v1 modela:
@@ -9,24 +9,34 @@ Leadflow v1 modela:
 - `teams` para ownership comercial.
 - `sponsors` como destinatarios de asignacion.
 - `rotation-pools` como contenedores de estrategia futura.
-- `funnels` para etapas y defaults operativos.
+- `funnels` para contexto operativo de captacion.
 - `visitors` para trazabilidad previa al lead.
 - `leads` como prospectos del negocio.
 - `assignments` como contrato de asignacion.
 - `events` como timeline y auditoria.
 
+## Foco estructural de esta etapa
+Esta fase documenta y formaliza:
+- diferencia entre `FunnelTemplate`, `FunnelInstance` y `FunnelStep`
+- tipos de funnel recomendados para v1
+- tipos de step recomendados para v1
+- estrategias de handoff inmediato o diferido
+- taxonomia de eventos de tracking
+- mapeo recomendado para Meta y TikTok
+- expansion de dominio sugerida para una fase posterior
+
 ## MVP de esta etapa
-- Prisma integrado en `apps/api`.
-- Schema inicial y migracion base para PostgreSQL.
-- Adapters/repositorios conectados al dominio.
-- Seed minimo de desarrollo.
-- Endpoints de lectura para validar persistencia.
-- Documentacion de persistencia en `docs/persistence-v1.md`.
+- Documento base de funnel y tracking en `docs/funnel-tracking-model-v1.md`.
+- Propuesta de expansion del dominio en `docs/funnel-domain-expansion-v1.md`.
+- Alineacion de `README.md` y `docs/architecture-v1.md`.
+- Criterios claros para la siguiente fase de implementacion de application flows.
 
 ## Fuera de alcance en esta etapa
-- Integracion con `n8n`.
-- Integracion con `Evolution API`.
+- Integracion real con `Meta`.
+- Integracion real con `TikTok`.
+- Handoff real con WhatsApp.
 - Auth real.
+- Cambios de persistencia para las nuevas entidades sugeridas.
 - Motor complejo de asignacion.
 - Migraciones desde WordPress.
 - Funcionalidades avanzadas de BI/ML.
@@ -34,10 +44,11 @@ Leadflow v1 modela:
 ## Dependencias tecnicas clave
 - Frontend: Next.js + Tailwind + TypeScript.
 - Backend: NestJS + Fastify + TypeScript.
+- Persistencia base actual: PostgreSQL + Prisma.
 - Infra objetivo: Docker Swarm + Traefik + PostgreSQL + Redis.
 
 ## Criterios de avance a la siguiente fase
-1. Exponer CRUDs iniciales y comandos de escritura sobre agregados core.
-2. Implementar una primera estrategia simple de asignacion usando `RotationPool`.
-3. Agregar auth y permisos por `workspace/team`.
-4. Preparar integraciones externas sin romper el modelo base.
+1. Traducir la propuesta a entidades persistibles sin romper `Persistence Foundation v1`.
+2. Implementar el modelo expandido de funnels/steps/tracking de forma incremental.
+3. Exponer flows iniciales de captura y lectura por funnel.
+4. Preparar la capa de tracking y handoff reales sin hardcodes de proveedor.

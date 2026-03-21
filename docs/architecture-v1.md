@@ -1,7 +1,7 @@
 # Architecture v1
 
 ## Objetivo de esta fase
-Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1 mas una primera capa de persistencia real en PostgreSQL, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio v1, persistencia real en PostgreSQL y una propuesta estructural clara para funnels, tracking y handoff, sin tocar produccion.
 
 ## Componentes
 
@@ -41,6 +41,42 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
 - `packages/types`: tipos base de dominio y de configuracion.
 - `packages/ui`: placeholder de componentes compartidos.
 
+## Capa de dominio actual
+El dominio operativo actual se apoya en:
+- `Workspace`
+- `Team`
+- `Sponsor`
+- `RotationPool`
+- `RotationMember`
+- `Funnel`
+- `Visitor`
+- `Lead`
+- `Assignment`
+- `DomainEvent`
+
+Este modelo ya soporta la base multi-tenant y de asignacion, pero el area de funnel/tracking todavia esta en expansion conceptual.
+
+## Expansion estructural recomendada para funnel/tracking
+Para soportar SaaS multi-domain, multi-funnel y tracking por proveedor, la arquitectura recomienda evolucionar hacia:
+- `FunnelTemplate`
+- `FunnelInstance`
+- `FunnelStep`
+- `TrackingProfile`
+- `ConversionEventMapping`
+- `DomainBinding`
+- `HandoffStrategy`
+
+Objetivo de esa expansion:
+- separar plantilla de despliegue operativo
+- modelar pasos con semantica real
+- desacoplar funnel de dominio/DNS
+- permitir tracking por perfil y proveedor
+- soportar handoff inmediato o diferido sin hardcodes
+
+Esta expansion queda documentada en:
+- `docs/funnel-tracking-model-v1.md`
+- `docs/funnel-domain-expansion-v1.md`
+
 ## Infraestructura de ejecucion v1
 
 ### Desarrollo local con contenedores
@@ -70,9 +106,12 @@ Dejar Leadflow listo para ejecutar su shell web y una API con dominio de negocio
 ## Fuera de alcance en esta fase
 - Deploy real en servidor.
 - DNS real aplicado.
+- Integracion real con Meta o TikTok.
+- Handoff real con WhatsApp.
 - Redis, n8n o Evolution.
 - Auth real.
 - Logica compleja de asignacion.
+- Cambios de persistencia para la expansion funnel/tracking.
 
 ## Estado
-Arquitectura lista para evolucionar el dominio sobre persistencia real y continuar con casos de uso en la siguiente fase, todavia sin cambios en produccion.
+Arquitectura lista para seguir con flows de captacion, tracking y handoff sobre una base documental mas fuerte, todavia sin cambios en produccion ni en la persistencia de la expansion propuesta.

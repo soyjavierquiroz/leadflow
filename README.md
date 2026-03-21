@@ -8,6 +8,7 @@ La base del monorepo ya incluye:
 - Shell funcional de `api` (NestJS + Fastify + health).
 - Foundation de dominio v1 en `apps/api` con modulos, DTOs e interfaces.
 - Persistence Foundation v1 con PostgreSQL + Prisma en `apps/api`.
+- Diseno estructural inicial para funnels, tracking y handoff.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -94,6 +95,8 @@ Validacion de stacks:
 - `docs/architecture-v1.md`
 - `docs/domain-model-v1.md`
 - `docs/persistence-v1.md`
+- `docs/funnel-tracking-model-v1.md`
+- `docs/funnel-domain-expansion-v1.md`
 - `docs/infrastructure-v1.md`
 - `docs/deployment-v1.md`
 - `docs/deployment-local-v1.md`
@@ -126,6 +129,12 @@ Validacion de stacks:
   - `GET /v1/sponsors`
   - `GET /v1/leads`
   - `GET /v1/rotation-pools`
+
+## Funnel & Tracking v1
+- El modelo actual documenta separacion recomendada entre `FunnelTemplate`, `FunnelInstance` y `FunnelStep`.
+- Se definen tipos base de funnel para captura simple, VSL, thank-you con WhatsApp y flujos de 3 pasos.
+- Se documentan estrategias de handoff inmediato y diferido.
+- Se propone una futura expansion del dominio sin aplicar aun cambios de persistencia.
 
 ## Estado de despliegue
 - Preparado para despliegue en Portainer con dos variantes de stack:
