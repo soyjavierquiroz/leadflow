@@ -72,10 +72,12 @@ services:
       MEMBERS_URL: ${MEMBERS_URL:-https://members.staging.example.com}
       ADMIN_URL: ${ADMIN_URL:-https://admin.staging.example.com}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://staging.example.com,https://members.staging.example.com,https://admin.staging.example.com}
+      DATABASE_URL: ${DATABASE_URL}
     networks:
       - traefik_public
       - leadflow_core
       - leadflow_automation
+      - general_network
     deploy:
       replicas: ${LEADFLOW_API_REPLICAS:-1}
       placement:
@@ -112,6 +114,8 @@ networks:
   leadflow_core:
     driver: overlay
     attachable: true
+  general_network:
+    external: true
   # Placeholder para integraciones internas futuras (n8n/Evolution/workers)
   leadflow_automation:
     driver: overlay

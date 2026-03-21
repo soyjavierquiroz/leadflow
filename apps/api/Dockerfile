@@ -13,7 +13,7 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/types/package.json packages/types/package.json
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 FROM deps AS builder
 COPY . .
@@ -30,9 +30,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV API_HOST=0.0.0.0
 ENV API_PORT=3001
+COPY --from=builder /workspace/node_modules ./node_modules
 COPY --from=builder /workspace/apps/api/package.json ./apps/api/package.json
+COPY --from=builder /workspace/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /workspace/apps/api/dist ./apps/api/dist
-# Instala solo dependencias de runtime de la API en la imagen final.
-RUN cd apps/api && npm install --omit=dev --no-package-lock --no-audit --no-fund
+COPY --from=builder /workspace/apps/api/prisma ./apps/api/prisma
 EXPOSE 3001
 CMD ["node", "apps/api/dist/main.js"]
