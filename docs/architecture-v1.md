@@ -2,7 +2,7 @@
 
 ## Objetivo de esta fase
 
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol, operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, una capa real de QR connect por sponsor/member sobre Evolution API usando backend e infraestructura interna como ruta principal, y un bridge basico pero real hacia n8n con payload estructurado y persistencia de dispatch, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol, operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, una capa real de QR connect por sponsor/member sobre Evolution API usando backend e infraestructura interna como ruta principal, un bridge basico pero real hacia n8n con payload estructurado y persistencia de dispatch, y recepción autenticada de señales entrantes para actualizar el estado operativo sin abrir todavía un inbox, sin tocar produccion.
 
 ## Componentes
 
@@ -41,13 +41,14 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - funnel publications
   - sponsors
   - rotation pool members
-  - leads con filtros basicos
+  - leads con filtros basicos y detalle con timeline ligera de señales entrantes
 - Member operations v1 conectadas sobre `/member/*` con acciones para:
   - aceptar handoffs
   - mover estado simple de leads
   - editar perfil operativo del sponsor
   - pausar o reactivar disponibilidad
   - revisar detalle basico del lead sin inbox
+  - ver señales de conversación recientes por lead
 - Messaging integrations v1 conectadas sobre `/member/channel` para:
   - ver estado actual de la conexion WhatsApp del sponsor
   - conectar o reprovisionar una instancia en Evolution
@@ -104,6 +105,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Endpoints privados adicionales para operacion de `Member`.
 - `MessagingIntegrationsModule` con adaptador Evolution API usando URL interna como ruta principal y fallback público opcional.
 - `MessagingAutomationModule` con bridge webhook hacia n8n, payload snapshot y persistencia del resultado por assignment.
+- `IncomingWebhooksModule` para recibir señales entrantes autenticadas desde n8n/Evolution y reflejarlas en el dominio operativo.
 - Contrato publico enriquecido para reveal/handoff en runtime y submit.
 - Modulos disponibles:
   - `auth`
@@ -126,6 +128,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `events`
   - `messaging-integrations`
   - `messaging-automation`
+  - `incoming-webhooks`
 - Endpoints auxiliares adicionales para UI operativa:
   - `GET /v1/tracking-profiles`
   - `GET /v1/handoff-strategies`
@@ -154,6 +157,9 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `POST /v1/messaging-integrations/me/disconnect`
 - Endpoints messaging automation:
   - `GET /v1/messaging-automation/me`
+- Endpoints incoming webhooks:
+  - `POST /v1/incoming-webhooks/messaging`
+  - `GET /v1/incoming-webhooks/messaging/signals?leadId=...`
 - Endpoints publicos de runtime:
   - `GET /v1/public/funnel-runtime/resolve`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`
@@ -197,6 +203,7 @@ El dominio operativo actual se apoya en:
 - `AuthSession`
 - `MessagingConnection`
 - `AutomationDispatch`
+- `ConversationSignal`
 - `RotationPool`
 - `RotationMember`
 - `Funnel` legacy
@@ -236,6 +243,7 @@ La arquitectura ya implementa:
 - routing interno preferente hacia Evolution con fallback público opcional
 - lifecycle completo de QR connect: ensure, create, webhook, qr, refresh, reset y disconnect
 - bridge v1 hacia n8n disparado tras una asignacion nueva, con persistencia de payload, respuesta y error
+- señales entrantes v1 autenticadas por secret, persistidas y aplicadas sobre lead/assignment con trazabilidad
 
 ## Runtime publico v1
 
@@ -327,4 +335,4 @@ Decision de transicion:
 
 ## Estado
 
-Arquitectura lista para una siguiente fase de workflows activos sobre n8n, webhooks entrantes y mensajeria operativa mas rica, sin rehacer ni el lifecycle base de Evolution ni el bridge ya persistido de automation.
+Arquitectura lista para una siguiente fase de timeline más rica, workflows activos sobre n8n y sincronización de mensajería más profunda, sin rehacer ni el lifecycle base de Evolution ni el bridge ya persistido de automation.

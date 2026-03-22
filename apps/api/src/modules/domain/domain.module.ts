@@ -9,6 +9,7 @@ import { FunnelStepsModule } from '../funnel-steps/funnel-steps.module';
 import { FunnelTemplatesModule } from '../funnel-templates/funnel-templates.module';
 import { FunnelsModule } from '../funnels/funnels.module';
 import { HandoffStrategiesModule } from '../handoff-strategies/handoff-strategies.module';
+import { IncomingWebhooksModule } from '../incoming-webhooks/incoming-webhooks.module';
 import { LeadsModule } from '../leads/leads.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { MessagingIntegrationsModule } from '../messaging-integrations/messaging-integrations.module';
@@ -34,6 +35,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     TrackingProfilesModule,
     HandoffStrategiesModule,
     ConversionEventMappingsModule,
+    IncomingWebhooksModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,
@@ -56,6 +58,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     TrackingProfilesModule,
     HandoffStrategiesModule,
     ConversionEventMappingsModule,
+    IncomingWebhooksModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,

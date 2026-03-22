@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
+import { LeadSignalTimeline } from "@/components/lead-signals/lead-signal-timeline";
+import { ModalShell } from "@/components/team-operations/modal-shell";
 import type { LeadView } from "@/lib/app-shell/types";
+import {
+  listLeadConversationSignals,
+  type LeadConversationSignal,
+} from "@/lib/conversation-signals";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
 
 type TeamLeadsClientProps = {
@@ -15,6 +21,10 @@ type TeamLeadsClientProps = {
 export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [signals, setSignals] = useState<LeadConversationSignal[]>([]);
+  const [signalsLoading, setSignalsLoading] = useState(false);
+  const [signalsError, setSignalsError] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     return initialRows.filter((row) => {
@@ -40,6 +50,53 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
       return matchesStatus && matchesSearch;
     });
   }, [initialRows, search, status]);
+
+  const selectedLead =
+    rows.find((row) => row.id === selectedLeadId) ??
+    initialRows.find((row) => row.id === selectedLeadId) ??
+    null;
+
+  useEffect(() => {
+    if (!selectedLeadId) {
+      setSignals([]);
+      setSignalsError(null);
+      setSignalsLoading(false);
+      return;
+    }
+
+    let ignore = false;
+
+    const loadSignals = async () => {
+      setSignalsLoading(true);
+      setSignalsError(null);
+
+      try {
+        const nextSignals = await listLeadConversationSignals(selectedLeadId);
+
+        if (!ignore) {
+          setSignals(nextSignals);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setSignalsError(
+            error instanceof Error
+              ? error.message
+              : "No pudimos cargar las señales de conversación.",
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setSignalsLoading(false);
+        }
+      }
+    };
+
+    void loadSignals();
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedLeadId]);
 
   return (
     <div className="space-y-8">
@@ -146,11 +203,99 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
             header: "Estado assignment",
             render: (row) => <StatusBadge value={row.assignmentStatus} />,
           },
+          {
+            key: "detail",
+            header: "Detalle",
+            render: (row) => (
+              <button
+                type="button"
+                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                onClick={() => setSelectedLeadId(row.id)}
+              >
+                Ver detalle
+              </button>
+            ),
+          },
         ]}
         rows={rows}
         emptyTitle="Sin leads para el team"
         emptyDescription="Cuando se capturen más leads desde el runtime público, esta vista los mostrará con su trazabilidad básica."
       />
+
+      {selectedLead ? (
+        <ModalShell
+          title={selectedLead.fullName ?? "Lead sin nombre"}
+          description="Detalle operativo con historial resumido de señales entrantes, sin abrir todavía un inbox."
+          onClose={() => setSelectedLeadId(null)}
+        >
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm">
+                <p className="text-slate-500">Contacto</p>
+                <p className="mt-2 font-medium text-slate-950">
+                  {selectedLead.email ?? "Sin email"}
+                </p>
+                <p className="mt-1 text-slate-700">
+                  {selectedLead.phone ?? "Sin teléfono"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm">
+                <p className="text-slate-500">Sponsor actual</p>
+                <p className="mt-2 font-medium text-slate-950">
+                  {selectedLead.sponsorName ?? "Pendiente"}
+                </p>
+                <p className="mt-1 text-slate-700">
+                  {selectedLead.domainHost ?? "Host pendiente"}
+                  {selectedLead.publicationPath ? ` · ${selectedLead.publicationPath}` : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge value={selectedLead.status} />
+              {selectedLead.assignmentStatus ? (
+                <StatusBadge value={selectedLead.assignmentStatus} />
+              ) : null}
+            </div>
+
+            <dl className="grid gap-3 text-sm md:grid-cols-2">
+              <div>
+                <dt className="text-slate-500">Empresa</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  {selectedLead.companyName ?? "Sin empresa"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Funnel</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  {selectedLead.funnelName ?? "Sin funnel"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Creado</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  {formatDateTime(selectedLead.createdAt)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Asignado</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  {selectedLead.assignedAt
+                    ? formatDateTime(selectedLead.assignedAt)
+                    : "Pendiente"}
+                </dd>
+              </div>
+            </dl>
+
+            <LeadSignalTimeline
+              signals={signals}
+              loading={signalsLoading}
+              error={signalsError}
+              emptyDescription="Todavía no llegaron señales entrantes para este lead."
+            />
+          </div>
+        </ModalShell>
+      ) : null}
     </div>
   );
 }

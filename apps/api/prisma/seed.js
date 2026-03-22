@@ -166,6 +166,7 @@ async function main() {
   });
 
   await prisma.authSession.deleteMany();
+  await prisma.conversationSignal.deleteMany();
   await prisma.automationDispatch.deleteMany();
 
   await prisma.user.upsert({
