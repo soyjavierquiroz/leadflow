@@ -41,14 +41,15 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - funnel publications
   - sponsors
   - rotation pool members
-  - leads con filtros basicos y detalle con timeline ligera de señales entrantes
+  - leads con filtros basicos, resumen operativo y timeline enriquecida
 - Member operations v1 conectadas sobre `/member/*` con acciones para:
   - aceptar handoffs
   - mover estado simple de leads
   - editar perfil operativo del sponsor
   - pausar o reactivar disponibilidad
-  - revisar detalle basico del lead sin inbox
-  - ver señales de conversación recientes por lead
+  - revisar detalle operativo del lead sin inbox
+  - calificar, resumir, agendar follow-up y agregar notas
+  - ver timeline consolidada por lead
 - Messaging integrations v1 conectadas sobre `/member/channel` para:
   - ver estado actual de la conexion WhatsApp del sponsor
   - conectar o reprovisionar una instancia en Evolution
@@ -106,6 +107,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `MessagingIntegrationsModule` con adaptador Evolution API usando URL interna como ruta principal y fallback público opcional.
 - `MessagingAutomationModule` con bridge webhook hacia n8n, payload snapshot y persistencia del resultado por assignment.
 - `IncomingWebhooksModule` para recibir señales entrantes autenticadas desde n8n/Evolution y reflejarlas en el dominio operativo.
+- `LeadsModule` ampliado para timeline consolidada, notas manuales y calificación simple.
 - Contrato publico enriquecido para reveal/handoff en runtime y submit.
 - Modulos disponibles:
   - `auth`
@@ -160,6 +162,11 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Endpoints incoming webhooks:
   - `POST /v1/incoming-webhooks/messaging`
   - `GET /v1/incoming-webhooks/messaging/signals?leadId=...`
+- Endpoints lead qualification timeline:
+  - `GET /v1/leads/:id/timeline`
+  - `PATCH /v1/leads/:id/qualification`
+  - `PATCH /v1/leads/:id/follow-up`
+  - `POST /v1/leads/:id/notes`
 - Endpoints publicos de runtime:
   - `GET /v1/public/funnel-runtime/resolve`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`
@@ -204,6 +211,7 @@ El dominio operativo actual se apoya en:
 - `MessagingConnection`
 - `AutomationDispatch`
 - `ConversationSignal`
+- `LeadNote`
 - `RotationPool`
 - `RotationMember`
 - `Funnel` legacy
@@ -244,6 +252,7 @@ La arquitectura ya implementa:
 - lifecycle completo de QR connect: ensure, create, webhook, qr, refresh, reset y disconnect
 - bridge v1 hacia n8n disparado tras una asignacion nueva, con persistencia de payload, respuesta y error
 - señales entrantes v1 autenticadas por secret, persistidas y aplicadas sobre lead/assignment con trazabilidad
+- capa operativa de lead con calificación simple, notas manuales, next action y follow-up
 
 ## Runtime publico v1
 

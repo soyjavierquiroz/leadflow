@@ -66,6 +66,14 @@ const sponsorContextInclude = {
   messagingConnection: true,
 } satisfies Prisma.SponsorInclude;
 
+const CONTACT_SIGNAL_TYPES = new Set<ConversationSignal['signalType']>([
+  'conversation_started',
+  'message_inbound',
+  'message_outbound',
+  'lead_contacted',
+  'lead_follow_up',
+]);
+
 type SponsorContextRecord = Prisma.SponsorGetPayload<{
   include: typeof sponsorContextInclude;
 }>;
@@ -180,21 +188,49 @@ export class IncomingWebhooksService {
         let leadStatusAfter = leadStatusBefore;
         let assignmentStatusAfter = assignmentStatusBefore;
 
-        if (
-          liveLead &&
-          transition.leadStatusAfter &&
-          transition.leadStatusAfter !== liveLead.status
-        ) {
-          const updatedLead = await tx.lead.update({
-            where: {
-              id: liveLead.id,
-            },
-            data: {
-              status: transition.leadStatusAfter,
-            },
-          });
+        if (liveLead) {
+          const nextLeadData: Prisma.LeadUpdateInput = {};
 
-          leadStatusAfter = updatedLead.status;
+          if (
+            transition.leadStatusAfter &&
+            transition.leadStatusAfter !== liveLead.status
+          ) {
+            nextLeadData.status = transition.leadStatusAfter;
+          }
+
+          if (CONTACT_SIGNAL_TYPES.has(signal.signalType)) {
+            nextLeadData.lastContactedAt = signal.occurredAt;
+          }
+
+          if (signal.signalType === 'lead_qualified') {
+            nextLeadData.lastQualifiedAt = signal.occurredAt;
+            if (!liveLead.qualificationGrade) {
+              nextLeadData.qualificationGrade = 'warm';
+            }
+          }
+
+          if (signal.signalType === 'lead_won') {
+            nextLeadData.lastQualifiedAt = signal.occurredAt;
+            nextLeadData.qualificationGrade = 'hot';
+          }
+
+          if (
+            signal.signalType === 'lead_lost' &&
+            !liveLead.qualificationGrade
+          ) {
+            nextLeadData.qualificationGrade = 'cold';
+          }
+
+          if (Object.keys(nextLeadData).length > 0) {
+            const updatedLead = await tx.lead.update({
+              where: {
+                id: liveLead.id,
+              },
+              data: nextLeadData,
+            });
+
+            leadStatusAfter = updatedLead.status;
+          }
         }
 
         if (

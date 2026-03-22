@@ -1,18 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
-import { LeadSignalTimeline } from "@/components/lead-signals/lead-signal-timeline";
+import { LeadQualificationTimelinePanel } from "@/components/lead-signals/lead-qualification-timeline-panel";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type { AssignmentRecord, LeadView } from "@/lib/app-shell/types";
-import {
-  listLeadConversationSignals,
-  type LeadConversationSignal,
-} from "@/lib/conversation-signals";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
 import { memberOperationRequest } from "@/lib/member-operations";
 
@@ -47,9 +43,6 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
   >("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  const [signals, setSignals] = useState<LeadConversationSignal[]>([]);
-  const [signalsLoading, setSignalsLoading] = useState(false);
-  const [signalsError, setSignalsError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     message: string;
@@ -76,48 +69,6 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
     filteredRows.find((row) => row.id === selectedLeadId) ??
     rows.find((row) => row.id === selectedLeadId) ??
     null;
-
-  useEffect(() => {
-    if (!selectedLeadId) {
-      setSignals([]);
-      setSignalsError(null);
-      setSignalsLoading(false);
-      return;
-    }
-
-    let ignore = false;
-
-    const loadSignals = async () => {
-      setSignalsLoading(true);
-      setSignalsError(null);
-
-      try {
-        const nextSignals = await listLeadConversationSignals(selectedLeadId);
-
-        if (!ignore) {
-          setSignals(nextSignals);
-        }
-      } catch (error) {
-        if (!ignore) {
-          setSignalsError(
-            error instanceof Error
-              ? error.message
-              : "No pudimos cargar las señales de conversación.",
-          );
-        }
-      } finally {
-        if (!ignore) {
-          setSignalsLoading(false);
-        }
-      }
-    };
-
-    void loadSignals();
-
-    return () => {
-      ignore = true;
-    };
-  }, [selectedLeadId]);
 
   const updateLeadRow = (
     leadId: string,
@@ -364,8 +315,17 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
                 {row.assignmentStatus ? (
                   <StatusBadge value={row.assignmentStatus} />
                 ) : null}
+                {row.qualificationGrade ? (
+                  <StatusBadge value={row.qualificationGrade} />
+                ) : null}
               </div>
             ),
+          },
+          {
+            key: "nextAction",
+            header: "Siguiente acción",
+            render: (row: LeadView) =>
+              row.nextActionLabel ?? row.summaryText ?? "Pendiente de calificar",
           },
           {
             key: "assignedAt",
@@ -457,13 +417,6 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
               </div>
             </dl>
 
-            <LeadSignalTimeline
-              signals={signals}
-              loading={signalsLoading}
-              error={signalsError}
-              emptyDescription="Todavía no llegaron señales entrantes para este lead."
-            />
-
             <div className="space-y-3 rounded-2xl border border-slate-200 p-4">
               <p className="text-sm font-semibold text-slate-900">
                 Acciones de seguimiento
@@ -511,6 +464,11 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
                 ) : null}
               </div>
             </div>
+
+            <LeadQualificationTimelinePanel
+              leadId={selectedLead.id}
+              onLeadChange={(leadId, updates) => updateLeadRow(leadId, updates)}
+            />
           </div>
         </ModalShell>
       ) : null}

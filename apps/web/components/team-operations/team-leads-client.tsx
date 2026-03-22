@@ -1,17 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
-import { LeadSignalTimeline } from "@/components/lead-signals/lead-signal-timeline";
+import { LeadQualificationTimelinePanel } from "@/components/lead-signals/lead-qualification-timeline-panel";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import type { LeadView } from "@/lib/app-shell/types";
-import {
-  listLeadConversationSignals,
-  type LeadConversationSignal,
-} from "@/lib/conversation-signals";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
 
 type TeamLeadsClientProps = {
@@ -19,15 +15,13 @@ type TeamLeadsClientProps = {
 };
 
 export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
+  const [allRows, setAllRows] = useState(initialRows);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [signals, setSignals] = useState<LeadConversationSignal[]>([]);
-  const [signalsLoading, setSignalsLoading] = useState(false);
-  const [signalsError, setSignalsError] = useState<string | null>(null);
 
   const rows = useMemo(() => {
-    return initialRows.filter((row) => {
+    return allRows.filter((row) => {
       const matchesStatus = status === "all" ? true : row.status === status;
       const haystack = [
         row.fullName,
@@ -49,54 +43,18 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
 
       return matchesStatus && matchesSearch;
     });
-  }, [initialRows, search, status]);
+  }, [allRows, search, status]);
 
   const selectedLead =
     rows.find((row) => row.id === selectedLeadId) ??
-    initialRows.find((row) => row.id === selectedLeadId) ??
+    allRows.find((row) => row.id === selectedLeadId) ??
     null;
 
-  useEffect(() => {
-    if (!selectedLeadId) {
-      setSignals([]);
-      setSignalsError(null);
-      setSignalsLoading(false);
-      return;
-    }
-
-    let ignore = false;
-
-    const loadSignals = async () => {
-      setSignalsLoading(true);
-      setSignalsError(null);
-
-      try {
-        const nextSignals = await listLeadConversationSignals(selectedLeadId);
-
-        if (!ignore) {
-          setSignals(nextSignals);
-        }
-      } catch (error) {
-        if (!ignore) {
-          setSignalsError(
-            error instanceof Error
-              ? error.message
-              : "No pudimos cargar las señales de conversación.",
-          );
-        }
-      } finally {
-        if (!ignore) {
-          setSignalsLoading(false);
-        }
-      }
-    };
-
-    void loadSignals();
-
-    return () => {
-      ignore = true;
-    };
-  }, [selectedLeadId]);
+  const updateLeadRow = (leadId: string, updates: Partial<LeadView>) => {
+    setAllRows((current) =>
+      current.map((row) => (row.id === leadId ? { ...row, ...updates } : row)),
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -196,12 +154,25 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
           {
             key: "status",
             header: "Estado lead",
-            render: (row) => <StatusBadge value={row.status} />,
+            render: (row) => (
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge value={row.status} />
+                {row.qualificationGrade ? (
+                  <StatusBadge value={row.qualificationGrade} />
+                ) : null}
+              </div>
+            ),
           },
           {
             key: "assignmentStatus",
             header: "Estado assignment",
             render: (row) => <StatusBadge value={row.assignmentStatus} />,
+          },
+          {
+            key: "nextAction",
+            header: "Siguiente acción",
+            render: (row) =>
+              row.nextActionLabel ?? row.summaryText ?? "Pendiente de calificar",
           },
           {
             key: "detail",
@@ -287,11 +258,9 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
               </div>
             </dl>
 
-            <LeadSignalTimeline
-              signals={signals}
-              loading={signalsLoading}
-              error={signalsError}
-              emptyDescription="Todavía no llegaron señales entrantes para este lead."
+            <LeadQualificationTimelinePanel
+              leadId={selectedLead.id}
+              onLeadChange={(leadId, updates) => updateLeadRow(leadId, updates)}
             />
           </div>
         </ModalShell>

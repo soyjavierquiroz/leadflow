@@ -340,6 +340,16 @@ export const mapLeadRecord = (record: LeadRecord): Lead => ({
   phone: record.phone,
   companyName: record.companyName,
   status: record.status,
+  qualificationGrade: record.qualificationGrade,
+  summaryText: record.summaryText,
+  nextActionLabel: record.nextActionLabel,
+  followUpAt: record.followUpAt ? toIso(record.followUpAt) : null,
+  lastContactedAt: record.lastContactedAt
+    ? toIso(record.lastContactedAt)
+    : null,
+  lastQualifiedAt: record.lastQualifiedAt
+    ? toIso(record.lastQualifiedAt)
+    : null,
   currentAssignmentId: record.currentAssignmentId,
   tags: record.tags,
   createdAt: toIso(record.createdAt),

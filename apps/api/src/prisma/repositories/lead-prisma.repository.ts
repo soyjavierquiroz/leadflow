@@ -121,6 +121,12 @@ export class LeadPrismaRepository implements LeadRepository {
         phone: data.phone ?? null,
         companyName: data.companyName ?? null,
         status: 'captured',
+        qualificationGrade: null,
+        summaryText: null,
+        nextActionLabel: null,
+        followUpAt: null,
+        lastContactedAt: null,
+        lastQualifiedAt: null,
         currentAssignmentId: null,
         tags: data.tags ?? [],
       },
@@ -145,6 +151,16 @@ export class LeadPrismaRepository implements LeadRepository {
         phone: entity.phone,
         companyName: entity.companyName,
         status: entity.status,
+        qualificationGrade: entity.qualificationGrade,
+        summaryText: entity.summaryText,
+        nextActionLabel: entity.nextActionLabel,
+        followUpAt: entity.followUpAt ? new Date(entity.followUpAt) : null,
+        lastContactedAt: entity.lastContactedAt
+          ? new Date(entity.lastContactedAt)
+          : null,
+        lastQualifiedAt: entity.lastQualifiedAt
+          ? new Date(entity.lastQualifiedAt)
+          : null,
         currentAssignmentId: entity.currentAssignmentId,
         tags: entity.tags,
         createdAt: new Date(entity.createdAt),
@@ -161,6 +177,16 @@ export class LeadPrismaRepository implements LeadRepository {
         phone: entity.phone,
         companyName: entity.companyName,
         status: entity.status,
+        qualificationGrade: entity.qualificationGrade,
+        summaryText: entity.summaryText,
+        nextActionLabel: entity.nextActionLabel,
+        followUpAt: entity.followUpAt ? new Date(entity.followUpAt) : null,
+        lastContactedAt: entity.lastContactedAt
+          ? new Date(entity.lastContactedAt)
+          : null,
+        lastQualifiedAt: entity.lastQualifiedAt
+          ? new Date(entity.lastQualifiedAt)
+          : null,
         currentAssignmentId: entity.currentAssignmentId,
         tags: entity.tags,
       },

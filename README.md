@@ -23,6 +23,7 @@ La base del monorepo ya incluye:
 - Evolution QR Connect v1 con lifecycle real de instancia, QR, refresh, reset y disconnect por backend.
 - Messaging Automation / n8n v1 con bridge real por webhook, payload estructurado y persistencia de dispatch por assignment.
 - Incoming Webhooks / Conversation Signals v1 con señales entrantes autenticadas, persistencia propia y actualización operativa básica de lead/assignment.
+- Lead Qualification & Timeline v1 con resumen operativo, calificación simple, notas y timeline consolidada para `member` y `team`.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -128,6 +129,7 @@ Validacion de stacks:
 - `docs/evolution-qr-connect-v1.md`
 - `docs/messaging-automation-n8n-v1.md`
 - `docs/incoming-webhooks-conversation-signals-v1.md`
+- `docs/lead-qualification-timeline-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -167,6 +169,7 @@ Modulos disponibles:
 - `messaging-integrations`
 - `messaging-automation`
 - `incoming-webhooks`
+- timeline operativa sobre `leads`
 
 ## Persistencia implementada
 
@@ -231,6 +234,10 @@ Modulos disponibles:
 - Endpoints de lectura ampliados:
   - `GET /v1/leads?sponsorId=...`
   - `GET /v1/leads?funnelPublicationId=...`
+  - `GET /v1/leads/:id/timeline`
+  - `PATCH /v1/leads/:id/qualification`
+  - `PATCH /v1/leads/:id/follow-up`
+  - `POST /v1/leads/:id/notes`
   - `GET /v1/assignments`
   - `GET /v1/assignments?sponsorId=...`
   - `GET /v1/assignments?funnelPublicationId=...`

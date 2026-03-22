@@ -155,6 +155,12 @@ enum LeadStatus {
   lost
 }
 
+enum LeadQualificationGrade {
+  cold
+  warm
+  hot
+}
+
 enum AssignmentStatus {
   pending
   assigned
@@ -282,6 +288,7 @@ model Workspace {
   messagingConnections MessagingConnection[]
   automationDispatches AutomationDispatch[]
   conversationSignals ConversationSignal[]
+  leadNotes          LeadNote[]
 }
 
 model Team {
@@ -309,6 +316,7 @@ model Team {
   messagingConnections MessagingConnection[]
   automationDispatches AutomationDispatch[]
   conversationSignals ConversationSignal[]
+  leadNotes          LeadNote[]
 
   @@unique([workspaceId, code])
 }
@@ -334,6 +342,7 @@ model Sponsor {
   messagingConnection MessagingConnection?
   automationDispatches AutomationDispatch[]
   conversationSignals ConversationSignal[]
+  leadNotes          LeadNote[]
 }
 
 model User {
@@ -353,6 +362,7 @@ model User {
   team         Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
   sponsor      Sponsor?      @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
   sessions     AuthSession[]
+  leadNotes    LeadNote[]
 
   @@index([workspaceId, role])
   @@index([teamId, role])
@@ -668,6 +678,12 @@ model Lead {
   phone               String?
   companyName         String?
   status              LeadStatus
+  qualificationGrade  LeadQualificationGrade?
+  summaryText         String?
+  nextActionLabel     String?
+  followUpAt          DateTime?
+  lastContactedAt     DateTime?
+  lastQualifiedAt     DateTime?
   currentAssignmentId String?             @unique
   tags                String[]
   createdAt           DateTime            @default(now())
@@ -682,6 +698,7 @@ model Lead {
   events              DomainEvent[]
   automationDispatches AutomationDispatch[]
   conversationSignals ConversationSignal[]
+  notes               LeadNote[]
 }
 
 model Assignment {
@@ -789,6 +806,30 @@ model ConversationSignal {
   @@index([sponsorId, occurredAt])
   @@index([messagingConnectionId, occurredAt])
   @@index([automationDispatchId, occurredAt])
+}
+
+model LeadNote {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  teamId       String
+  leadId       String
+  sponsorId    String?
+  authorUserId String
+  authorRole   UserRole
+  authorName   String
+  body         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team         Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sponsor      Sponsor?  @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+  authorUser   User      @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@index([teamId, createdAt])
+  @@index([authorUserId, createdAt])
 }
 
 model DomainEvent {

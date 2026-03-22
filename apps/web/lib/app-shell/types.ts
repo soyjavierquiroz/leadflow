@@ -148,6 +148,12 @@ export type LeadRecord = {
   phone: string | null;
   companyName: string | null;
   status: string;
+  qualificationGrade: "cold" | "warm" | "hot" | null;
+  summaryText: string | null;
+  nextActionLabel: string | null;
+  followUpAt: string | null;
+  lastContactedAt: string | null;
+  lastQualifiedAt: string | null;
   currentAssignmentId: string | null;
   tags: string[];
   createdAt: string;

@@ -2,6 +2,7 @@ import type { CreateLeadDto } from '../dto/create-lead.dto';
 import type {
   BaseDomainEntity,
   DomainId,
+  ISODateString,
   LeadSourceChannel,
   RepositoryPort,
   WorkspaceScoped,
@@ -15,6 +16,8 @@ export type LeadStatus =
   | 'won'
   | 'lost';
 
+export type LeadQualificationGrade = 'cold' | 'warm' | 'hot';
+
 export interface Lead extends BaseDomainEntity, WorkspaceScoped {
   funnelId: DomainId;
   funnelInstanceId: DomainId | null;
@@ -26,6 +29,12 @@ export interface Lead extends BaseDomainEntity, WorkspaceScoped {
   phone: string | null;
   companyName: string | null;
   status: LeadStatus;
+  qualificationGrade: LeadQualificationGrade | null;
+  summaryText: string | null;
+  nextActionLabel: string | null;
+  followUpAt: ISODateString | null;
+  lastContactedAt: ISODateString | null;
+  lastQualifiedAt: ISODateString | null;
   currentAssignmentId: DomainId | null;
   tags: string[];
 }
