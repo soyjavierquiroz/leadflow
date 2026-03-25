@@ -31,6 +31,10 @@ La base del monorepo ya incluye:
 
 No hay deploy aplicado en esta fase.
 
+## Nota de login
+
+- El login web usa un flujo cliente mínimo: `preventDefault`, un solo `fetch` `POST /v1/auth/login` con `credentials: include`, timeout explícito de 10 segundos y navegación final con `window.location.href` según `redirectPath`.
+
 ## Stack tecnico
 
 - Frontend: Next.js + React + TypeScript + Tailwind.

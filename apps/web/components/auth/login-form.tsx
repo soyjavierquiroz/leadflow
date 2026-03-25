@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { loginWithCredentials, resolveAppUrlForPath } from "@/lib/auth-client";
+import {
+  getLoginErrorMessage,
+  isLoginApiResponse,
+  LOGIN_REQUEST_TIMEOUT_MS,
+  resolveLoginTarget,
+} from "@/lib/auth-client";
+import { webPublicConfig } from "@/lib/public-env";
 
 type LoginFormProps = {
   demoAccounts: Array<{
@@ -28,33 +34,59 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
     setErrorMessage(null);
     setIsSubmitting(true);
 
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort("login-timeout");
+    }, LOGIN_REQUEST_TIMEOUT_MS);
+
     try {
       console.info("[leadflow-auth] login_submit_start", {
         email,
       });
 
-      const payload = await loginWithCredentials({
-        email,
-        password,
+      const response = await fetch(`${webPublicConfig.urls.api}/v1/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+        signal: controller.signal,
       });
-      const destinationUrl = resolveAppUrlForPath(payload.redirectPath);
+
+      const payload = (await response.json().catch(() => null)) as unknown;
+
+      if (!response.ok) {
+        throw new Error(getLoginErrorMessage(payload));
+      }
+
+      if (!isLoginApiResponse(payload)) {
+        throw new Error("El API devolvió una respuesta de login invalida.");
+      }
+
+      const destinationUrl = resolveLoginTarget(payload.redirectPath);
 
       console.info("[leadflow-auth] login_submit_redirect", {
-        role: payload.user.role,
         redirectPath: payload.redirectPath,
         destinationUrl,
       });
 
-      setIsSubmitting(false);
-      window.location.assign(destinationUrl);
+      window.location.href = destinationUrl;
     } catch (error) {
       console.error("[leadflow-auth] login_submit_failed", error);
-      setIsSubmitting(false);
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "No pudimos conectar con el API de autenticación.",
+        error instanceof Error && error.name === "AbortError"
+          ? "El login excedio el tiempo limite de 10 segundos."
+          : error instanceof Error
+            ? error.message
+            : "No pudimos conectar con el API de autenticacion.",
       );
+      setIsSubmitting(false);
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   };
 
