@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { loginWithCredentials, resolveAppUrlForPath } from "@/lib/auth-client";
 
 type LoginFormProps = {
@@ -17,15 +17,6 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
   const [password, setPassword] = useState(demoAccounts[0]?.password ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigationTimeoutRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (navigationTimeoutRef.current !== null) {
-        window.clearTimeout(navigationTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,31 +25,30 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
       return;
     }
 
-    if (navigationTimeoutRef.current !== null) {
-      window.clearTimeout(navigationTimeoutRef.current);
-      navigationTimeoutRef.current = null;
-    }
-
     setErrorMessage(null);
     setIsSubmitting(true);
 
     try {
+      console.info("[leadflow-auth] login_submit_start", {
+        email,
+      });
+
       const payload = await loginWithCredentials({
         email,
         password,
       });
       const destinationUrl = resolveAppUrlForPath(payload.redirectPath);
 
-      navigationTimeoutRef.current = window.setTimeout(() => {
-        navigationTimeoutRef.current = null;
-        setIsSubmitting(false);
-        setErrorMessage(
-          "El login fue exitoso, pero no pudimos completar la redirección.",
-        );
-      }, 2500);
+      console.info("[leadflow-auth] login_submit_redirect", {
+        role: payload.user.role,
+        redirectPath: payload.redirectPath,
+        destinationUrl,
+      });
 
-      window.location.replace(destinationUrl);
+      setIsSubmitting(false);
+      window.location.assign(destinationUrl);
     } catch (error) {
+      console.error("[leadflow-auth] login_submit_failed", error);
       setIsSubmitting(false);
       setErrorMessage(
         error instanceof Error
