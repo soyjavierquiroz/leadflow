@@ -34,6 +34,7 @@ No hay deploy aplicado en esta fase.
 ## Nota de login
 
 - El login web usa flujo server-first: el formulario de `/login` envía a una `server action` de Next, esa acción llama a `POST https://api.exitosos.com/v1/auth/login`, persiste la cookie de sesión en el servidor de Next y resuelve el redirect final por rol sin depender de `fetch` cliente ni `window.location`.
+- El logout web usa flujo server-first: el botón envía a una `server action` de Next, esa acción llama a `POST https://api.exitosos.com/v1/auth/logout`, limpia la cookie de sesión del lado Next y redirige a `/login` sin depender de navegación JS en cliente.
 
 ## Stack tecnico
 

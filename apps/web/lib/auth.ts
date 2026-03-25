@@ -37,6 +37,20 @@ type AuthMeResponse = {
   user: AuthenticatedAppUser;
 };
 
+type AuthSessionCookie = {
+  name: string;
+  options: {
+    domain?: string;
+    expires?: Date;
+    httpOnly?: boolean;
+    maxAge?: number;
+    path: string;
+    sameSite?: "lax" | "strict" | "none";
+    secure?: boolean;
+  };
+  value: string;
+};
+
 const authApiBaseUrl = `${webPublicConfig.urls.api}/v1`;
 const authCookieName = process.env.AUTH_COOKIE_NAME?.trim() || "leadflow_session";
 const authCookieDomain = webPublicConfig.baseDomain ?? undefined;
@@ -49,6 +63,7 @@ export type LoginApiResponse = {
 };
 
 export const LOGIN_REQUEST_TIMEOUT_MS = 10_000;
+export const LOGOUT_REQUEST_TIMEOUT_MS = 10_000;
 
 const buildCookieHeader = async () => {
   const cookieStore = await cookies();
@@ -65,8 +80,14 @@ const getStringAttributeValue = (attribute: string) => {
   return attribute.slice(separatorIndex + 1).trim();
 };
 
-const readAuthSessionCookie = (response: Response) => {
+const readAuthSessionCookie = (
+  response: Response,
+  input?: {
+    allowEmptyValue?: boolean;
+  },
+): AuthSessionCookie | null => {
   const setCookieHeaders = response.headers.getSetCookie();
+  const allowEmptyValue = input?.allowEmptyValue ?? false;
 
   for (const header of setCookieHeaders) {
     const parts = header
@@ -89,7 +110,7 @@ const readAuthSessionCookie = (response: Response) => {
     const name = nameValue.slice(0, nameSeparatorIndex).trim();
     const value = nameValue.slice(nameSeparatorIndex + 1);
 
-    if (name !== authCookieName || !value) {
+    if (name !== authCookieName || (!allowEmptyValue && !value)) {
       continue;
     }
 
@@ -181,6 +202,32 @@ const readAuthSessionCookie = (response: Response) => {
   return null;
 };
 
+const setAuthSessionCookie = async (sessionCookie: AuthSessionCookie) => {
+  const cookieStore = await cookies();
+
+  cookieStore.set(
+    sessionCookie.name,
+    sessionCookie.value,
+    sessionCookie.options,
+  );
+};
+
+const clearAuthSessionCookie = async (
+  sessionCookieOptions?: Partial<AuthSessionCookie["options"]>,
+) => {
+  const cookieStore = await cookies();
+
+  cookieStore.set(authCookieName, "", {
+    domain: sessionCookieOptions?.domain ?? authCookieDomain,
+    expires: new Date(0),
+    httpOnly: sessionCookieOptions?.httpOnly ?? true,
+    maxAge: 0,
+    path: sessionCookieOptions?.path ?? "/",
+    sameSite: sessionCookieOptions?.sameSite ?? "lax",
+    secure: sessionCookieOptions?.secure ?? authCookieSecure,
+  });
+};
+
 export const getHomePathForRole = (role: AppUserRole) => {
   switch (role) {
     case "SUPER_ADMIN":
@@ -201,7 +248,7 @@ export const isLoginApiResponse = (
   typeof value.redirectPath === "string" &&
   value.redirectPath.startsWith("/");
 
-export const getLoginErrorMessage = (payload: unknown) =>
+const getAuthErrorMessage = (payload: unknown) =>
   (typeof payload === "object" &&
   payload !== null &&
   "message" in payload &&
@@ -213,8 +260,13 @@ export const getLoginErrorMessage = (payload: unknown) =>
   "error" in payload &&
   typeof payload.error === "string"
     ? payload.error
-    : null) ??
-  "No pudimos iniciar sesión.";
+    : null);
+
+export const getLoginErrorMessage = (payload: unknown) =>
+  getAuthErrorMessage(payload) ?? "No pudimos iniciar sesión.";
+
+export const getLogoutErrorMessage = (payload: unknown) =>
+  getAuthErrorMessage(payload) ?? "No pudimos cerrar la sesión.";
 
 export const resolveAuthRedirectTarget = (redirectPath: string) => {
   if (redirectPath.startsWith("/admin") || redirectPath.startsWith("/team")) {
@@ -289,12 +341,7 @@ export const loginWithServerSession = async (input: {
       };
     }
 
-    const cookieStore = await cookies();
-    cookieStore.set(
-      sessionCookie.name,
-      sessionCookie.value,
-      sessionCookie.options,
-    );
+    await setAuthSessionCookie(sessionCookie);
 
     return {
       ok: true as const,
@@ -305,6 +352,49 @@ export const loginWithServerSession = async (input: {
       errorMessage:
         error instanceof Error && error.name === "AbortError"
           ? "El login excedió el tiempo límite del servidor."
+          : "No pudimos conectar con el API de autenticación.",
+      ok: false as const,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+export const logoutWithServerSession = async () => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, LOGOUT_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await apiFetchWithSession("/auth/logout", {
+      method: "POST",
+      signal: controller.signal,
+    });
+
+    const payload = (await response.json().catch(() => null)) as unknown;
+
+    if (!response.ok) {
+      return {
+        errorMessage: getLogoutErrorMessage(payload),
+        ok: false as const,
+      };
+    }
+
+    const sessionCookie = readAuthSessionCookie(response, {
+      allowEmptyValue: true,
+    });
+
+    await clearAuthSessionCookie(sessionCookie?.options);
+
+    return {
+      ok: true as const,
+    };
+  } catch (error) {
+    return {
+      errorMessage:
+        error instanceof Error && error.name === "AbortError"
+          ? "El logout excedió el tiempo límite del servidor."
           : "No pudimos conectar con el API de autenticación.",
       ok: false as const,
     };
