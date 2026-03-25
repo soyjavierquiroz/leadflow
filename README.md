@@ -33,7 +33,7 @@ No hay deploy aplicado en esta fase.
 
 ## Nota de login
 
-- El login web usa un flujo cliente mínimo: `preventDefault`, un solo `fetch` `POST /v1/auth/login` con `credentials: include`, timeout explícito de 10 segundos y navegación final con `window.location.href` según `redirectPath`.
+- El login web usa flujo server-first: el formulario de `/login` envía a una `server action` de Next, esa acción llama a `POST https://api.exitosos.com/v1/auth/login`, persiste la cookie de sesión en el servidor de Next y resuelve el redirect final por rol sin depender de `fetch` cliente ni `window.location`.
 
 ## Stack tecnico
 

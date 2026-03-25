@@ -38,10 +38,147 @@ type AuthMeResponse = {
 };
 
 const authApiBaseUrl = `${webPublicConfig.urls.api}/v1`;
+const authCookieName = process.env.AUTH_COOKIE_NAME?.trim() || "leadflow_session";
+const authCookieDomain = webPublicConfig.baseDomain ?? undefined;
+const authCookieSecure =
+  (process.env.NODE_ENV ?? "development") === "production" ||
+  Boolean(authCookieDomain);
+
+export type LoginApiResponse = {
+  redirectPath: string;
+};
+
+export const LOGIN_REQUEST_TIMEOUT_MS = 10_000;
 
 const buildCookieHeader = async () => {
   const cookieStore = await cookies();
   return cookieStore.toString();
+};
+
+const getStringAttributeValue = (attribute: string) => {
+  const separatorIndex = attribute.indexOf("=");
+
+  if (separatorIndex === -1) {
+    return null;
+  }
+
+  return attribute.slice(separatorIndex + 1).trim();
+};
+
+const readAuthSessionCookie = (response: Response) => {
+  const setCookieHeaders = response.headers.getSetCookie();
+
+  for (const header of setCookieHeaders) {
+    const parts = header
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    const [nameValue, ...attributes] = parts;
+
+    if (!nameValue) {
+      continue;
+    }
+
+    const nameSeparatorIndex = nameValue.indexOf("=");
+
+    if (nameSeparatorIndex === -1) {
+      continue;
+    }
+
+    const name = nameValue.slice(0, nameSeparatorIndex).trim();
+    const value = nameValue.slice(nameSeparatorIndex + 1);
+
+    if (name !== authCookieName || !value) {
+      continue;
+    }
+
+    const options: {
+      domain?: string;
+      expires?: Date;
+      httpOnly?: boolean;
+      maxAge?: number;
+      path: string;
+      sameSite?: "lax" | "strict" | "none";
+      secure?: boolean;
+    } = {
+      path: "/",
+    };
+
+    for (const attribute of attributes) {
+      const normalizedAttribute = attribute.toLowerCase();
+
+      if (normalizedAttribute === "httponly") {
+        options.httpOnly = true;
+        continue;
+      }
+
+      if (normalizedAttribute === "secure") {
+        options.secure = true;
+        continue;
+      }
+
+      if (normalizedAttribute.startsWith("domain=")) {
+        options.domain = getStringAttributeValue(attribute) ?? undefined;
+        continue;
+      }
+
+      if (normalizedAttribute.startsWith("path=")) {
+        options.path = getStringAttributeValue(attribute) ?? "/";
+        continue;
+      }
+
+      if (normalizedAttribute.startsWith("max-age=")) {
+        const parsedMaxAge = Number(getStringAttributeValue(attribute));
+
+        if (Number.isFinite(parsedMaxAge)) {
+          options.maxAge = parsedMaxAge;
+        }
+
+        continue;
+      }
+
+      if (normalizedAttribute.startsWith("expires=")) {
+        const rawExpiresAt = getStringAttributeValue(attribute);
+
+        if (!rawExpiresAt) {
+          continue;
+        }
+
+        const expiresAt = new Date(rawExpiresAt);
+
+        if (!Number.isNaN(expiresAt.getTime())) {
+          options.expires = expiresAt;
+        }
+
+        continue;
+      }
+
+      if (normalizedAttribute.startsWith("samesite=")) {
+        const rawSameSite = getStringAttributeValue(attribute)?.toLowerCase();
+
+        if (
+          rawSameSite === "lax" ||
+          rawSameSite === "strict" ||
+          rawSameSite === "none"
+        ) {
+          options.sameSite = rawSameSite;
+        }
+      }
+    }
+
+    return {
+      name,
+      options: {
+        ...options,
+        domain: options.domain ?? authCookieDomain,
+        secure: options.secure ?? authCookieSecure,
+      },
+      value,
+    };
+  }
+
+  return null;
 };
 
 export const getHomePathForRole = (role: AppUserRole) => {
@@ -52,6 +189,127 @@ export const getHomePathForRole = (role: AppUserRole) => {
       return "/team";
     case "MEMBER":
       return "/member";
+  }
+};
+
+export const isLoginApiResponse = (
+  value: unknown,
+): value is LoginApiResponse =>
+  typeof value === "object" &&
+  value !== null &&
+  "redirectPath" in value &&
+  typeof value.redirectPath === "string" &&
+  value.redirectPath.startsWith("/");
+
+export const getLoginErrorMessage = (payload: unknown) =>
+  (typeof payload === "object" &&
+  payload !== null &&
+  "message" in payload &&
+  typeof payload.message === "string"
+    ? payload.message
+    : null) ??
+  (typeof payload === "object" &&
+  payload !== null &&
+  "error" in payload &&
+  typeof payload.error === "string"
+    ? payload.error
+    : null) ??
+  "No pudimos iniciar sesión.";
+
+export const resolveAuthRedirectTarget = (redirectPath: string) => {
+  if (redirectPath.startsWith("/admin") || redirectPath.startsWith("/team")) {
+    return new URL(redirectPath, webPublicConfig.urls.admin).toString();
+  }
+
+  if (redirectPath.startsWith("/member")) {
+    return new URL(redirectPath, webPublicConfig.urls.members).toString();
+  }
+
+  return new URL(redirectPath, webPublicConfig.urls.site).toString();
+};
+
+export const getAuthLoginApiUrl = () => `${authApiBaseUrl}/auth/login`;
+
+export const loginWithServerSession = async (input: {
+  email: string;
+  password: string;
+}) => {
+  const email = input.email.trim().toLowerCase();
+  const password = input.password;
+
+  if (!email || !password) {
+    return {
+      errorMessage: "Ingresa tu email y password para continuar.",
+      ok: false as const,
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, LOGIN_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(getAuthLoginApiUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password,
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    const payload = (await response.json().catch(() => null)) as unknown;
+
+    if (!response.ok) {
+      return {
+        errorMessage: getLoginErrorMessage(payload),
+        ok: false as const,
+      };
+    }
+
+    if (!isLoginApiResponse(payload)) {
+      return {
+        errorMessage: "El API devolvió una respuesta de login inválida.",
+        ok: false as const,
+      };
+    }
+
+    const sessionCookie = readAuthSessionCookie(response);
+
+    if (!sessionCookie) {
+      return {
+        errorMessage:
+          "El API no devolvió una cookie de sesión válida para completar el login.",
+        ok: false as const,
+      };
+    }
+
+    const cookieStore = await cookies();
+    cookieStore.set(
+      sessionCookie.name,
+      sessionCookie.value,
+      sessionCookie.options,
+    );
+
+    return {
+      ok: true as const,
+      redirectUrl: resolveAuthRedirectTarget(payload.redirectPath),
+    };
+  } catch (error) {
+    return {
+      errorMessage:
+        error instanceof Error && error.name === "AbortError"
+          ? "El login excedió el tiempo límite del servidor."
+          : "No pudimos conectar con el API de autenticación.",
+      ok: false as const,
+    };
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
@@ -100,7 +358,7 @@ export const requireRole = async (requiredRole: AppUserRole) => {
   }
 
   if (user.role !== requiredRole) {
-    redirect(getHomePathForRole(user.role));
+    redirect(resolveAuthRedirectTarget(getHomePathForRole(user.role)));
   }
 
   return user;
