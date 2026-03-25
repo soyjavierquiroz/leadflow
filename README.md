@@ -369,6 +369,7 @@ Modulos disponibles:
   - cualquier respuesta `2xx` de `POST /v1/auth/login` se trata como éxito
   - el frontend mantiene `credentials: "include"`
   - el redirect final usa el `redirectPath` devuelto por el API
+  - si la navegación posterior no ocurre, el estado `Ingresando...` debe liberarse y mostrar error
   - `SUPER_ADMIN -> /admin`
   - `TEAM_ADMIN -> /team`
   - `MEMBER -> /member`

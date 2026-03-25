@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loginWithCredentials, resolveAppUrlForPath } from "@/lib/auth-client";
 
 type LoginFormProps = {
@@ -16,34 +16,62 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
   const [email, setEmail] = useState(demoAccounts[0]?.email ?? "");
   const [password, setPassword] = useState(demoAccounts[0]?.password ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigationTimeoutRef = useRef<number | null>(null);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setErrorMessage(null);
-
-    startTransition(async () => {
-      try {
-        const payload = await loginWithCredentials({
-          email,
-          password,
-        });
-
-        window.location.assign(resolveAppUrlForPath(payload.redirectPath));
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "No pudimos conectar con el API de autenticación.",
-        );
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current !== null) {
+        window.clearTimeout(navigationTimeoutRef.current);
       }
-    });
+    };
+  }, []);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    if (navigationTimeoutRef.current !== null) {
+      window.clearTimeout(navigationTimeoutRef.current);
+      navigationTimeoutRef.current = null;
+    }
+
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const payload = await loginWithCredentials({
+        email,
+        password,
+      });
+      const destinationUrl = resolveAppUrlForPath(payload.redirectPath);
+
+      navigationTimeoutRef.current = window.setTimeout(() => {
+        navigationTimeoutRef.current = null;
+        setIsSubmitting(false);
+        setErrorMessage(
+          "El login fue exitoso, pero no pudimos completar la redirección.",
+        );
+      }, 2500);
+
+      window.location.replace(destinationUrl);
+    } catch (error) {
+      setIsSubmitting(false);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos conectar con el API de autenticación.",
+      );
+    }
   };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(event) => void handleSubmit(event)}
         className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_28px_90px_rgba(15,23,42,0.08)]"
       >
         <div>
@@ -90,10 +118,10 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
 
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isSubmitting}
             className="inline-flex w-full items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isPending ? "Ingresando..." : "Entrar a Leadflow"}
+            {isSubmitting ? "Ingresando..." : "Entrar a Leadflow"}
           </button>
         </div>
       </form>
