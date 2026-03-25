@@ -372,6 +372,11 @@ Modulos disponibles:
   - `SUPER_ADMIN -> /admin`
   - `TEAM_ADMIN -> /team`
   - `MEMBER -> /member`
+- Comportamiento esperado del logout web:
+  - `POST /v1/auth/logout` usa `credentials: "include"`
+  - cualquier respuesta `2xx` se trata como logout exitoso
+  - el frontend fuerza navegación dura a `/login`
+  - una vez cerrada la sesión, volver a `/admin`, `/team` o `/member` debe redirigir a `/login`
 
 ## Team Operations v1
 

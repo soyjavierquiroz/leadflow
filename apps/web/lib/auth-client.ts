@@ -83,3 +83,14 @@ export const loginWithCredentials = async (input: {
 
   return payload;
 };
+
+export const logoutWithSession = async (): Promise<void> => {
+  const response = await fetch(`${authApiBaseUrl}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("No pudimos cerrar la sesión.");
+  }
+};

@@ -1,31 +1,30 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { webPublicConfig } from "@/lib/public-env";
+import { useState } from "react";
+import { logoutWithSession } from "@/lib/auth-client";
 
 export function LogoutButton() {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
 
-  const handleLogout = () => {
-    startTransition(async () => {
-      try {
-        await fetch(`${webPublicConfig.urls.api}/v1/auth/logout`, {
-          method: "POST",
-          credentials: "include",
-        });
-      } finally {
-        router.replace("/login");
-        router.refresh();
-      }
-    });
+  const handleLogout = async () => {
+    if (isPending) {
+      return;
+    }
+
+    setIsPending(true);
+
+    try {
+      await logoutWithSession();
+      window.location.assign("/login");
+    } catch {
+      setIsPending(false);
+    }
   };
 
   return (
     <button
       type="button"
-      onClick={handleLogout}
+      onClick={() => void handleLogout()}
       disabled={isPending}
       className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
     >
