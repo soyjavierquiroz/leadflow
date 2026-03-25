@@ -9,6 +9,7 @@ import type {
   UserRole,
 } from '@prisma/client';
 import type { ISODateString } from '../shared/domain.types';
+import type { LeadPlaybookKey, LeadReminderBucket } from './leads-workflows';
 
 export type LeadTimelineScope = {
   workspaceId?: string;
@@ -58,6 +59,40 @@ export type LeadTimelineItem =
       eventName: string;
     };
 
+export type LeadWorkflowView = {
+  reminder: {
+    bucket: LeadReminderBucket;
+    label: string;
+    followUpAt: ISODateString | null;
+    needsAttention: boolean;
+    isOverdue: boolean;
+    isDueToday: boolean;
+    isUpcoming: boolean;
+    needsScheduling: boolean;
+  };
+  suggestedNextAction: string;
+  effectiveNextAction: string;
+  playbook: {
+    key: LeadPlaybookKey;
+    title: string;
+    description: string;
+    checklist: string[];
+    suggestedNextAction: string;
+  };
+};
+
+export type LeadReminderSummary = {
+  generatedAt: ISODateString;
+  totals: {
+    active: number;
+    overdue: number;
+    dueToday: number;
+    upcoming: number;
+    unscheduled: number;
+    needsAttention: number;
+  };
+};
+
 export type LeadTimelineDetail = {
   lead: {
     id: string;
@@ -86,6 +121,7 @@ export type LeadTimelineDetail = {
     createdAt: ISODateString;
     updatedAt: ISODateString;
   };
+  workflow: LeadWorkflowView;
   notes: LeadNoteView[];
   timeline: LeadTimelineItem[];
 };

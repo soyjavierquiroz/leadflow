@@ -264,22 +264,26 @@ export function LeadQualificationTimelinePanel({
           <p className="text-slate-500">Calificación</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <StatusBadge value={detail.lead.status} />
-            <StatusBadge value={detail.lead.assignmentStatus ?? "sin_assignment"} />
+            <StatusBadge
+              value={detail.lead.assignmentStatus ?? "sin_assignment"}
+            />
             {detail.lead.qualificationGrade ? (
               <StatusBadge value={detail.lead.qualificationGrade} />
             ) : null}
           </div>
           <p className="mt-3 text-slate-700">
-            {detail.lead.summaryText ?? "Todavía no hay resumen operativo manual."}
+            {detail.lead.summaryText ??
+              "Todavía no hay resumen operativo manual."}
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
           <p className="text-slate-500">Siguiente acción</p>
           <p className="mt-2 font-medium text-slate-950">
-            {detail.lead.nextActionLabel ?? "Pendiente de definir"}
+            {detail.workflow.effectiveNextAction}
           </p>
           <p className="mt-1 text-slate-700">
+            {detail.workflow.reminder.label} ·{" "}
             {formatMaybeDate(detail.lead.followUpAt, "Sin follow-up agendado")}
           </p>
         </div>
@@ -313,6 +317,24 @@ export function LeadQualificationTimelinePanel({
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge value={detail.workflow.reminder.bucket} />
+              <StatusBadge value={detail.workflow.playbook.key} />
+            </div>
+            <p className="mt-3 font-semibold text-slate-950">
+              {detail.workflow.playbook.title}
+            </p>
+            <p className="mt-1 text-slate-700">
+              {detail.workflow.playbook.description}
+            </p>
+            <ul className="mt-3 space-y-2 text-slate-700">
+              {detail.workflow.playbook.checklist.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+          </div>
+
           <div>
             <p className="text-sm font-semibold text-slate-900">
               Calificación rápida
@@ -342,7 +364,9 @@ export function LeadQualificationTimelinePanel({
           </label>
 
           <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Resumen operativo</span>
+            <span className="font-medium text-slate-700">
+              Resumen operativo
+            </span>
             <textarea
               value={summaryText}
               onChange={(event) => setSummaryText(event.target.value)}
@@ -440,7 +464,9 @@ export function LeadQualificationTimelinePanel({
                       <StatusBadge value={item.statusLabel} />
                     ) : null}
                   </div>
-                  <p className="mt-3 font-semibold text-slate-950">{item.title}</p>
+                  <p className="mt-3 font-semibold text-slate-950">
+                    {item.title}
+                  </p>
                   <p className="mt-1 text-slate-600">{item.description}</p>
                   <p className="mt-2 text-xs text-slate-500">
                     {item.actorLabel} · {formatDateTime(item.occurredAt)}

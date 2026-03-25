@@ -169,6 +169,10 @@ async function main() {
   await prisma.leadNote.deleteMany();
   await prisma.conversationSignal.deleteMany();
   await prisma.automationDispatch.deleteMany();
+  await prisma.domainEvent.deleteMany();
+  await prisma.assignment.deleteMany();
+  await prisma.lead.deleteMany();
+  await prisma.visitor.deleteMany();
 
   await prisma.user.upsert({
     where: { email: 'admin@leadflow.local' },
@@ -749,7 +753,7 @@ async function main() {
     ],
   });
 
-  await prisma.funnelPublication.upsert({
+  const rootPublication = await prisma.funnelPublication.upsert({
     where: {
       domainId_pathPrefix: {
         domainId: domain.id,
@@ -778,7 +782,7 @@ async function main() {
     },
   });
 
-  await prisma.funnelPublication.upsert({
+  const opportunityPublication = await prisma.funnelPublication.upsert({
     where: {
       domainId_pathPrefix: {
         domainId: domain.id,
@@ -826,6 +830,328 @@ async function main() {
         position: 2,
         weight: 1,
         isActive: true,
+      },
+    ],
+  });
+
+  const seededVisitors = [
+    {
+      id: 'visitor-maria-santos',
+      anonymousId: 'anon-maria-santos',
+      sourceChannel: 'form',
+      firstSeenAt: new Date('2026-03-24T14:00:00.000Z'),
+      lastSeenAt: new Date('2026-03-24T14:01:00.000Z'),
+      utmSource: 'meta',
+      utmCampaign: 'warm-remarketing',
+    },
+    {
+      id: 'visitor-carlos-rivera',
+      anonymousId: 'anon-carlos-rivera',
+      sourceChannel: 'form',
+      firstSeenAt: new Date('2026-03-25T09:00:00.000Z'),
+      lastSeenAt: new Date('2026-03-25T09:02:00.000Z'),
+      utmSource: 'google',
+      utmCampaign: 'intent-search',
+    },
+    {
+      id: 'visitor-andrea-lopez',
+      anonymousId: 'anon-andrea-lopez',
+      sourceChannel: 'landing_page',
+      firstSeenAt: new Date('2026-03-25T10:30:00.000Z'),
+      lastSeenAt: new Date('2026-03-25T10:32:00.000Z'),
+      utmSource: 'organic',
+      utmCampaign: 'content-cold',
+    },
+    {
+      id: 'visitor-lucia-mendez',
+      anonymousId: 'anon-lucia-mendez',
+      sourceChannel: 'form',
+      firstSeenAt: new Date('2026-03-25T11:00:00.000Z'),
+      lastSeenAt: new Date('2026-03-25T11:01:00.000Z'),
+      utmSource: 'meta',
+      utmCampaign: 'new-leads',
+    },
+  ];
+
+  await prisma.visitor.createMany({
+    data: seededVisitors.map((visitor) => ({
+      id: visitor.id,
+      workspaceId: workspace.id,
+      anonymousId: visitor.anonymousId,
+      kind: 'identified',
+      status: 'converted',
+      sourceChannel: visitor.sourceChannel,
+      firstSeenAt: visitor.firstSeenAt,
+      lastSeenAt: visitor.lastSeenAt,
+      utmSource: visitor.utmSource,
+      utmCampaign: visitor.utmCampaign,
+    })),
+  });
+
+  const seededLeads = [
+    {
+      id: 'lead-maria-santos',
+      visitorId: seededVisitors[0].id,
+      sponsorId: sponsorA.id,
+      assignmentId: 'assignment-maria-ana',
+      publicationId: rootPublication.id,
+      sourceChannel: 'form',
+      fullName: 'Maria Santos',
+      email: 'maria@empresa.co',
+      phone: '+57 310 222 3000',
+      companyName: 'Santos Growth',
+      status: 'nurturing',
+      qualificationGrade: 'warm',
+      summaryText:
+        'Lead con conversacion abierta. Pidio retomar cuando vuelva de una reunion interna.',
+      nextActionLabel: 'Retomar WhatsApp con contexto comercial',
+      followUpAt: new Date('2026-03-24T16:30:00.000Z'),
+      lastContactedAt: new Date('2026-03-24T12:00:00.000Z'),
+      lastQualifiedAt: new Date('2026-03-24T12:05:00.000Z'),
+      tags: ['remarketing', 'follow-up'],
+      createdAt: new Date('2026-03-24T11:55:00.000Z'),
+      updatedAt: new Date('2026-03-24T12:05:00.000Z'),
+    },
+    {
+      id: 'lead-carlos-rivera',
+      visitorId: seededVisitors[1].id,
+      sponsorId: sponsorB.id,
+      assignmentId: 'assignment-carlos-bruno',
+      publicationId: opportunityPublication.id,
+      sourceChannel: 'form',
+      fullName: 'Carlos Rivera',
+      email: 'carlos@rivera.io',
+      phone: '+57 300 443 9010',
+      companyName: 'Rivera Studio',
+      status: 'qualified',
+      qualificationGrade: 'hot',
+      summaryText:
+        'Lead con alta intencion. Quiere propuesta y disponibilidad para demo hoy mismo.',
+      nextActionLabel: 'Enviar propuesta corta y confirmar demo',
+      followUpAt: new Date('2026-03-25T17:00:00.000Z'),
+      lastContactedAt: new Date('2026-03-25T09:45:00.000Z'),
+      lastQualifiedAt: new Date('2026-03-25T09:50:00.000Z'),
+      tags: ['high-intent', 'demo'],
+      createdAt: new Date('2026-03-25T09:02:00.000Z'),
+      updatedAt: new Date('2026-03-25T09:50:00.000Z'),
+    },
+    {
+      id: 'lead-andrea-lopez',
+      visitorId: seededVisitors[2].id,
+      sponsorId: sponsorA.id,
+      assignmentId: 'assignment-andrea-ana',
+      publicationId: rootPublication.id,
+      sourceChannel: 'landing_page',
+      fullName: 'Andrea Lopez',
+      email: 'andrea@north.dev',
+      phone: '+57 321 555 2200',
+      companyName: 'North Dev',
+      status: 'captured',
+      qualificationGrade: 'cold',
+      summaryText:
+        'Aun no responde. Conviene reintentar con mensaje breve y validar timing.',
+      nextActionLabel: 'Reintentar con mensaje corto manana',
+      followUpAt: new Date('2026-03-27T15:00:00.000Z'),
+      lastContactedAt: null,
+      lastQualifiedAt: null,
+      tags: ['cold', 'reactivation'],
+      createdAt: new Date('2026-03-25T10:32:00.000Z'),
+      updatedAt: new Date('2026-03-25T10:35:00.000Z'),
+    },
+    {
+      id: 'lead-lucia-mendez',
+      visitorId: seededVisitors[3].id,
+      sponsorId: sponsorB.id,
+      assignmentId: 'assignment-lucia-bruno',
+      publicationId: rootPublication.id,
+      sourceChannel: 'form',
+      fullName: 'Lucia Mendez',
+      email: 'lucia@mendez.mx',
+      phone: '+52 55 9000 7788',
+      companyName: 'Mendez Retail',
+      status: 'assigned',
+      qualificationGrade: null,
+      summaryText:
+        'Lead nuevo recien capturado. Todavia no hay contacto ni seguimiento agendado.',
+      nextActionLabel: null,
+      followUpAt: null,
+      lastContactedAt: null,
+      lastQualifiedAt: null,
+      tags: ['new', 'unscheduled'],
+      createdAt: new Date('2026-03-25T11:01:00.000Z'),
+      updatedAt: new Date('2026-03-25T11:01:00.000Z'),
+    },
+  ];
+
+  await prisma.lead.createMany({
+    data: seededLeads.map((lead) => ({
+      id: lead.id,
+      workspaceId: workspace.id,
+      funnelId: legacyFunnel.id,
+      funnelInstanceId: funnelInstance.id,
+      funnelPublicationId: lead.publicationId,
+      visitorId: lead.visitorId,
+      sourceChannel: lead.sourceChannel,
+      fullName: lead.fullName,
+      email: lead.email,
+      phone: lead.phone,
+      companyName: lead.companyName,
+      status: lead.status,
+      qualificationGrade: lead.qualificationGrade,
+      summaryText: lead.summaryText,
+      nextActionLabel: lead.nextActionLabel,
+      followUpAt: lead.followUpAt,
+      lastContactedAt: lead.lastContactedAt,
+      lastQualifiedAt: lead.lastQualifiedAt,
+      currentAssignmentId: null,
+      tags: lead.tags,
+      createdAt: lead.createdAt,
+      updatedAt: lead.updatedAt,
+    })),
+  });
+
+  await prisma.assignment.createMany({
+    data: seededLeads.map((lead) => ({
+      id: lead.assignmentId,
+      workspaceId: workspace.id,
+      leadId: lead.id,
+      sponsorId: lead.sponsorId,
+      teamId: team.id,
+      funnelId: legacyFunnel.id,
+      funnelInstanceId: funnelInstance.id,
+      funnelPublicationId: lead.publicationId,
+      rotationPoolId: rotationPool.id,
+      status: lead.id === 'lead-lucia-mendez' ? 'assigned' : 'accepted',
+      reason: 'rotation',
+      assignedAt: lead.createdAt,
+      resolvedAt: null,
+      createdAt: lead.createdAt,
+      updatedAt: lead.updatedAt,
+    })),
+  });
+
+  for (const lead of seededLeads) {
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: {
+        currentAssignmentId: lead.assignmentId,
+      },
+    });
+  }
+
+  await prisma.conversationSignal.createMany({
+    data: [
+      {
+        id: 'signal-maria-follow-up',
+        workspaceId: workspace.id,
+        teamId: team.id,
+        sponsorId: sponsorA.id,
+        leadId: 'lead-maria-santos',
+        assignmentId: 'assignment-maria-ana',
+        messagingConnectionId: null,
+        automationDispatchId: null,
+        source: 'n8n',
+        signalType: 'lead_follow_up',
+        processingStatus: 'applied',
+        externalEventId: 'evt-maria-follow-up',
+        payloadSnapshot: {
+          note: 'Lead pidió retomar la conversación al día siguiente.',
+        },
+        errorCode: null,
+        errorMessage: null,
+        leadStatusAfter: 'nurturing',
+        assignmentStatusAfter: 'accepted',
+        occurredAt: new Date('2026-03-24T12:00:00.000Z'),
+        processedAt: new Date('2026-03-24T12:00:05.000Z'),
+      },
+      {
+        id: 'signal-carlos-qualified',
+        workspaceId: workspace.id,
+        teamId: team.id,
+        sponsorId: sponsorB.id,
+        leadId: 'lead-carlos-rivera',
+        assignmentId: 'assignment-carlos-bruno',
+        messagingConnectionId: null,
+        automationDispatchId: null,
+        source: 'evolution',
+        signalType: 'lead_qualified',
+        processingStatus: 'applied',
+        externalEventId: 'evt-carlos-qualified',
+        payloadSnapshot: {
+          note: 'Lead confirmó interés y pidió propuesta.',
+        },
+        errorCode: null,
+        errorMessage: null,
+        leadStatusAfter: 'qualified',
+        assignmentStatusAfter: 'accepted',
+        occurredAt: new Date('2026-03-25T09:50:00.000Z'),
+        processedAt: new Date('2026-03-25T09:50:03.000Z'),
+      },
+    ],
+  });
+
+  await prisma.leadNote.createMany({
+    data: [
+      {
+        id: 'note-maria-context',
+        workspaceId: workspace.id,
+        teamId: team.id,
+        leadId: 'lead-maria-santos',
+        sponsorId: sponsorA.id,
+        authorUserId: teamAdminUser.id,
+        authorRole: 'TEAM_ADMIN',
+        authorName: 'Leadflow Team Admin',
+        body: 'Conviene retomar con contexto de ROI y no con pitch largo.',
+      },
+      {
+        id: 'note-lucia-first-touch',
+        workspaceId: workspace.id,
+        teamId: team.id,
+        leadId: 'lead-lucia-mendez',
+        sponsorId: sponsorB.id,
+        authorUserId: teamAdminUser.id,
+        authorRole: 'TEAM_ADMIN',
+        authorName: 'Leadflow Team Admin',
+        body: 'Lead nuevo. Priorizar primer contacto antes del cierre del día.',
+      },
+    ],
+  });
+
+  await prisma.domainEvent.createMany({
+    data: [
+      {
+        id: 'event-lead-maria-created',
+        workspaceId: workspace.id,
+        eventId: 'event-lead-maria-created',
+        aggregateType: 'lead',
+        aggregateId: 'lead-maria-santos',
+        eventName: 'lead_created',
+        actorType: 'visitor',
+        payload: { source: 'seed' },
+        occurredAt: new Date('2026-03-24T11:55:00.000Z'),
+        funnelInstanceId: funnelInstance.id,
+        funnelPublicationId: rootPublication.id,
+        funnelStepId: null,
+        visitorId: 'visitor-maria-santos',
+        leadId: 'lead-maria-santos',
+        assignmentId: null,
+      },
+      {
+        id: 'event-assignment-carlos-created',
+        workspaceId: workspace.id,
+        eventId: 'event-assignment-carlos-created',
+        aggregateType: 'assignment',
+        aggregateId: 'assignment-carlos-bruno',
+        eventName: 'assignment_created',
+        actorType: 'system',
+        payload: { source: 'seed' },
+        occurredAt: new Date('2026-03-25T09:02:00.000Z'),
+        funnelInstanceId: funnelInstance.id,
+        funnelPublicationId: opportunityPublication.id,
+        funnelStepId: null,
+        visitorId: null,
+        leadId: 'lead-carlos-rivera',
+        assignmentId: 'assignment-carlos-bruno',
       },
     ],
   });

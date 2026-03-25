@@ -2,7 +2,7 @@
 
 ## Objetivo de esta fase
 
-Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol, operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, una capa real de QR connect por sponsor/member sobre Evolution API usando backend e infraestructura interna como ruta principal, un bridge basico pero real hacia n8n con payload estructurado y persistencia de dispatch, y recepción autenticada de señales entrantes para actualizar el estado operativo sin abrir todavía un inbox, sin tocar produccion.
+Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio v1, persistencia real en PostgreSQL, expansion implementada para ownership/publicacion/templates, un runtime publico JSON-driven ya conectado a captura, assignment, reveal, handoff y tracking events v1, las primeras superficies privadas visibles del SaaS, auth real base por rol, operaciones mutativas iniciales tanto para `Team Admin` como para `Member`, una capa real de QR connect por sponsor/member sobre Evolution API usando backend e infraestructura interna como ruta principal, un bridge basico pero real hacia n8n con payload estructurado y persistencia de dispatch, recepción autenticada de señales entrantes para actualizar el estado operativo sin abrir todavía un inbox, y una capa pragmatica de workflows/reminders/playbooks para volver mas guiada la operación diaria sobre leads, sin tocar produccion.
 
 ## Componentes
 
@@ -42,6 +42,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - sponsors
   - rotation pool members
   - leads con filtros basicos, resumen operativo y timeline enriquecida
+  - leads con reminders summary, playbook recomendado y proximo seguimiento visible
 - Member operations v1 conectadas sobre `/member/*` con acciones para:
   - aceptar handoffs
   - mover estado simple de leads
@@ -50,6 +51,8 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - revisar detalle operativo del lead sin inbox
   - calificar, resumir, agendar follow-up y agregar notas
   - ver timeline consolidada por lead
+  - priorizar follow-ups vencidos, del dia, proximos y sin fecha
+  - ver playbook recomendado y siguiente accion efectiva
 - Messaging integrations v1 conectadas sobre `/member/channel` para:
   - ver estado actual de la conexion WhatsApp del sponsor
   - conectar o reprovisionar una instancia en Evolution
@@ -107,7 +110,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - `MessagingIntegrationsModule` con adaptador Evolution API usando URL interna como ruta principal y fallback público opcional.
 - `MessagingAutomationModule` con bridge webhook hacia n8n, payload snapshot y persistencia del resultado por assignment.
 - `IncomingWebhooksModule` para recibir señales entrantes autenticadas desde n8n/Evolution y reflejarlas en el dominio operativo.
-- `LeadsModule` ampliado para timeline consolidada, notas manuales y calificación simple.
+- `LeadsModule` ampliado para timeline consolidada, notas manuales, calificación simple, reminders summary y playbooks derivados.
 - Contrato publico enriquecido para reveal/handoff en runtime y submit.
 - Modulos disponibles:
   - `auth`
@@ -164,6 +167,8 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `GET /v1/incoming-webhooks/messaging/signals?leadId=...`
 - Endpoints lead qualification timeline:
   - `GET /v1/leads/:id/timeline`
+  - `GET /v1/leads/reminders/summary`
+  - `GET /v1/leads/:id/playbook`
   - `PATCH /v1/leads/:id/qualification`
   - `PATCH /v1/leads/:id/follow-up`
   - `POST /v1/leads/:id/notes`
@@ -252,7 +257,7 @@ La arquitectura ya implementa:
 - lifecycle completo de QR connect: ensure, create, webhook, qr, refresh, reset y disconnect
 - bridge v1 hacia n8n disparado tras una asignacion nueva, con persistencia de payload, respuesta y error
 - señales entrantes v1 autenticadas por secret, persistidas y aplicadas sobre lead/assignment con trazabilidad
-- capa operativa de lead con calificación simple, notas manuales, next action y follow-up
+- capa operativa de lead con calificación simple, notas manuales, next action, follow-up, reminders summary y playbooks simples por estado/calificacion
 
 ## Runtime publico v1
 

@@ -1,4 +1,5 @@
 import type { CreateLeadDto } from '../dto/create-lead.dto';
+import type { LeadPlaybookKey, LeadReminderBucket } from '../leads-workflows';
 import type {
   BaseDomainEntity,
   DomainId,
@@ -36,6 +37,14 @@ export interface Lead extends BaseDomainEntity, WorkspaceScoped {
   lastContactedAt: ISODateString | null;
   lastQualifiedAt: ISODateString | null;
   currentAssignmentId: DomainId | null;
+  reminderBucket?: LeadReminderBucket;
+  reminderLabel?: string | null;
+  suggestedNextAction?: string | null;
+  effectiveNextAction?: string | null;
+  playbookKey?: LeadPlaybookKey | null;
+  playbookTitle?: string | null;
+  playbookDescription?: string | null;
+  needsAttention?: boolean;
   tags: string[];
 }
 

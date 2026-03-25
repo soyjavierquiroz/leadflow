@@ -28,6 +28,7 @@ import type {
   FunnelView,
   HandoffStrategyRecord,
   LeadRecord,
+  LeadRemindersSummary,
   LeadView,
   PublicationView,
   RotationPoolRecord,
@@ -108,7 +109,11 @@ const fetchSingleton = async <T>(
 
     const payload = (await response.json()) as unknown;
 
-    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    if (
+      typeof payload !== "object" ||
+      payload === null ||
+      Array.isArray(payload)
+    ) {
       throw new Error("The API payload is not an object.");
     }
 
@@ -137,8 +142,8 @@ const buildTeamCatalog = (ids: string[], workspaceId: string) => {
       workspaceId,
       name:
         ids.length === 1
-          ? mock?.name ?? "Sales Core"
-          : mock?.name ?? `Team ${index + 1}`,
+          ? (mock?.name ?? "Sales Core")
+          : (mock?.name ?? `Team ${index + 1}`),
       code: mock?.code ?? `team-${index + 1}`,
       status: mock?.status ?? "active",
       description:
@@ -183,20 +188,25 @@ const buildDerivedTeams = (input: {
 
     return {
       ...team,
-      sponsorCount: input.sponsors.filter((item) => item.teamId === team.id).length,
+      sponsorCount: input.sponsors.filter((item) => item.teamId === team.id)
+        .length,
       funnelCount: funnelIds.length,
       publicationCount: publicationIds.length,
-      domainCount: input.domains.filter((item) => item.teamId === team.id).length,
-      poolCount: input.rotationPools.filter((item) => item.teamId === team.id).length,
+      domainCount: input.domains.filter((item) => item.teamId === team.id)
+        .length,
+      poolCount: input.rotationPools.filter((item) => item.teamId === team.id)
+        .length,
       leadCount: input.leads.filter((item) => {
         return (
-          (item.funnelInstanceId && funnelIds.includes(item.funnelInstanceId)) ||
+          (item.funnelInstanceId &&
+            funnelIds.includes(item.funnelInstanceId)) ||
           (item.funnelPublicationId &&
             publicationIds.includes(item.funnelPublicationId))
         );
       }).length,
-      assignmentCount: input.assignments.filter((item) => item.teamId === team.id)
-        .length,
+      assignmentCount: input.assignments.filter(
+        (item) => item.teamId === team.id,
+      ).length,
     };
   });
 };
@@ -209,7 +219,9 @@ const buildPublicationViews = (input: {
   teams: DerivedTeam[];
 }): PublicationView[] => {
   return input.publications.map((publication) => {
-    const domain = input.domains.find((item) => item.id === publication.domainId);
+    const domain = input.domains.find(
+      (item) => item.id === publication.domainId,
+    );
     const funnel = input.funnelInstances.find(
       (item) => item.id === publication.funnelInstanceId,
     );
@@ -225,8 +237,12 @@ const buildPublicationViews = (input: {
       funnelCode: funnel?.code ?? "pending",
       templateName: template?.name ?? "Template sin referencia",
       teamName: team?.name ?? "Team sin metadata",
-      trackingLabel: publication.trackingProfileId ? "Tracking conectado" : "Tracking pendiente",
-      handoffLabel: publication.handoffStrategyId ? "Handoff definido" : "Handoff pendiente",
+      trackingLabel: publication.trackingProfileId
+        ? "Tracking conectado"
+        : "Tracking pendiente",
+      handoffLabel: publication.handoffStrategyId
+        ? "Handoff definido"
+        : "Handoff pendiente",
     };
   });
 };
@@ -238,7 +254,9 @@ const buildFunnelViews = (input: {
   publications: FunnelPublicationRecord[];
 }): FunnelView[] => {
   return input.funnelInstances.map((instance) => {
-    const template = input.templates.find((item) => item.id === instance.templateId);
+    const template = input.templates.find(
+      (item) => item.id === instance.templateId,
+    );
     const team = input.teams.find((item) => item.id === instance.teamId);
 
     return {
@@ -248,7 +266,9 @@ const buildFunnelViews = (input: {
         (item) => item.funnelInstanceId === instance.id,
       ).length,
       teamName: team?.name ?? "Team sin metadata",
-      rotationLabel: instance.rotationPoolId ? "Pool asignado" : "Pool pendiente",
+      rotationLabel: instance.rotationPoolId
+        ? "Pool asignado"
+        : "Pool pendiente",
       trackingReady: Boolean(instance.trackingProfileId),
     };
   });
@@ -266,11 +286,15 @@ const buildLeadViews = (input: {
     const assignment =
       input.assignments.find((item) => item.id === lead.currentAssignmentId) ??
       input.assignments.find((item) => item.leadId === lead.id);
-    const sponsor = input.sponsors.find((item) => item.id === assignment?.sponsorId);
+    const sponsor = input.sponsors.find(
+      (item) => item.id === assignment?.sponsorId,
+    );
     const publication = input.publications.find(
       (item) => item.id === lead.funnelPublicationId,
     );
-    const funnel = input.funnels.find((item) => item.id === lead.funnelInstanceId);
+    const funnel = input.funnels.find(
+      (item) => item.id === lead.funnelInstanceId,
+    );
     const team =
       input.teams.find((item) => item.id === assignment?.teamId) ??
       input.teams.find((item) => item.id === funnel?.teamId) ??
@@ -318,9 +342,59 @@ const buildMockRotationPoolMembers = (input: {
   );
 };
 
+const buildLeadRemindersSummary = (
+  leads: LeadRecord[],
+): LeadRemindersSummary => {
+  return leads.reduce<LeadRemindersSummary>(
+    (summary, lead) => {
+      if (lead.reminderBucket === "none") {
+        return summary;
+      }
+
+      summary.totals.active += 1;
+
+      if (lead.needsAttention) {
+        summary.totals.needsAttention += 1;
+      }
+
+      switch (lead.reminderBucket) {
+        case "overdue":
+          summary.totals.overdue += 1;
+          break;
+        case "due_today":
+          summary.totals.dueToday += 1;
+          break;
+        case "upcoming":
+          summary.totals.upcoming += 1;
+          break;
+        case "unscheduled":
+          summary.totals.unscheduled += 1;
+          break;
+        default:
+          break;
+      }
+
+      return summary;
+    },
+    {
+      generatedAt: new Date().toISOString(),
+      totals: {
+        active: 0,
+        overdue: 0,
+        dueToday: 0,
+        upcoming: 0,
+        unscheduled: 0,
+        needsAttention: 0,
+      },
+    },
+  );
+};
+
 export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
   noStore();
-  const currentUser = (await getSessionUser()) as AuthenticatedAppUserRecord | null;
+  const currentUser =
+    (await getSessionUser()) as AuthenticatedAppUserRecord | null;
+  const remindersFallback = buildLeadRemindersSummary(mockLeads);
 
   const canReadAdminCollections =
     currentUser?.role === "SUPER_ADMIN" || currentUser?.role === "TEAM_ADMIN";
@@ -351,6 +425,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     handoffStrategiesResult,
     leadsResult,
     assignmentsResult,
+    remindersSummaryResult,
   ] = await Promise.all([
     currentUser?.role === "SUPER_ADMIN"
       ? fetchCollection<WorkspaceRecord>("/workspaces", [mockWorkspace])
@@ -388,7 +463,10 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           source: "live" as const,
         }),
     canReadAdminCollections
-      ? fetchCollection<FunnelTemplateRecord>("/funnel-templates", mockTemplates)
+      ? fetchCollection<FunnelTemplateRecord>(
+          "/funnel-templates",
+          mockTemplates,
+        )
       : Promise.resolve({
           data: mockTemplates,
           source: "mock" as const,
@@ -418,12 +496,13 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           source: "mock" as const,
         }),
     currentUser?.role === "MEMBER"
-      ? fetchSingleton<SponsorRecord>("/sponsors/me", memberSponsorFallback).then(
-          (result) => ({
-            data: [result.data],
-            source: result.source,
-          }),
-        )
+      ? fetchSingleton<SponsorRecord>(
+          "/sponsors/me",
+          memberSponsorFallback,
+        ).then((result) => ({
+          data: [result.data],
+          source: result.source,
+        }))
       : canReadAdminCollections
         ? fetchCollection<SponsorRecord>("/sponsors", mockSponsors)
         : Promise.resolve({
@@ -431,7 +510,10 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
             source: "mock" as const,
           }),
     canReadAdminCollections
-      ? fetchCollection<RotationPoolRecord>("/rotation-pools", mockRotationPools)
+      ? fetchCollection<RotationPoolRecord>(
+          "/rotation-pools",
+          mockRotationPools,
+        )
       : Promise.resolve({
           data: mockRotationPools,
           source: "mock" as const,
@@ -462,6 +544,10 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
         }),
     fetchCollection<LeadRecord>("/leads", mockLeads),
     fetchCollection<AssignmentRecord>("/assignments", mockAssignments),
+    fetchSingleton<LeadRemindersSummary>(
+      "/leads/reminders/summary",
+      remindersFallback,
+    ),
   ]);
 
   const sources = {
@@ -478,6 +564,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     handoffStrategies: handoffStrategiesResult.source,
     leads: leadsResult.source,
     assignments: assignmentsResult.source,
+    remindersSummary: remindersSummaryResult.source,
   };
 
   const workspace = workspacesResult.data[0] ?? mockWorkspace;
@@ -523,10 +610,9 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     teams: derivedTeams,
   });
 
-  const currentTeam =
-    (currentUser?.teamId
-      ? derivedTeams.find((item) => item.id === currentUser.teamId)
-      : null) ??
+  const currentTeam = (currentUser?.teamId
+    ? derivedTeams.find((item) => item.id === currentUser.teamId)
+    : null) ??
     derivedTeams[0] ?? {
       ...mockTeamMetadata[0],
       sponsorCount: mockSponsors.length,
@@ -572,5 +658,6 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     assignments: assignmentsResult.data,
     events: mockEvents,
     memberProfile: mockMemberProfile,
+    remindersSummary: remindersSummaryResult.data,
   };
 };

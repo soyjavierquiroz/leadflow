@@ -50,6 +50,21 @@ export class LeadsController {
     });
   }
 
+  @Get('reminders/summary')
+  getRemindersSummary(@CurrentAuthUser() user: AuthenticatedUser) {
+    return this.leadsService.getRemindersSummary({
+      workspaceId: user.workspaceId ?? undefined,
+      teamId:
+        user.role === UserRole.TEAM_ADMIN || user.role === UserRole.MEMBER
+          ? (user.teamId ?? undefined)
+          : undefined,
+      sponsorId:
+        user.role === UserRole.MEMBER
+          ? (user.sponsorId ?? undefined)
+          : undefined,
+    });
+  }
+
   @Get(':id')
   findOne(
     @CurrentAuthUser() user: AuthenticatedUser,
@@ -67,6 +82,27 @@ export class LeadsController {
           ? (user.sponsorId ?? undefined)
           : undefined,
     });
+  }
+
+  @Get(':id/playbook')
+  getPlaybook(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') leadId: string,
+  ) {
+    return this.leadsService.getLeadPlaybook(
+      {
+        workspaceId: user.workspaceId ?? undefined,
+        teamId:
+          user.role === UserRole.TEAM_ADMIN || user.role === UserRole.MEMBER
+            ? (user.teamId ?? undefined)
+            : undefined,
+        sponsorId:
+          user.role === UserRole.MEMBER
+            ? (user.sponsorId ?? undefined)
+            : undefined,
+      },
+      leadId,
+    );
   }
 
   @Get(':id/timeline')

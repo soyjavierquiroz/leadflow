@@ -8,12 +8,21 @@ import { StatusBadge } from "@/components/app-shell/status-badge";
 import { LeadQualificationTimelinePanel } from "@/components/lead-signals/lead-qualification-timeline-panel";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
-import type { AssignmentRecord, LeadView } from "@/lib/app-shell/types";
-import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
+import type {
+  AssignmentRecord,
+  LeadRemindersSummary,
+  LeadView,
+} from "@/lib/app-shell/types";
+import {
+  formatCompactNumber,
+  formatDateTime,
+  toSentenceCase,
+} from "@/lib/app-shell/utils";
 import { memberOperationRequest } from "@/lib/member-operations";
 
 type MemberLeadsClientProps = {
   initialRows: LeadView[];
+  remindersSummary: LeadRemindersSummary;
 };
 
 const leadStatusOptions = [
@@ -32,15 +41,26 @@ const assignmentStatusOptions = [
   "closed",
 ] as const;
 
-export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
+const reminderBucketOptions = [
+  "all",
+  "overdue",
+  "due_today",
+  "upcoming",
+  "unscheduled",
+] as const;
+
+export function MemberLeadsClient({
+  initialRows,
+  remindersSummary,
+}: MemberLeadsClientProps) {
   const [rows, setRows] = useState(initialRows);
   const [search, setSearch] = useState("");
-  const [leadStatus, setLeadStatus] = useState<(typeof leadStatusOptions)[number]>(
-    "all",
-  );
-  const [assignmentStatus, setAssignmentStatus] = useState<
-    (typeof assignmentStatusOptions)[number]
-  >("all");
+  const [leadStatus, setLeadStatus] =
+    useState<(typeof leadStatusOptions)[number]>("all");
+  const [assignmentStatus, setAssignmentStatus] =
+    useState<(typeof assignmentStatusOptions)[number]>("all");
+  const [reminderBucket, setReminderBucket] =
+    useState<(typeof reminderBucketOptions)[number]>("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -61,8 +81,15 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
     const matchesLeadStatus = leadStatus === "all" || row.status === leadStatus;
     const matchesAssignmentStatus =
       assignmentStatus === "all" || row.assignmentStatus === assignmentStatus;
+    const matchesReminderBucket =
+      reminderBucket === "all" || row.reminderBucket === reminderBucket;
 
-    return Boolean(matchesSearch && matchesLeadStatus && matchesAssignmentStatus);
+    return Boolean(
+      matchesSearch &&
+      matchesLeadStatus &&
+      matchesAssignmentStatus &&
+      matchesReminderBucket,
+    );
   });
 
   const selectedLead =
@@ -70,10 +97,7 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
     rows.find((row) => row.id === selectedLeadId) ??
     null;
 
-  const updateLeadRow = (
-    leadId: string,
-    updates: Partial<LeadView>,
-  ) => {
+  const updateLeadRow = (leadId: string, updates: Partial<LeadView>) => {
     setRows((current) =>
       current.map((row) => (row.id === leadId ? { ...row, ...updates } : row)),
     );
@@ -196,7 +220,7 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
       <SectionHeader
         eyebrow="Sponsor / Member / Leads"
         title="Mis leads asignados"
-        description="Esta vista ya es operativa: filtra, revisa detalle básico y mueve el seguimiento del lead sin entrar todavía en un inbox conversacional."
+        description="Bandeja operativa para priorizar follow-ups vencidos, ver qué toca hoy y trabajar cada lead con la próxima acción sugerida y su playbook recomendado."
       />
 
       {feedback ? (
@@ -205,34 +229,28 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          label="Leads"
-          value={formatCompactNumber(rows.length)}
-          hint="Leads asignados al sponsor autenticado."
+          label="Vencidos"
+          value={formatCompactNumber(remindersSummary.totals.overdue)}
+          hint="Seguimientos que ya debieron resolverse."
         />
         <KpiCard
-          label="Por aceptar"
-          value={formatCompactNumber(
-            rows.filter((item) => item.assignmentStatus === "assigned").length,
-          )}
-          hint="Handoffs aún pendientes de aceptación."
+          label="Hoy"
+          value={formatCompactNumber(remindersSummary.totals.dueToday)}
+          hint="Leads que requieren follow-up hoy."
         />
         <KpiCard
-          label="En nurturing"
-          value={formatCompactNumber(
-            rows.filter((item) => item.status === "nurturing").length,
-          )}
-          hint="Leads ya tomados en seguimiento activo."
+          label="Próximos"
+          value={formatCompactNumber(remindersSummary.totals.upcoming)}
+          hint="Seguimientos ya agendados para los próximos días."
         />
         <KpiCard
-          label="Ganados"
-          value={formatCompactNumber(
-            rows.filter((item) => item.status === "won").length,
-          )}
-          hint="Cierre positivo informado desde la operación del member."
+          label="Sin follow-up"
+          value={formatCompactNumber(remindersSummary.totals.unscheduled)}
+          hint="Leads activos que todavía no tienen una próxima fecha."
         />
       </section>
 
-      <section className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)] md:grid-cols-3">
+      <section className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)] md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-2 text-sm">
           <span className="font-medium text-slate-700">Buscar lead</span>
           <input
@@ -247,7 +265,9 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
           <select
             value={leadStatus}
             onChange={(event) =>
-              setLeadStatus(event.target.value as (typeof leadStatusOptions)[number])
+              setLeadStatus(
+                event.target.value as (typeof leadStatusOptions)[number],
+              )
             }
             className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
           >
@@ -259,7 +279,9 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
           </select>
         </label>
         <label className="space-y-2 text-sm">
-          <span className="font-medium text-slate-700">Estado del assignment</span>
+          <span className="font-medium text-slate-700">
+            Estado del assignment
+          </span>
           <select
             value={assignmentStatus}
             onChange={(event) =>
@@ -272,6 +294,24 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
             {assignmentStatusOptions.map((option) => (
               <option key={option} value={option}>
                 {option === "all" ? "Todos" : option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-2 text-sm">
+          <span className="font-medium text-slate-700">Seguimiento</span>
+          <select
+            value={reminderBucket}
+            onChange={(event) =>
+              setReminderBucket(
+                event.target.value as (typeof reminderBucketOptions)[number],
+              )
+            }
+            className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+          >
+            {reminderBucketOptions.map((option) => (
+              <option key={option} value={option}>
+                {option === "all" ? "Todos" : toSentenceCase(option)}
               </option>
             ))}
           </select>
@@ -318,6 +358,9 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
                 {row.qualificationGrade ? (
                   <StatusBadge value={row.qualificationGrade} />
                 ) : null}
+                {row.reminderBucket !== "none" ? (
+                  <StatusBadge value={row.reminderBucket} />
+                ) : null}
               </div>
             ),
           },
@@ -325,7 +368,28 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
             key: "nextAction",
             header: "Siguiente acción",
             render: (row: LeadView) =>
-              row.nextActionLabel ?? row.summaryText ?? "Pendiente de calificar",
+              row.effectiveNextAction ??
+              row.summaryText ??
+              "Pendiente de definir",
+          },
+          {
+            key: "playbook",
+            header: "Playbook",
+            render: (row: LeadView) => row.playbookTitle ?? "Sin recomendación",
+          },
+          {
+            key: "followUp",
+            header: "Follow-up",
+            render: (row: LeadView) => (
+              <div>
+                <p>{row.reminderLabel ?? "Sin seguimiento"}</p>
+                <p className="text-xs text-slate-500">
+                  {row.followUpAt
+                    ? formatDateTime(row.followUpAt)
+                    : "Sin fecha"}
+                </p>
+              </div>
+            ),
           },
           {
             key: "assignedAt",
@@ -355,7 +419,7 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
       {selectedLead ? (
         <ModalShell
           title={selectedLead.fullName ?? "Lead sin nombre"}
-          description="Detalle operativo básico del lead para tomarlo, mover su seguimiento o cerrarlo."
+          description="Detalle operativo del lead con reminder, próxima acción efectiva y playbook recomendado para decidir el siguiente movimiento."
           onClose={() => setSelectedLeadId(null)}
         >
           <div className="space-y-5">
@@ -386,6 +450,12 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
               {selectedLead.assignmentStatus ? (
                 <StatusBadge value={selectedLead.assignmentStatus} />
               ) : null}
+              {selectedLead.qualificationGrade ? (
+                <StatusBadge value={selectedLead.qualificationGrade} />
+              ) : null}
+              {selectedLead.reminderBucket !== "none" ? (
+                <StatusBadge value={selectedLead.reminderBucket} />
+              ) : null}
             </div>
 
             <dl className="grid gap-3 text-sm md:grid-cols-2">
@@ -415,6 +485,18 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
                     : "Pendiente"}
                 </dd>
               </div>
+              <div>
+                <dt className="text-slate-500">Playbook recomendado</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  {selectedLead.playbookTitle ?? "Sin recomendación"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Próxima acción efectiva</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  {selectedLead.effectiveNextAction ?? "Pendiente de definir"}
+                </dd>
+              </div>
             </dl>
 
             <div className="space-y-3 rounded-2xl border border-slate-200 p-4">
@@ -428,7 +510,8 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
                     type="button"
                     className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={
-                      loadingAction === `accept:${selectedLead.currentAssignmentId}`
+                      loadingAction ===
+                      `accept:${selectedLead.currentAssignmentId}`
                     }
                     onClick={() => handleAcceptAssignment(selectedLead)}
                   >
@@ -442,8 +525,12 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
                       key={status}
                       type="button"
                       className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={loadingAction === `lead:${selectedLead.id}:${status}`}
-                      onClick={() => handleLeadStatusChange(selectedLead, status)}
+                      disabled={
+                        loadingAction === `lead:${selectedLead.id}:${status}`
+                      }
+                      onClick={() =>
+                        handleLeadStatusChange(selectedLead, status)
+                      }
                     >
                       Marcar {status}
                     </button>
@@ -455,7 +542,8 @@ export function MemberLeadsClient({ initialRows }: MemberLeadsClientProps) {
                     type="button"
                     className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={
-                      loadingAction === `close:${selectedLead.currentAssignmentId}`
+                      loadingAction ===
+                      `close:${selectedLead.currentAssignmentId}`
                     }
                     onClick={() => handleCloseAssignment(selectedLead)}
                   >

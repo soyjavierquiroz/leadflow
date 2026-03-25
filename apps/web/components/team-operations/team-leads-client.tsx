@@ -7,22 +7,42 @@ import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
 import { LeadQualificationTimelinePanel } from "@/components/lead-signals/lead-qualification-timeline-panel";
 import { ModalShell } from "@/components/team-operations/modal-shell";
-import type { LeadView } from "@/lib/app-shell/types";
-import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
+import type { LeadRemindersSummary, LeadView } from "@/lib/app-shell/types";
+import {
+  formatCompactNumber,
+  formatDateTime,
+  toSentenceCase,
+} from "@/lib/app-shell/utils";
 
 type TeamLeadsClientProps = {
   initialRows: LeadView[];
+  remindersSummary: LeadRemindersSummary;
 };
 
-export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
+const reminderBucketOptions = [
+  "all",
+  "overdue",
+  "due_today",
+  "upcoming",
+  "unscheduled",
+] as const;
+
+export function TeamLeadsClient({
+  initialRows,
+  remindersSummary,
+}: TeamLeadsClientProps) {
   const [allRows, setAllRows] = useState(initialRows);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [reminderBucket, setReminderBucket] =
+    useState<(typeof reminderBucketOptions)[number]>("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     return allRows.filter((row) => {
       const matchesStatus = status === "all" ? true : row.status === status;
+      const matchesReminderBucket =
+        reminderBucket === "all" ? true : row.reminderBucket === reminderBucket;
       const haystack = [
         row.fullName,
         row.email,
@@ -41,9 +61,9 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
           ? true
           : haystack.includes(search.trim().toLowerCase());
 
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesSearch && matchesReminderBucket;
     });
-  }, [allRows, search, status]);
+  }, [allRows, reminderBucket, search, status]);
 
   const selectedLead =
     rows.find((row) => row.id === selectedLeadId) ??
@@ -61,7 +81,7 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
       <SectionHeader
         eyebrow="Team Admin / Leads"
         title="Pipeline del team"
-        description="Listado operativo con filtros básicos para que el team admin pueda revisar rápidamente qué está entrando desde el runtime y cómo va el assignment."
+        description="Vista operativa del team con foco en reminders, follow-ups vencidos y playbooks sugeridos para priorizar el trabajo diario."
         actions={
           <>
             <input
@@ -83,30 +103,47 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
               <option value="won">Won</option>
               <option value="lost">Lost</option>
             </select>
+            <select
+              value={reminderBucket}
+              onChange={(event) =>
+                setReminderBucket(
+                  event.target.value as (typeof reminderBucketOptions)[number],
+                )
+              }
+              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
+            >
+              {reminderBucketOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option === "all"
+                    ? "Todos los reminders"
+                    : toSentenceCase(option)}
+                </option>
+              ))}
+            </select>
           </>
         }
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          label="Leads"
-          value={formatCompactNumber(rows.length)}
-          hint="Prospectos capturados por el runtime público o cargados por el seed."
+          label="Vencidos"
+          value={formatCompactNumber(remindersSummary.totals.overdue)}
+          hint="Leads del team con seguimiento ya vencido."
         />
         <KpiCard
-          label="Assigned"
-          value={formatCompactNumber(rows.filter((item) => item.status === "assigned").length)}
-          hint="Leads ya puestos en manos de un sponsor."
+          label="Hoy"
+          value={formatCompactNumber(remindersSummary.totals.dueToday)}
+          hint="Seguimientos que deberían resolverse durante hoy."
         />
         <KpiCard
-          label="Captured"
-          value={formatCompactNumber(rows.filter((item) => item.status === "captured").length)}
-          hint="Leads que todavía no completan un assignment activo."
+          label="Próximos"
+          value={formatCompactNumber(remindersSummary.totals.upcoming)}
+          hint="Leads con próximos follow-ups ya visibles."
         />
         <KpiCard
-          label="Con sponsor"
-          value={formatCompactNumber(rows.filter((item) => item.sponsorId).length)}
-          hint="Visibilidad directa del ownership comercial actual."
+          label="Sin follow-up"
+          value={formatCompactNumber(remindersSummary.totals.unscheduled)}
+          hint="Leads activos donde todavía falta programar seguimiento."
         />
       </section>
 
@@ -160,6 +197,9 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
                 {row.qualificationGrade ? (
                   <StatusBadge value={row.qualificationGrade} />
                 ) : null}
+                {row.reminderBucket !== "none" ? (
+                  <StatusBadge value={row.reminderBucket} />
+                ) : null}
               </div>
             ),
           },
@@ -172,7 +212,28 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
             key: "nextAction",
             header: "Siguiente acción",
             render: (row) =>
-              row.nextActionLabel ?? row.summaryText ?? "Pendiente de calificar",
+              row.effectiveNextAction ??
+              row.summaryText ??
+              "Pendiente de definir",
+          },
+          {
+            key: "playbook",
+            header: "Playbook",
+            render: (row) => row.playbookTitle ?? "Sin recomendación",
+          },
+          {
+            key: "followUp",
+            header: "Seguimiento",
+            render: (row) => (
+              <div>
+                <p>{row.reminderLabel ?? "Sin seguimiento"}</p>
+                <p className="text-xs text-slate-500">
+                  {row.followUpAt
+                    ? formatDateTime(row.followUpAt)
+                    : "Sin fecha"}
+                </p>
+              </div>
+            ),
           },
           {
             key: "detail",
@@ -196,7 +257,7 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
       {selectedLead ? (
         <ModalShell
           title={selectedLead.fullName ?? "Lead sin nombre"}
-          description="Detalle operativo con historial resumido de señales entrantes, sin abrir todavía un inbox."
+          description="Detalle operativo con reminder, playbook sugerido e historial resumido de señales entrantes, sin abrir todavía un inbox."
           onClose={() => setSelectedLeadId(null)}
         >
           <div className="space-y-5">
@@ -217,7 +278,9 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
                 </p>
                 <p className="mt-1 text-slate-700">
                   {selectedLead.domainHost ?? "Host pendiente"}
-                  {selectedLead.publicationPath ? ` · ${selectedLead.publicationPath}` : ""}
+                  {selectedLead.publicationPath
+                    ? ` · ${selectedLead.publicationPath}`
+                    : ""}
                 </p>
               </div>
             </div>
@@ -226,6 +289,12 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
               <StatusBadge value={selectedLead.status} />
               {selectedLead.assignmentStatus ? (
                 <StatusBadge value={selectedLead.assignmentStatus} />
+              ) : null}
+              {selectedLead.qualificationGrade ? (
+                <StatusBadge value={selectedLead.qualificationGrade} />
+              ) : null}
+              {selectedLead.reminderBucket !== "none" ? (
+                <StatusBadge value={selectedLead.reminderBucket} />
               ) : null}
             </div>
 
@@ -254,6 +323,18 @@ export function TeamLeadsClient({ initialRows }: TeamLeadsClientProps) {
                   {selectedLead.assignedAt
                     ? formatDateTime(selectedLead.assignedAt)
                     : "Pendiente"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Playbook recomendado</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  {selectedLead.playbookTitle ?? "Sin recomendación"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Próxima acción efectiva</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  {selectedLead.effectiveNextAction ?? "Pendiente de definir"}
                 </dd>
               </div>
             </dl>

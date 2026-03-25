@@ -87,6 +87,33 @@ export type LeadTimelineDetail = {
     createdAt: string;
     updatedAt: string;
   };
+  workflow: {
+    reminder: {
+      bucket: "overdue" | "due_today" | "upcoming" | "unscheduled" | "none";
+      label: string;
+      followUpAt: string | null;
+      needsAttention: boolean;
+      isOverdue: boolean;
+      isDueToday: boolean;
+      isUpcoming: boolean;
+      needsScheduling: boolean;
+    };
+    suggestedNextAction: string;
+    effectiveNextAction: string;
+    playbook: {
+      key:
+        | "first_contact"
+        | "active_nurture"
+        | "high_intent_close"
+        | "cold_reengage"
+        | "won_handoff"
+        | "lost_recycle";
+      title: string;
+      description: string;
+      checklist: string[];
+      suggestedNextAction: string;
+    };
+  };
   notes: LeadTimelineNote[];
   timeline: LeadTimelineItem[];
 };
@@ -163,7 +190,10 @@ export const updateLeadFollowUp = async (
     body: JSON.stringify(payload),
   });
 
-export const createLeadNote = async (leadId: string, payload: { body: string }) =>
+export const createLeadNote = async (
+  leadId: string,
+  payload: { body: string },
+) =>
   leadQualificationRequest<LeadTimelineNote>(`/leads/${leadId}/notes`, {
     method: "POST",
     body: JSON.stringify(payload),

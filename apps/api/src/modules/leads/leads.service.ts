@@ -17,8 +17,10 @@ import type { UpdateLeadFollowUpDto } from './dto/update-lead-follow-up.dto';
 import type { UpdateLeadQualificationDto } from './dto/update-lead-qualification.dto';
 import type { UpdateMemberLeadDto } from './dto/update-member-lead.dto';
 import type { Lead, LeadRepository } from './interfaces/lead.interface';
+import { buildLeadWorkflow, type LeadWorkflowView } from './leads-workflows';
 import type {
   LeadNoteView,
+  LeadReminderSummary,
   LeadTimelineDetail,
   LeadTimelineItem,
   LeadTimelineScope,
@@ -175,27 +177,29 @@ export class LeadsService {
   ) {}
 
   createDraft(dto: CreateLeadDto): Lead {
-    return buildEntity<Lead>({
-      workspaceId: dto.workspaceId,
-      funnelId: dto.funnelId,
-      funnelInstanceId: dto.funnelInstanceId ?? null,
-      funnelPublicationId: dto.funnelPublicationId ?? null,
-      visitorId: dto.visitorId ?? null,
-      sourceChannel: dto.sourceChannel,
-      fullName: dto.fullName ?? null,
-      email: dto.email ?? null,
-      phone: dto.phone ?? null,
-      companyName: dto.companyName ?? null,
-      status: 'captured',
-      qualificationGrade: null,
-      summaryText: null,
-      nextActionLabel: null,
-      followUpAt: null,
-      lastContactedAt: null,
-      lastQualifiedAt: null,
-      currentAssignmentId: null,
-      tags: dto.tags ?? [],
-    });
+    return this.enrichLead(
+      buildEntity<Lead>({
+        workspaceId: dto.workspaceId,
+        funnelId: dto.funnelId,
+        funnelInstanceId: dto.funnelInstanceId ?? null,
+        funnelPublicationId: dto.funnelPublicationId ?? null,
+        visitorId: dto.visitorId ?? null,
+        sourceChannel: dto.sourceChannel,
+        fullName: dto.fullName ?? null,
+        email: dto.email ?? null,
+        phone: dto.phone ?? null,
+        companyName: dto.companyName ?? null,
+        status: 'captured',
+        qualificationGrade: null,
+        summaryText: null,
+        nextActionLabel: null,
+        followUpAt: null,
+        lastContactedAt: null,
+        lastQualifiedAt: null,
+        currentAssignmentId: null,
+        tags: dto.tags ?? [],
+      }),
+    );
   }
 
   async list(filters?: {
@@ -211,40 +215,50 @@ export class LeadsService {
 
     if (filters?.sponsorId) {
       const records = await this.repository.findBySponsorId(filters.sponsorId);
-      return filters.status
-        ? records.filter((item) => item.status === filters.status)
-        : records;
+      return this.enrichLeads(
+        filters.status
+          ? records.filter((item) => item.status === filters.status)
+          : records,
+      );
     }
 
     if (filters?.funnelPublicationId) {
       const records = await this.repository.findByPublicationId(
         filters.funnelPublicationId,
       );
-      return filters.status
-        ? records.filter((item) => item.status === filters.status)
-        : records;
+      return this.enrichLeads(
+        filters.status
+          ? records.filter((item) => item.status === filters.status)
+          : records,
+      );
     }
 
     if (filters?.teamId) {
       const records = await this.repository.findByTeamId(filters.teamId);
-      return filters.status
-        ? records.filter((item) => item.status === filters.status)
-        : records;
+      return this.enrichLeads(
+        filters.status
+          ? records.filter((item) => item.status === filters.status)
+          : records,
+      );
     }
 
     if (filters?.workspaceId) {
       const records = await this.repository.findByWorkspaceId(
         filters.workspaceId,
       );
-      return filters.status
-        ? records.filter((item) => item.status === filters.status)
-        : records;
+      return this.enrichLeads(
+        filters.status
+          ? records.filter((item) => item.status === filters.status)
+          : records,
+      );
     }
 
     const records = await this.repository.findAll();
-    return filters?.status
-      ? records.filter((item) => item.status === filters.status)
-      : records;
+    return this.enrichLeads(
+      filters?.status
+        ? records.filter((item) => item.status === filters.status)
+        : records,
+    );
   }
 
   async findOne(filters: {
@@ -271,7 +285,71 @@ export class LeadsService {
       });
     }
 
-    return mapLeadRecord(record);
+    return this.enrichLead(mapLeadRecord(record));
+  }
+
+  async getRemindersSummary(
+    scope: LeadTimelineScope,
+  ): Promise<LeadReminderSummary> {
+    const leads = await this.list(scope);
+
+    return leads.reduce<LeadReminderSummary>(
+      (summary, lead) => {
+        if (lead.reminderBucket === 'none') {
+          return summary;
+        }
+
+        summary.totals.active += 1;
+
+        if (lead.needsAttention) {
+          summary.totals.needsAttention += 1;
+        }
+
+        switch (lead.reminderBucket) {
+          case 'overdue':
+            summary.totals.overdue += 1;
+            break;
+          case 'due_today':
+            summary.totals.dueToday += 1;
+            break;
+          case 'upcoming':
+            summary.totals.upcoming += 1;
+            break;
+          case 'unscheduled':
+            summary.totals.unscheduled += 1;
+            break;
+          default:
+            break;
+        }
+
+        return summary;
+      },
+      {
+        generatedAt: new Date().toISOString(),
+        totals: {
+          active: 0,
+          overdue: 0,
+          dueToday: 0,
+          upcoming: 0,
+          unscheduled: 0,
+          needsAttention: 0,
+        },
+      },
+    );
+  }
+
+  async getLeadPlaybook(scope: LeadTimelineScope, leadId: string) {
+    const lead = await this.findOne({
+      id: leadId,
+      workspaceId: scope.workspaceId,
+      teamId: scope.teamId,
+      sponsorId: scope.sponsorId,
+    });
+
+    return {
+      leadId: lead.id,
+      workflow: this.toWorkflowView(lead),
+    };
   }
 
   async updateForMember(
@@ -349,7 +427,7 @@ export class LeadsService {
       return record;
     });
 
-    return mapLeadRecord(updated);
+    return this.enrichLead(mapLeadRecord(updated));
   }
 
   async getTimelineDetail(
@@ -379,6 +457,14 @@ export class LeadsService {
     }));
 
     const timeline = this.buildTimeline(lead);
+    const workflow = this.toWorkflowView({
+      status: lead.status,
+      qualificationGrade: lead.qualificationGrade,
+      nextActionLabel: lead.nextActionLabel,
+      followUpAt: toIso(lead.followUpAt),
+      lastContactedAt: toIso(lead.lastContactedAt),
+      lastQualifiedAt: toIso(lead.lastQualifiedAt),
+    });
 
     return {
       lead: {
@@ -408,6 +494,7 @@ export class LeadsService {
         createdAt: lead.createdAt.toISOString(),
         updatedAt: lead.updatedAt.toISOString(),
       },
+      workflow,
       notes,
       timeline,
     };
@@ -491,7 +578,7 @@ export class LeadsService {
       return record;
     });
 
-    return mapLeadRecord(updated);
+    return this.enrichLead(mapLeadRecord(updated));
   }
 
   async updateFollowUp(
@@ -580,7 +667,7 @@ export class LeadsService {
       return record;
     });
 
-    return mapLeadRecord(updated);
+    return this.enrichLead(mapLeadRecord(updated));
   }
 
   async addNote(
@@ -704,6 +791,44 @@ export class LeadsService {
           }
         : {}),
     };
+  }
+
+  private enrichLeads(leads: Lead[]): Lead[] {
+    return leads.map((lead) => this.enrichLead(lead));
+  }
+
+  private enrichLead(lead: Lead): Lead {
+    const workflow = this.toWorkflowView(lead);
+
+    return {
+      ...lead,
+      reminderBucket: workflow.reminder.bucket,
+      reminderLabel: workflow.reminder.label,
+      suggestedNextAction: workflow.suggestedNextAction,
+      effectiveNextAction: workflow.effectiveNextAction,
+      playbookKey: workflow.playbook.key,
+      playbookTitle: workflow.playbook.title,
+      playbookDescription: workflow.playbook.description,
+      needsAttention: workflow.reminder.needsAttention,
+    };
+  }
+
+  private toWorkflowView(input: {
+    status: Lead['status'];
+    qualificationGrade: Lead['qualificationGrade'];
+    nextActionLabel: Lead['nextActionLabel'];
+    followUpAt: Lead['followUpAt'];
+    lastContactedAt: Lead['lastContactedAt'];
+    lastQualifiedAt: Lead['lastQualifiedAt'];
+  }): LeadWorkflowView {
+    return buildLeadWorkflow({
+      status: input.status,
+      qualificationGrade: input.qualificationGrade,
+      nextActionLabel: input.nextActionLabel,
+      followUpAt: input.followUpAt,
+      lastContactedAt: input.lastContactedAt,
+      lastQualifiedAt: input.lastQualifiedAt,
+    });
   }
 
   private buildTimeline(lead: LeadTimelineRecord): LeadTimelineItem[] {

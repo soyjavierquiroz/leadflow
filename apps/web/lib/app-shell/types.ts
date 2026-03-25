@@ -155,6 +155,21 @@ export type LeadRecord = {
   lastContactedAt: string | null;
   lastQualifiedAt: string | null;
   currentAssignmentId: string | null;
+  reminderBucket: "overdue" | "due_today" | "upcoming" | "unscheduled" | "none";
+  reminderLabel: string | null;
+  suggestedNextAction: string | null;
+  effectiveNextAction: string | null;
+  playbookKey:
+    | "first_contact"
+    | "active_nurture"
+    | "high_intent_close"
+    | "cold_reengage"
+    | "won_handoff"
+    | "lost_recycle"
+    | null;
+  playbookTitle: string | null;
+  playbookDescription: string | null;
+  needsAttention: boolean;
   tags: string[];
   createdAt: string;
   updatedAt: string;
@@ -265,6 +280,18 @@ export type LeadView = LeadRecord & {
   teamName: string | null;
 };
 
+export type LeadRemindersSummary = {
+  generatedAt: string;
+  totals: {
+    active: number;
+    overdue: number;
+    dueToday: number;
+    upcoming: number;
+    unscheduled: number;
+    needsAttention: number;
+  };
+};
+
 export type MemberProfile = {
   title: string;
   focus: string;
@@ -306,4 +333,5 @@ export type AppShellSnapshot = {
   assignments: AssignmentRecord[];
   events: EventRecord[];
   memberProfile: MemberProfile;
+  remindersSummary: LeadRemindersSummary;
 };

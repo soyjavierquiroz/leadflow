@@ -24,6 +24,7 @@ La base del monorepo ya incluye:
 - Messaging Automation / n8n v1 con bridge real por webhook, payload estructurado y persistencia de dispatch por assignment.
 - Incoming Webhooks / Conversation Signals v1 con señales entrantes autenticadas, persistencia propia y actualización operativa básica de lead/assignment.
 - Lead Qualification & Timeline v1 con resumen operativo, calificación simple, notas y timeline consolidada para `member` y `team`.
+- Lead Workflows / Reminders / Qualification Playbooks v1 con follow-up vencido/hoy/próximo, sugerencias de próxima acción y playbooks simples por lead.
 - Configuracion por entorno para dominios y URLs.
 - Baseline de ejecucion con Dockerfiles, Compose de desarrollo y stack Swarm.
 - Variante de stack local para primer despliegue controlado desde Portainer.
@@ -130,6 +131,7 @@ Validacion de stacks:
 - `docs/messaging-automation-n8n-v1.md`
 - `docs/incoming-webhooks-conversation-signals-v1.md`
 - `docs/lead-qualification-timeline-v1.md`
+- `docs/lead-workflows-reminders-playbooks-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -235,6 +237,8 @@ Modulos disponibles:
   - `GET /v1/leads?sponsorId=...`
   - `GET /v1/leads?funnelPublicationId=...`
   - `GET /v1/leads/:id/timeline`
+  - `GET /v1/leads/reminders/summary`
+  - `GET /v1/leads/:id/playbook`
   - `PATCH /v1/leads/:id/qualification`
   - `PATCH /v1/leads/:id/follow-up`
   - `POST /v1/leads/:id/notes`
