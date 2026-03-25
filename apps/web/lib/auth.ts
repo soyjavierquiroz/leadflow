@@ -55,10 +55,7 @@ export const getHomePathForRole = (role: AppUserRole) => {
   }
 };
 
-export const apiFetchWithSession = async (
-  path: string,
-  init?: RequestInit,
-) => {
+export const apiFetchWithSession = async (path: string, init?: RequestInit) => {
   const cookieHeader = await buildCookieHeader();
   const headers = new Headers(init?.headers);
 

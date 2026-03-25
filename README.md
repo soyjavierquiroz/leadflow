@@ -365,6 +365,13 @@ Modulos disponibles:
   - `team@leadflow.local / Team123!`
   - `ana.member@leadflow.local / Member123!`
   - `bruno.member@leadflow.local / Member456!`
+- Comportamiento esperado del login web:
+  - cualquier respuesta `2xx` de `POST /v1/auth/login` se trata como éxito
+  - el frontend mantiene `credentials: "include"`
+  - el redirect final usa el `redirectPath` devuelto por el API
+  - `SUPER_ADMIN -> /admin`
+  - `TEAM_ADMIN -> /team`
+  - `MEMBER -> /member`
 
 ## Team Operations v1
 

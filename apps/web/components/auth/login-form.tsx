@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { webPublicConfig } from "@/lib/public-env";
+import { loginWithCredentials, resolveAppUrlForPath } from "@/lib/auth-client";
 
 type LoginFormProps = {
   demoAccounts: Array<{
@@ -13,16 +12,7 @@ type LoginFormProps = {
   }>;
 };
 
-type LoginResponse = {
-  user: {
-    fullName: string;
-    role: string;
-  };
-  redirectPath: string;
-};
-
 export function LoginForm({ demoAccounts }: LoginFormProps) {
-  const router = useRouter();
   const [email, setEmail] = useState(demoAccounts[0]?.email ?? "");
   const [password, setPassword] = useState(demoAccounts[0]?.password ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -34,40 +24,18 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
 
     startTransition(async () => {
       try {
-        const response = await fetch(`${webPublicConfig.urls.api}/v1/auth/login`, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
+        const payload = await loginWithCredentials({
+          email,
+          password,
         });
 
-        const payload = (await response.json()) as
-          | LoginResponse
-          | { message?: string; error?: string };
-
-        if (!response.ok) {
-          const message =
-            ("message" in payload && typeof payload.message === "string"
-              ? payload.message
-              : null) ??
-            ("error" in payload && typeof payload.error === "string"
-              ? payload.error
-              : null) ??
-            "No pudimos iniciar sesión.";
-
-          setErrorMessage(message);
-          return;
-        }
-
-        router.replace((payload as LoginResponse).redirectPath);
-        router.refresh();
-      } catch {
-        setErrorMessage("No pudimos conectar con el API de autenticación.");
+        window.location.assign(resolveAppUrlForPath(payload.redirectPath));
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No pudimos conectar con el API de autenticación.",
+        );
       }
     });
   };
