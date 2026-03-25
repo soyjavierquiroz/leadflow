@@ -6,32 +6,32 @@ const teamNav = [
   {
     href: "/team",
     label: "Dashboard",
-    description: "Operación diaria del team y capacidad comercial.",
+    description: "Pulso del equipo, capacidad comercial y prioridades del día.",
   },
   {
     href: "/team/funnels",
     label: "Funnels",
-    description: "Instancias activas y readiness operativo.",
+    description: "Embudos activos, readiness y salida al mercado.",
   },
   {
     href: "/team/publications",
     label: "Publicaciones",
-    description: "Dominios, paths y estados de salida.",
+    description: "Rutas activas donde ya está captando el funnel.",
   },
   {
     href: "/team/sponsors",
     label: "Sponsors",
-    description: "Miembros activos y disponibilidad.",
+    description: "Quién está disponible para recibir y trabajar leads.",
   },
   {
     href: "/team/pools",
     label: "Pools",
-    description: "Rotación y cobertura del handoff.",
+    description: "Cobertura de rotación y fallback de handoff.",
   },
   {
     href: "/team/leads",
     label: "Leads",
-    description: "Pipeline capturado desde runtime público.",
+    description: "Bandeja operativa para seguimiento, reminders y cierre.",
   },
 ];
 
@@ -44,11 +44,11 @@ export default async function TeamLayout({
   const snapshot = await getAppShellSnapshot();
 
   return (
-    <AppShellLayout
-      areaLabel="Team Admin"
-      areaDescription="Configuración operativa del team, publicaciones activas y seguimiento del pipeline."
-      topBarTitle={snapshot.currentTeam.name}
-      personaLabel="Team Admin"
+      <AppShellLayout
+        areaLabel="Team Admin"
+        areaDescription="Centro operativo del equipo para revisar captación, capacidad, asignación y seguimiento comercial."
+        topBarTitle={snapshot.currentTeam.name}
+        personaLabel="Team Admin"
       workspaceName={snapshot.workspace.name}
       sourceMode={snapshot.sourceMode}
       currentUser={snapshot.currentUser}

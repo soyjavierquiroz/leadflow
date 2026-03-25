@@ -187,16 +187,31 @@ export function AssignedSponsorReveal({
   };
 
   return (
-    <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-8 shadow-[0_18px_50px_rgba(245,158,11,0.12)]">
-      <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+    <section className="rounded-[2rem] border border-amber-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.16),_transparent_32%),linear-gradient(180deg,_rgba(255,251,235,0.96)_0%,_rgba(255,255,255,0.96)_100%)] p-8 shadow-[0_22px_60px_rgba(245,158,11,0.12)]">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">
+          Reveal & Handoff
+        </span>
+        <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">
+          Paso final visible
+        </span>
+      </div>
+
+      <h2 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
         {title}
       </h2>
       {description ? (
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700">
           {description}
         </p>
-      ) : null}
-      <div className="mt-6 rounded-2xl border border-amber-200 bg-white p-5">
+      ) : (
+        <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700">
+          Presentamos al sponsor asignado y dejamos clara la continuidad del
+          handoff para que el usuario entienda quién sigue y por dónde.
+        </p>
+      )}
+
+      <div className="mt-6 rounded-[1.75rem] border border-amber-200 bg-white p-5">
         {assignment && sponsor ? (
           <>
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -207,6 +222,10 @@ export function AssignedSponsorReveal({
                 <p className="mt-3 text-2xl font-semibold text-slate-950">
                   {sponsor.displayName}
                 </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Tu oportunidad ya fue asignada. El siguiente paso es continuar
+                  la conversación por el canal indicado.
+                </p>
               </div>
               <span className="rounded-full border border-amber-300 bg-amber-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">
                 {handoffMode === "immediate_whatsapp"
@@ -215,7 +234,7 @@ export function AssignedSponsorReveal({
               </span>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                   Estado
                 </p>
@@ -223,7 +242,7 @@ export function AssignedSponsorReveal({
                   {assignment.status}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                   Email
                 </p>
@@ -231,7 +250,7 @@ export function AssignedSponsorReveal({
                   {sponsor.email ?? "Sin email"}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                   WhatsApp
                 </p>
@@ -240,12 +259,26 @@ export function AssignedSponsorReveal({
                 </p>
               </div>
             </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {[
+                "Assignment resuelto y asociado a esta sesión.",
+                "Sponsor visible con datos de continuidad.",
+                "CTA listo para pasar a WhatsApp o fallback definido.",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700"
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
             {whatsappUrl ? (
-              <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="mt-5 rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5">
                 <p className="text-sm leading-6 text-emerald-950">
                   {handoffMode === "immediate_whatsapp"
-                    ? "Vamos a abrir WhatsApp automaticamente para continuar con tu sponsor asignado."
-                    : "Tu sponsor ya esta listo para continuar contigo por WhatsApp."}
+                    ? "Vamos a abrir WhatsApp automáticamente para continuar con tu sponsor asignado."
+                    : "Tu sponsor ya está listo para continuar contigo por WhatsApp."}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <a
@@ -259,16 +292,16 @@ export function AssignedSponsorReveal({
                     {runtime.handoff.autoRedirect &&
                     handoffMode === "immediate_whatsapp"
                       ? "Redirigiendo ahora..."
-                      : "Si no se abre automaticamente, usa el boton."}
+                      : "Si no se abre automáticamente, usa el botón."}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm leading-6 text-slate-700">
-                  El sponsor fue asignado correctamente, pero todavia no tenemos
-                  un numero de WhatsApp disponible para continuar el handoff en
-                  esta sesion.
+                  El sponsor fue asignado correctamente, pero todavía no tenemos
+                  un número de WhatsApp disponible para continuar el handoff en
+                  esta sesión.
                 </p>
               </div>
             )}
@@ -276,11 +309,11 @@ export function AssignedSponsorReveal({
         ) : (
           <>
             <p className="text-sm font-medium text-slate-700">
-              Todavia no hay un sponsor asignado en esta sesion.
+              Todavía no hay un sponsor asignado en esta sesión.
             </p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Completa el formulario del funnel para resolver el assignment y
-              ver aqui el reveal con el CTA de handoff.
+              ver aquí el reveal con el CTA de handoff.
             </p>
           </>
         )}

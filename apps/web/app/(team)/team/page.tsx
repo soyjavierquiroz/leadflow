@@ -22,26 +22,28 @@ export default async function TeamPage() {
   const teamLeads = data.leadViews.filter(
     (item) => item.teamId === data.currentTeam.id,
   );
+  const leadsNeedingAttention = teamLeads.filter((item) => item.needsAttention);
+  const teamReadyFunnels = teamFunnels.filter((item) => item.trackingReady);
 
   return (
     <div className="space-y-8">
       <SectionHeader
-        eyebrow="Team Admin / Dashboard"
-        title={`Operación de ${data.currentTeam.name}`}
-        description="Vista inicial del team para operar funnels, sponsors, publicaciones y leads con datos reales cuando la API está disponible."
+        eyebrow="Team Admin / Operacion"
+        title={`Centro operativo de ${data.currentTeam.name}`}
+        description="Esta vista resume captación, capacidad comercial y seguimiento para que el team sepa qué revisar primero y dónde está el próximo bloqueo."
         actions={
           <>
             <Link
               href="/team/publications"
               className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
-              Ver publicaciones
+              Revisar publicaciones
             </Link>
             <Link
               href="/team/leads"
               className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
             >
-              Ir a leads
+              Abrir bandeja de leads
             </Link>
           </>
         }
@@ -53,35 +55,87 @@ export default async function TeamPage() {
           value={formatCompactNumber(
             teamFunnels.filter((item) => item.status === "active").length,
           )}
-          hint="Instancias del team ya listas para operar sobre templates aprobados."
+          hint="Embudos del team que ya sostienen la captación o están listos para hacerlo."
         />
         <KpiCard
           label="Publicaciones activas"
           value={formatCompactNumber(
             teamPublications.filter((item) => item.status === "active").length,
           )}
-          hint="Rutas visibles sobre dominio real o mock del workspace."
+          hint="Salidas visibles donde el team ya está captando o validando demanda."
         />
         <KpiCard
           label="Sponsors habilitados"
           value={formatCompactNumber(
             teamSponsors.filter((item) => item.status === "active").length,
           )}
-          hint="Miembros comerciales listos para recibir handoffs."
+          hint="Miembros comerciales que hoy pueden absorber handoffs sin fricción."
         />
         <KpiCard
           label="Leads en pipeline"
           value={formatCompactNumber(teamLeads.length)}
-          hint="Leads capturados desde el runtime público y listos para seguimiento."
+          hint="Volumen total que el team tiene hoy entre captación, asignación y seguimiento."
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+            Prioridades del team
+          </p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            Lo que conviene mover hoy
+          </h2>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-950">
+                Capacidad comercial
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {formatCompactNumber(
+                  teamSponsors.filter(
+                    (item) => item.availabilityStatus === "available",
+                  ).length,
+                )}{" "}
+                sponsors disponibles para tomar leads ahora mismo.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-950">
+                Seguimiento con riesgo
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {formatCompactNumber(leadsNeedingAttention.length)} leads ya
+                requieren atención para que la oportunidad no se enfríe.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-950">
+                Readiness de funnels
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {formatCompactNumber(teamReadyFunnels.length)} de{" "}
+                {formatCompactNumber(teamFunnels.length)} funnels ya tienen
+                tracking resuelto para salir con mejor lectura.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-950">
+                Siguiente superficie
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                La bandeja de leads ya concentra reminders, próxima acción y
+                playbook para ordenar la operación diaria.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-4">
           <SectionHeader
             eyebrow="Sponsors"
-            title="Capacidad actual del team"
-            description="Cards rápidas para revisar disponibilidad y volumen asignado."
+            title="Capacidad comercial actual"
+            description="Lectura rápida de quién está disponible, con cuántos leads está cargado y dónde se puede seguir asignando."
           />
           {teamSponsors.length > 0 ? (
             <div className="grid gap-4">
@@ -110,8 +164,8 @@ export default async function TeamPage() {
         <div className="space-y-4">
           <SectionHeader
             eyebrow="Leads recientes"
-            title="Pipeline operativo"
-            description="El team puede revisar aquí el estado de los leads provenientes del funnel público."
+            title="Pulso de la bandeja"
+            description="Muestra rápida del pipeline que ya está entrando desde el funnel público y cómo se está distribuyendo."
           />
           <DataTable
             columns={[
@@ -131,7 +185,7 @@ export default async function TeamPage() {
               },
               {
                 key: "source",
-                header: "Origen",
+                header: "Entrada",
                 render: (row) => (
                   <div>
                     <p>{row.sourceChannel}</p>
@@ -143,7 +197,7 @@ export default async function TeamPage() {
               },
               {
                 key: "assignment",
-                header: "Asignación",
+                header: "Responsable",
                 render: (row) =>
                   row.sponsorName ? (
                     <div>
@@ -164,7 +218,7 @@ export default async function TeamPage() {
             ]}
             rows={teamLeads.slice(0, 6)}
             emptyTitle="Sin leads para este team"
-            emptyDescription="Los leads del runtime público aparecerán aquí en cuanto existan capturas o asignaciones."
+            emptyDescription="Cuando el funnel capture o rote nuevas oportunidades, aparecerán aquí para lectura rápida del equipo."
           />
         </div>
       </section>

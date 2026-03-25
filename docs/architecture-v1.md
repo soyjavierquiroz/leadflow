@@ -36,6 +36,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `/member/*` -> `MEMBER`
 - Redirects por rol despues de login y cuando un usuario intenta entrar a una superficie ajena.
 - Capa server-side para app shells en `apps/web/lib/app-shell`.
+- UI / Product Clarity Pass v1 sobre shells internos para reforzar contexto por rol, navegación operativa, KPIs más claros y copy menos técnico.
 - Team operations v1 conectadas sobre `/team/*` con formularios y acciones para:
   - funnel instances
   - funnel publications
@@ -66,6 +67,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
+- Public Funnel Frontend v1 sobre el runtime actual para mejorar hero, CTA, formulario, thank-you, sponsor reveal y handoff sin cambiar el modelo JSON-driven.
 - Reveal & handoff v1 sobre el runtime publico:
   - reveal del sponsor asignado en thank-you
   - CTA a WhatsApp con mensaje prellenado

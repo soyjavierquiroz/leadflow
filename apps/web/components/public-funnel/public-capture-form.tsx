@@ -242,25 +242,47 @@ export function PublicCaptureForm({
   };
 
   return (
-    <section className="rounded-[1.75rem] border border-teal-200 bg-teal-50/90 p-8 shadow-[0_18px_50px_rgba(13,148,136,0.12)]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="rounded-[2rem] border border-teal-200 bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_28%),linear-gradient(180deg,_rgba(240,253,250,0.96)_0%,_rgba(255,255,255,0.96)_100%)] p-8 shadow-[0_22px_60px_rgba(13,148,136,0.12)]">
+      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-full border border-teal-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-teal-700">
+              Lead capture v1
+            </div>
+            <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">
+              Paso clave de conversión
+            </div>
+          </div>
+
+          <h2 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
             {title || "Captura de lead"}
           </h2>
-          {description ? (
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-700">
-              {description}
-            </p>
-          ) : null}
-        </div>
-        <div className="rounded-full border border-teal-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-teal-700">
-          Lead capture v1
-        </div>
-      </div>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700 md:text-base">
+            {description ||
+              "Déjanos tus datos y continuamos con el siguiente paso del funnel sin perder contexto ni trazabilidad."}
+          </p>
 
-      <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
-        <div className="grid gap-4 md:grid-cols-2">
+          <div className="mt-6 grid gap-3">
+            {[
+              "Capturamos tu lead en la publicación activa.",
+              "Resolvemos assignment y guardamos el contexto de la sesión.",
+              "Te llevamos al siguiente paso o reveal disponible.",
+            ].map((item, index) => (
+              <div
+                key={item}
+                className="flex items-start gap-3 rounded-[1.5rem] border border-teal-100 bg-white/85 px-4 py-4"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white">
+                  {index + 1}
+                </div>
+                <p className="text-sm leading-6 text-slate-700">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <form className="grid gap-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]" onSubmit={handleSubmit}>
+          <div className="grid gap-4 md:grid-cols-2">
           {resolvedFields.map((field) => (
             <label
               key={field.key}
@@ -286,34 +308,40 @@ export function PublicCaptureForm({
               />
             </label>
           ))}
-        </div>
+          </div>
 
-        {errorMessage ? (
-          <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {errorMessage}
-          </p>
-        ) : null}
+          {errorMessage ? (
+            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {errorMessage}
+            </p>
+          ) : null}
 
-        {successMessage ? (
-          <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {successMessage}
-          </p>
-        ) : null}
+          {successMessage ? (
+            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {successMessage}
+            </p>
+          ) : null}
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="inline-flex items-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSubmitting ? "Enviando..." : "Enviar y continuar"}
-          </button>
-          <p className="text-sm text-slate-600">
-            Capturamos el lead, resolvemos assignment y avanzamos al siguiente
-            step si existe.
-          </p>
-        </div>
-      </form>
+          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
+            Completa al menos nombre y un dato de contacto. Con eso ya podemos
+            capturar, enrutar y mantener continuidad del handoff.
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex items-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? "Enviando..." : "Quiero continuar"}
+            </button>
+            <p className="text-sm text-slate-600">
+              Capturamos el lead, resolvemos assignment y avanzamos al siguiente
+              step si existe.
+            </p>
+          </div>
+        </form>
+      </div>
     </section>
   );
 }

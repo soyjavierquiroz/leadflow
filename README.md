@@ -15,7 +15,9 @@ La base del monorepo ya incluye:
 - Lead Capture & Assignment Flows v1 conectados al runtime publico.
 - Tracking Events v1 sobre runtime, capture y assignment.
 - App Shells + UI Base v1 para `Super Admin`, `Team Admin` y `Sponsor / Member`.
+- UI / Product Clarity Pass v1 con shells internos más claros, más operativos y menos abstractos en `admin`, `team` y `member`.
 - Roles & Auth v1 con login real, sesión segura y protección base por superficie.
+- Public Funnel Frontend v1 con mejor jerarquía visual, CTA más claros, thank-you más sólido y reveal/handoff mejor presentados.
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
@@ -127,6 +129,7 @@ Validacion de stacks:
 - `docs/lead-capture-assignment-flows-v1.md`
 - `docs/tracking-events-v1.md`
 - `docs/app-shells-ui-base-v1.md`
+- `docs/ui-product-clarity-pass-v1.md`
 - `docs/roles-auth-v1.md`
 - `docs/team-operations-v1.md`
 - `docs/member-operations-v1.md`
@@ -137,6 +140,7 @@ Validacion de stacks:
 - `docs/incoming-webhooks-conversation-signals-v1.md`
 - `docs/lead-qualification-timeline-v1.md`
 - `docs/lead-workflows-reminders-playbooks-v1.md`
+- `docs/public-funnel-frontend-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`

@@ -3,7 +3,6 @@ import { AssignedSponsorReveal } from "@/components/public-funnel/assigned-spons
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
 import { PublicRuntimeTracker } from "@/components/public-funnel/public-runtime-tracker";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
-import { webPublicConfig } from "@/lib/public-env";
 import type {
   JsonValue,
   PublicFunnelRuntimePayload,
@@ -110,6 +109,11 @@ const resolveCtaHref = (
   return runtime.currentStep.path;
 };
 
+const toStepLabel = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/^./, (letter) => letter.toUpperCase());
+
 function BlockRenderer({
   block,
   runtime,
@@ -125,45 +129,94 @@ function BlockRenderer({
       const eyebrow = asString(block.eyebrow, runtime.funnel.name);
       const accent = asString(block.accent, "Signal");
       return (
-        <section className="grid gap-8 rounded-[2rem] border border-white/10 bg-slate-950/90 p-8 text-white shadow-[0_30px_90px_rgba(15,23,42,0.35)] md:grid-cols-[1.3fr_0.9fr] md:p-12">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-teal-300">
-              {eyebrow}
-            </p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-6xl">
-              {title || runtime.funnel.name}
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 md:text-lg">
-              {description || "Runtime publico JSON-driven para Leadflow."}
-            </p>
-          </div>
-          <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-200">
-              {accent}
-            </p>
-            <div className="mt-5 grid gap-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-300">
-                  Dominio
-                </p>
-                <p className="mt-2 text-lg font-semibold text-white">
+        <section className="grid gap-8 rounded-[2.5rem] border border-white/15 bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.24),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(251,191,36,0.18),_transparent_28%),linear-gradient(135deg,_rgba(2,6,23,0.98)_0%,_rgba(15,23,42,0.94)_48%,_rgba(17,24,39,0.98)_100%)] p-8 text-white shadow-[0_36px_110px_rgba(15,23,42,0.34)] md:grid-cols-[1.2fr_0.8fr] md:p-12">
+          <div className="flex flex-col justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-teal-300">
+                {eyebrow}
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <span className="rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200">
+                  {toStepLabel(runtime.currentStep.stepType)}
+                </span>
+                <span className="rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200">
                   {runtime.domain.host}
-                </p>
+                </span>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-300">
-                  Publicacion
+              <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-6xl">
+                {title || runtime.funnel.name}
+              </h1>
+              <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 md:text-lg">
+                {description ||
+                  "Leadflow convierte el runtime público en una experiencia más clara, más creíble y más orientada a conversión."}
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/6 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-300">
+                  Publicación
                 </p>
                 <p className="mt-2 text-lg font-semibold text-white">
                   {runtime.publication.pathPrefix}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-300">
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/6 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-300">
                   Tracking
                 </p>
                 <p className="mt-2 text-lg font-semibold text-white">
-                  {runtime.trackingProfile?.provider ?? "pending"}
+                  {runtime.trackingProfile?.provider ?? "Pendiente"}
+                </p>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/6 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-300">
+                  Handoff
+                </p>
+                <p className="mt-2 text-lg font-semibold text-white">
+                  {runtime.handoff.buttonLabel ?? "Continuidad activa"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/10 bg-white/7 p-6 backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-200">
+              {eyebrow}
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+              {accent}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-200">
+              Esta experiencia ya muestra estructura real de producto: mensaje,
+              captura, thank-you y reveal conectados con tracking y handoff.
+            </p>
+            <div className="mt-5 grid gap-4">
+              <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/30 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-300">
+                  Lo que vive aquí
+                </p>
+                <p className="mt-2 text-sm leading-6 text-white">
+                  Copy más claro, CTA con jerarquía visible, mejor espaciado y
+                  una lectura pública menos técnica.
+                </p>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/30 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-300">
+                  Qué sigue
+                </p>
+                <p className="mt-2 text-sm leading-6 text-white">
+                  La navegación del funnel sigue usando el mismo runtime y las
+                  mismas rutas; lo que mejora es cómo se presenta el valor.
+                </p>
+              </div>
+              <div className="rounded-[1.5rem] border border-teal-300/20 bg-teal-400/10 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-teal-200">
+                  Señal comercial
+                </p>
+                <p className="mt-2 text-sm leading-6 text-white">
+                  Funnel visible, legible y listo para validar captación sin
+                  esperar un rediseño completo de templates.
                 </p>
               </div>
             </div>
@@ -175,7 +228,7 @@ function BlockRenderer({
     case "text": {
       const items = asStringArray(block.items);
       return (
-        <section className="rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+        <section className="rounded-[2rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
             {title}
           </h2>
@@ -184,16 +237,23 @@ function BlockRenderer({
           </p>
           {items.length > 0 ? (
             <div className="mt-6 grid gap-3 md:grid-cols-3">
-              {items.map((item) => (
+              {items.map((item, index) => (
                 <div
                   key={item}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-700"
+                  className="rounded-[1.5rem] border border-slate-200 bg-[linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] px-4 py-4 text-sm text-slate-700"
                 >
-                  {item}
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-teal-700">
+                    Punto {index + 1}
+                  </p>
+                  <p className="mt-2 font-medium">{item}</p>
                 </div>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-6 text-slate-700">
+              La experiencia pública mantiene el mismo contenido del runtime, pero con mejor jerarquía para que se lea y se entienda más rápido.
+            </div>
+          )}
         </section>
       );
     }
@@ -206,21 +266,23 @@ function BlockRenderer({
       }
 
       return (
-        <section className="rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+        <section className="rounded-[2rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
                 {title}
               </h2>
               {caption ? (
-                <p className="mt-2 text-sm text-slate-600">{caption}</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                  {caption}
+                </p>
               ) : null}
             </div>
             <div className="rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-white">
-              Video MVP
+              Demo guiada
             </div>
           </div>
-          <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-950 shadow-inner">
+          <div className="mt-6 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-950 shadow-inner">
             <div className="aspect-video">
               <iframe
                 className="h-full w-full"
@@ -237,44 +299,60 @@ function BlockRenderer({
 
     case "cta": {
       const href = resolveCtaHref(block, runtime);
-      const label = asString(block.label, "Continuar");
+      const label = `${asString(block.label, "Continuar")} →`;
       const variant = asString(block.variant, "primary");
       const classes =
         variant === "secondary"
           ? "border border-slate-300 bg-white text-slate-900 hover:bg-slate-100"
           : "bg-slate-950 text-white hover:bg-slate-800";
 
-      if (/^https?:\/\//.test(href)) {
-        return (
-          <TrackedCta
-            publicationId={runtime.publication.id}
-            currentStepId={runtime.currentStep.id}
-            currentPath={runtime.request.path}
-            href={href}
-            label={label}
-            className={`inline-flex w-fit items-center rounded-full px-6 py-3 text-sm font-semibold transition ${classes}`}
-            action={asString(block.action) || null}
-          />
-        );
-      }
-
       return (
-        <TrackedCta
-          publicationId={runtime.publication.id}
-          currentStepId={runtime.currentStep.id}
-          currentPath={runtime.request.path}
-          href={href}
-          label={label}
-          className={`inline-flex w-fit items-center rounded-full px-6 py-3 text-sm font-semibold transition ${classes}`}
-          action={asString(block.action) || null}
-        />
+        <section className="rounded-[2rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+                Siguiente movimiento
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                {title || "Continuar en el funnel"}
+              </h2>
+              {description ? (
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {description}
+                </p>
+              ) : null}
+            </div>
+
+            {/^https?:\/\//.test(href) ? (
+              <TrackedCta
+                publicationId={runtime.publication.id}
+                currentStepId={runtime.currentStep.id}
+                currentPath={runtime.request.path}
+                href={href}
+                label={label}
+                className={`inline-flex w-fit items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition ${classes}`}
+                action={asString(block.action) || null}
+              />
+            ) : (
+              <TrackedCta
+                publicationId={runtime.publication.id}
+                currentStepId={runtime.currentStep.id}
+                currentPath={runtime.request.path}
+                href={href}
+                label={label}
+                className={`inline-flex w-fit items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition ${classes}`}
+                action={asString(block.action) || null}
+              />
+            )}
+          </div>
+        </section>
       );
     }
 
     case "faq": {
       const items = asFaqItems(block.items);
       return (
-        <section className="rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+        <section className="rounded-[2rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
             {title || "FAQ"}
           </h2>
@@ -282,7 +360,7 @@ function BlockRenderer({
             {items.map((item) => (
               <details
                 key={item.question}
-                className="group rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                className="group rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5"
               >
                 <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
                   {item.question}
@@ -312,7 +390,7 @@ function BlockRenderer({
 
     case "thank_you": {
       return (
-        <section className="rounded-[1.75rem] border border-emerald-200 bg-emerald-50/90 p-8 shadow-[0_18px_50px_rgba(16,185,129,0.12)]">
+        <section className="rounded-[2rem] border border-emerald-200 bg-[radial-gradient(circle_at_top_left,_rgba(52,211,153,0.18),_transparent_30%),linear-gradient(180deg,_rgba(236,253,245,0.96)_0%,_rgba(209,250,229,0.92)_100%)] p-8 shadow-[0_20px_60px_rgba(16,185,129,0.12)]">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">
             {asString(block.eyebrow, "Gracias")}
           </p>
@@ -322,6 +400,20 @@ function BlockRenderer({
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
             {description}
           </p>
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {[
+              "Capturamos tu información y la asociamos a la publicación activa.",
+              "Resolvemos assignment con el sponsor o siguiente paso correspondiente.",
+              "Mostramos el reveal y el CTA de continuidad cuando aplica.",
+            ].map((item) => (
+              <div
+                key={item}
+                className="rounded-[1.5rem] border border-emerald-200 bg-white/80 px-4 py-4 text-sm leading-6 text-slate-700"
+              >
+                {item}
+              </div>
+            ))}
+          </div>
         </section>
       );
     }
@@ -351,35 +443,35 @@ export function FunnelRuntimePage({
     runtime.currentStep.path;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(251,191,36,0.16),_transparent_26%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-4 py-6 md:px-8 md:py-10">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(251,191,36,0.14),_transparent_26%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_55%,_#f8fafc_100%)] px-4 py-6 md:px-8 md:py-10">
       <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-full border border-slate-200/80 bg-white/80 px-5 py-3 shadow-sm backdrop-blur">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Leadflow Runtime
-            </p>
-            <p className="mt-1 text-sm text-slate-700">
-              {runtime.domain.host}
-              {" · "}
-              {runtime.request.path}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            <span className="rounded-full bg-slate-950 px-3 py-2 text-white">
-              {runtime.currentStep.stepType}
-            </span>
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-700">
-              Step {runtime.currentStep.position} / {runtime.steps.length}
-            </span>
-            {previewHost ? (
-              <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-2 text-amber-800">
-                previewHost={previewHost}
+        <section className="rounded-[1.75rem] border border-slate-200/80 bg-white/85 px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.06)] backdrop-blur">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                Leadflow Public Funnel
+              </p>
+              <p className="mt-2 text-sm text-slate-700">
+                {runtime.domain.host} · {runtime.request.path}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <span className="rounded-full bg-slate-950 px-3 py-2 text-white">
+                {toStepLabel(runtime.currentStep.stepType)}
               </span>
-            ) : null}
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-700">
-              API {webPublicConfig.urls.api}
-            </span>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-700">
+                Paso {runtime.currentStep.position} de {runtime.steps.length}
+              </span>
+              {previewHost ? (
+                <span className="rounded-full border border-amber-300 bg-amber-100 px-3 py-2 text-amber-800">
+                  previewHost={previewHost}
+                </span>
+              ) : null}
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-700">
+                Template {runtime.funnel.template.name}
+              </span>
+            </div>
           </div>
         </section>
 
@@ -392,12 +484,12 @@ export function FunnelRuntimePage({
         ))}
 
         <section className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[1.75rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+          <div className="rounded-[2rem] border border-slate-200/80 bg-white/90 p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-              Runtime Metadata
+              Detras de esta experiencia
             </p>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                   Template
                 </p>
@@ -408,7 +500,7 @@ export function FunnelRuntimePage({
                   {runtime.funnel.template.funnelType}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                   Tracking
                 </p>
@@ -416,7 +508,7 @@ export function FunnelRuntimePage({
                   {runtime.trackingProfile?.name ?? "Sin perfil"}
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  {runtime.trackingProfile?.provider ?? "pending"}
+                  {runtime.trackingProfile?.provider ?? "Pendiente"}
                 </p>
               </div>
             </div>
@@ -426,7 +518,7 @@ export function FunnelRuntimePage({
                 currentStepId={runtime.currentStep.id}
                 currentPath={runtime.request.path}
                 href={entryStepPath}
-                label="Volver al entry step"
+                label="Volver al inicio"
                 className="inline-flex items-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
                 action="entry_step"
               />
@@ -436,7 +528,7 @@ export function FunnelRuntimePage({
                   currentStepId={runtime.currentStep.id}
                   currentPath={runtime.request.path}
                   href={runtime.nextStep.path}
-                  label="Ir al siguiente step"
+                  label="Continuar"
                   className="inline-flex items-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
                   action="next_step"
                 />
@@ -444,9 +536,14 @@ export function FunnelRuntimePage({
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] border border-slate-200/80 bg-slate-950 p-8 text-white shadow-[0_18px_50px_rgba(15,23,42,0.2)]">
+          <div className="rounded-[2rem] border border-slate-200/80 bg-slate-950 p-8 text-white shadow-[0_20px_60px_rgba(15,23,42,0.2)]">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Navegacion del Funnel
+              Ruta del funnel
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Cada paso sigue corriendo sobre el mismo runtime; esta vista solo
+              hace más clara la transición entre entrada, captura, gracias y
+              handoff.
             </p>
             <div className="mt-5 space-y-3">
               {runtime.steps.map((step) => {
@@ -455,14 +552,14 @@ export function FunnelRuntimePage({
                   <Link
                     key={step.id}
                     href={step.path}
-                    className={`block rounded-2xl border px-4 py-4 transition ${
+                    className={`block rounded-[1.5rem] border px-4 py-4 transition ${
                       isCurrent
                         ? "border-teal-300 bg-teal-400/10 text-white"
                         : "border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10"
                     }`}
                   >
                     <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
-                      {step.stepType}
+                      {toStepLabel(step.stepType)}
                     </p>
                     <p className="mt-2 text-base font-semibold">{step.path}</p>
                   </Link>

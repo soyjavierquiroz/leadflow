@@ -270,13 +270,22 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
   const isPolling = currentStatus
     ? POLLABLE_STATUSES.has(currentStatus)
     : false;
+  const connectionReadinessLabel =
+    connection?.status === "connected"
+      ? "Canal listo para operar"
+      : connection?.status === "qr_ready"
+        ? "Falta escanear QR"
+        : connection?.status === "connecting" ||
+            connection?.status === "provisioning"
+          ? "Canal en preparación"
+          : "Aún sin canal conectado";
 
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Sponsor / Member / Canal"
-        title="Evolution QR Connect"
-        description="El member administra su WhatsApp real desde Leadflow Web, mientras Leadflow API habla con Evolution por backend. El handoff público actual sigue cayendo a wa.me como fallback comercial."
+        title="Mi canal de WhatsApp"
+        description="Esta superficie te muestra si tu canal real ya está listo, qué falta para conectarlo y cómo impacta eso en el handoff comercial desde el funnel."
       />
 
       {feedback ? (
@@ -290,6 +299,11 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
             connection ? channelStatusLabel[connection.status] : "Sin conectar"
           }
           hint="Persistido por sponsor y sincronizado con Evolution cuando el provider está disponible."
+        />
+        <KpiCard
+          label="Readiness"
+          value={connectionReadinessLabel}
+          hint="Sirve para saber si ya puedes recibir continuidad por canal real o todavía dependes de fallback."
         />
         <KpiCard
           label="Routing Evolution"
@@ -315,6 +329,45 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
         />
       </section>
 
+      <section className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Paso 1
+          </p>
+          <h3 className="mt-3 text-lg font-semibold text-slate-950">
+            Preparar instancia
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Define tu número, crea la instancia y deja visible el estado del
+            canal antes de pedir el QR.
+          </p>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Paso 2
+          </p>
+          <h3 className="mt-3 text-lg font-semibold text-slate-950">
+            Escanear y validar
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Cuando el QR esté listo, completa la conexión y confirma que el
+            estado pase a conectado.
+          </p>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Paso 3
+          </p>
+          <h3 className="mt-3 text-lg font-semibold text-slate-950">
+            Asegurar continuidad
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Si n8n está listo y el canal quedó conectado, el sponsor ya tiene
+            mejor base para continuidad real más allá del fallback `wa.me`.
+          </p>
+        </div>
+      </section>
+
       <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -327,8 +380,8 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 El canal pertenece a tu sponsor y su lifecycle se resuelve
-                siempre desde backend. Nunca exponemos Evolution directamente al
-                navegador.
+                siempre desde backend. Aquí solo ves el estado y disparas
+                acciones operativas claras.
               </p>
             </div>
 
@@ -408,7 +461,7 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
 
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold text-slate-950">
-                    QR disponible
+                    QR listo para conectar
                   </h3>
                   <p className="text-sm leading-6 text-slate-600">
                     Escanea este QR desde WhatsApp. Si Evolution devuelve un
@@ -428,7 +481,7 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
             connection?.status === "connecting" ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5">
               <h3 className="text-lg font-semibold text-slate-950">
-                Esperando señal de Evolution
+                Esperando señal del provider
               </h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 La instancia ya está en movimiento. Seguimos refrescando el
@@ -452,9 +505,8 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
               ) : null}
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              El flujo operativo es: asegurar instancia, crear si falta,
-              configurar webhook, pedir QR, refrescar estado y resetear cuando
-              haga falta.
+              El flujo operativo es simple: preparar instancia, pedir QR,
+              confirmar conexión y refrescar el estado cuando haga falta.
             </p>
           </div>
 
@@ -551,7 +603,7 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
           ) : null}
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-            <p className="font-medium text-slate-900">Compatibilidad actual</p>
+            <p className="font-medium text-slate-900">Qué pasa hoy con el funnel</p>
             <p className="mt-2">
               Esta fase no cambia todavía el handoff comercial final. Aunque el
               sponsor conecte su WhatsApp real, Reveal & Handoff sigue operando

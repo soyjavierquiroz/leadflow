@@ -49,6 +49,25 @@ const reminderBucketOptions = [
   "unscheduled",
 ] as const;
 
+const leadStatusLabel: Record<(typeof leadStatusOptions)[number], string> = {
+  all: "Todos",
+  qualified: "Calificado",
+  assigned: "Asignado",
+  nurturing: "En seguimiento",
+  won: "Ganado",
+  lost: "Perdido",
+};
+
+const assignmentStatusLabel: Record<
+  (typeof assignmentStatusOptions)[number],
+  string
+> = {
+  all: "Todos",
+  assigned: "Asignado",
+  accepted: "Aceptado",
+  closed: "Cerrado",
+};
+
 export function MemberLeadsClient({
   initialRows,
   remindersSummary,
@@ -96,6 +115,13 @@ export function MemberLeadsClient({
     filteredRows.find((row) => row.id === selectedLeadId) ??
     rows.find((row) => row.id === selectedLeadId) ??
     null;
+  const hotLeadCount = filteredRows.filter(
+    (row) => row.qualificationGrade === "hot",
+  ).length;
+  const pendingAcceptanceCount = filteredRows.filter(
+    (row) => row.assignmentStatus === "assigned",
+  ).length;
+  const attentionCount = filteredRows.filter((row) => row.needsAttention).length;
 
   const updateLeadRow = (leadId: string, updates: Partial<LeadView>) => {
     setRows((current) =>
@@ -219,8 +245,8 @@ export function MemberLeadsClient({
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Sponsor / Member / Leads"
-        title="Mis leads asignados"
-        description="Bandeja operativa para priorizar follow-ups vencidos, ver qué toca hoy y trabajar cada lead con la próxima acción sugerida y su playbook recomendado."
+        title="Mi bandeja de seguimiento"
+        description="Aquí ordenas tus leads por prioridad, follow-up y próxima acción sugerida para que el trabajo diario sea más claro y menos reactivo."
       />
 
       {feedback ? (
@@ -250,13 +276,49 @@ export function MemberLeadsClient({
         />
       </section>
 
+      <section className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Bandeja filtrada
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {formatCompactNumber(filteredRows.length)} leads visibles
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Ajusta filtros para quedarte solo con la carga que vas a mover hoy.
+          </p>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Handoffs por tomar
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {formatCompactNumber(pendingAcceptanceCount)} esperando respuesta
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Tómalos primero si quieres bajar fricción entre assignment y seguimiento.
+          </p>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Prioridad comercial
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {formatCompactNumber(hotLeadCount + attentionCount)} leads calientes o en riesgo
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Mezcla intención alta y necesidad de atención para ordenar tu foco.
+          </p>
+        </div>
+      </section>
+
       <section className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)] md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-2 text-sm">
           <span className="font-medium text-slate-700">Buscar lead</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Nombre, email, teléfono o funnel"
+            placeholder="Nombre, email, telefono o funnel"
             className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
           />
         </label>
@@ -273,7 +335,7 @@ export function MemberLeadsClient({
           >
             {leadStatusOptions.map((option) => (
               <option key={option} value={option}>
-                {option === "all" ? "Todos" : option}
+                {leadStatusLabel[option]}
               </option>
             ))}
           </select>
@@ -293,7 +355,7 @@ export function MemberLeadsClient({
           >
             {assignmentStatusOptions.map((option) => (
               <option key={option} value={option}>
-                {option === "all" ? "Todos" : option}
+                {assignmentStatusLabel[option]}
               </option>
             ))}
           </select>
@@ -336,7 +398,7 @@ export function MemberLeadsClient({
           },
           {
             key: "origin",
-            header: "Origen",
+            header: "Origen comercial",
             render: (row: LeadView) => (
               <div>
                 <p>{row.publicationPath ?? "Sin publicación"}</p>
@@ -348,7 +410,7 @@ export function MemberLeadsClient({
           },
           {
             key: "statuses",
-            header: "Estado",
+            header: "Estado y prioridad",
             render: (row: LeadView) => (
               <div className="flex flex-wrap gap-2">
                 <StatusBadge value={row.status} />
@@ -379,7 +441,7 @@ export function MemberLeadsClient({
           },
           {
             key: "followUp",
-            header: "Follow-up",
+            header: "Seguimiento",
             render: (row: LeadView) => (
               <div>
                 <p>{row.reminderLabel ?? "Sin seguimiento"}</p>
@@ -393,10 +455,10 @@ export function MemberLeadsClient({
           },
           {
             key: "assignedAt",
-            header: "Asignado",
+            header: "Entró a mi bandeja",
             render: (row: LeadView) =>
               row.assignedAt ? formatDateTime(row.assignedAt) : "Pendiente",
-          },
+            },
           {
             key: "actions",
             header: "Detalle",
@@ -413,7 +475,7 @@ export function MemberLeadsClient({
         ]}
         rows={filteredRows}
         emptyTitle="Sin leads asignados"
-        emptyDescription="Cuando el sistema te asigne handoffs nuevos, aparecerán en esta bandeja operativa."
+        emptyDescription="Cuando el sistema te asigne nuevos handoffs, aparecerán aquí con prioridad, siguiente acción y seguimiento."
       />
 
       {selectedLead ? (
@@ -515,7 +577,7 @@ export function MemberLeadsClient({
                     }
                     onClick={() => handleAcceptAssignment(selectedLead)}
                   >
-                    Aceptar lead
+                    Tomar handoff
                   </button>
                 ) : null}
 
@@ -532,7 +594,7 @@ export function MemberLeadsClient({
                         handleLeadStatusChange(selectedLead, status)
                       }
                     >
-                      Marcar {status}
+                      Mover a {status}
                     </button>
                   ),
                 )}
@@ -547,7 +609,7 @@ export function MemberLeadsClient({
                     }
                     onClick={() => handleCloseAssignment(selectedLead)}
                   >
-                    Cerrar assignment
+                    Cerrar handoff
                   </button>
                 ) : null}
               </div>

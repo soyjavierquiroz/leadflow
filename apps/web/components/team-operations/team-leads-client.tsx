@@ -27,6 +27,16 @@ const reminderBucketOptions = [
   "unscheduled",
 ] as const;
 
+const leadStatusLabel: Record<string, string> = {
+  all: "Todos",
+  captured: "Capturado",
+  assigned: "Asignado",
+  qualified: "Calificado",
+  nurturing: "En seguimiento",
+  won: "Ganado",
+  lost: "Perdido",
+};
+
 export function TeamLeadsClient({
   initialRows,
   remindersSummary,
@@ -69,6 +79,11 @@ export function TeamLeadsClient({
     rows.find((row) => row.id === selectedLeadId) ??
     allRows.find((row) => row.id === selectedLeadId) ??
     null;
+  const pendingAssignmentCount = rows.filter(
+    (row) => !row.sponsorId || row.assignmentStatus === "assigned",
+  ).length;
+  const hotLeadCount = rows.filter((row) => row.qualificationGrade === "hot").length;
+  const attentionCount = rows.filter((row) => row.needsAttention).length;
 
   const updateLeadRow = (leadId: string, updates: Partial<LeadView>) => {
     setAllRows((current) =>
@@ -80,14 +95,14 @@ export function TeamLeadsClient({
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Team Admin / Leads"
-        title="Pipeline del team"
-        description="Vista operativa del team con foco en reminders, follow-ups vencidos y playbooks sugeridos para priorizar el trabajo diario."
+        title="Bandeja operativa del equipo"
+        description="Prioriza qué leads están vencidos, cuáles requieren dueño claro y qué siguiente acción recomienda Leadflow para no perder ritmo comercial."
         actions={
           <>
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar lead, funnel, sponsor..."
+              placeholder="Buscar lead, funnel, sponsor o dominio"
               className="min-w-72 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
             />
             <select
@@ -95,13 +110,11 @@ export function TeamLeadsClient({
               onChange={(event) => setStatus(event.target.value)}
               className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
             >
-              <option value="all">Todos</option>
-              <option value="captured">Captured</option>
-              <option value="assigned">Assigned</option>
-              <option value="qualified">Qualified</option>
-              <option value="nurturing">Nurturing</option>
-              <option value="won">Won</option>
-              <option value="lost">Lost</option>
+              {Object.entries(leadStatusLabel).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
             <select
               value={reminderBucket}
@@ -147,6 +160,44 @@ export function TeamLeadsClient({
         />
       </section>
 
+      <section className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Carga visible
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {formatCompactNumber(rows.length)} leads en foco
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            La bandeja se ajusta a tus filtros y deja visible solo lo que el
+            equipo necesita revisar ahora.
+          </p>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Por destrabar
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {formatCompactNumber(pendingAssignmentCount)} por tomar o mover
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Leads sin sponsor claro o todavía en etapa temprana de assignment.
+          </p>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Prioridad comercial
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {formatCompactNumber(hotLeadCount + attentionCount)} leads calientes o en riesgo
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Combina intención alta y necesidad de atención para ordenar el día
+            del equipo.
+          </p>
+        </div>
+      </section>
+
       <DataTable
         columns={[
           {
@@ -165,7 +216,7 @@ export function TeamLeadsClient({
           },
           {
             key: "funnel",
-            header: "Funnel / Publicación",
+            header: "Origen comercial",
             render: (row) => (
               <div>
                 <p>{row.funnelName ?? "Sin funnel"}</p>
@@ -178,7 +229,7 @@ export function TeamLeadsClient({
           },
           {
             key: "assignment",
-            header: "Sponsor",
+            header: "Owner actual",
             render: (row) => (
               <div>
                 <p>{row.sponsorName ?? "Pendiente"}</p>
@@ -190,7 +241,7 @@ export function TeamLeadsClient({
           },
           {
             key: "status",
-            header: "Estado lead",
+            header: "Estado y prioridad",
             render: (row) => (
               <div className="flex flex-wrap gap-2">
                 <StatusBadge value={row.status} />
@@ -205,7 +256,7 @@ export function TeamLeadsClient({
           },
           {
             key: "assignmentStatus",
-            header: "Estado assignment",
+            header: "Estado del handoff",
             render: (row) => <StatusBadge value={row.assignmentStatus} />,
           },
           {
@@ -251,13 +302,13 @@ export function TeamLeadsClient({
         ]}
         rows={rows}
         emptyTitle="Sin leads para el team"
-        emptyDescription="Cuando se capturen más leads desde el runtime público, esta vista los mostrará con su trazabilidad básica."
+        emptyDescription="Cuando entren nuevas oportunidades desde el funnel público, esta bandeja las mostrará con owner, próxima acción y seguimiento."
       />
 
       {selectedLead ? (
         <ModalShell
           title={selectedLead.fullName ?? "Lead sin nombre"}
-          description="Detalle operativo con reminder, playbook sugerido e historial resumido de señales entrantes, sin abrir todavía un inbox."
+          description="Detalle operativo del lead con owner, reminder, playbook sugerido e historial resumido para decidir el siguiente movimiento."
           onClose={() => setSelectedLeadId(null)}
         >
           <div className="space-y-5">

@@ -40,6 +40,9 @@ export function MemberDashboardClient({
   const availableLeads = currentLeads.filter(
     (item) => item.assignmentStatus === "assigned",
   );
+  const activeFollowUps = currentLeads.filter(
+    (item) => item.reminderBucket === "overdue" || item.reminderBucket === "due_today",
+  );
 
   const handleAvailabilityChange = async (
     availabilityStatus: "available" | "paused" | "offline",
@@ -128,8 +131,8 @@ export function MemberDashboardClient({
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Sponsor / Member"
-        title="Operación diaria del member"
-        description="Esta vista ya trabaja con leads asignados reales, disponibilidad operativa y acciones rápidas para tomar handoffs sin salir del shell."
+        title="Mi jornada comercial"
+        description="Aquí ves tus handoffs nuevos, tu carga activa y tu disponibilidad para decidir si conviene tomar más leads o concentrarte en seguimiento."
       />
 
       {feedback ? (
@@ -140,23 +143,63 @@ export function MemberDashboardClient({
         <KpiCard
           label="Leads asignados"
           value={formatCompactNumber(currentLeads.length)}
-          hint="Total de oportunidades actualmente asociadas a este sponsor."
+          hint="Total de oportunidades que hoy ya dependen de ti."
         />
         <KpiCard
           label="Por aceptar"
           value={formatCompactNumber(availableLeads.length)}
-          hint="Handoffs nuevos listos para ser tomados por el member."
+          hint="Handoffs nuevos que todavía debes tomar explícitamente."
         />
         <KpiCard
           label="Seguimiento activo"
           value={formatCompactNumber(openAssignments.length)}
-          hint="Assignments todavía abiertos o en proceso."
+          hint="Assignments todavía abiertos y en proceso."
         />
         <KpiCard
-          label="Aceptados"
-          value={formatCompactNumber(acceptedAssignments.length)}
-          hint="Leads ya tomados explícitamente por el sponsor."
+          label="Acciones para hoy"
+          value={formatCompactNumber(activeFollowUps.length)}
+          hint="Leads con follow-up vencido o que toca mover hoy."
         />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Mi capacidad
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {currentSponsor.availabilityStatus === "available"
+              ? "Listo para recibir"
+              : "Capacidad reducida"}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Ajusta tu disponibilidad según tu carga real para que el handoff no
+            se rompa y el team rote mejor.
+          </p>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Oportunidades nuevas
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {formatCompactNumber(availableLeads.length)} esperando respuesta
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Si aceptas rápido, el lead entra antes a nurturing y mejora la
+            continuidad comercial.
+          </p>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Handoffs tomados
+          </p>
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            {formatCompactNumber(acceptedAssignments.length)} ya aceptados
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Leads que ya reconociste y forman parte activa de tu cartera.
+          </p>
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
@@ -204,7 +247,7 @@ export function MemberDashboardClient({
             },
             {
               key: "origin",
-              header: "Entrada",
+              header: "Origen",
               render: (row: LeadView) => (
                 <div>
                   <p>{row.publicationPath ?? "Sin publicación"}</p>
@@ -216,7 +259,7 @@ export function MemberDashboardClient({
             },
             {
               key: "assignedAt",
-              header: "Asignado",
+              header: "Entró a mi bandeja",
               render: (row: LeadView) =>
                 row.assignedAt ? formatDateTime(row.assignedAt) : "Pendiente",
             },
@@ -234,7 +277,7 @@ export function MemberDashboardClient({
             },
             {
               key: "actions",
-              header: "Acción",
+              header: "Acción rápida",
               render: (row: LeadView) =>
                 row.assignmentStatus === "assigned" && row.currentAssignmentId ? (
                   <button
@@ -243,7 +286,7 @@ export function MemberDashboardClient({
                     disabled={loadingAction === `accept:${row.currentAssignmentId}`}
                     onClick={() => handleAcceptLead(row)}
                   >
-                    Aceptar lead
+                    Tomar handoff
                   </button>
                 ) : (
                   <span className="text-xs text-slate-500">Sin acción rápida</span>
@@ -252,7 +295,7 @@ export function MemberDashboardClient({
           ]}
           rows={currentLeads.slice(0, 5)}
           emptyTitle="Sin leads asignados"
-          emptyDescription="Cuando el runtime te rote nuevos leads, aparecerán aquí para tomar acción."
+          emptyDescription="Cuando el runtime rote nuevas oportunidades, aparecerán aquí para que las tomes rápido."
         />
       </section>
     </div>

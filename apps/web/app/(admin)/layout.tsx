@@ -6,22 +6,22 @@ const adminNav = [
   {
     href: "/admin",
     label: "Dashboard",
-    description: "Salud de la plataforma y panorama general.",
+    description: "Pulso general de plataforma, equipos y funnel runtime.",
   },
   {
     href: "/admin/teams",
     label: "Teams",
-    description: "Ownership operativo y capacidad instalada.",
+    description: "Capacidad instalada, ownership y cobertura operativa.",
   },
   {
     href: "/admin/templates",
     label: "Templates",
-    description: "Supervisión del catálogo JSON-driven.",
+    description: "Catálogo base que define la experiencia pública.",
   },
   {
     href: "/admin/publications",
     label: "Publicaciones",
-    description: "Bindings activos por host y path.",
+    description: "Qué funnels ya están expuestos y por dónde salen.",
   },
 ];
 
@@ -34,11 +34,11 @@ export default async function AdminLayout({
   const snapshot = await getAppShellSnapshot();
 
   return (
-    <AppShellLayout
-      areaLabel="Super Admin"
-      areaDescription="Gobierno estructural de templates, equipos, publicaciones y rollout operativo."
-      topBarTitle="Plataforma Leadflow"
-      personaLabel="Super Admin"
+      <AppShellLayout
+        areaLabel="Super Admin"
+        areaDescription="Panel de plataforma para entender catálogo, equipos, publicaciones y salud del rollout sin perder el contexto comercial."
+        topBarTitle="Plataforma Leadflow"
+        personaLabel="Super Admin"
       workspaceName={snapshot.workspace.name}
       sourceMode={snapshot.sourceMode}
       currentUser={snapshot.currentUser}

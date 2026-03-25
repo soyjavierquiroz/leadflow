@@ -6,22 +6,22 @@ const memberNav = [
   {
     href: "/member",
     label: "Dashboard",
-    description: "Resumen personal de handoffs y capacidad actual.",
+    description: "Mi dia de trabajo, handoffs nuevos y carga activa.",
   },
   {
     href: "/member/leads",
     label: "Leads",
-    description: "Leads asignados al sponsor demo activo.",
+    description: "Bandeja diaria para seguimiento, prioridad y cierre.",
   },
   {
     href: "/member/profile",
     label: "Perfil",
-    description: "Datos operativos y preferencias futuras.",
+    description: "Datos de trabajo y configuracion del sponsor.",
   },
   {
     href: "/member/channel",
     label: "Canal",
-    description: "Conexion WhatsApp individual y estado del provider.",
+    description: "Conexion de WhatsApp y readiness del canal real.",
   },
 ];
 
@@ -34,11 +34,11 @@ export default async function MemberLayout({
   const snapshot = await getAppShellSnapshot();
 
   return (
-    <AppShellLayout
-      areaLabel="Sponsor / Member"
-      areaDescription="Superficie inicial para sponsors, con enfoque en leads asignados y perfil operativo."
-      topBarTitle={snapshot.currentSponsor.displayName}
-      personaLabel="Sponsor / Member"
+      <AppShellLayout
+        areaLabel="Sponsor / Member"
+        areaDescription="Workspace personal del sponsor para aceptar handoffs, hacer seguimiento y sostener su canal de atencion."
+        topBarTitle={snapshot.currentSponsor.displayName}
+        personaLabel="Sponsor / Member"
       workspaceName={snapshot.workspace.name}
       sourceMode={snapshot.sourceMode}
       currentUser={snapshot.currentUser}
