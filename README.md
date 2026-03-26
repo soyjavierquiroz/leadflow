@@ -25,6 +25,7 @@ La base del monorepo ya incluye:
 - Template Presets / Block Variants v1 para aplicar presets declarativos y variantes visuales por template/funnel sobre la registry pública actual.
 - Compatible Block Expansion v2 con normalización más fiel para aliases, nested CTA, media ruidosa y bloques comerciales compatibles de mayor impacto.
 - Recycled Component Intake v2 con capa `public-funnel/recycled/` para hero, hook, social proof, video, offer stack y FAQ sobre los adapters actuales.
+- Real JSON Intake Pack v1 con 3 payloads reales o casi reales dentro del repo para validar compatibilidad práctica del runtime público.
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
@@ -156,6 +157,7 @@ Validacion de stacks:
 - `docs/template-presets-block-variants-v1.md`
 - `docs/compatible-block-expansion-v2.md`
 - `docs/recycled-component-intake-v2.md`
+- `docs/real-json-intake-pack-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -250,6 +252,10 @@ Modulos disponibles:
   - `primary_cta` / `secondary_cta` anidados
   - `stats`, `reviews`, `faq_items`, `price_box`, `video.embed_url`
   - media inline o por `media_dictionary`
+- Intake pack real disponible en:
+  - `apps/web/lib/public-funnel/intake-examples/sales-audit-landing.json`
+  - `apps/web/lib/public-funnel/intake-examples/advisor-opportunity-vsl.json`
+  - `apps/web/lib/public-funnel/intake-examples/clinic-whatsapp-intake.json`
 - Presets iniciales disponibles:
   - `landing_capture_v1`
   - `opportunity_vsl_v1`
@@ -268,6 +274,7 @@ Modulos disponibles:
   - video
   - offer stack
   - FAQ accordion
+- La demo seed pública de `/` ya corre sobre un payload intake real (`sales-audit-landing.json`) en vez de un objeto inline montado a mano.
 - Preview local en desarrollo con `?previewHost=...` si hace falta simular otro host.
 - Reveal operativo en el thank-you usando el assignment de la sesion.
 - CTA a WhatsApp con enlace `wa.me` y fallback limpio si falta telefono.

@@ -1,0 +1,170 @@
+{
+  "template": "opportunity_vsl_v1",
+  "ui_config": {
+    "preset": "opportunity_vsl_v1",
+    "block_variants": {
+      "hero_block": "opportunity",
+      "social_proof": "testimonials_focus",
+      "lead_capture_form": "compact_capture",
+      "final_cta": "final_cta"
+    }
+  },
+  "media_dictionary": {
+    "hero_opportunity": {
+      "src": "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1400&q=80",
+      "alt": "Equipo revisando un pipeline comercial"
+    }
+  },
+  "hero_block": {
+    "key": "hero-opportunity-vsl",
+    "kicker": "Advisor Opportunity",
+    "heading": "Mira cómo un funnel público ordenado puede acelerar tu primer contacto",
+    "subtitle": "Caso inspirado en una VSL comercial con hero, video, prueba, offer y captura compacta.",
+    "supporting_label": "Ruta de oportunidad",
+    "asset_key": "hero_opportunity",
+    "numbers": [
+      {
+        "name": "Respuesta",
+        "result": "Mismo día",
+        "text": "Cuando el sponsor recibe contexto útil, el follow-up mejora."
+      },
+      {
+        "name": "VSL",
+        "result": "Activa",
+        "text": "Video central antes de capturar."
+      },
+      {
+        "name": "Preset",
+        "result": "Opportunity",
+        "text": "Variant aplicada sin duplicar el runtime."
+      }
+    ],
+    "primary_cta": {
+      "text": "Ver demo y aplicar",
+      "href": "#public-capture-form"
+    }
+  },
+  "layout_blocks": [
+    {
+      "type": "video_block",
+      "key": "opportunity-video",
+      "title": "Ve el recorrido completo de captación a reveal",
+      "description": "Caso casi real con foco en VSL y momentum hacia la captura.",
+      "video": {
+        "url": "https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-opportunity-vsl"
+      },
+      "takeaways": [
+        "La propuesta se entiende antes del formulario.",
+        "El siguiente paso del funnel sigue siendo estándar.",
+        "La capa compatible no rompe el handoff."
+      ]
+    },
+    {
+      "type": "social_proof",
+      "key": "opportunity-proof",
+      "headline": "Lo que este tipo de funnel hace mejor",
+      "copy": "Testimonial wall y métricas resumidas en un payload compatible.",
+      "kpis": [
+        {
+          "headline": "Claridad",
+          "stat": "Alta",
+          "copy": "Mejor lectura en móvil y desktop."
+        },
+        {
+          "headline": "Foco",
+          "stat": "Video-first",
+          "copy": "La narrativa comercial entra antes de capturar."
+        },
+        {
+          "headline": "Continuidad",
+          "stat": "Visible",
+          "copy": "Thank-you y sponsor reveal no cambian."
+        }
+      ],
+      "quotes": [
+        {
+          "testimonial": "La VSL ordena la conversación antes del primer contacto.",
+          "person": "Sofía Lara",
+          "position": "Revenue Lead",
+          "business": "Catalyst Studio"
+        },
+        {
+          "testimonial": "El funnel ya no parece un parche técnico entre bloques.",
+          "person": "Jorge Núñez",
+          "position": "Growth Advisor",
+          "business": "Pipeline House"
+        }
+      ]
+    },
+    {
+      "type": "offer_stack",
+      "key": "opportunity-offer",
+      "title": "Qué te llevas de esta oportunidad",
+      "description": "Offer stack corto y orientado a decisión.",
+      "price": "Demo guiada",
+      "note": "Entrada rápida para evaluar encaje del flujo comercial.",
+      "included": [
+        {
+          "name": "Diagnóstico breve",
+          "details": "Lectura inicial del punto donde pierdes momentum."
+        },
+        {
+          "name": "Mapa de continuidad",
+          "details": "Captura, assignment y reveal visibles."
+        }
+      ],
+      "button": {
+        "label": "Quiero aplicar",
+        "href": "#public-capture-form"
+      }
+    },
+    {
+      "type": "lead_capture_form",
+      "key": "opportunity-form",
+      "eyebrow": "Aplicación rápida",
+      "headline": "Déjanos tus datos y te mostramos la siguiente acción",
+      "subheadline": "Compact capture con naming mixto para validar intake realista.",
+      "button_text": "Aplicar ahora",
+      "fields": [
+        {
+          "field_name": "name",
+          "title": "Nombre",
+          "field_type": "text",
+          "is_required": true,
+          "width": "full"
+        },
+        {
+          "field_name": "mobile",
+          "title": "WhatsApp",
+          "field_type": "tel",
+          "width": "half"
+        },
+        {
+          "field_name": "correo",
+          "title": "Correo",
+          "field_type": "email",
+          "width": "half"
+        }
+      ],
+      "settings": {
+        "captureUrlContext": true,
+        "tags": ["intake-pack-v1", "opportunity-vsl"]
+      }
+    },
+    {
+      "type": "final_cta",
+      "key": "opportunity-final-cta",
+      "title": "Si quieres mover oportunidades más rápido, empieza por un funnel que no pierda contexto",
+      "description": "CTA final compatible con highlights y CTA anidado.",
+      "items": [
+        "Video, capture y continuity sobre el mismo runtime.",
+        "JSON reusable sin editor visual todavía.",
+        "Base lista para templates de oportunidad."
+      ],
+      "cta": {
+        "label": "Quiero una demo",
+        "href": "#public-capture-form"
+      }
+    }
+  ]
+}

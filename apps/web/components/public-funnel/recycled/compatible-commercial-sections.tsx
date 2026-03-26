@@ -12,6 +12,7 @@ import {
 import type {
   RuntimeFaqItem,
   RuntimeFeatureItem,
+  RuntimeLogoItem,
   RuntimeMediaItem,
   RuntimeMetricItem,
   RuntimeOfferItem,
@@ -174,6 +175,7 @@ type RecycledSocialProofSectionProps = {
   metrics: RuntimeMetricItem[];
   testimonials: RuntimeTestimonialItem[];
   checklist: RuntimeFeatureItem[];
+  logos?: RuntimeLogoItem[];
 };
 
 export function RecycledSocialProofSection({
@@ -184,6 +186,7 @@ export function RecycledSocialProofSection({
   metrics,
   testimonials,
   checklist,
+  logos = [],
 }: RecycledSocialProofSectionProps) {
   return (
     <PublicSectionSurface>
@@ -194,6 +197,23 @@ export function RecycledSocialProofSection({
         </h2>
         <p className="mt-4 text-base leading-7 text-slate-600">{description}</p>
       </div>
+      {logos.length > 0 ? (
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {logos.map((logo) => (
+            <div
+              key={`${logo.alt}-${logo.src}`}
+              className="flex min-h-20 items-center justify-center rounded-[1.4rem] border border-slate-200 bg-white px-4 py-5"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logo.src}
+                alt={logo.alt}
+                className="max-h-10 w-auto object-contain opacity-80 saturate-0"
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {metrics.map((item) => (
           <PublicStatCard
@@ -233,27 +253,36 @@ export function RecycledSocialProofSection({
 }
 
 type RecycledVideoSectionProps = {
+  sectionId?: string;
   eyebrow: string;
   title: string;
   caption?: string;
   embedUrl: string;
   checklist: string[];
   footer: string;
+  helperPill?: string;
 };
 
 export function RecycledVideoSection({
+  sectionId,
   eyebrow,
   title,
   caption,
   embedUrl,
   checklist,
   footer,
+  helperPill,
 }: RecycledVideoSectionProps) {
   return (
-    <PublicSectionSurface>
+    <PublicSectionSurface id={sectionId}>
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div>
           <PublicEyebrow tone="neutral">{eyebrow}</PublicEyebrow>
+          {helperPill ? (
+            <div className="mt-4">
+              <PublicPill>{helperPill}</PublicPill>
+            </div>
+          ) : null}
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
             {title}
           </h2>
@@ -327,11 +356,23 @@ export function RecycledOfferStackSection({
           <p className="mt-4 text-base leading-7 text-slate-700">{description}</p>
           {items.length > 0 ? (
             <div className="mt-6 grid gap-3">
-              {items.map((item) => (
-                <PublicChecklistItem key={item.title} accent="warm">
-                  <span className="font-semibold text-slate-900">{item.title}</span>
-                  {item.description ? ` · ${item.description}` : ""}
-                </PublicChecklistItem>
+              {items.map((item, index) => (
+                <div
+                  key={item.title}
+                  className="rounded-[1.5rem] border border-amber-200/80 bg-white/80 px-4 py-4"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-700">
+                    Incluye {index + 1}
+                  </p>
+                  <p className="mt-3 text-base font-semibold text-slate-950">
+                    {item.title}
+                  </p>
+                  {item.description ? (
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {item.description}
+                    </p>
+                  ) : null}
+                </div>
               ))}
             </div>
           ) : null}
@@ -349,6 +390,49 @@ export function RecycledOfferStackSection({
               "Componente listo para envolver pricing, bonus, bundles y CTA propio."}
           </p>
           <div className="mt-6">{cta}</div>
+        </div>
+      </div>
+    </PublicSectionSurface>
+  );
+}
+
+type RecycledFinalCtaSectionProps = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  highlights: string[];
+  primaryCta: ReactNode;
+  secondaryCta?: ReactNode;
+};
+
+export function RecycledFinalCtaSection({
+  eyebrow,
+  title,
+  description,
+  highlights,
+  primaryCta,
+  secondaryCta,
+}: RecycledFinalCtaSectionProps) {
+  return (
+    <PublicSectionSurface tone="brand" className="md:p-10">
+      <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
+        <div>
+          <PublicEyebrow>{eyebrow}</PublicEyebrow>
+          <h2 className="mt-3 text-4xl font-semibold tracking-tight text-balance text-white md:text-5xl">
+            {title}
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200">
+            {description}
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            {primaryCta}
+            {secondaryCta}
+          </div>
+        </div>
+        <div className="grid gap-3">
+          {highlights.map((item) => (
+            <PublicChecklistItem key={item}>{item}</PublicChecklistItem>
+          ))}
         </div>
       </div>
     </PublicSectionSurface>

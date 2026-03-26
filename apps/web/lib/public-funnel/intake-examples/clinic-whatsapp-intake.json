@@ -1,0 +1,147 @@
+{
+  "template": "landing_capture_v1",
+  "ui_config": {
+    "preset": "landing_capture_v1",
+    "block_variants": {
+      "social_proof": "metrics_trust",
+      "faq_accordion": "accordion",
+      "final_cta": "final_cta"
+    }
+  },
+  "media_dictionary": {
+    "clinic_hero": {
+      "src": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1400&q=80",
+      "alt": "Clínica atendiendo consultas y coordinando seguimiento"
+    }
+  },
+  "hero_block": {
+    "key": "clinic-hero",
+    "tag": "WhatsApp Intake",
+    "name": "Convierte consultas de WhatsApp en leads ordenados y asignados",
+    "copy": "Caso casi real enfocado en captación para clínica con prioridad en claridad, confianza y paso siguiente visible.",
+    "image_key": "clinic_hero",
+    "primary_cta": {
+      "label": "Reservar llamada",
+      "href": "#public-capture-form"
+    }
+  },
+  "layout_blocks": [
+    {
+      "type": "social_proof",
+      "key": "clinic-proof",
+      "title": "Señales de confianza que sí importan en este tipo de funnel",
+      "description": "Stats, reviews y continuidad operativa sobre el mismo motor.",
+      "results": [
+        {
+          "title": "Respuesta",
+          "value": "Más rápida",
+          "description": "El sponsor recibe un lead mejor contextualizado."
+        },
+        {
+          "title": "Orden",
+          "value": "Más claro",
+          "description": "El funnel evita perder datos entre landing y WhatsApp."
+        },
+        {
+          "title": "Percepción",
+          "value": "Más seria",
+          "description": "La experiencia pública refuerza confianza."
+        }
+      ],
+      "customers": [
+        {
+          "content": "La experiencia ya no se siente improvisada antes de pasar a WhatsApp.",
+          "client": "Patricia Molina",
+          "title": "Operations Manager",
+          "company": "Clínica Nova"
+        }
+      ]
+    },
+    {
+      "type": "urgency_timer",
+      "key": "clinic-urgency",
+      "tag": "Cupos limitados",
+      "headline": "La ventana de revisión gratuita cierra hoy",
+      "body": "Urgency simple y declarativa para empujar la acción sin inventar lógica rara.",
+      "duration": 90
+    },
+    {
+      "type": "risk_reversal",
+      "key": "clinic-risk",
+      "headline": "Qué no tienes que sacrificar para usar este flujo",
+      "body": "Caso de riesgo reducido para intake en vertical de salud/servicios.",
+      "points": [
+        {
+          "headline": "No reemplazas tu operación actual de golpe"
+        },
+        {
+          "headline": "No pierdes continuidad hacia WhatsApp"
+        },
+        {
+          "headline": "No dependes de formularios libres por JSON"
+        }
+      ]
+    },
+    {
+      "type": "lead_capture_form",
+      "key": "clinic-form",
+      "eyebrow": "Solicitud",
+      "headline": "Déjanos tus datos y te guiamos al siguiente paso",
+      "subheadline": "Payload casi real de vertical clínica/servicios usando hidden defaults y choices simples.",
+      "button_text": "Solicitar revisión",
+      "fields": [
+        {
+          "name": "nombre",
+          "label": "Nombre completo",
+          "type": "text",
+          "required": true,
+          "width": "full"
+        },
+        {
+          "name": "telefono",
+          "label": "WhatsApp",
+          "type": "tel",
+          "required": true,
+          "width": "half"
+        },
+        {
+          "name": "tratamiento_interes",
+          "label": "Interés principal",
+          "type": "select",
+          "options": [
+            "Primera consulta",
+            "Seguimiento",
+            "Valoración"
+          ],
+          "width": "half"
+        },
+        {
+          "name": "utm_campaign",
+          "label": "Campaign",
+          "type": "hidden",
+          "default": "clinic-intake-pack"
+        }
+      ],
+      "settings": {
+        "capture_url_context": true,
+        "source_channel": "landing_form",
+        "tags": ["intake-pack-v1", "clinic-whatsapp"]
+      }
+    },
+    {
+      "type": "faq_accordion",
+      "key": "clinic-faq",
+      "title": "FAQ",
+      "faqs": [
+        {
+          "question": "¿El lead sigue llegando al sponsor por el flujo normal?",
+          "answer": "Sí. Este intake solo valida compatibilidad del JSON; el motor de captura y handoff no cambia."
+        },
+        {
+          "question": "¿Se puede adaptar a verticales con más confianza visual?",
+          "answer": "Sí. La capa recycled deja base para testimonios, offers y CTAs más específicos por vertical."
+        }
+      ]
+    }
+  ]
+}

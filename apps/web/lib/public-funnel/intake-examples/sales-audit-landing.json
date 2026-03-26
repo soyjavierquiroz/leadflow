@@ -1,0 +1,315 @@
+{
+  "template": "landing_capture_v1",
+  "ui_config": {
+    "preset": "landing_capture_v1",
+    "block_variants": {
+      "hero_block": "leadflow_signal",
+      "social_proof": "testimonials_focus",
+      "offer_stack": "offer_stack",
+      "faq_accordion": "accordion"
+    }
+  },
+  "media_dictionary": {
+    "hero_sales_audit": {
+      "src": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1400&q=80",
+      "alt": "Equipo comercial revisando métricas y oportunidades"
+    },
+    "brand_acme": {
+      "src": "https://dummyimage.com/220x70/e2e8f0/0f172a.png&text=Acme+CRM",
+      "alt": "Acme CRM"
+    },
+    "brand_nova": {
+      "src": "https://dummyimage.com/220x70/e2e8f0/0f172a.png&text=Nova+Sales",
+      "alt": "Nova Sales"
+    },
+    "brand_peak": {
+      "src": "https://dummyimage.com/220x70/e2e8f0/0f172a.png&text=Peak+Growth",
+      "alt": "Peak Growth"
+    },
+    "brand_orbit": {
+      "src": "https://dummyimage.com/220x70/e2e8f0/0f172a.png&text=Orbit+Ops",
+      "alt": "Orbit Ops"
+    }
+  },
+  "hero_block": {
+    "key": "hero-sales-audit",
+    "badge": "Revenue Audit Sprint",
+    "headline": "Detecta dónde se enfrían tus leads antes del primer contacto",
+    "subheadline": "Payload de referencia inspirado en un landing JSON real del otro sistema: hero con stats, proof strip, CTAs anidados y media resuelta por dictionary.",
+    "accent": "Diagnóstico de captación y handoff",
+    "image_key": "hero_sales_audit",
+    "stats": [
+      {
+        "title": "Tiempo a contacto",
+        "value": "< 5 min",
+        "body": "Cuando el handoff no se rompe, la oportunidad mantiene temperatura."
+      },
+      {
+        "title": "Captura",
+        "value": "Estándar",
+        "body": "El submit sigue pasando por el motor compuesto de Leadflow."
+      },
+      {
+        "title": "Continuidad",
+        "value": "Visible",
+        "body": "La historia comercial se mantiene hasta el thank-you."
+      }
+    ],
+    "proof_strip": [
+      "Compatibilidad útil con payloads ruidosos y CTAs anidados.",
+      "Bloques comerciales visuales sin reescribir el renderer.",
+      "Lead capture, next step y reveal siguen usando el runtime estándar."
+    ],
+    "primary_cta": {
+      "label": "Quiero mi auditoría",
+      "href": "#public-capture-form",
+      "action": "scroll_to_capture"
+    },
+    "secondary_cta": {
+      "label": "Ver recorrido del funnel",
+      "href": "#sales-audit-video"
+    }
+  },
+  "layout_blocks": [
+    {
+      "type": "hook_and_promise",
+      "key": "sales-audit-hook",
+      "tag": "Diagnóstico comercial",
+      "title": "Si hoy tu equipo persigue leads sin contexto, no tienes un problema de tráfico: tienes un problema de continuidad.",
+      "body": "Leadflow te deja captación, assignment, reveal y WhatsApp handoff sobre un runtime público JSON-driven que ya absorbe bloques compatibles con naming más realista.",
+      "bullets": [
+        "Menos páginas hechas a mano y más composición declarativa.",
+        "Menos fricción técnica entre landing y follow-up.",
+        "Más claridad para escalar presets y variantes después."
+      ],
+      "primary_cta": {
+        "label": "Ver video del flujo",
+        "href": "#sales-audit-video",
+        "action": "hook_primary"
+      }
+    },
+    {
+      "type": "social_proof",
+      "key": "sales-audit-proof",
+      "title": "Lo que ya entra en el runtime sin traducción manual agresiva",
+      "description": "Este caso usa stats, reviews y logo strip con naming externo más realista.",
+      "stats": [
+        {
+          "title": "Bloques compatibles",
+          "value": "9+",
+          "body": "Hero, proof, offer, FAQ, video, urgency y más."
+        },
+        {
+          "title": "Session continuity",
+          "value": "Activa",
+          "body": "Reveal y handoff siguen usando contexto real."
+        },
+        {
+          "title": "Intake pack",
+          "value": "v1",
+          "body": "Fixtures concretos dentro del repo para validar compatibilidad."
+        }
+      ],
+      "reviews": [
+        {
+          "review": "La landing ya se siente como producto y no como prueba interna del runtime.",
+          "customer_name": "María Ortega",
+          "role": "Head of Revenue",
+          "organization": "Northlane Partners"
+        },
+        {
+          "review": "El formulario sigue estándar, pero por fuera parece una pieza comercial real.",
+          "customer_name": "Gabriel Soto",
+          "role": "Growth Director",
+          "organization": "Axial Ops"
+        },
+        {
+          "review": "El valor ahora se entiende mejor antes del handoff a WhatsApp.",
+          "customer_name": "Ivana Pérez",
+          "role": "Sales Ops",
+          "organization": "Vista Demand"
+        }
+      ],
+      "logo_strip": [
+        {
+          "media_key": "brand_acme"
+        },
+        {
+          "media_key": "brand_nova"
+        },
+        {
+          "media_key": "brand_peak"
+        },
+        {
+          "media_key": "brand_orbit"
+        }
+      ]
+    },
+    {
+      "type": "video_block",
+      "key": "sales-audit-video",
+      "headline": "Recorre el funnel compatible en menos de dos minutos",
+      "subheadline": "Caso casi real con `video.embed_url`, highlights y presentación comercial reforzada.",
+      "video": {
+        "embed_url": "https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-intake-sales-audit"
+      },
+      "highlights": [
+        "Hero y social proof compatibles con naming externo.",
+        "El bloque de captura sigue siendo first-class en Leadflow.",
+        "Thank-you, reveal y handoff no cambian de motor."
+      ]
+    },
+    {
+      "type": "urgency_timer",
+      "key": "sales-audit-urgency",
+      "badge": "Ventana de diagnóstico",
+      "headline": "Esta auditoría se prioriza hoy mientras el slot del sponsor siga abierto",
+      "subheadline": "Urgency declarativa para empujar decisión sin meter lógica arbitraria en el JSON.",
+      "duration_min": 180
+    },
+    {
+      "type": "lead_capture_form",
+      "key": "sales-audit-form",
+      "eyebrow": "Aplicación de auditoría",
+      "headline": "Déjanos tus datos y armamos tu lectura del funnel actual",
+      "subheadline": "Caso casi real con fields más cercanos al otro sistema: `field_type`, `is_required`, `choices` y defaults declarativos.",
+      "buttonText": "Quiero mi auditoría comercial",
+      "helper_text": "Menos de un minuto. El submit sigue por el flujo estándar de Leadflow.",
+      "privacy_note": "Usamos esta información solo para procesar la solicitud dentro del funnel público.",
+      "fields": [
+        {
+          "name": "full_name",
+          "label": "Nombre completo",
+          "field_type": "text",
+          "is_required": true,
+          "placeholder": "Tu nombre completo",
+          "autocomplete": "name",
+          "width": "full"
+        },
+        {
+          "name": "whatsapp",
+          "label": "WhatsApp",
+          "field_type": "tel",
+          "placeholder": "+52 55 0000 0000",
+          "autocomplete": "tel",
+          "width": "half"
+        },
+        {
+          "name": "email",
+          "label": "Email",
+          "field_type": "email",
+          "placeholder": "tu@email.com",
+          "autocomplete": "email",
+          "width": "half"
+        },
+        {
+          "name": "team_size",
+          "label": "Tamaño del equipo",
+          "field_type": "select",
+          "choices": ["1-5", "6-20", "21-50", "50+"],
+          "width": "half"
+        },
+        {
+          "name": "primary_goal",
+          "label": "¿Qué quieres destrabar?",
+          "field_type": "textarea",
+          "placeholder": "Describe el cuello de botella principal",
+          "width": "full"
+        },
+        {
+          "name": "utm_source",
+          "label": "UTM Source",
+          "field_type": "hidden",
+          "is_hidden": true
+        }
+      ],
+      "settings": {
+        "captureUrlContext": true,
+        "sourceChannel": "form",
+        "tags": ["intake-pack-v1", "sales-audit", "compatible-json"],
+        "successMessage": "Tu solicitud quedó capturada. Estamos resolviendo el siguiente paso del funnel."
+      }
+    },
+    {
+      "type": "offer_stack",
+      "key": "sales-audit-offer",
+      "title": "Qué incluye esta auditoría de funnel",
+      "description": "Offer stack casi real con `price_box`, `offer_items` y CTA anidado.",
+      "price_box": {
+        "amount": "Sin costo",
+        "note": "Pensado para validar fit y continuidad antes de escalar implementación."
+      },
+      "offer_items": [
+        {
+          "headline": "Lectura del cuello de botella",
+          "copy": "Detectamos en qué parte de tu recorrido se enfría el lead."
+        },
+        {
+          "headline": "Mapa de captura a handoff",
+          "copy": "Visualizamos cómo debería llegar el lead al sponsor."
+        },
+        {
+          "headline": "Siguiente paso recomendado",
+          "copy": "Te dejamos una recomendación clara para mover tu funnel."
+        }
+      ],
+      "primary_cta": {
+        "label": "Aplicar ahora",
+        "href": "#public-capture-form",
+        "action": "scroll_to_capture"
+      }
+    },
+    {
+      "type": "risk_reversal",
+      "key": "sales-audit-risk",
+      "title": "Sin fricción rara ni dependencias ocultas",
+      "description": "El runtime no cambia por fuera de la capa compatible.",
+      "guarantee_items": [
+        {
+          "headline": "Sin endpoints custom por JSON"
+        },
+        {
+          "headline": "Sin romper assignment ni reveal"
+        },
+        {
+          "headline": "Sin rehacer publicación ni navegación"
+        }
+      ]
+    },
+    {
+      "type": "faq_accordion",
+      "key": "sales-audit-faq",
+      "title": "Preguntas frecuentes",
+      "faq_items": [
+        {
+          "q": "¿Este payload usa un shape más cercano al otro sistema?",
+          "a": "Sí. Usa hero_block, nested CTA, reviews, logo strip, price_box, faq_items y video.embed_url."
+        },
+        {
+          "q": "¿El formulario ya se envía por el flujo real de Leadflow?",
+          "a": "Sí. `lead_capture_form` sigue enviando al motor estándar de visitor, lead, assignment y next step."
+        },
+        {
+          "q": "¿El handoff final cambia por este intake?",
+          "a": "No. El thank-you y el CTA a WhatsApp siguen soportados por el runtime actual."
+        }
+      ]
+    },
+    {
+      "type": "final_cta",
+      "key": "sales-audit-final-cta",
+      "headline": "Si ya identificaste el problema, hagamos visible tu siguiente paso comercial",
+      "body": "Final CTA compatible para cerrar el recorrido con una acción fuerte sin salir del runtime público.",
+      "bullets": [
+        "Captura real con contexto de URL.",
+        "Continuidad hasta reveal y WhatsApp handoff.",
+        "Base lista para presets y intake serio."
+      ],
+      "primary_cta": {
+        "label": "Quiero que revisen mi funnel",
+        "href": "#public-capture-form",
+        "action": "scroll_to_capture"
+      }
+    }
+  ]
+}

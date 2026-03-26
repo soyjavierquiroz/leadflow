@@ -11,6 +11,7 @@ import {
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
 import {
   RecycledFaqAccordionSection,
+  RecycledFinalCtaSection,
   RecycledHeroSection,
   RecycledHookSection,
   RecycledOfferStackSection,
@@ -28,6 +29,7 @@ import {
   asFaqItems,
   asFeatureItems,
   asMediaItem,
+  asMediaItems,
   asMetricItems,
   asNumber,
   asOfferItems,
@@ -335,11 +337,13 @@ function VideoBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
 
   return (
     <RecycledVideoSection
+      sectionId={asString(block.key) || undefined}
       eyebrow="Prueba visual"
       title={title}
       caption={caption || undefined}
       embedUrl={embedUrl}
       checklist={checklist}
+      helperPill="Video block compatible"
       footer={`Paso conectado: ${toStepLabel(runtime.currentStep.stepType)} sobre ${runtime.request.path}.`}
     />
   );
@@ -366,12 +370,52 @@ function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
           "Seguimos emitiendo tracking al hacer click.",
           "El runtime conserva el mismo contrato de navegación.",
         ];
+  const eyebrow =
+    asString(block.variant) === "final_cta" ? "Final CTA" : "CTA principal";
+
+  if (asString(block.variant) === "final_cta") {
+    return (
+      <RecycledFinalCtaSection
+        eyebrow={eyebrow}
+        title={title}
+        description={description}
+        highlights={items}
+        primaryCta={
+          <TrackedCta
+            publicationId={runtime.publication.id}
+            currentStepId={runtime.currentStep.id}
+            currentPath={runtime.request.path}
+            href={href}
+            label={label}
+            className={buildCtaClassName("primary")}
+            action={asString(block.action) || null}
+          />
+        }
+        secondaryCta={
+          runtime.previousStep ? (
+            <TrackedCta
+              publicationId={runtime.publication.id}
+              currentStepId={runtime.currentStep.id}
+              currentPath={runtime.request.path}
+              href={runtime.previousStep.path}
+              label="Revisar paso anterior"
+              className={cx(
+                buildCtaClassName("secondary"),
+                "border-white/20 bg-white/8 text-white hover:bg-white/14",
+              )}
+              action="previous_step"
+            />
+          ) : undefined
+        }
+      />
+    );
+  }
 
   return (
     <PublicSectionSurface className="md:p-10">
       <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
         <div>
-          <PublicEyebrow tone="neutral">CTA principal</PublicEyebrow>
+          <PublicEyebrow tone="neutral">{eyebrow}</PublicEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
             {title}
           </h2>
@@ -436,6 +480,7 @@ function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
   const metrics = asMetricItems(block.metrics ?? block.items);
   const testimonials = asTestimonialItems(block.testimonials);
   const featureItems = asFeatureItems(block.items);
+  const logos = asMediaItems(block.logos, title);
   const fallbackMetrics = [
     {
       label: "Legibilidad",
@@ -463,6 +508,7 @@ function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
       metrics={metrics.length > 0 ? metrics : fallbackMetrics}
       testimonials={testimonials}
       checklist={featureItems}
+      logos={logos}
     />
   );
 }

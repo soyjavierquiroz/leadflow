@@ -86,6 +86,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Template Presets / Block Variants v1 con presets declarativos en `apps/web/components/public-funnel/template-presets.ts` para resolver composición sugerida, defaults y variantes visuales sin duplicar el runtime.
 - Compatible Block Expansion v2 para aceptar aliases más reales por bloque, nested CTA, shapes de media más ruidosos y mappings comerciales con mayor fidelidad.
 - Recycled Component Intake v2 con capa `apps/web/components/public-funnel/recycled` para secciones comerciales reutilizables consumidas por los adapters públicos.
+- Real JSON Intake Pack v1 con fixtures concretos en `apps/web/lib/public-funnel/intake-examples` para validar compatibilidad práctica end-to-end sobre payloads reales o casi reales.
 - Reveal & handoff v1 sobre el runtime publico:
   - reveal del sponsor asignado en thank-you
   - CTA a WhatsApp con mensaje prellenado
@@ -130,6 +131,10 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `price_box`
   - `primary_cta` / `secondary_cta`
   - `video.embed_url`
+- Intake pack real disponible para validación manual o seed:
+  - `sales-audit-landing.json`
+  - `advisor-opportunity-vsl.json`
+  - `clinic-whatsapp-intake.json`
 - Intake reciclado activo para:
   - `hero`
   - `hook_and_promise`
@@ -137,6 +142,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `video`
   - `offer_pricing`
   - `faq`
+- La landing demo actual usa directamente uno de los payloads intake reales del pack, manteniendo el mismo runtime público de Leadflow.
 - Presets iniciales disponibles:
   - `landing_capture_v1`
   - `opportunity_vsl_v1`

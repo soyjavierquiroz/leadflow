@@ -100,6 +100,8 @@ export type RuntimeBlocksParseResult = {
   };
 };
 
+export type RuntimeLogoItem = RuntimeMediaItem;
+
 export const asRecord = (
   value: JsonValue | undefined,
 ): Record<string, JsonValue> | null => {
@@ -384,6 +386,45 @@ const resolveMediaFromDictionary = (
   return resolveInlineMedia(blockRecord, fallbackAlt);
 };
 
+const resolveMediaArrayFromDictionary = (
+  value: JsonValue | undefined,
+  dictionary: Record<string, JsonValue>,
+  fallbackAlt: string,
+) => {
+  if (!Array.isArray(value)) {
+    return [] as RuntimeMediaItem[];
+  }
+
+  return value
+    .map((item, index) => {
+      if (typeof item === "string") {
+        return resolveMediaDictionaryEntry(
+          dictionary,
+          item,
+          index === 0 ? fallbackAlt : `${fallbackAlt} ${index + 1}`,
+        );
+      }
+
+      const record = asRecord(item);
+      if (!record) {
+        return null;
+      }
+
+      return (
+        resolveMediaFromDictionary(
+          record,
+          dictionary,
+          index === 0 ? fallbackAlt : `${fallbackAlt} ${index + 1}`,
+        ) ??
+        asMediaItem(
+          record,
+          index === 0 ? fallbackAlt : `${fallbackAlt} ${index + 1}`,
+        )
+      );
+    })
+    .filter((item): item is RuntimeMediaItem => Boolean(item));
+};
+
 const normalizeHowItWorksItems = (value: JsonValue | undefined) => {
   return mapObjectArray(value, (item) => {
     const title = pickString(item, ["title", "step", "label", "headline", "name"]);
@@ -569,6 +610,19 @@ const normalizeCompatibleExternalBlock = (
           "stories",
           "customers",
         ]) ?? undefined;
+      const logos = resolveMediaArrayFromDictionary(
+        pickArrayValue(rawBlock, [
+          "logos",
+          "logo_strip",
+          "logoStrip",
+          "brands",
+          "brand_strip",
+          "brandStrip",
+        ]),
+        dictionary,
+        title || "Logo",
+      );
+      baseBlock.logos = logos.length > 0 ? (logos as unknown as JsonValue) : undefined;
       baseBlock.items =
         pickArrayValue(rawBlock, [
           "items",
@@ -1024,6 +1078,18 @@ export const asTestimonialItems = (value: JsonValue | undefined) => {
   });
 };
 
+export const asMediaItems = (value: JsonValue | undefined, fallbackAlt: string) => {
+  if (!Array.isArray(value)) {
+    return [] as RuntimeMediaItem[];
+  }
+
+  return value
+    .map((item, index) =>
+      asMediaItem(item, index === 0 ? fallbackAlt : `${fallbackAlt} ${index + 1}`),
+    )
+    .filter((item): item is RuntimeMediaItem => Boolean(item));
+};
+
 export const asOfferItems = (value: JsonValue | undefined) => {
   if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
     return value.map((item) => ({
@@ -1171,9 +1237,16 @@ const normalizeLeadFieldWidth = (
 };
 
 const asLeadFieldOptions = (value: JsonValue | undefined) => {
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value.map((item) => ({
+      label: item,
+      value: item,
+    }));
+  }
+
   return mapObjectArray(value, (item) => {
-    const label = asString(item.label, asString(item.value));
-    const optionValue = asString(item.value, asString(item.label));
+    const label = pickString(item, ["label", "title", "name", "text", "value"]);
+    const optionValue = pickString(item, ["value", "id", "slug", "label", "title"]);
 
     if (!label || !optionValue) {
       return null;
@@ -1227,10 +1300,19 @@ export const normalizeLeadCaptureFormBlock = (
 ): RuntimeLeadCaptureFormBlock => {
   const settings = asRecord(block.settings);
   const recordFields = mapObjectArray(block.fields, (item) => {
-    const rawName = asString(item.name, detectLeadFieldNameFromLabel(asString(item.label)));
-    const label = asString(item.label, rawName);
+    const fieldSettings = asRecord(item.settings);
+    const rawName = pickString(
+      item,
+      ["name", "field_name", "fieldName", "id"],
+      detectLeadFieldNameFromLabel(pickString(item, ["label", "title"])),
+    );
+    const label = pickString(item, ["label", "title", "headline"], rawName);
     const type = normalizeLeadFieldType(
-      asString(item.type, asBoolean(item.hidden) ? "hidden" : "text"),
+      pickString(
+        item,
+        ["type", "field_type", "fieldType", "input_type", "inputType"],
+        asBoolean(item.hidden) ? "hidden" : "text",
+      ),
     );
 
     if (!rawName) {
@@ -1241,14 +1323,30 @@ export const normalizeLeadCaptureFormBlock = (
       name: resolveKnownLeadFieldName(rawName),
       label,
       type,
-      required: asBoolean(item.required),
-      placeholder: asString(item.placeholder) || undefined,
-      autocomplete: asString(item.autocomplete) || undefined,
-      width: normalizeLeadFieldWidth(asString(item.width, "full")),
-      options: asLeadFieldOptions(item.options),
-      hidden: asBoolean(item.hidden) || type === "hidden",
+      required: asBoolean(
+        item.required,
+        asBoolean(item.is_required, asBoolean(item.isRequired)),
+      ),
+      placeholder:
+        pickString(item, ["placeholder", "hint", "example"]) || undefined,
+      autocomplete:
+        pickString(item, ["autocomplete", "auto_complete", "autoComplete"]) ||
+        undefined,
+      width: normalizeLeadFieldWidth(
+        pickString(item, ["width", "column_width", "columnWidth"], "full"),
+      ),
+      options: asLeadFieldOptions(
+        item.options ?? item.choices ?? item.values ?? fieldSettings?.options,
+      ),
+      hidden:
+        asBoolean(item.hidden, asBoolean(item.is_hidden, asBoolean(item.isHidden))) ||
+        type === "hidden",
       defaultValue:
-        asString(item.default_value, asString(item.defaultValue)) || undefined,
+        pickString(
+          item,
+          ["default_value", "defaultValue", "default", "value"],
+          pickString(fieldSettings ?? {}, ["default_value", "defaultValue", "default"]),
+        ) || undefined,
     } satisfies RuntimeLeadCaptureField;
   });
   const legacyFields = asStringArray(block.fields).map((label, index) => {
