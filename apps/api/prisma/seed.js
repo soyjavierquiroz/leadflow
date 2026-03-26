@@ -753,6 +753,7 @@ async function main() {
             block_variants: {
               hero_block: 'leadflow_signal',
               social_proof: 'metrics_trust',
+              video_block: 'vsl_focus',
               lead_capture_form: 'conversion_card',
               offer_stack: 'offer_stack',
               faq_accordion: 'accordion',
@@ -766,21 +767,63 @@ async function main() {
           },
           hero_block: {
             key: 'hero-main',
-            eyebrow: 'Leadflow Sales Core',
+            badge: 'Leadflow Sales Core',
             headline: 'Captura oportunidades y deriva el handoff sin romper el runtime',
             subheadline:
-              'Este funnel demo usa bloques comerciales reales sobre el runtime público: hook, social proof, oferta, formulario declarativo y reveal conectado.',
+              'Este funnel demo usa un JSON compatible más cercano al ecosistema externo: hero_block, reviews, video, oferta, formulario declarativo y reveal conectado.',
             accent: 'Captura, assignment y continuidad',
-            media_key: 'hero_primary',
+            image_key: 'hero_primary',
+            stats: [
+              {
+                title: 'Captura',
+                value: 'Real',
+                body: 'Visitor, lead y tracking conectados.',
+              },
+              {
+                title: 'Assignment',
+                value: 'Round robin',
+                body: 'El sponsor se resuelve usando el pool operativo.',
+              },
+              {
+                title: 'Reveal',
+                value: 'Activo',
+                body: 'El thank-you usa contexto real de sesión.',
+              },
+            ],
+            proof_strip: [
+              'Hero compatible con CTAs anidados y media por dictionary.',
+              'Jerarquía clara para mobile y continuidad comercial visible.',
+              'Bloque preparado para intake de componentes reciclados.',
+            ],
+            primary_cta: {
+              label: 'Quiero dejar mis datos',
+              href: '#public-capture-form',
+              action: 'scroll_to_capture',
+            },
+            secondary_cta: {
+              label: 'Ver recorrido compatible',
+              href: '#compat-video-block',
+            },
           },
           layout_blocks: [
             {
               type: 'hook_and_promise',
               key: 'hook-main',
-              eyebrow: 'Diagnóstico comercial',
-              hook: 'Si hoy tus leads llegan sin contexto o se enfrían antes del primer contacto, este funnel es para ti.',
-              promise:
+              badge: 'Diagnóstico comercial',
+              title:
+                'Si hoy tus leads llegan sin contexto o se enfrían antes del primer contacto, este funnel es para ti.',
+              body:
                 'Leadflow centraliza captación, assignment y continuidad a WhatsApp con bloques JSON-driven listos para reutilizarse por template.',
+              bullets: [
+                'Compatibilidad útil con contratos de bloques externos más reales.',
+                'Submit estándar de Leadflow para no abrir endpoints arbitrarios.',
+                'Base lista para seguir absorbiendo componentes reciclados.',
+              ],
+              primary_cta: {
+                label: 'Quiero ver cómo funciona',
+                href: '#compat-video-block',
+                action: 'hook_primary',
+              },
             },
             {
               type: 'social_proof',
@@ -788,21 +831,37 @@ async function main() {
               title: 'Señales que este runtime ya sostiene hoy',
               description:
                 'El funnel público ya puede capturar lead real, resolver owner y mantener la continuidad del follow-up visible.',
-              metrics: [
+              stats: [
                 {
-                  label: 'Captura',
+                  title: 'Captura',
                   value: 'Real',
-                  description: 'Visitor, lead y tracking conectados.',
+                  body: 'Visitor, lead y tracking conectados.',
                 },
                 {
-                  label: 'Assignment',
+                  title: 'Assignment',
                   value: 'Round robin',
-                  description: 'El sponsor se resuelve usando el pool operativo.',
+                  body: 'El sponsor se resuelve usando el pool operativo.',
                 },
                 {
-                  label: 'Reveal',
+                  title: 'Reveal',
                   value: 'Activo',
-                  description: 'El thank-you usa contexto real de sesión.',
+                  body: 'El thank-you usa contexto real de sesión.',
+                },
+              ],
+              reviews: [
+                {
+                  review:
+                    'Se entiende mejor el paso comercial completo sin tocar el motor base.',
+                  customer_name: 'Ana Ruiz',
+                  role: 'Revenue Ops',
+                  organization: 'Northlane Studio',
+                },
+                {
+                  review:
+                    'El submit sigue estándar, pero el funnel ya se siente mucho más serio.',
+                  customer_name: 'Luis Meza',
+                  role: 'Growth Lead',
+                  organization: 'Signal Commerce',
                 },
               ],
             },
@@ -812,7 +871,7 @@ async function main() {
               title: 'Qué desbloquea Leadflow para el equipo',
               description:
                 'Bloques comerciales que viven sobre el mismo motor estándar del runtime público.',
-              items: [
+              benefits: [
                 {
                   eyebrow: 'Bloques',
                   title: 'Composición declarativa',
@@ -834,13 +893,29 @@ async function main() {
               ],
             },
             {
+              type: 'video_block',
+              key: 'compat-video-block',
+              headline: 'Mira el recorrido del funnel compatible',
+              subheadline:
+                'Este bloque acepta un shape más cercano al sistema externo usando `video.embed_url`, `highlights` y copy comercial corto.',
+              video: {
+                embed_url:
+                  'https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-compatible-v2',
+              },
+              highlights: [
+                'El renderer mantiene el mismo contrato interno.',
+                'La compatibilidad resuelve props ruidosas antes del adapter.',
+                'La pieza visual ahora entra por la capa recycled.',
+              ],
+            },
+            {
               type: 'urgency_timer',
               key: 'urgency-main',
-              eyebrow: 'Ventana prioritaria',
+              badge: 'Ventana prioritaria',
               headline: 'La demo local está lista para probar captación y handoff ahora mismo',
               subheadline:
                 'Usamos un timer declarativo para reforzar urgencia sin meter lógica libre por formulario.',
-              duration_minutes: 120,
+              duration_min: 120,
             },
             {
               type: 'lead_capture_form',
@@ -947,32 +1022,49 @@ async function main() {
               title: 'Qué incluye esta demo del funnel',
               description:
                 'Un ejemplo compacto de cómo Leadflow conecta frontend público, capture y continuidad comercial.',
-              price: 'Sin costo',
-              price_note:
-                'Pensado para validar el flujo antes de escalar a presets o templates más profundos.',
-              items: [
-                'Lead capture form declarativo',
-                'Tracking y UTMs capturados por el runtime',
-                'Assignment + reveal + handoff sobre la misma sesión',
+              price_box: {
+                amount: 'Sin costo',
+                note: 'Pensado para validar el flujo antes de escalar a presets o templates más profundos.',
+              },
+              offer_items: [
+                {
+                  headline: 'Lead capture form declarativo',
+                  copy: 'Bloque real conectado al submit estándar.',
+                },
+                {
+                  headline: 'Tracking y UTMs capturados por el runtime',
+                  copy: 'Sin abrir endpoints ni lógica libre por formulario.',
+                },
+                {
+                  headline: 'Assignment + reveal + handoff',
+                  copy: 'Sobre la misma sesión pública del funnel.',
+                },
               ],
-              href: '#public-capture-form',
-              label: 'Completar formulario',
-              action: 'scroll_to_capture',
+              primary_cta: {
+                label: 'Completar formulario',
+                href: '#public-capture-form',
+                action: 'scroll_to_capture',
+              },
             },
             {
               type: 'faq_accordion',
               key: 'faq-main',
               title: 'Preguntas rápidas',
-              items: [
+              faq_items: [
                 {
-                  question: '¿El formulario ya es un bloque real del runtime?',
-                  answer:
+                  q: '¿El formulario ya es un bloque real del runtime?',
+                  a:
                     'Sí. `lead_capture_form` ya no es placeholder y dispara el submit estándar de Leadflow.',
                 },
                 {
-                  question: '¿Leadflow ya acepta un JSON más cercano al otro sistema?',
-                  answer:
+                  q: '¿Leadflow ya acepta un JSON más cercano al otro sistema?',
+                  a:
                     'Sí. Esta landing ya usa `hero_block`, `layout_blocks`, `media_dictionary` y `ui_config` sobre la capa de compatibilidad.',
+                },
+                {
+                  q: '¿Ya entraron componentes reciclados al funnel público?',
+                  a:
+                    'Sí. Hero, hook, social proof, video, offer stack y FAQ ya pasan por una capa `recycled/` integrada con los adapters.',
                 },
               ],
             },

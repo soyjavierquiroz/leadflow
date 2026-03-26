@@ -130,6 +130,135 @@ export const asStringArray = (value: JsonValue | undefined) => {
   return value.filter((item): item is string => typeof item === "string");
 };
 
+const pickValue = (
+  record: Record<string, JsonValue>,
+  keys: string[],
+): JsonValue | undefined => {
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined && value !== null) {
+      return value;
+    }
+  }
+
+  return undefined;
+};
+
+const pickString = (
+  record: Record<string, JsonValue>,
+  keys: string[],
+  fallback = "",
+) => {
+  for (const key of keys) {
+    const value = asString(record[key]);
+    if (value) {
+      return value;
+    }
+  }
+
+  return fallback;
+};
+
+const pickArrayValue = (
+  record: Record<string, JsonValue>,
+  keys: string[],
+): JsonValue | undefined => {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  return undefined;
+};
+
+const pickRecord = (
+  record: Record<string, JsonValue>,
+  keys: string[],
+): Record<string, JsonValue> | null => {
+  for (const key of keys) {
+    const value = asRecord(record[key]);
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
+const normalizeTextItems = (value: JsonValue | undefined) => {
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value;
+  }
+
+  return mapObjectArray(value, (item) => {
+    const text = pickString(item, [
+      "title",
+      "label",
+      "text",
+      "body",
+      "value",
+      "name",
+      "question",
+    ]);
+
+    return text || null;
+  });
+};
+
+const resolveCompatibleCtaConfig = (
+  record: Record<string, JsonValue>,
+  options?: {
+    containerKeys?: string[];
+    hrefKeys?: string[];
+    labelKeys?: string[];
+    actionKeys?: string[];
+  },
+) => {
+  const containers = [
+    record,
+    ...((options?.containerKeys ?? [])
+      .map((key) => asRecord(record[key]))
+      .filter((value): value is Record<string, JsonValue> => Boolean(value))),
+  ];
+
+  const hrefKeys = options?.hrefKeys ?? [];
+  const labelKeys = options?.labelKeys ?? [];
+  const actionKeys = options?.actionKeys ?? [];
+
+  for (const candidate of containers) {
+    const href = pickString(candidate, [
+      ...hrefKeys,
+      "href",
+      "url",
+      "path",
+      "target",
+      "link",
+    ]);
+    const label = pickString(candidate, [
+      ...labelKeys,
+      "label",
+      "text",
+      "title",
+      "button_text",
+      "buttonText",
+      "caption",
+    ]);
+    const action = pickString(candidate, [...actionKeys, "action", "event"]);
+
+    if (href || label || action) {
+      return {
+        href: href || undefined,
+        label: label || undefined,
+        action: action || undefined,
+      };
+    }
+  }
+
+  return null;
+};
+
 export const normalizeRuntimeBlockType = (value: string) => {
   switch (value) {
     case "form_placeholder":
@@ -199,6 +328,34 @@ const resolveMediaDictionaryEntry = (
   return asMediaItem(value, fallbackAlt);
 };
 
+const resolveInlineMedia = (
+  blockRecord: Record<string, JsonValue>,
+  fallbackAlt: string,
+) => {
+  const candidates = [
+    pickValue(blockRecord, [
+      "media",
+      "image",
+      "asset",
+      "hero_media",
+      "heroMedia",
+      "video",
+      "poster",
+      "thumbnail",
+    ]),
+    pickRecord(blockRecord, ["media"])?.asset,
+  ];
+
+  for (const candidate of candidates) {
+    const media = asMediaItem(candidate, fallbackAlt);
+    if (media) {
+      return media;
+    }
+  }
+
+  return null;
+};
+
 const resolveMediaFromDictionary = (
   blockRecord: Record<string, JsonValue>,
   dictionary: Record<string, JsonValue>,
@@ -213,6 +370,8 @@ const resolveMediaFromDictionary = (
     asString(blockRecord.videoKey),
     asString(blockRecord.asset_key),
     asString(blockRecord.assetKey),
+    asString(blockRecord.media_dictionary_key),
+    asString(blockRecord.mediaDictionaryKey),
   ].filter(Boolean);
 
   for (const key of candidateKeys) {
@@ -222,14 +381,20 @@ const resolveMediaFromDictionary = (
     }
   }
 
-  return null;
+  return resolveInlineMedia(blockRecord, fallbackAlt);
 };
 
 const normalizeHowItWorksItems = (value: JsonValue | undefined) => {
   return mapObjectArray(value, (item) => {
-    const title = asString(item.title, asString(item.step));
-    const description = asString(item.description, asString(item.body));
-    const eyebrow = asString(item.eyebrow, asString(item.label));
+    const title = pickString(item, ["title", "step", "label", "headline", "name"]);
+    const description = pickString(item, [
+      "description",
+      "body",
+      "copy",
+      "text",
+      "details",
+    ]);
+    const eyebrow = pickString(item, ["eyebrow", "label", "tag"]);
 
     if (!title) {
       return null;
@@ -252,11 +417,22 @@ const normalizeCompatibleExternalBlock = (
 ) => {
   const rawType = asString(rawBlock.type);
   const normalizedType = normalizeRuntimeBlockType(rawType);
-  const title = asString(rawBlock.title, asString(rawBlock.headline));
-  const description = asString(
-    rawBlock.description,
-    asString(rawBlock.subheadline),
-  );
+  const title = pickString(rawBlock, [
+    "title",
+    "headline",
+    "hook",
+    "heading",
+    "name",
+  ]);
+  const description = pickString(rawBlock, [
+    "description",
+    "subheadline",
+    "subtitle",
+    "promise",
+    "body",
+    "copy",
+    "text",
+  ]);
   const media = resolveMediaFromDictionary(rawBlock, dictionary, title || rawType);
 
   const baseBlock: RuntimeBlock = {
@@ -267,61 +443,305 @@ const normalizeCompatibleExternalBlock = (
 
   switch (rawType) {
     case "hero_block":
-      baseBlock.eyebrow = asString(rawBlock.eyebrow, asString(rawBlock.badge));
+      baseBlock.eyebrow = pickString(rawBlock, [
+        "eyebrow",
+        "badge",
+        "kicker",
+        "tag",
+      ]);
       baseBlock.title = title;
       baseBlock.description = description;
+      baseBlock.accent = pickString(rawBlock, [
+        "accent",
+        "supporting_label",
+        "supportingLabel",
+      ]);
+      baseBlock.metrics =
+        pickArrayValue(rawBlock, ["metrics", "stats", "kpis", "numbers"]) ??
+        undefined;
+      baseBlock.proofItems =
+        normalizeTextItems(
+          pickArrayValue(rawBlock, [
+            "proofItems",
+            "proof_strip",
+            "proofStrip",
+            "bullets",
+            "benefits",
+            "supporting_points",
+            "supportingPoints",
+          ]),
+        ) as unknown as JsonValue;
+      const heroPrimaryCta = resolveCompatibleCtaConfig(rawBlock, {
+        containerKeys: [
+          "primary_cta",
+          "primaryCta",
+          "cta_primary",
+          "primary_button",
+          "primaryButton",
+          "cta",
+        ],
+        hrefKeys: ["primary_href", "primaryHref"],
+        labelKeys: ["primary_label", "primaryLabel"],
+        actionKeys: ["primary_action", "primaryAction"],
+      });
+      const heroSecondaryCta = resolveCompatibleCtaConfig(rawBlock, {
+        containerKeys: [
+          "secondary_cta",
+          "secondaryCta",
+          "cta_secondary",
+          "secondary_button",
+          "secondaryButton",
+        ],
+        hrefKeys: ["secondary_href", "secondaryHref"],
+        labelKeys: ["secondary_label", "secondaryLabel"],
+        actionKeys: ["secondary_action", "secondaryAction"],
+      });
+      if (heroPrimaryCta?.href) {
+        baseBlock.primaryCtaHref = heroPrimaryCta.href;
+      }
+      if (heroPrimaryCta?.label) {
+        baseBlock.primaryCtaLabel = heroPrimaryCta.label;
+      }
+      if (heroSecondaryCta?.href) {
+        baseBlock.secondaryCtaHref = heroSecondaryCta.href;
+      }
+      if (heroSecondaryCta?.label) {
+        baseBlock.secondaryCtaLabel = heroSecondaryCta.label;
+      }
       if (media) {
         baseBlock.media = media;
       }
       break;
+    case "hook_and_promise":
+      baseBlock.eyebrow = pickString(rawBlock, [
+        "eyebrow",
+        "badge",
+        "kicker",
+        "tag",
+      ]);
+      baseBlock.hook = pickString(rawBlock, [
+        "hook",
+        "title",
+        "headline",
+        "heading",
+      ]);
+      baseBlock.promise = pickString(rawBlock, [
+        "promise",
+        "description",
+        "subheadline",
+        "body",
+        "copy",
+      ]);
+      baseBlock.items =
+        normalizeTextItems(
+          pickArrayValue(rawBlock, [
+            "items",
+            "bullets",
+            "points",
+            "benefits",
+            "supporting_points",
+          ]),
+        ) as unknown as JsonValue;
+      const hookCta = resolveCompatibleCtaConfig(rawBlock, {
+        containerKeys: ["primary_cta", "primaryCta", "cta", "button"],
+      });
+      if (hookCta?.href) {
+        baseBlock.href = hookCta.href;
+      }
+      if (hookCta?.label) {
+        baseBlock.label = hookCta.label;
+      }
+      if (hookCta?.action) {
+        baseBlock.action = hookCta.action;
+      }
+      break;
+    case "social_proof":
+      baseBlock.title = title || "Prueba social";
+      baseBlock.description = description;
+      baseBlock.metrics =
+        pickArrayValue(rawBlock, ["metrics", "stats", "kpis", "results"]) ??
+        undefined;
+      baseBlock.testimonials =
+        pickArrayValue(rawBlock, [
+          "testimonials",
+          "reviews",
+          "quotes",
+          "stories",
+          "customers",
+        ]) ?? undefined;
+      baseBlock.items =
+        pickArrayValue(rawBlock, [
+          "items",
+          "proof_items",
+          "proofItems",
+          "trust_points",
+        ]) ?? undefined;
+      break;
+    case "urgency_timer":
+      baseBlock.eyebrow = pickString(rawBlock, ["eyebrow", "badge", "tag"]);
+      baseBlock.headline = pickString(rawBlock, [
+        "headline",
+        "title",
+        "heading",
+      ]);
+      baseBlock.subheadline = pickString(rawBlock, [
+        "subheadline",
+        "description",
+        "body",
+      ]);
+      baseBlock.expires_at = pickString(rawBlock, [
+        "expires_at",
+        "expiresAt",
+        "deadline",
+        "deadline_at",
+        "deadlineAt",
+        "end_at",
+        "endAt",
+        "ends_at",
+        "endsAt",
+      ]);
+      baseBlock.duration_minutes =
+        pickValue(rawBlock, [
+          "duration_minutes",
+          "durationMinutes",
+          "duration_min",
+          "durationMin",
+          "duration",
+        ]) ?? undefined;
+      break;
     case "video_block":
       baseBlock.title = title;
-      baseBlock.caption = description;
+      baseBlock.caption = pickString(rawBlock, [
+        "caption",
+        "description",
+        "subheadline",
+        "body",
+      ]);
       baseBlock.embedUrl =
-        asString(rawBlock.embedUrl) || media?.src || asString(rawBlock.url);
+        pickString(rawBlock, [
+          "embedUrl",
+          "embed_url",
+          "video_url",
+          "videoUrl",
+          "youtube_url",
+          "youtubeUrl",
+          "vimeo_url",
+          "vimeoUrl",
+          "url",
+        ]) ||
+        pickString(asRecord(rawBlock.video) ?? {}, [
+          "embedUrl",
+          "embed_url",
+          "url",
+          "src",
+        ]) ||
+        media?.src ||
+        asString(rawBlock.url);
+      baseBlock.items =
+        normalizeTextItems(
+          pickArrayValue(rawBlock, [
+            "items",
+            "bullets",
+            "highlights",
+            "takeaways",
+          ]),
+        ) as unknown as JsonValue;
       break;
     case "offer_stack":
       baseBlock.title = title || "Oferta";
       baseBlock.description = description;
-      baseBlock.price = asString(rawBlock.price, asString(rawBlock.primary_price));
-      baseBlock.price_note = asString(
-        rawBlock.price_note,
-        asString(rawBlock.note),
-      );
+      const priceBox = pickRecord(rawBlock, ["price_box", "priceBox"]);
+      baseBlock.price =
+        pickString(rawBlock, ["price", "primary_price", "primaryPrice"]) ||
+        pickString(priceBox ?? {}, ["amount", "value", "price"]);
+      baseBlock.price_note =
+        pickString(rawBlock, ["price_note", "priceNote", "note", "subnote"]) ||
+        pickString(priceBox ?? {}, ["note", "description", "caption"]);
+      baseBlock.label =
+        pickString(rawBlock, ["label", "button_text", "buttonText"]) || undefined;
+      const offerCta = resolveCompatibleCtaConfig(rawBlock, {
+        containerKeys: ["primary_cta", "primaryCta", "cta", "button"],
+      });
+      if (offerCta?.href) {
+        baseBlock.href = offerCta.href;
+      }
+      if (offerCta?.label) {
+        baseBlock.label = offerCta.label;
+      }
+      if (offerCta?.action) {
+        baseBlock.action = offerCta.action;
+      }
       baseBlock.items =
-        rawBlock.items ?? rawBlock.stack_items ?? rawBlock.offers ?? undefined;
+        pickArrayValue(rawBlock, [
+          "items",
+          "stack_items",
+          "stackItems",
+          "offer_items",
+          "offerItems",
+          "offers",
+          "included",
+          "inclusions",
+        ]) ?? undefined;
       break;
     case "features_and_benefits":
       baseBlock.title = title || "Beneficios";
       baseBlock.description = description;
-      baseBlock.items = rawBlock.items ?? rawBlock.features ?? rawBlock.benefits;
+      baseBlock.items =
+        pickArrayValue(rawBlock, [
+          "items",
+          "features",
+          "benefits",
+          "cards",
+          "bullets",
+        ]) ?? undefined;
       break;
     case "how_it_works":
       baseBlock.title = title || "Cómo funciona";
       baseBlock.description = description;
       baseBlock.items = normalizeHowItWorksItems(
-        rawBlock.items ?? rawBlock.steps ?? rawBlock.sequence,
+        pickArrayValue(rawBlock, ["items", "steps", "sequence", "cards"]),
       ) as unknown as JsonValue;
       break;
     case "risk_reversal":
       baseBlock.title = title || "Reduce el riesgo";
       baseBlock.description = description;
-      baseBlock.items = rawBlock.items ?? rawBlock.guarantees ?? rawBlock.points;
+      baseBlock.items =
+        pickArrayValue(rawBlock, [
+          "items",
+          "guarantees",
+          "guarantee_items",
+          "guaranteeItems",
+          "points",
+          "bullets",
+        ]) ?? undefined;
       baseBlock.variant = asString(rawBlock.variant, "risk_reversal");
       break;
     case "final_cta":
       baseBlock.title = title || "Siguiente paso";
       baseBlock.description = description;
-      baseBlock.label = asString(
-        rawBlock.button_text,
-        asString(rawBlock.label, "Continuar"),
-      );
-      baseBlock.href = asString(rawBlock.href);
+      const finalCta = resolveCompatibleCtaConfig(rawBlock, {
+        containerKeys: ["primary_cta", "primaryCta", "cta", "button"],
+        labelKeys: ["button_text", "buttonText"],
+      });
+      baseBlock.label = finalCta?.label || pickString(rawBlock, ["label"], "Continuar");
+      baseBlock.href = finalCta?.href || pickString(rawBlock, ["href", "url"]);
+      baseBlock.action = finalCta?.action || undefined;
+      baseBlock.items =
+        normalizeTextItems(
+          pickArrayValue(rawBlock, ["items", "bullets", "points", "benefits"]),
+        ) as unknown as JsonValue;
       baseBlock.variant = asString(rawBlock.variant, "final_cta");
       break;
     case "faq_accordion":
       baseBlock.title = title || "Preguntas frecuentes";
-      baseBlock.items = rawBlock.items ?? rawBlock.questions ?? undefined;
+      baseBlock.items =
+        pickArrayValue(rawBlock, [
+          "items",
+          "questions",
+          "faq_items",
+          "faqItems",
+          "faqs",
+        ]) ?? undefined;
       baseBlock.variant = asString(rawBlock.variant, "accordion");
       break;
     default:
@@ -490,8 +910,22 @@ const mapObjectArray = <T>(
 
 export const asFaqItems = (value: JsonValue | undefined) => {
   return mapObjectArray(value, (item) => {
-    const question = asString(item.question);
-    const answer = asString(item.answer);
+    const question = pickString(item, [
+      "question",
+      "q",
+      "title",
+      "headline",
+      "label",
+    ]);
+    const answer = pickString(item, [
+      "answer",
+      "a",
+      "body",
+      "content",
+      "description",
+      "copy",
+      "text",
+    ]);
 
     if (!question || !answer) {
       return null;
@@ -511,9 +945,15 @@ export const asFeatureItems = (value: JsonValue | undefined) => {
   }
 
   return mapObjectArray(value, (item) => {
-    const title = asString(item.title, asString(item.label));
-    const description = asString(item.description, asString(item.body));
-    const eyebrow = asString(item.eyebrow);
+    const title = pickString(item, ["title", "label", "headline", "name"]);
+    const description = pickString(item, [
+      "description",
+      "body",
+      "copy",
+      "text",
+      "details",
+    ]);
+    const eyebrow = pickString(item, ["eyebrow", "tag", "kicker"]);
 
     if (!title) {
       return null;
@@ -529,9 +969,14 @@ export const asFeatureItems = (value: JsonValue | undefined) => {
 
 export const asMetricItems = (value: JsonValue | undefined) => {
   return mapObjectArray(value, (item) => {
-    const label = asString(item.label, asString(item.title));
-    const value = asString(item.value);
-    const description = asString(item.description, asString(item.body));
+    const label = pickString(item, ["label", "title", "name", "headline"]);
+    const value = pickString(item, ["value", "stat", "number", "result"]);
+    const description = pickString(item, [
+      "description",
+      "body",
+      "copy",
+      "text",
+    ]);
 
     if (!label || !value) {
       return null;
@@ -547,10 +992,24 @@ export const asMetricItems = (value: JsonValue | undefined) => {
 
 export const asTestimonialItems = (value: JsonValue | undefined) => {
   return mapObjectArray(value, (item) => {
-    const quote = asString(item.quote, asString(item.body));
-    const author = asString(item.author, asString(item.name));
-    const role = asString(item.role);
-    const company = asString(item.company);
+    const quote = pickString(item, [
+      "quote",
+      "body",
+      "text",
+      "review",
+      "testimonial",
+      "content",
+    ]);
+    const author = pickString(item, [
+      "author",
+      "name",
+      "customer_name",
+      "customerName",
+      "client",
+      "person",
+    ]);
+    const role = pickString(item, ["role", "title", "position"]);
+    const company = pickString(item, ["company", "organization", "business"]);
 
     if (!quote || !author) {
       return null;
@@ -574,8 +1033,14 @@ export const asOfferItems = (value: JsonValue | undefined) => {
   }
 
   return mapObjectArray(value, (item) => {
-    const title = asString(item.title, asString(item.label));
-    const description = asString(item.description, asString(item.body));
+    const title = pickString(item, ["title", "label", "name", "headline"]);
+    const description = pickString(item, [
+      "description",
+      "body",
+      "copy",
+      "text",
+      "details",
+    ]);
 
     if (!title) {
       return null;
@@ -878,14 +1343,37 @@ export const asMediaItem = (
   value: JsonValue | RuntimeBlock | undefined,
   fallbackAlt: string,
 ): RuntimeMediaItem | null => {
+  if (typeof value === "string" && value.trim()) {
+    return {
+      src: value,
+      alt: fallbackAlt,
+    };
+  }
+
   const record = asRecord(value as JsonValue | undefined);
   if (!record) {
     return null;
   }
 
-  const src = asString(
-    record.imageUrl ?? record.src ?? record.url ?? record.embedUrl,
-  );
+  const nestedMedia =
+    asMediaItem(record.image, fallbackAlt) ??
+    asMediaItem(record.asset, fallbackAlt) ??
+    asMediaItem(record.file, fallbackAlt) ??
+    asMediaItem(record.video, fallbackAlt);
+  if (nestedMedia) {
+    return nestedMedia;
+  }
+
+  const src = pickString(record, [
+    "imageUrl",
+    "image_url",
+    "src",
+    "url",
+    "embedUrl",
+    "embed_url",
+    "videoUrl",
+    "video_url",
+  ]);
 
   if (!src) {
     return null;
@@ -893,8 +1381,8 @@ export const asMediaItem = (
 
   return {
     src,
-    alt: asString(record.alt, fallbackAlt),
-    caption: asString(record.caption) || undefined,
+    alt: pickString(record, ["alt", "label", "title"], fallbackAlt),
+    caption: pickString(record, ["caption", "description"]) || undefined,
   };
 };
 
@@ -909,12 +1397,9 @@ export const extractImageFromMap = (
   }
 
   for (const key of preferredKeys) {
-    const value = asString(record[key]);
-    if (value) {
-      return {
-        src: value,
-        alt: fallbackAlt,
-      } satisfies RuntimeMediaItem;
+    const media = asMediaItem(record[key], fallbackAlt);
+    if (media) {
+      return media;
     }
   }
 
@@ -925,7 +1410,11 @@ export const resolveCtaHref = (
   block: RuntimeBlock,
   runtime: PublicFunnelRuntimePayload,
 ) => {
-  const directHref = asString(block.href);
+  const directHref =
+    asString(block.href) ||
+    asString(block.url) ||
+    asString(block.path) ||
+    asString(asRecord(block.cta)?.href);
   if (directHref) {
     return directHref;
   }

@@ -23,6 +23,8 @@ La base del monorepo ya incluye:
 - JSON Block Runtime Expansion v1 con bloques comerciales iniciales realmente funcionales sobre el runtime público.
 - JSON Compatibility Layer v1 para aceptar payloads compatibles con `hero_block`, `layout_blocks`, `media_dictionary` y `ui_config` sin rehacer el runtime.
 - Template Presets / Block Variants v1 para aplicar presets declarativos y variantes visuales por template/funnel sobre la registry pública actual.
+- Compatible Block Expansion v2 con normalización más fiel para aliases, nested CTA, media ruidosa y bloques comerciales compatibles de mayor impacto.
+- Recycled Component Intake v2 con capa `public-funnel/recycled/` para hero, hook, social proof, video, offer stack y FAQ sobre los adapters actuales.
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
@@ -152,6 +154,8 @@ Validacion de stacks:
 - `docs/json-block-runtime-expansion-v1.md`
 - `docs/json-compatibility-layer-v1.md`
 - `docs/template-presets-block-variants-v1.md`
+- `docs/compatible-block-expansion-v2.md`
+- `docs/recycled-component-intake-v2.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -241,6 +245,11 @@ Modulos disponibles:
   - `media_dictionary`
   - `hero_block`
   - `layout_blocks`
+- Compatibilidad v2 reforzada para:
+  - aliases de props por bloque
+  - `primary_cta` / `secondary_cta` anidados
+  - `stats`, `reviews`, `faq_items`, `price_box`, `video.embed_url`
+  - media inline o por `media_dictionary`
 - Presets iniciales disponibles:
   - `landing_capture_v1`
   - `opportunity_vsl_v1`
@@ -252,6 +261,13 @@ Modulos disponibles:
 - Adapters preparados para asimilación de componentes reciclados:
   - `testimonial` / `testimonials`
   - `media` / `image`
+- Intake `recycled/` activo para secciones comerciales:
+  - hero
+  - hook
+  - social proof
+  - video
+  - offer stack
+  - FAQ accordion
 - Preview local en desarrollo con `?previewHost=...` si hace falta simular otro host.
 - Reveal operativo en el thank-you usando el assignment de la sesion.
 - CTA a WhatsApp con enlace `wa.me` y fallback limpio si falta telefono.

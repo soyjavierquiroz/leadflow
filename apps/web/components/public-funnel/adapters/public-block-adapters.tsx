@@ -3,13 +3,20 @@ import {
   buildCtaClassName,
   PublicChecklistItem,
   PublicEyebrow,
-  PublicPill,
   PublicQuoteCard,
   PublicSectionSurface,
   PublicStatCard,
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
+import {
+  RecycledFaqAccordionSection,
+  RecycledHeroSection,
+  RecycledHookSection,
+  RecycledOfferStackSection,
+  RecycledSocialProofSection,
+  RecycledVideoSection,
+} from "@/components/public-funnel/recycled/compatible-commercial-sections";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import { UrgencyTimerBlock } from "@/components/public-funnel/urgency-timer-block";
 import { WhatsappHandoffCta } from "@/components/public-funnel/whatsapp-handoff-cta";
@@ -112,105 +119,63 @@ function HeroBlockAdapter({
   );
 
   return (
-    <PublicSectionSurface
-      tone="brand"
-      className={cx(
-        "md:p-10",
-        variant === "opportunity" ? "border-amber-300/30" : "",
-      )}
-    >
-      <div className="grid gap-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-stretch">
-        <div className="flex flex-col justify-between">
-          <div>
-            <PublicEyebrow>{eyebrow}</PublicEyebrow>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <PublicPill tone="brand">
-                {variant === "opportunity"
-                  ? "Oportunidad"
-                  : toStepLabel(runtime.currentStep.stepType)}
-              </PublicPill>
-              <PublicPill tone="brand">{runtime.domain.host}</PublicPill>
-              <PublicPill tone="brand">
-                {variant === "opportunity"
-                  ? "Ruta de oportunidad"
-                  : `Paso ${runtime.currentStep.position} de ${runtime.steps.length}`}
-              </PublicPill>
-            </div>
-            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-6xl">
-              {title}
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 md:text-lg">
-              {description}
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <TrackedCta
-                publicationId={runtime.publication.id}
-                currentStepId={runtime.currentStep.id}
-                currentPath={runtime.request.path}
-                href={primaryCtaHref}
-                label={primaryCtaLabel}
-                className={buildCtaClassName("primary")}
-                action={hasCaptureBlock ? "scroll_to_capture" : "hero_primary"}
-              />
-              <TrackedCta
-                publicationId={runtime.publication.id}
-                currentStepId={runtime.currentStep.id}
-                currentPath={runtime.request.path}
-                href={secondaryCtaHref}
-                label={secondaryCtaLabel}
-                className={cx(
-                  buildCtaClassName("secondary"),
-                  "border-white/20 bg-white/8 text-white hover:bg-white/14",
-                )}
-                action="hero_secondary"
-              />
-            </div>
-          </div>
-
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            {heroMetrics.map((item) => (
-              <PublicStatCard
-                key={`${item.label}-${item.value}`}
-                label={item.label}
-                value={item.value}
-                description={item.description}
-                tone="brand"
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-[2rem] border border-white/10 bg-white/7 p-5 backdrop-blur">
-          {media ? (
-            <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-slate-950/50">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={media.src}
-                alt={media.alt}
-                className="h-64 w-full object-cover md:h-72"
-              />
-            </div>
-          ) : null}
-          <div className={cx("grid gap-4", media ? "mt-5" : "")}>
-            <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/35 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200">
-                {accent}
-              </p>
-              <p className="mt-3 text-lg font-semibold text-white">
-                {variant === "opportunity"
-                  ? "Este hero prioriza momentum comercial y transición rápida hacia la captura."
-                  : "La historia del funnel ahora se entiende completa: promesa, prueba, captura, confirmación y continuidad."}
-              </p>
-            </div>
-            <div className="grid gap-3">
-              {heroProof.map((item) => (
-                <PublicChecklistItem key={item}>{item}</PublicChecklistItem>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </PublicSectionSurface>
+    <RecycledHeroSection
+      variant={variant}
+      eyebrow={eyebrow}
+      pills={[
+        {
+          label:
+            variant === "opportunity"
+              ? "Oportunidad"
+              : toStepLabel(runtime.currentStep.stepType),
+          tone: "brand",
+        },
+        { label: runtime.domain.host, tone: "brand" },
+        {
+          label:
+            variant === "opportunity"
+              ? "Ruta de oportunidad"
+              : `Paso ${runtime.currentStep.position} de ${runtime.steps.length}`,
+          tone: "brand",
+        },
+      ]}
+      title={title}
+      description={description}
+      primaryCta={
+        <TrackedCta
+          publicationId={runtime.publication.id}
+          currentStepId={runtime.currentStep.id}
+          currentPath={runtime.request.path}
+          href={primaryCtaHref}
+          label={primaryCtaLabel}
+          className={buildCtaClassName("primary")}
+          action={hasCaptureBlock ? "scroll_to_capture" : "hero_primary"}
+        />
+      }
+      secondaryCta={
+        <TrackedCta
+          publicationId={runtime.publication.id}
+          currentStepId={runtime.currentStep.id}
+          currentPath={runtime.request.path}
+          href={secondaryCtaHref}
+          label={secondaryCtaLabel}
+          className={cx(
+            buildCtaClassName("secondary"),
+            "border-white/20 bg-white/8 text-white hover:bg-white/14",
+          )}
+          action="hero_secondary"
+        />
+      }
+      metrics={heroMetrics}
+      media={media}
+      accent={accent}
+      narrative={
+        variant === "opportunity"
+          ? "Este hero prioriza momentum comercial y transición rápida hacia la captura."
+          : "La historia del funnel ahora se entiende completa: promesa, prueba, captura, confirmación y continuidad."
+      }
+      proofItems={heroProof}
+    />
   );
 }
 
@@ -238,43 +203,31 @@ function HookAndPromiseBlockAdapter({
   const ctaLabel = asString(block.label, "Quiero ver cómo funciona");
 
   return (
-    <PublicSectionSurface tone="brand">
-      <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
-        <div>
-          <PublicEyebrow>{eyebrow}</PublicEyebrow>
-          <h2 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-            {hook}
-          </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200">
-            {promise}
-          </p>
-          <div className="mt-7">
-            <TrackedCta
-              publicationId={runtime.publication.id}
-              currentStepId={runtime.currentStep.id}
-              currentPath={runtime.request.path}
-              href={ctaHref}
-              label={ctaLabel}
-              className={buildCtaClassName("primary")}
-              action={asString(block.action) || "hook_primary"}
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-3">
-          {(points.length > 0
-            ? points
-            : [
-                "Copy directo para abrir interés sin rodeos.",
-                "Promesa alineada al siguiente paso del funnel.",
-                "Bloque pensado para presets comerciales futuros.",
-              ]
-          ).map((item) => (
-            <PublicChecklistItem key={item}>{item}</PublicChecklistItem>
-          ))}
-        </div>
-      </div>
-    </PublicSectionSurface>
+    <RecycledHookSection
+      eyebrow={eyebrow}
+      hook={hook}
+      promise={promise}
+      cta={
+        <TrackedCta
+          publicationId={runtime.publication.id}
+          currentStepId={runtime.currentStep.id}
+          currentPath={runtime.request.path}
+          href={ctaHref}
+          label={ctaLabel}
+          className={buildCtaClassName("primary")}
+          action={asString(block.action) || "hook_primary"}
+        />
+      }
+      points={
+        points.length > 0
+          ? points
+          : [
+              "Copy directo para abrir interés sin rodeos.",
+              "Promesa alineada al siguiente paso del funnel.",
+              "Bloque pensado para intake de componentes reciclados.",
+            ]
+      }
+    />
   );
 }
 
@@ -381,51 +334,14 @@ function VideoBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
         ];
 
   return (
-    <PublicSectionSurface>
-      <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <div>
-          <PublicEyebrow tone="neutral">Prueba visual</PublicEyebrow>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            {title}
-          </h2>
-          {caption ? (
-            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-              {caption}
-            </p>
-          ) : null}
-          <div className="mt-6 overflow-hidden rounded-[1.8rem] border border-slate-200 bg-slate-950 shadow-inner">
-            <div className="aspect-video">
-              <iframe
-                className="h-full w-full"
-                src={embedUrl}
-                title={title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[1.8rem] border border-slate-200 bg-slate-50 p-5">
-          <PublicEyebrow tone="neutral">Qué refuerza este bloque</PublicEyebrow>
-          <p className="mt-3 text-lg font-semibold text-slate-950">
-            Una pieza media ya no se siente como relleno: acompaña la decisión y
-            sostiene el siguiente paso del funnel.
-          </p>
-          <div className="mt-6 grid gap-3">
-            {checklist.map((item) => (
-              <PublicChecklistItem key={item}>{item}</PublicChecklistItem>
-            ))}
-          </div>
-          <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-white p-4">
-            <p className="text-sm leading-6 text-slate-700">
-              Paso conectado: {toStepLabel(runtime.currentStep.stepType)} sobre{" "}
-              {runtime.request.path}.
-            </p>
-          </div>
-        </div>
-      </div>
-    </PublicSectionSurface>
+    <RecycledVideoSection
+      eyebrow="Prueba visual"
+      title={title}
+      caption={caption || undefined}
+      embedUrl={embedUrl}
+      checklist={checklist}
+      footer={`Paso conectado: ${toStepLabel(runtime.currentStep.stepType)} sobre ${runtime.request.path}.`}
+    />
   );
 }
 
@@ -502,29 +418,11 @@ function FaqBlockAdapter({ block }: PublicBlockAdapterProps) {
   const items = asFaqItems(block.items);
 
   return (
-    <PublicSectionSurface>
-      <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral">
-          {variant === "accordion" ? "FAQ accordion" : "Confianza y objeciones"}
-        </PublicEyebrow>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-          {title}
-        </h2>
-      </div>
-      <div className="mt-8 space-y-3">
-        {items.map((item) => (
-          <details
-            key={item.question}
-            className="group rounded-[1.6rem] border border-slate-200 bg-slate-50 p-5 open:bg-white"
-          >
-            <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
-              {item.question}
-            </summary>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{item.answer}</p>
-          </details>
-        ))}
-      </div>
-    </PublicSectionSurface>
+    <RecycledFaqAccordionSection
+      eyebrow={variant === "accordion" ? "FAQ accordion" : "Confianza y objeciones"}
+      title={title}
+      items={items}
+    />
   );
 }
 
@@ -557,49 +455,15 @@ function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
   ];
 
   return (
-    <PublicSectionSurface>
-      <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral">Social proof adapter</PublicEyebrow>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-          {title}
-        </h2>
-        <p className="mt-4 text-base leading-7 text-slate-600">{description}</p>
-      </div>
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
-        {(metrics.length > 0 ? metrics : fallbackMetrics).map((item) => (
-          <PublicStatCard
-            key={`${item.label}-${item.value}`}
-            label={item.label}
-            value={item.value}
-            description={item.description}
-          />
-        ))}
-      </div>
-      {variant === "risk_reversal" && featureItems.length > 0 ? (
-        <div className="mt-8 grid gap-3">
-          {featureItems.map((item) => (
-            <PublicChecklistItem key={item.title}>{item.title}</PublicChecklistItem>
-          ))}
-        </div>
-      ) : null}
-      {testimonials.length > 0 ? (
-        <div
-          className={cx(
-            "mt-8 grid gap-4",
-            variant === "testimonials_focus" ? "lg:grid-cols-3" : "lg:grid-cols-2",
-          )}
-        >
-          {testimonials.map((item) => (
-            <PublicQuoteCard
-              key={`${item.author}-${item.quote}`}
-              quote={item.quote}
-              author={item.author}
-              detail={[item.role, item.company].filter(Boolean).join(" · ")}
-            />
-          ))}
-        </div>
-      ) : null}
-    </PublicSectionSurface>
+    <RecycledSocialProofSection
+      variant={variant}
+      eyebrow="Social proof adapter"
+      title={title}
+      description={description}
+      metrics={metrics.length > 0 ? metrics : fallbackMetrics}
+      testimonials={testimonials}
+      checklist={featureItems}
+    />
   );
 }
 
@@ -736,53 +600,26 @@ function OfferBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
   const ctaLabel = asString(block.label, "Quiero esta oferta");
 
   return (
-    <PublicSectionSurface tone="warm">
-      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-        <div>
-          <PublicEyebrow tone="warm">Offer adapter</PublicEyebrow>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            {title}
-          </h2>
-          <p className="mt-4 text-base leading-7 text-slate-700">{description}</p>
-          {items.length > 0 ? (
-            <div className="mt-6 grid gap-3">
-              {items.map((item) => (
-                <PublicChecklistItem key={item.title} accent="warm">
-                  <span className="font-semibold text-slate-900">{item.title}</span>
-                  {item.description ? ` · ${item.description}` : ""}
-                </PublicChecklistItem>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="rounded-[1.8rem] border border-amber-200 bg-white p-6">
-          <PublicPill tone="warm">
-            {variant === "offer_stack"
-              ? "Offer stack"
-              : "Lista para pricing y bundles"}
-          </PublicPill>
-          <p className="mt-5 text-4xl font-semibold tracking-tight text-slate-950">
-            {price || "Personalizable"}
-          </p>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            {note ||
-              "Este adapter puede envolver componentes reciclados con precio, beneficios y CTA propio."}
-          </p>
-          <div className="mt-6">
-            <TrackedCta
-              publicationId={runtime.publication.id}
-              currentStepId={runtime.currentStep.id}
-              currentPath={runtime.request.path}
-              href={ctaHref}
-              label={ctaLabel}
-              className={buildCtaClassName("primary")}
-              action={asString(block.action) || "offer_cta"}
-            />
-          </div>
-        </div>
-      </div>
-    </PublicSectionSurface>
+    <RecycledOfferStackSection
+      variant={variant}
+      eyebrow="Offer adapter"
+      title={title}
+      description={description}
+      items={items}
+      price={price || undefined}
+      note={note || undefined}
+      cta={
+        <TrackedCta
+          publicationId={runtime.publication.id}
+          currentStepId={runtime.currentStep.id}
+          currentPath={runtime.request.path}
+          href={ctaHref}
+          label={ctaLabel}
+          className={buildCtaClassName("primary")}
+          action={asString(block.action) || "offer_cta"}
+        />
+      }
+    />
   );
 }
 

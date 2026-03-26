@@ -84,6 +84,8 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Component Assimilation v1 con registry de adapters en `apps/web/components/public-funnel/adapters` para desacoplar markup visual del contrato de `blocks_json` y preparar variantes de template futuras.
 - JSON Compatibility Layer v1 para aceptar payloads con `template`, `ui_config`, `media_dictionary`, `hero_block` y `layout_blocks`, traducirlos al shape interno y renderizarlos con la misma registry pública.
 - Template Presets / Block Variants v1 con presets declarativos en `apps/web/components/public-funnel/template-presets.ts` para resolver composición sugerida, defaults y variantes visuales sin duplicar el runtime.
+- Compatible Block Expansion v2 para aceptar aliases más reales por bloque, nested CTA, shapes de media más ruidosos y mappings comerciales con mayor fidelidad.
+- Recycled Component Intake v2 con capa `apps/web/components/public-funnel/recycled` para secciones comerciales reutilizables consumidas por los adapters públicos.
 - Reveal & handoff v1 sobre el runtime publico:
   - reveal del sponsor asignado en thank-you
   - CTA a WhatsApp con mensaje prellenado
@@ -121,6 +123,20 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `risk_reversal` -> `social_proof`
   - `final_cta` -> `cta`
   - `form_placeholder` -> `lead_capture_form`
+- Compatibilidad v2 reforzada además para:
+  - `stats` / `kpis` / `numbers`
+  - `reviews` / `quotes` / `customers`
+  - `faq_items` / `faqs`
+  - `price_box`
+  - `primary_cta` / `secondary_cta`
+  - `video.embed_url`
+- Intake reciclado activo para:
+  - `hero`
+  - `hook_and_promise`
+  - `social_proof`
+  - `video`
+  - `offer_pricing`
+  - `faq`
 - Presets iniciales disponibles:
   - `landing_capture_v1`
   - `opportunity_vsl_v1`
