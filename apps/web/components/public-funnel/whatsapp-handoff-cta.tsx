@@ -23,6 +23,7 @@ type WhatsappHandoffCtaProps = {
   subheadline?: string;
   buttonText?: string;
   helperText?: string;
+  variant?: string;
 };
 
 const buildHandoffMarker = (
@@ -38,6 +39,7 @@ export function WhatsappHandoffCta({
   subheadline,
   buttonText,
   helperText,
+  variant,
 }: WhatsappHandoffCtaProps) {
   const context = useMemo(
     () => readSubmissionContext(runtime.publication.id),
@@ -155,7 +157,9 @@ export function WhatsappHandoffCta({
                   onClick={trackHandoff}
                   className={cx(
                     buildCtaClassName("primary"),
-                    "bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-600",
+                    variant === "handoff_primary"
+                      ? "bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-600"
+                      : "bg-slate-950 hover:bg-slate-800 focus-visible:outline-slate-950",
                   )}
                 >
                   {handoffButtonLabel}

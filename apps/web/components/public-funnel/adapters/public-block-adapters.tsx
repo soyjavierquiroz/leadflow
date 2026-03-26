@@ -45,6 +45,7 @@ function HeroBlockAdapter({
   runtime,
   blocks,
 }: PublicBlockAdapterProps) {
+  const variant = asString(block.variant, "leadflow_signal");
   const title = asString(block.title, runtime.funnel.name);
   const description = asString(
     block.description,
@@ -111,18 +112,28 @@ function HeroBlockAdapter({
   );
 
   return (
-    <PublicSectionSurface tone="brand" className="md:p-10">
+    <PublicSectionSurface
+      tone="brand"
+      className={cx(
+        "md:p-10",
+        variant === "opportunity" ? "border-amber-300/30" : "",
+      )}
+    >
       <div className="grid gap-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-stretch">
         <div className="flex flex-col justify-between">
           <div>
             <PublicEyebrow>{eyebrow}</PublicEyebrow>
             <div className="mt-5 flex flex-wrap gap-2">
               <PublicPill tone="brand">
-                {toStepLabel(runtime.currentStep.stepType)}
+                {variant === "opportunity"
+                  ? "Oportunidad"
+                  : toStepLabel(runtime.currentStep.stepType)}
               </PublicPill>
               <PublicPill tone="brand">{runtime.domain.host}</PublicPill>
               <PublicPill tone="brand">
-                Paso {runtime.currentStep.position} de {runtime.steps.length}
+                {variant === "opportunity"
+                  ? "Ruta de oportunidad"
+                  : `Paso ${runtime.currentStep.position} de ${runtime.steps.length}`}
               </PublicPill>
             </div>
             <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-6xl">
@@ -186,8 +197,9 @@ function HeroBlockAdapter({
                 {accent}
               </p>
               <p className="mt-3 text-lg font-semibold text-white">
-                La historia del funnel ahora se entiende completa: promesa,
-                prueba, captura, confirmación y continuidad.
+                {variant === "opportunity"
+                  ? "Este hero prioriza momentum comercial y transición rápida hacia la captura."
+                  : "La historia del funnel ahora se entiende completa: promesa, prueba, captura, confirmación y continuidad."}
               </p>
             </div>
             <div className="grid gap-3">
@@ -485,13 +497,16 @@ function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
 }
 
 function FaqBlockAdapter({ block }: PublicBlockAdapterProps) {
+  const variant = asString(block.variant, "accordion");
   const title = asString(block.title, "Preguntas frecuentes");
   const items = asFaqItems(block.items);
 
   return (
     <PublicSectionSurface>
       <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral">Confianza y objeciones</PublicEyebrow>
+        <PublicEyebrow tone="neutral">
+          {variant === "accordion" ? "FAQ accordion" : "Confianza y objeciones"}
+        </PublicEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
           {title}
         </h2>
@@ -514,6 +529,7 @@ function FaqBlockAdapter({ block }: PublicBlockAdapterProps) {
 }
 
 function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
+  const variant = asString(block.variant, "metrics_trust");
   const title = asString(block.title, "Prueba social");
   const description = asString(
     block.description,
@@ -521,6 +537,7 @@ function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
   );
   const metrics = asMetricItems(block.metrics ?? block.items);
   const testimonials = asTestimonialItems(block.testimonials);
+  const featureItems = asFeatureItems(block.items);
   const fallbackMetrics = [
     {
       label: "Legibilidad",
@@ -558,8 +575,20 @@ function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
           />
         ))}
       </div>
+      {variant === "risk_reversal" && featureItems.length > 0 ? (
+        <div className="mt-8 grid gap-3">
+          {featureItems.map((item) => (
+            <PublicChecklistItem key={item.title}>{item.title}</PublicChecklistItem>
+          ))}
+        </div>
+      ) : null}
       {testimonials.length > 0 ? (
-        <div className="mt-8 grid gap-4 lg:grid-cols-2">
+        <div
+          className={cx(
+            "mt-8 grid gap-4",
+            variant === "testimonials_focus" ? "lg:grid-cols-3" : "lg:grid-cols-2",
+          )}
+        >
           {testimonials.map((item) => (
             <PublicQuoteCard
               key={`${item.author}-${item.quote}`}
@@ -694,6 +723,7 @@ function MediaBlockAdapter({ block }: PublicBlockAdapterProps) {
 }
 
 function OfferBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
+  const variant = asString(block.variant, "offer_stack");
   const title = asString(block.title, "Oferta");
   const description = asString(
     block.description,
@@ -727,7 +757,11 @@ function OfferBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
         </div>
 
         <div className="rounded-[1.8rem] border border-amber-200 bg-white p-6">
-          <PublicPill tone="warm">Lista para pricing y bundles</PublicPill>
+          <PublicPill tone="warm">
+            {variant === "offer_stack"
+              ? "Offer stack"
+              : "Lista para pricing y bundles"}
+          </PublicPill>
           <p className="mt-5 text-4xl font-semibold tracking-tight text-slate-950">
             {price || "Personalizable"}
           </p>
@@ -814,6 +848,7 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
 }
 
 function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
+  const variant = asString(props.block.variant, "confirmation_reveal");
   const title = asString(
     props.block.headline,
     asString(props.block.title, "Gracias, ya estás dentro"),
@@ -835,7 +870,7 @@ function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
   );
 
   return (
-    <div className="grid gap-6">
+    <div className={cx("grid gap-6", variant === "confirmation_reveal" ? "" : "")}>
       <ThankYouBlockAdapter
         block={{
           ...props.block,
@@ -871,6 +906,7 @@ function WhatsappHandoffCtaBlockAdapter({
       helperText={
         asString(block.helper_text, asString(block.helperText)) || undefined
       }
+      variant={asString(block.variant) || undefined}
     />
   );
 }

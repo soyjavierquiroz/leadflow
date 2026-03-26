@@ -194,6 +194,7 @@ export function PublicCaptureForm({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasTrackedFormStart, setHasTrackedFormStart] = useState(false);
+  const variant = block.variant ?? "conversion_card";
 
   const updateValue = (key: string, value: string) => {
     setValues((current) => ({
@@ -324,14 +325,25 @@ export function PublicCaptureForm({
     <PublicSectionSurface
       id="public-capture-form"
       tone="success"
-      className="scroll-mt-8"
+      className={cx(
+        "scroll-mt-8",
+        variant === "compact_capture" ? "md:p-6" : "",
+      )}
     >
       <div className="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
         <div>
           <PublicEyebrow tone="success">{block.eyebrow}</PublicEyebrow>
           <div className="mt-4 flex flex-wrap gap-2">
-            <PublicPill tone="success">Bloque real del runtime</PublicPill>
-            <PublicPill>Submit estándar Leadflow</PublicPill>
+            <PublicPill tone="success">
+              {variant === "compact_capture"
+                ? "Captura compacta"
+                : "Bloque real del runtime"}
+            </PublicPill>
+            <PublicPill>
+              {variant === "compact_capture"
+                ? "Preset opportunity"
+                : "Submit estándar Leadflow"}
+            </PublicPill>
           </div>
 
           <h2 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
@@ -341,17 +353,24 @@ export function PublicCaptureForm({
             {block.subheadline}
           </p>
 
-          <div className="mt-7 grid gap-3">
-            {[
-              "Visitor, lead, assignment y nextStep siguen resolviéndose con el motor estándar.",
-              "El bloque captura contexto de URL y valores declarativos sin abrir lógica custom por JSON.",
-              "El reveal y handoff posterior mantienen la misma continuidad del runtime público.",
-            ].map((item) => (
-              <PublicChecklistItem key={item} accent="success">
-                {item}
-              </PublicChecklistItem>
-            ))}
-          </div>
+          {variant === "compact_capture" ? (
+            <div className="mt-7 rounded-[1.5rem] border border-emerald-200 bg-white/90 p-4 text-sm leading-6 text-slate-700">
+              Captura rápida, contexto de URL conservado y continuidad automática
+              al siguiente step cuando el runtime lo define.
+            </div>
+          ) : (
+            <div className="mt-7 grid gap-3">
+              {[
+                "Visitor, lead, assignment y nextStep siguen resolviéndose con el motor estándar.",
+                "El bloque captura contexto de URL y valores declarativos sin abrir lógica custom por JSON.",
+                "El reveal y handoff posterior mantienen la misma continuidad del runtime público.",
+              ].map((item) => (
+                <PublicChecklistItem key={item} accent="success">
+                  {item}
+                </PublicChecklistItem>
+              ))}
+            </div>
+          )}
         </div>
 
         <form

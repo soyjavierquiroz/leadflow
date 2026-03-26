@@ -82,6 +82,8 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Lead Capture Form Block v1 como bloque declarativo de primera clase conectado al submit compuesto del runtime público.
 - JSON Block Runtime Expansion v1 para soportar bloques comerciales reales y una normalización clara entre contrato JSON y markup.
 - Component Assimilation v1 con registry de adapters en `apps/web/components/public-funnel/adapters` para desacoplar markup visual del contrato de `blocks_json` y preparar variantes de template futuras.
+- JSON Compatibility Layer v1 para aceptar payloads con `template`, `ui_config`, `media_dictionary`, `hero_block` y `layout_blocks`, traducirlos al shape interno y renderizarlos con la misma registry pública.
+- Template Presets / Block Variants v1 con presets declarativos en `apps/web/components/public-funnel/template-presets.ts` para resolver composición sugerida, defaults y variantes visuales sin duplicar el runtime.
 - Reveal & handoff v1 sobre el runtime publico:
   - reveal del sponsor asignado en thank-you
   - CTA a WhatsApp con mensaje prellenado
@@ -110,6 +112,19 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - entrada al thank-you con assignment
 - Build preparado para contenedor con `output: standalone`.
 - Fetch real a API cuando existe backend disponible y fallback controlado a mocks aislados para evitar romper shells en `build` o preview local.
+- Compatibilidad actual mantenida por normalización/adapters:
+  - `hero_block` -> `hero`
+  - `video_block` -> `video`
+  - `faq_accordion` -> `faq`
+  - `offer_stack` -> `offer_pricing`
+  - `features_and_benefits` / `how_it_works` -> `feature_grid`
+  - `risk_reversal` -> `social_proof`
+  - `final_cta` -> `cta`
+  - `form_placeholder` -> `lead_capture_form`
+- Presets iniciales disponibles:
+  - `landing_capture_v1`
+  - `opportunity_vsl_v1`
+  - `thank_you_reveal_v1`
 
 ### Backend (`apps/api`)
 

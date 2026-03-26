@@ -9,7 +9,7 @@ import {
 import { PublicRuntimeTracker } from "@/components/public-funnel/public-runtime-tracker";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import {
-  asBlockArray,
+  parseRuntimeBlocks,
   toStepLabel,
 } from "@/components/public-funnel/runtime-block-utils";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
@@ -23,7 +23,8 @@ export function FunnelRuntimePage({
   runtime,
   previewHost,
 }: FunnelRuntimePageProps) {
-  const blocks = asBlockArray(runtime.currentStep.blocksJson);
+  const parsedBlocks = parseRuntimeBlocks(runtime.currentStep.blocksJson);
+  const blocks = parsedBlocks.blocks;
   const entryStepPath =
     runtime.steps.find((step) => step.isEntryStep)?.path ??
     runtime.currentStep.path;
@@ -50,6 +51,14 @@ export function FunnelRuntimePage({
                   <PublicPill>
                     Template {runtime.funnel.template.name}
                   </PublicPill>
+                  {parsedBlocks.compatibility.mode === "leadflow_compatible" ? (
+                    <PublicPill tone="warm">JSON compatible</PublicPill>
+                  ) : null}
+                  {parsedBlocks.compatibility.presetId ? (
+                    <PublicPill>
+                      Preset {parsedBlocks.compatibility.presetId}
+                    </PublicPill>
+                  ) : null}
                   {previewHost ? (
                     <PublicPill tone="warm">previewHost={previewHost}</PublicPill>
                   ) : null}
@@ -153,6 +162,9 @@ export function FunnelRuntimePage({
                 `Dominio resuelto: ${runtime.domain.host}`,
                 `Tracking profile: ${runtime.trackingProfile?.name ?? "sin perfil activo"}`,
                 `Modo de handoff: ${runtime.handoff.mode ?? "sin modo definido"}`,
+                parsedBlocks.compatibility.mediaDictionaryKeys.length > 0
+                  ? `Media dictionary: ${parsedBlocks.compatibility.mediaDictionaryKeys.length} assets`
+                  : "Media dictionary: no definido",
               ].map((item) => (
                 <div
                   key={item}

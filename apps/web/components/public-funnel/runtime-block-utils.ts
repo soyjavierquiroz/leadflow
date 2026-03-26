@@ -3,6 +3,7 @@ import type {
   PublicFunnelRuntimePayload,
   RuntimeBlock,
 } from "@/lib/public-funnel-runtime.types";
+import { applyTemplatePresetToBlock } from "@/components/public-funnel/template-presets";
 
 export type RuntimeFaqItem = {
   question: string;
@@ -68,6 +69,7 @@ export type RuntimeLeadCaptureField = {
 };
 
 export type RuntimeLeadCaptureFormBlock = {
+  variant?: string;
   eyebrow: string;
   headline: string;
   subheadline: string;
@@ -81,6 +83,20 @@ export type RuntimeLeadCaptureFormBlock = {
     sourceChannel: string;
     tags: string[];
     successMessage?: string;
+  };
+};
+
+export type RuntimeBlocksCompatibilityMode =
+  | "leadflow_native"
+  | "leadflow_compatible";
+
+export type RuntimeBlocksParseResult = {
+  blocks: RuntimeBlock[];
+  compatibility: {
+    mode: RuntimeBlocksCompatibilityMode;
+    templateId: string | null;
+    presetId: string | null;
+    mediaDictionaryKeys: string[];
   };
 };
 
@@ -118,11 +134,25 @@ export const normalizeRuntimeBlockType = (value: string) => {
   switch (value) {
     case "form_placeholder":
       return "lead_capture_form";
+    case "hero_block":
+      return "hero";
+    case "video_block":
+      return "video";
+    case "faq_accordion":
+      return "faq";
     case "features":
+      return "feature_grid";
+    case "features_and_benefits":
+    case "how_it_works":
       return "feature_grid";
     case "offer":
     case "pricing":
+    case "offer_stack":
       return "offer_pricing";
+    case "final_cta":
+      return "cta";
+    case "risk_reversal":
+      return "social_proof";
     case "testimonial":
     case "testimonials":
       return "testimonials";
@@ -131,17 +161,278 @@ export const normalizeRuntimeBlockType = (value: string) => {
   }
 };
 
-export const asBlockArray = (value: JsonValue | undefined) => {
+const resolveTemplateId = (value: JsonValue | undefined) => {
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  return (
+    asString(record.preset) ||
+    asString(record.code) ||
+    asString(record.id) ||
+    null
+  );
+};
+
+const resolveMediaDictionaryRecord = (value: JsonValue | undefined) => {
+  return asRecord(value) ?? {};
+};
+
+const resolveMediaDictionaryEntry = (
+  dictionary: Record<string, JsonValue>,
+  key: string,
+  fallbackAlt: string,
+) => {
+  const value = dictionary[key];
+  if (typeof value === "string" && value.trim()) {
+    return {
+      src: value,
+      alt: fallbackAlt,
+    } satisfies RuntimeMediaItem;
+  }
+
+  return asMediaItem(value, fallbackAlt);
+};
+
+const resolveMediaFromDictionary = (
+  blockRecord: Record<string, JsonValue>,
+  dictionary: Record<string, JsonValue>,
+  fallbackAlt: string,
+) => {
+  const candidateKeys = [
+    asString(blockRecord.media_key),
+    asString(blockRecord.mediaKey),
+    asString(blockRecord.image_key),
+    asString(blockRecord.imageKey),
+    asString(blockRecord.video_key),
+    asString(blockRecord.videoKey),
+    asString(blockRecord.asset_key),
+    asString(blockRecord.assetKey),
+  ].filter(Boolean);
+
+  for (const key of candidateKeys) {
+    const media = resolveMediaDictionaryEntry(dictionary, key, fallbackAlt);
+    if (media) {
+      return media;
+    }
+  }
+
+  return null;
+};
+
+const normalizeHowItWorksItems = (value: JsonValue | undefined) => {
+  return mapObjectArray(value, (item) => {
+    const title = asString(item.title, asString(item.step));
+    const description = asString(item.description, asString(item.body));
+    const eyebrow = asString(item.eyebrow, asString(item.label));
+
+    if (!title) {
+      return null;
+    }
+
+    return {
+      eyebrow: eyebrow || undefined,
+      title,
+      description: description || undefined,
+    };
+  });
+};
+
+const normalizeCompatibleExternalBlock = (
+  rawBlock: Record<string, JsonValue>,
+  dictionary: Record<string, JsonValue>,
+  uiConfigValue: JsonValue | undefined,
+  presetId: string | null,
+  index: number,
+) => {
+  const rawType = asString(rawBlock.type);
+  const normalizedType = normalizeRuntimeBlockType(rawType);
+  const title = asString(rawBlock.title, asString(rawBlock.headline));
+  const description = asString(
+    rawBlock.description,
+    asString(rawBlock.subheadline),
+  );
+  const media = resolveMediaFromDictionary(rawBlock, dictionary, title || rawType);
+
+  const baseBlock: RuntimeBlock = {
+    ...rawBlock,
+    type: normalizedType,
+    key: asString(rawBlock.key, `${normalizedType}-${index}`),
+  };
+
+  switch (rawType) {
+    case "hero_block":
+      baseBlock.eyebrow = asString(rawBlock.eyebrow, asString(rawBlock.badge));
+      baseBlock.title = title;
+      baseBlock.description = description;
+      if (media) {
+        baseBlock.media = media;
+      }
+      break;
+    case "video_block":
+      baseBlock.title = title;
+      baseBlock.caption = description;
+      baseBlock.embedUrl =
+        asString(rawBlock.embedUrl) || media?.src || asString(rawBlock.url);
+      break;
+    case "offer_stack":
+      baseBlock.title = title || "Oferta";
+      baseBlock.description = description;
+      baseBlock.price = asString(rawBlock.price, asString(rawBlock.primary_price));
+      baseBlock.price_note = asString(
+        rawBlock.price_note,
+        asString(rawBlock.note),
+      );
+      baseBlock.items =
+        rawBlock.items ?? rawBlock.stack_items ?? rawBlock.offers ?? undefined;
+      break;
+    case "features_and_benefits":
+      baseBlock.title = title || "Beneficios";
+      baseBlock.description = description;
+      baseBlock.items = rawBlock.items ?? rawBlock.features ?? rawBlock.benefits;
+      break;
+    case "how_it_works":
+      baseBlock.title = title || "Cómo funciona";
+      baseBlock.description = description;
+      baseBlock.items = normalizeHowItWorksItems(
+        rawBlock.items ?? rawBlock.steps ?? rawBlock.sequence,
+      ) as unknown as JsonValue;
+      break;
+    case "risk_reversal":
+      baseBlock.title = title || "Reduce el riesgo";
+      baseBlock.description = description;
+      baseBlock.items = rawBlock.items ?? rawBlock.guarantees ?? rawBlock.points;
+      baseBlock.variant = asString(rawBlock.variant, "risk_reversal");
+      break;
+    case "final_cta":
+      baseBlock.title = title || "Siguiente paso";
+      baseBlock.description = description;
+      baseBlock.label = asString(
+        rawBlock.button_text,
+        asString(rawBlock.label, "Continuar"),
+      );
+      baseBlock.href = asString(rawBlock.href);
+      baseBlock.variant = asString(rawBlock.variant, "final_cta");
+      break;
+    case "faq_accordion":
+      baseBlock.title = title || "Preguntas frecuentes";
+      baseBlock.items = rawBlock.items ?? rawBlock.questions ?? undefined;
+      baseBlock.variant = asString(rawBlock.variant, "accordion");
+      break;
+    default:
+      if (media) {
+        if (normalizedType === "video") {
+          baseBlock.embedUrl =
+            asString(rawBlock.embedUrl) || media.src || asString(rawBlock.url);
+        } else {
+          baseBlock.media = media;
+        }
+      }
+      if (title && !baseBlock.title) {
+        baseBlock.title = title;
+      }
+      if (description && !baseBlock.description) {
+        baseBlock.description = description;
+      }
+      break;
+  }
+
+  return applyTemplatePresetToBlock(baseBlock, uiConfigValue, presetId);
+};
+
+export const parseRuntimeBlocks = (value: JsonValue | undefined) => {
   if (!value || typeof value !== "object" || !("blocks" in value)) {
-    return [] as RuntimeBlock[];
+    const compatibleRecord = asRecord(value);
+
+    if (!compatibleRecord) {
+      return {
+        blocks: [] as RuntimeBlock[],
+        compatibility: {
+          mode: "leadflow_native" as const,
+          templateId: null,
+          presetId: null,
+          mediaDictionaryKeys: [],
+        },
+      } satisfies RuntimeBlocksParseResult;
+    }
+
+    const templateId = resolveTemplateId(compatibleRecord.template);
+    const uiConfig = compatibleRecord.ui_config;
+    const presetId =
+      asString(asRecord(uiConfig)?.preset, templateId ?? undefined) || templateId;
+    const mediaDictionary = resolveMediaDictionaryRecord(
+      compatibleRecord.media_dictionary,
+    );
+    const blocks: RuntimeBlock[] = [];
+    const heroBlock = asRecord(compatibleRecord.hero_block);
+
+    if (heroBlock) {
+      blocks.push(
+        normalizeCompatibleExternalBlock(
+          {
+            ...heroBlock,
+            type: heroBlock.type ?? "hero_block",
+          },
+          mediaDictionary,
+          uiConfig,
+          presetId,
+          0,
+        ),
+      );
+    }
+
+    const layoutBlocks = Array.isArray(compatibleRecord.layout_blocks)
+      ? compatibleRecord.layout_blocks
+      : [];
+    const blockOffset = blocks.length;
+
+    layoutBlocks.forEach((item, index) => {
+      const record = asRecord(item);
+      if (!record) {
+        return;
+      }
+
+      blocks.push(
+        normalizeCompatibleExternalBlock(
+          record,
+          mediaDictionary,
+          uiConfig,
+          presetId,
+          blockOffset + index,
+        ),
+      );
+    });
+
+    return {
+      blocks,
+      compatibility: {
+        mode: "leadflow_compatible",
+        templateId,
+        presetId,
+        mediaDictionaryKeys: Object.keys(mediaDictionary),
+      },
+    } satisfies RuntimeBlocksParseResult;
   }
 
   const blocks = (value as { blocks?: JsonValue }).blocks;
   if (!Array.isArray(blocks)) {
-    return [] as RuntimeBlock[];
+    return {
+      blocks: [] as RuntimeBlock[],
+      compatibility: {
+        mode: "leadflow_native",
+        templateId: null,
+        presetId: null,
+        mediaDictionaryKeys: [],
+      },
+    } satisfies RuntimeBlocksParseResult;
   }
 
-  return blocks.reduce<RuntimeBlock[]>((accumulator, block) => {
+  const normalizedBlocks = blocks.reduce<RuntimeBlock[]>((accumulator, block) => {
     if (
       block &&
       typeof block === "object" &&
@@ -153,7 +444,29 @@ export const asBlockArray = (value: JsonValue | undefined) => {
 
     return accumulator;
   }, []);
+  const nativeRecord = asRecord(value);
+  const templateId = resolveTemplateId(nativeRecord?.template);
+  const uiConfig = nativeRecord?.ui_config;
+  const presetId =
+    asString(asRecord(uiConfig)?.preset, templateId ?? undefined) || templateId;
+
+  return {
+    blocks: normalizedBlocks.map((block) =>
+      applyTemplatePresetToBlock(block, uiConfig, presetId),
+    ),
+    compatibility: {
+      mode: "leadflow_native",
+      templateId,
+      presetId,
+      mediaDictionaryKeys: Object.keys(
+        resolveMediaDictionaryRecord(nativeRecord?.media_dictionary),
+      ),
+    },
+  } satisfies RuntimeBlocksParseResult;
 };
+
+export const asBlockArray = (value: JsonValue | undefined) =>
+  parseRuntimeBlocks(value).blocks;
 
 const mapObjectArray = <T>(
   value: JsonValue | undefined,
@@ -500,6 +813,7 @@ export const normalizeLeadCaptureFormBlock = (
   });
 
   return {
+    variant: asString(block.variant) || undefined,
     eyebrow: asString(block.eyebrow, "Paso de conversión"),
     headline: asString(block.headline, asString(block.title, "Captura de lead")),
     subheadline: asString(

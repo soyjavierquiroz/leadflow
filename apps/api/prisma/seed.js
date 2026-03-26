@@ -747,16 +747,33 @@ async function main() {
         isEntryStep: true,
         isConversionStep: false,
         blocksJson: {
-          blocks: [
-            {
-              type: 'hero',
-              key: 'hero-main',
-              eyebrow: 'Leadflow Sales Core',
-              title: 'Captura oportunidades y deriva el handoff sin romper el runtime',
-              description:
-                'Este funnel demo usa bloques comerciales reales sobre el runtime público: hook, social proof, oferta, formulario declarativo y reveal conectado.',
-              accent: 'Captura, assignment y continuidad',
+          template: 'landing_capture_v1',
+          ui_config: {
+            preset: 'landing_capture_v1',
+            block_variants: {
+              hero_block: 'leadflow_signal',
+              social_proof: 'metrics_trust',
+              lead_capture_form: 'conversion_card',
+              offer_stack: 'offer_stack',
+              faq_accordion: 'accordion',
             },
+          },
+          media_dictionary: {
+            hero_primary: {
+              src: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+              alt: 'Equipo comercial revisando métricas y leads',
+            },
+          },
+          hero_block: {
+            key: 'hero-main',
+            eyebrow: 'Leadflow Sales Core',
+            headline: 'Captura oportunidades y deriva el handoff sin romper el runtime',
+            subheadline:
+              'Este funnel demo usa bloques comerciales reales sobre el runtime público: hook, social proof, oferta, formulario declarativo y reveal conectado.',
+            accent: 'Captura, assignment y continuidad',
+            media_key: 'hero_primary',
+          },
+          layout_blocks: [
             {
               type: 'hook_and_promise',
               key: 'hook-main',
@@ -790,7 +807,7 @@ async function main() {
               ],
             },
             {
-              type: 'feature_grid',
+              type: 'features_and_benefits',
               key: 'feature-grid-main',
               title: 'Qué desbloquea Leadflow para el equipo',
               description:
@@ -925,7 +942,7 @@ async function main() {
               },
             },
             {
-              type: 'offer_pricing',
+              type: 'offer_stack',
               key: 'offer-main',
               title: 'Qué incluye esta demo del funnel',
               description:
@@ -943,7 +960,7 @@ async function main() {
               action: 'scroll_to_capture',
             },
             {
-              type: 'faq',
+              type: 'faq_accordion',
               key: 'faq-main',
               title: 'Preguntas rápidas',
               items: [
@@ -953,9 +970,9 @@ async function main() {
                     'Sí. `lead_capture_form` ya no es placeholder y dispara el submit estándar de Leadflow.',
                 },
                 {
-                  question: '¿El JSON ya soporta bloques comerciales reales?',
+                  question: '¿Leadflow ya acepta un JSON más cercano al otro sistema?',
                   answer:
-                    'Sí. Esta demo ya usa `hook_and_promise`, `social_proof`, `feature_grid`, `urgency_timer`, `offer_pricing`, `faq` y `lead_capture_form`.',
+                    'Sí. Esta landing ya usa `hero_block`, `layout_blocks`, `media_dictionary` y `ui_config` sobre la capa de compatibilidad.',
                 },
               ],
             },

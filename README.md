@@ -21,6 +21,8 @@ La base del monorepo ya incluye:
 - Component Assimilation v1 con adapters públicos listos para absorber componentes reciclados sin rehacer el runtime.
 - Lead Capture Form Block v1 con formulario declarativo de primera clase conectado al submit público estándar.
 - JSON Block Runtime Expansion v1 con bloques comerciales iniciales realmente funcionales sobre el runtime público.
+- JSON Compatibility Layer v1 para aceptar payloads compatibles con `hero_block`, `layout_blocks`, `media_dictionary` y `ui_config` sin rehacer el runtime.
+- Template Presets / Block Variants v1 para aplicar presets declarativos y variantes visuales por template/funnel sobre la registry pública actual.
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
@@ -148,6 +150,8 @@ Validacion de stacks:
 - `docs/component-assimilation-v1.md`
 - `docs/lead-capture-form-block-v1.md`
 - `docs/json-block-runtime-expansion-v1.md`
+- `docs/json-compatibility-layer-v1.md`
+- `docs/template-presets-block-variants-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -218,6 +222,8 @@ Modulos disponibles:
   - `immediate_whatsapp`
 - Renderer JSON-driven con shell visual v2 y registry de adapters para bloques:
   - `hero`
+  - `video`
+  - `cta`
   - `hook_and_promise`
   - `urgency_timer`
   - `social_proof`
@@ -229,6 +235,16 @@ Modulos disponibles:
   - `thank_you_reveal`
   - `whatsapp_handoff_cta`
   - `sponsor_reveal_placeholder`
+- Compatibilidad base soportada para payloads estilo Jakawi/Vexer con:
+  - `template`
+  - `ui_config`
+  - `media_dictionary`
+  - `hero_block`
+  - `layout_blocks`
+- Presets iniciales disponibles:
+  - `landing_capture_v1`
+  - `opportunity_vsl_v1`
+  - `thank_you_reveal_v1`
 - Compatibilidad mantenida por normalización:
   - `form_placeholder` -> `lead_capture_form`
   - `features` -> `feature_grid`
