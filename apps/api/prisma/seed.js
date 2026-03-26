@@ -483,24 +483,72 @@ async function main() {
           {
             type: 'hero',
             key: 'hero-main',
-            eyebrow: 'Leadflow Runtime',
-            title: 'Public funnel runtime listo para crecer',
+            eyebrow: 'Leadflow Revenue Engine',
+            title: 'Funnels públicos listos para capturar y derivar oportunidades reales',
             description:
-              'Este template base publica funnels por host + path y renderiza bloques JSON-driven sin acoplar la experiencia a un dominio fijo.',
+              'Este template base publica funnels por host + path y compone bloques comerciales reutilizables sin romper el runtime estándar.',
           },
           {
-            type: 'text',
-            key: 'text-positioning',
-            title: 'Base JSON-driven',
-            body: 'La estructura del funnel queda en manos de plataforma, mientras el team opera dominios, tracking, pools y publicaciones.',
+            type: 'hook_and_promise',
+            key: 'hook-main',
+            eyebrow: 'Captación declarativa',
+            hook: 'Convierte tráfico frío en conversaciones listas para handoff sin depender de páginas hechas a mano.',
+            promise:
+              'Leadflow deja el funnel, la captura, el assignment, el reveal y el handoff en un runtime JSON-driven listo para iterar.',
           },
           {
-            type: 'form_placeholder',
-            key: 'form-placeholder',
-            title: 'Captura y assignment MVP',
-            description:
-              'Este bloque ya puede registrar visitante, capturar lead y ejecutar assignment simple por round robin.',
-            fields: ['Nombre', 'Telefono', 'Email'],
+            type: 'lead_capture_form',
+            key: 'template-capture-form',
+            eyebrow: 'Lead Capture Form Block v1',
+            headline: 'Solicita una demo del flujo comercial',
+            subheadline:
+              'Bloque real del runtime para capturar contacto, contexto y continuidad usando el motor estándar de Leadflow.',
+            button_text: 'Quiero mi demo',
+            helper_text:
+              'Completa nombre y un medio de contacto para continuar al siguiente step.',
+            privacy_note:
+              'Usamos esta información para procesar tu solicitud y continuar la conversación comercial dentro del funnel.',
+            success_mode: 'next_step',
+            fields: [
+              {
+                name: 'fullName',
+                label: 'Nombre completo',
+                type: 'text',
+                required: true,
+                placeholder: 'Tu nombre completo',
+                autocomplete: 'name',
+                width: 'full',
+              },
+              {
+                name: 'phone',
+                label: 'WhatsApp',
+                type: 'tel',
+                required: false,
+                placeholder: '+52 55 0000 0000',
+                autocomplete: 'tel',
+                width: 'half',
+              },
+              {
+                name: 'email',
+                label: 'Email',
+                type: 'email',
+                required: false,
+                placeholder: 'tu@email.com',
+                autocomplete: 'email',
+                width: 'half',
+              },
+              {
+                name: 'utm_source',
+                label: 'UTM Source',
+                type: 'hidden',
+                hidden: true,
+              },
+            ],
+            settings: {
+              capture_url_context: true,
+              source_channel: 'form',
+              tags: ['runtime-v1', 'lead-capture-form-v1'],
+            },
           },
         ],
       },
@@ -513,7 +561,16 @@ async function main() {
         locale: 'es',
       },
       allowedOverridesJson: {
-        editableFields: ['hero', 'text', 'faq', 'cta', 'media'],
+        editableFields: [
+          'hero',
+          'hook_and_promise',
+          'social_proof',
+          'feature_grid',
+          'lead_capture_form',
+          'offer_pricing',
+          'faq',
+          'media',
+        ],
       },
       defaultHandoffStrategyId: thankYouHandoffStrategy.id,
     },
@@ -528,24 +585,72 @@ async function main() {
           {
             type: 'hero',
             key: 'hero-main',
-            eyebrow: 'Leadflow Runtime',
-            title: 'Public funnel runtime listo para crecer',
+            eyebrow: 'Leadflow Revenue Engine',
+            title: 'Funnels públicos listos para capturar y derivar oportunidades reales',
             description:
-              'Este template base publica funnels por host + path y renderiza bloques JSON-driven sin acoplar la experiencia a un dominio fijo.',
+              'Este template base publica funnels por host + path y compone bloques comerciales reutilizables sin romper el runtime estándar.',
           },
           {
-            type: 'text',
-            key: 'text-positioning',
-            title: 'Base JSON-driven',
-            body: 'La estructura del funnel queda en manos de plataforma, mientras el team opera dominios, tracking, pools y publicaciones.',
+            type: 'hook_and_promise',
+            key: 'hook-main',
+            eyebrow: 'Captación declarativa',
+            hook: 'Convierte tráfico frío en conversaciones listas para handoff sin depender de páginas hechas a mano.',
+            promise:
+              'Leadflow deja el funnel, la captura, el assignment, el reveal y el handoff en un runtime JSON-driven listo para iterar.',
           },
           {
-            type: 'form_placeholder',
-            key: 'form-placeholder',
-            title: 'Captura y assignment MVP',
-            description:
-              'Este bloque ya puede registrar visitante, capturar lead y ejecutar assignment simple por round robin.',
-            fields: ['Nombre', 'Telefono', 'Email'],
+            type: 'lead_capture_form',
+            key: 'template-capture-form',
+            eyebrow: 'Lead Capture Form Block v1',
+            headline: 'Solicita una demo del flujo comercial',
+            subheadline:
+              'Bloque real del runtime para capturar contacto, contexto y continuidad usando el motor estándar de Leadflow.',
+            button_text: 'Quiero mi demo',
+            helper_text:
+              'Completa nombre y un medio de contacto para continuar al siguiente step.',
+            privacy_note:
+              'Usamos esta información para procesar tu solicitud y continuar la conversación comercial dentro del funnel.',
+            success_mode: 'next_step',
+            fields: [
+              {
+                name: 'fullName',
+                label: 'Nombre completo',
+                type: 'text',
+                required: true,
+                placeholder: 'Tu nombre completo',
+                autocomplete: 'name',
+                width: 'full',
+              },
+              {
+                name: 'phone',
+                label: 'WhatsApp',
+                type: 'tel',
+                required: false,
+                placeholder: '+52 55 0000 0000',
+                autocomplete: 'tel',
+                width: 'half',
+              },
+              {
+                name: 'email',
+                label: 'Email',
+                type: 'email',
+                required: false,
+                placeholder: 'tu@email.com',
+                autocomplete: 'email',
+                width: 'half',
+              },
+              {
+                name: 'utm_source',
+                label: 'UTM Source',
+                type: 'hidden',
+                hidden: true,
+              },
+            ],
+            settings: {
+              capture_url_context: true,
+              source_channel: 'form',
+              tags: ['runtime-v1', 'lead-capture-form-v1'],
+            },
           },
         ],
       },
@@ -558,7 +663,16 @@ async function main() {
         locale: 'es',
       },
       allowedOverridesJson: {
-        editableFields: ['hero', 'text', 'faq', 'cta', 'media'],
+        editableFields: [
+          'hero',
+          'hook_and_promise',
+          'social_proof',
+          'feature_grid',
+          'lead_capture_form',
+          'offer_pricing',
+          'faq',
+          'media',
+        ],
       },
       defaultHandoffStrategyId: thankYouHandoffStrategy.id,
     },
@@ -637,63 +751,213 @@ async function main() {
             {
               type: 'hero',
               key: 'hero-main',
-              eyebrow: 'Leadflow Public Runtime',
-              title: 'Lanza funnels publicos por host + path',
+              eyebrow: 'Leadflow Sales Core',
+              title: 'Captura oportunidades y deriva el handoff sin romper el runtime',
               description:
-                'Este funnel demuestra resolucion publica, renderer JSON-driven y compatibilidad con el modelo Team-owned aprobado.',
-              accent: 'Teal',
+                'Este funnel demo usa bloques comerciales reales sobre el runtime público: hook, social proof, oferta, formulario declarativo y reveal conectado.',
+              accent: 'Captura, assignment y continuidad',
             },
             {
-              type: 'text',
-              key: 'text-main',
-              title: 'Que valida esta fase',
-              body: 'Resolucion de publicacion activa, renderer JSON-driven, captura de lead y assignment round robin simples sobre el pool operativo.',
-              items: [
-                'Runtime publico por host + path',
-                'Renderer extensible para bloques JSON',
-                'Lead capture y assignment v1 conectados',
+              type: 'hook_and_promise',
+              key: 'hook-main',
+              eyebrow: 'Diagnóstico comercial',
+              hook: 'Si hoy tus leads llegan sin contexto o se enfrían antes del primer contacto, este funnel es para ti.',
+              promise:
+                'Leadflow centraliza captación, assignment y continuidad a WhatsApp con bloques JSON-driven listos para reutilizarse por template.',
+            },
+            {
+              type: 'social_proof',
+              key: 'social-proof-main',
+              title: 'Señales que este runtime ya sostiene hoy',
+              description:
+                'El funnel público ya puede capturar lead real, resolver owner y mantener la continuidad del follow-up visible.',
+              metrics: [
+                {
+                  label: 'Captura',
+                  value: 'Real',
+                  description: 'Visitor, lead y tracking conectados.',
+                },
+                {
+                  label: 'Assignment',
+                  value: 'Round robin',
+                  description: 'El sponsor se resuelve usando el pool operativo.',
+                },
+                {
+                  label: 'Reveal',
+                  value: 'Activo',
+                  description: 'El thank-you usa contexto real de sesión.',
+                },
               ],
             },
             {
-              type: 'video',
-              key: 'video-main',
-              title: 'Vista previa del runtime',
-              embedUrl:
-                'https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-runtime-v1',
-              caption:
-                'Video placeholder para validar el bloque visual antes de integrar media real.',
+              type: 'feature_grid',
+              key: 'feature-grid-main',
+              title: 'Qué desbloquea Leadflow para el equipo',
+              description:
+                'Bloques comerciales que viven sobre el mismo motor estándar del runtime público.',
+              items: [
+                {
+                  eyebrow: 'Bloques',
+                  title: 'Composición declarativa',
+                  description:
+                    'El JSON decide qué aparece y en qué orden, sin rehacer páginas completas.',
+                },
+                {
+                  eyebrow: 'Operación',
+                  title: 'Captura con continuidad',
+                  description:
+                    'El formulario ya no es placeholder: dispara submit real y persiste el contexto para reveal/handoff.',
+                },
+                {
+                  eyebrow: 'Escala',
+                  title: 'Base para presets',
+                  description:
+                    'La registry actual permite absorber variantes y componentes reciclados después.',
+                },
+              ],
+            },
+            {
+              type: 'urgency_timer',
+              key: 'urgency-main',
+              eyebrow: 'Ventana prioritaria',
+              headline: 'La demo local está lista para probar captación y handoff ahora mismo',
+              subheadline:
+                'Usamos un timer declarativo para reforzar urgencia sin meter lógica libre por formulario.',
+              duration_minutes: 120,
+            },
+            {
+              type: 'lead_capture_form',
+              key: 'lead-capture-form-main',
+              eyebrow: 'Lead Capture Form Block v1',
+              headline: 'Solicita tu demo guiada',
+              subheadline:
+                'Déjanos tus datos y el runtime estándar registra visitor, crea lead, resuelve assignment y te lleva al thank-you con reveal.',
+              button_text: 'Quiero mi diagnóstico comercial',
+              helper_text:
+                'Te tomará menos de un minuto y el siguiente paso se resuelve automáticamente.',
+              privacy_note:
+                'Tus datos se usan solo para procesar la solicitud dentro del flujo comercial del funnel.',
+              success_mode: 'next_step',
+              fields: [
+                {
+                  name: 'fullName',
+                  label: 'Nombre completo',
+                  type: 'text',
+                  required: true,
+                  placeholder: 'Tu nombre completo',
+                  autocomplete: 'name',
+                  width: 'full',
+                },
+                {
+                  name: 'phone',
+                  label: 'WhatsApp',
+                  type: 'tel',
+                  required: false,
+                  placeholder: '+52 55 0000 0000',
+                  autocomplete: 'tel',
+                  width: 'half',
+                },
+                {
+                  name: 'email',
+                  label: 'Email',
+                  type: 'email',
+                  required: false,
+                  placeholder: 'tu@email.com',
+                  autocomplete: 'email',
+                  width: 'half',
+                },
+                {
+                  name: 'companyName',
+                  label: 'Empresa',
+                  type: 'text',
+                  required: false,
+                  placeholder: 'Nombre de tu empresa',
+                  autocomplete: 'organization',
+                  width: 'full',
+                },
+                {
+                  name: 'team_size',
+                  label: 'Tamaño del equipo comercial',
+                  type: 'select',
+                  required: false,
+                  placeholder: 'Selecciona una opción',
+                  width: 'half',
+                  options: [
+                    { label: '1 a 5', value: '1-5' },
+                    { label: '6 a 20', value: '6-20' },
+                    { label: '21+', value: '21-plus' },
+                  ],
+                },
+                {
+                  name: 'primary_goal',
+                  label: '¿Qué quieres destrabar?',
+                  type: 'textarea',
+                  required: false,
+                  placeholder:
+                    'Describe el principal cuello de botella comercial que quieres resolver.',
+                  width: 'full',
+                },
+                {
+                  name: 'utm_source',
+                  label: 'UTM Source',
+                  type: 'hidden',
+                  hidden: true,
+                },
+                {
+                  name: 'utm_campaign',
+                  label: 'UTM Campaign',
+                  type: 'hidden',
+                  hidden: true,
+                },
+                {
+                  name: 'fbclid',
+                  label: 'FBCLID',
+                  type: 'hidden',
+                  hidden: true,
+                },
+              ],
+              settings: {
+                capture_url_context: true,
+                source_channel: 'form',
+                tags: ['runtime-v1', 'lead-capture-form-v1', 'public-demo'],
+                success_message:
+                  'Perfecto. Tu solicitud ya quedó capturada y el runtime está resolviendo el siguiente paso.',
+              },
+            },
+            {
+              type: 'offer_pricing',
+              key: 'offer-main',
+              title: 'Qué incluye esta demo del funnel',
+              description:
+                'Un ejemplo compacto de cómo Leadflow conecta frontend público, capture y continuidad comercial.',
+              price: 'Sin costo',
+              price_note:
+                'Pensado para validar el flujo antes de escalar a presets o templates más profundos.',
+              items: [
+                'Lead capture form declarativo',
+                'Tracking y UTMs capturados por el runtime',
+                'Assignment + reveal + handoff sobre la misma sesión',
+              ],
+              href: '#public-capture-form',
+              label: 'Completar formulario',
+              action: 'scroll_to_capture',
             },
             {
               type: 'faq',
               key: 'faq-main',
-              title: 'Preguntas rapidas',
+              title: 'Preguntas rápidas',
               items: [
                 {
-                  question: 'Se captura el lead en esta fase?',
+                  question: '¿El formulario ya es un bloque real del runtime?',
                   answer:
-                    'Si. Esta fase registra visitor, captura lead y ejecuta assignment simple usando el rotation pool del funnel.',
+                    'Sí. `lead_capture_form` ya no es placeholder y dispara el submit estándar de Leadflow.',
                 },
                 {
-                  question: 'Se soportan subrutas?',
+                  question: '¿El JSON ya soporta bloques comerciales reales?',
                   answer:
-                    'Si. El runtime resuelve host + path y elige la publicacion mas especifica activa.',
+                    'Sí. Esta demo ya usa `hook_and_promise`, `social_proof`, `feature_grid`, `urgency_timer`, `offer_pricing`, `faq` y `lead_capture_form`.',
                 },
               ],
-            },
-            {
-              type: 'form_placeholder',
-              key: 'form-placeholder',
-              title: 'Formulario MVP',
-              description:
-                'Completa el formulario para registrar visitor, crear lead y asignarlo al siguiente sponsor elegible.',
-              fields: ['Nombre completo', 'WhatsApp', 'Email'],
-            },
-            {
-              type: 'cta',
-              key: 'cta-next',
-              label: 'Continuar al thank you',
-              action: 'next_step',
-              variant: 'primary',
             },
           ],
         },
@@ -718,19 +982,25 @@ async function main() {
         blocksJson: {
           blocks: [
             {
-              type: 'thank_you',
-              key: 'thank-you-main',
+              type: 'thank_you_reveal',
+              key: 'thank-you-reveal-main',
               eyebrow: 'Lead capturado',
-              title: 'Tu funnel ya completo captura y assignment v1',
-              description:
-                'Este step revela el sponsor asignado y deja listo el CTA para continuar el handoff por WhatsApp.',
+              headline: 'Tu solicitud ya quedó registrada y asignada',
+              subheadline:
+                'Este step combina confirmación visible con reveal usando el contexto real de la sesión.',
+              reveal_headline: 'Sponsor asignado para continuar contigo',
+              reveal_subheadline:
+                'Mostramos al sponsor real y mantenemos la continuidad del handoff sin salirnos del runtime público.',
             },
             {
-              type: 'sponsor_reveal_placeholder',
-              key: 'sponsor-placeholder',
-              title: 'Sponsor asignado en esta sesion',
-              description:
-                'Aqui mostramos el sponsor asignado y el siguiente paso operativo del handoff usando el contexto real de la sesion.',
+              type: 'whatsapp_handoff_cta',
+              key: 'whatsapp-handoff-main',
+              headline: 'Continúa por WhatsApp',
+              subheadline:
+                'Cuando el sponsor ya está resuelto, este bloque usa el contexto del runtime para disparar la continuidad comercial.',
+              button_text: 'Abrir WhatsApp ahora',
+              helper_text:
+                'Si el handoff no se abre automáticamente, este CTA mantiene el siguiente paso visible.',
             },
             {
               type: 'cta',

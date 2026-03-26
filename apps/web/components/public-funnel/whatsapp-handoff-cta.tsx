@@ -1,0 +1,179 @@
+"use client";
+
+import { useCallback, useMemo } from "react";
+import {
+  buildCtaClassName,
+  PublicEyebrow,
+  PublicSectionSurface,
+  cx,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
+import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
+import { buildWhatsappUrl, normalizeWhatsappPhone } from "@/lib/public-handoff";
+import { readSubmissionContext } from "@/lib/public-funnel-session";
+import {
+  emitPublicRuntimeEvent,
+  getOrCreateRuntimeSessionId,
+  hasTrackedRuntimeEvent,
+  markRuntimeEventTracked,
+} from "@/lib/public-runtime-tracking";
+
+type WhatsappHandoffCtaProps = {
+  runtime: PublicFunnelRuntimePayload;
+  headline: string;
+  subheadline?: string;
+  buttonText?: string;
+  helperText?: string;
+};
+
+const buildHandoffMarker = (
+  eventName: "cta_clicked" | "handoff_completed",
+  publicationId: string,
+  stepId: string,
+  assignmentId: string,
+) => [eventName, publicationId, stepId, assignmentId, "standalone"].join(":");
+
+export function WhatsappHandoffCta({
+  runtime,
+  headline,
+  subheadline,
+  buttonText,
+  helperText,
+}: WhatsappHandoffCtaProps) {
+  const context = useMemo(
+    () => readSubmissionContext(runtime.publication.id),
+    [runtime.publication.id],
+  );
+  const sponsor =
+    context?.handoff?.sponsor ?? context?.assignment?.sponsor ?? null;
+  const whatsappPhone =
+    context?.handoff?.whatsappPhone ??
+    normalizeWhatsappPhone(sponsor?.phone ?? null);
+  const whatsappUrl =
+    context?.handoff?.whatsappUrl ??
+    buildWhatsappUrl(whatsappPhone, context?.handoff?.whatsappMessage ?? null);
+  const handoffMode = context?.handoff?.mode ?? runtime.handoff.mode;
+  const handoffButtonLabel =
+    buttonText ??
+    context?.handoff?.buttonLabel ??
+    runtime.handoff.buttonLabel ??
+    "Continuar por WhatsApp";
+
+  const trackHandoff = useCallback(() => {
+    if (!context?.assignment || !whatsappUrl) {
+      return;
+    }
+
+    const ctaMarker = buildHandoffMarker(
+      "cta_clicked",
+      runtime.publication.id,
+      runtime.currentStep.id,
+      context.assignment.id,
+    );
+    if (!hasTrackedRuntimeEvent(ctaMarker)) {
+      markRuntimeEventTracked(ctaMarker);
+      void emitPublicRuntimeEvent({
+        eventName: "cta_clicked",
+        publicationId: runtime.publication.id,
+        stepId: runtime.currentStep.id,
+        anonymousId: context.anonymousId,
+        visitorId: context.visitorId,
+        leadId: context.leadId,
+        assignmentId: context.assignment.id,
+        currentPath: runtime.request.path,
+        ctaLabel: handoffButtonLabel,
+        ctaHref: whatsappUrl,
+        ctaAction: "whatsapp_handoff",
+        metadata: {
+          sessionId: getOrCreateRuntimeSessionId(),
+          handoffMode,
+          handoffSource: "standalone_block",
+        },
+      });
+    }
+
+    const completionMarker = buildHandoffMarker(
+      "handoff_completed",
+      runtime.publication.id,
+      runtime.currentStep.id,
+      context.assignment.id,
+    );
+    if (!hasTrackedRuntimeEvent(completionMarker)) {
+      markRuntimeEventTracked(completionMarker);
+      void emitPublicRuntimeEvent({
+        eventName: "handoff_completed",
+        publicationId: runtime.publication.id,
+        stepId: runtime.currentStep.id,
+        anonymousId: context.anonymousId,
+        visitorId: context.visitorId,
+        leadId: context.leadId,
+        assignmentId: context.assignment.id,
+        currentPath: runtime.request.path,
+        ctaLabel: handoffButtonLabel,
+        ctaHref: whatsappUrl,
+        ctaAction: "whatsapp_handoff",
+        metadata: {
+          sessionId: getOrCreateRuntimeSessionId(),
+          handoffMode,
+          handoffSource: "standalone_block",
+        },
+      });
+    }
+  }, [
+    context,
+    handoffButtonLabel,
+    handoffMode,
+    runtime.currentStep.id,
+    runtime.publication.id,
+    runtime.request.path,
+    whatsappUrl,
+  ]);
+
+  return (
+    <PublicSectionSurface tone="success">
+      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+        <div>
+          <PublicEyebrow tone="success">WhatsApp handoff CTA</PublicEyebrow>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+            {headline}
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
+            {subheadline ||
+              "Bloque declarativo para continuar el handoff por WhatsApp usando el contexto real de la sesión."}
+          </p>
+        </div>
+
+        <div className="rounded-[1.75rem] border border-emerald-200 bg-white p-5">
+          {whatsappUrl && sponsor ? (
+            <>
+              <p className="text-sm leading-6 text-slate-700">
+                Continuarás con {sponsor.displayName} por el canal definido en
+                el runtime.
+              </p>
+              <div className="mt-5">
+                <a
+                  href={whatsappUrl}
+                  onClick={trackHandoff}
+                  className={cx(
+                    buildCtaClassName("primary"),
+                    "bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-600",
+                  )}
+                >
+                  {handoffButtonLabel}
+                </a>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-600">
+                {helperText ||
+                  "Si el canal no se abre automáticamente, este CTA mantiene el handoff visible y trazable."}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm leading-6 text-slate-700">
+              Todavía no hay contexto de sponsor o WhatsApp disponible en esta
+              sesión.
+            </p>
+          )}
+        </div>
+      </div>
+    </PublicSectionSurface>
+  );
+}

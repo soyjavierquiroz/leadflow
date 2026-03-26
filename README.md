@@ -19,6 +19,8 @@ La base del monorepo ya incluye:
 - Roles & Auth v1 con login real, sesión segura y protección base por superficie.
 - Public Funnel Frontend v2 con shell pública más sólida, mejor jerarquía visual, mejor lectura móvil y flujo más coherente entre landing, captura, thank-you y reveal.
 - Component Assimilation v1 con adapters públicos listos para absorber componentes reciclados sin rehacer el runtime.
+- Lead Capture Form Block v1 con formulario declarativo de primera clase conectado al submit público estándar.
+- JSON Block Runtime Expansion v1 con bloques comerciales iniciales realmente funcionales sobre el runtime público.
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
@@ -144,6 +146,8 @@ Validacion de stacks:
 - `docs/public-funnel-frontend-v1.md`
 - `docs/public-funnel-frontend-v2.md`
 - `docs/component-assimilation-v1.md`
+- `docs/lead-capture-form-block-v1.md`
+- `docs/json-block-runtime-expansion-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -214,19 +218,24 @@ Modulos disponibles:
   - `immediate_whatsapp`
 - Renderer JSON-driven con shell visual v2 y registry de adapters para bloques:
   - `hero`
-  - `text`
-  - `video`
-  - `cta`
-  - `faq`
-  - `form_placeholder`
-  - `thank_you`
-  - `sponsor_reveal_placeholder`
-- Adapters preparados para asimilación de componentes reciclados:
+  - `hook_and_promise`
+  - `urgency_timer`
   - `social_proof`
+  - `feature_grid`
+  - `offer_pricing`
+  - `faq`
+  - `lead_capture_form`
+  - `thank_you`
+  - `thank_you_reveal`
+  - `whatsapp_handoff_cta`
+  - `sponsor_reveal_placeholder`
+- Compatibilidad mantenida por normalización:
+  - `form_placeholder` -> `lead_capture_form`
+  - `features` -> `feature_grid`
+  - `offer` / `pricing` -> `offer_pricing`
+- Adapters preparados para asimilación de componentes reciclados:
   - `testimonial` / `testimonials`
-  - `feature_grid` / `features`
   - `media` / `image`
-  - `offer` / `pricing`
 - Preview local en desarrollo con `?previewHost=...` si hace falta simular otro host.
 - Reveal operativo en el thank-you usando el assignment de la sesion.
 - CTA a WhatsApp con enlace `wa.me` y fallback limpio si falta telefono.
@@ -235,11 +244,13 @@ Modulos disponibles:
   - `/gracias`
   - `/oportunidad`
   - `/oportunidad/gracias`
+- `lead_capture_form` captura también contexto de URL cuando existe (`utm_*`, `fbclid`, `gclid`, `ttclid`) sin cambiar el endpoint estándar del runtime.
 - La capa nueva desacopla markup visual del contrato bruto del bloque y deja una base clara para variantes futuras sin cambiar publicación, assignment ni editor.
 
 ## Lead Capture & Assignment v1
 
-- El bloque `form_placeholder` ahora envia un submit real al API publico.
+- El bloque `lead_capture_form` ahora envia un submit real al API publico.
+- El alias legacy `form_placeholder` sigue resolviendo al mismo motor mientras migramos seeds y templates.
 - Flujo compuesto disponible:
   - registrar `Visitor`
   - capturar `Lead`

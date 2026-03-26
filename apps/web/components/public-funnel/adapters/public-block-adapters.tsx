@@ -11,6 +11,8 @@ import {
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
+import { UrgencyTimerBlock } from "@/components/public-funnel/urgency-timer-block";
+import { WhatsappHandoffCta } from "@/components/public-funnel/whatsapp-handoff-cta";
 import type {
   PublicFunnelRuntimePayload,
   RuntimeBlock,
@@ -20,11 +22,14 @@ import {
   asFeatureItems,
   asMediaItem,
   asMetricItems,
+  asNumber,
   asOfferItems,
   asString,
   asStringArray,
   asTestimonialItems,
   extractImageFromMap,
+  normalizeLeadCaptureFormBlock,
+  normalizeRuntimeBlockType,
   resolveCtaHref,
   toStepLabel,
 } from "@/components/public-funnel/runtime-block-utils";
@@ -49,7 +54,9 @@ function HeroBlockAdapter({
   const accent = asString(block.accent, "Funnel listo para convertir");
   const metrics = asMetricItems(block.metrics);
   const proofItems = asStringArray(block.proofItems);
-  const hasCaptureBlock = blocks.some((item) => item.type === "form_placeholder");
+  const hasCaptureBlock = blocks.some(
+    (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
+  );
   const media =
     asMediaItem(block.media, title) ??
     extractImageFromMap(
@@ -195,6 +202,70 @@ function HeroBlockAdapter({
   );
 }
 
+function HookAndPromiseBlockAdapter({
+  block,
+  runtime,
+}: PublicBlockAdapterProps) {
+  const eyebrow = asString(block.eyebrow, "Hook & Promise");
+  const hook = asString(
+    block.hook,
+    asString(block.title, "Atrae atención con una propuesta clara"),
+  );
+  const promise = asString(
+    block.promise,
+    asString(
+      block.description,
+      "Bloque comercial diseñado para abrir el funnel con claridad, tensión positiva y continuidad hacia la captura.",
+    ),
+  );
+  const points = asStringArray(block.items);
+  const ctaHref =
+    asString(block.href) ||
+    runtime.steps.find((step) => step.isEntryStep)?.path ||
+    runtime.currentStep.path;
+  const ctaLabel = asString(block.label, "Quiero ver cómo funciona");
+
+  return (
+    <PublicSectionSurface tone="brand">
+      <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
+        <div>
+          <PublicEyebrow>{eyebrow}</PublicEyebrow>
+          <h2 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-5xl">
+            {hook}
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200">
+            {promise}
+          </p>
+          <div className="mt-7">
+            <TrackedCta
+              publicationId={runtime.publication.id}
+              currentStepId={runtime.currentStep.id}
+              currentPath={runtime.request.path}
+              href={ctaHref}
+              label={ctaLabel}
+              className={buildCtaClassName("primary")}
+              action={asString(block.action) || "hook_primary"}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          {(points.length > 0
+            ? points
+            : [
+                "Copy directo para abrir interés sin rodeos.",
+                "Promesa alineada al siguiente paso del funnel.",
+                "Bloque pensado para presets comerciales futuros.",
+              ]
+          ).map((item) => (
+            <PublicChecklistItem key={item}>{item}</PublicChecklistItem>
+          ))}
+        </div>
+      </div>
+    </PublicSectionSurface>
+  );
+}
+
 function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
   const title = asString(block.title);
   const description = asString(block.description, asString(block.body));
@@ -254,6 +325,27 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
         </div>
       )}
     </PublicSectionSurface>
+  );
+}
+
+function UrgencyTimerBlockAdapter({ block }: PublicBlockAdapterProps) {
+  return (
+    <UrgencyTimerBlock
+      eyebrow={asString(block.eyebrow) || undefined}
+      headline={asString(block.headline, asString(block.title, "Cierre próximo"))}
+      subheadline={
+        asString(block.subheadline, asString(block.description)) || undefined
+      }
+      expiresAt={
+        asString(
+          block.expires_at,
+          asString(block.expiresAt, asString(block.deadline)),
+        ) || undefined
+      }
+      durationMinutes={
+        asNumber(block.duration_minutes, asNumber(block.durationMinutes, 0)) || undefined
+      }
+    />
   );
 }
 
@@ -721,14 +813,88 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
   );
 }
 
+function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
+  const title = asString(
+    props.block.headline,
+    asString(props.block.title, "Gracias, ya estás dentro"),
+  );
+  const description = asString(
+    props.block.subheadline,
+    asString(
+      props.block.description,
+      "Capturamos tu lead y ahora te mostramos quién continúa contigo dentro del flujo.",
+    ),
+  );
+  const revealTitle = asString(
+    props.block.reveal_headline,
+    "Sponsor asignado en esta sesión",
+  );
+  const revealDescription = asString(
+    props.block.reveal_subheadline,
+    "El runtime usa el assignment real guardado en sesión para mostrar continuidad y handoff.",
+  );
+
+  return (
+    <div className="grid gap-6">
+      <ThankYouBlockAdapter
+        block={{
+          ...props.block,
+          title,
+          description,
+        }}
+        runtime={props.runtime}
+        blocks={props.blocks}
+      />
+      <AssignedSponsorReveal
+        runtime={props.runtime}
+        title={revealTitle}
+        description={revealDescription}
+      />
+    </div>
+  );
+}
+
+function WhatsappHandoffCtaBlockAdapter({
+  block,
+  runtime,
+}: PublicBlockAdapterProps) {
+  return (
+    <WhatsappHandoffCta
+      runtime={runtime}
+      headline={asString(block.headline, asString(block.title, "Continuar por WhatsApp"))}
+      subheadline={
+        asString(block.subheadline, asString(block.description)) || undefined
+      }
+      buttonText={
+        asString(block.button_text, asString(block.buttonText)) || undefined
+      }
+      helperText={
+        asString(block.helper_text, asString(block.helperText)) || undefined
+      }
+    />
+  );
+}
+
 export function PublicBlockAdapter({
   block,
   runtime,
   blocks,
 }: PublicBlockAdapterProps) {
-  switch (block.type) {
+  switch (normalizeRuntimeBlockType(block.type)) {
     case "hero":
       return <HeroBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+    case "hook_and_promise":
+      return (
+        <HookAndPromiseBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+        />
+      );
+    case "urgency_timer":
+      return (
+        <UrgencyTimerBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+      );
     case "text":
       return <TextBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
     case "video":
@@ -737,19 +903,25 @@ export function PublicBlockAdapter({
       return <CtaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
     case "faq":
       return <FaqBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
-    case "form_placeholder":
+    case "lead_capture_form":
       return (
         <PublicCaptureForm
           publicationId={runtime.publication.id}
           currentStepId={runtime.currentStep.id}
-          fields={asStringArray(block.fields)}
-          title={asString(block.title, "Captura de lead")}
-          description={asString(block.description) || undefined}
+          block={normalizeLeadCaptureFormBlock(block)}
         />
       );
     case "thank_you":
       return (
         <ThankYouBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+      );
+    case "thank_you_reveal":
+      return (
+        <ThankYouRevealBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+        />
       );
     case "sponsor_reveal_placeholder":
       return (
@@ -773,7 +945,6 @@ export function PublicBlockAdapter({
         />
       );
     case "feature_grid":
-    case "features":
       return (
         <FeatureGridBlockAdapter
           block={block}
@@ -784,9 +955,16 @@ export function PublicBlockAdapter({
     case "media":
     case "image":
       return <MediaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
-    case "offer":
-    case "pricing":
+    case "offer_pricing":
       return <OfferBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+    case "whatsapp_handoff_cta":
+      return (
+        <WhatsappHandoffCtaBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+        />
+      );
     default:
       return null;
   }

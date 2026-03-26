@@ -114,6 +114,18 @@ type AssignmentFailureTrackingContext = {
   leadId?: string | null;
 };
 
+type RuntimeAttributionPayload = {
+  sourceUrl?: string | null;
+  utmSource?: string | null;
+  utmCampaign?: string | null;
+  utmMedium?: string | null;
+  utmContent?: string | null;
+  utmTerm?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
+};
+
 @Injectable()
 export class LeadCaptureAssignmentService {
   constructor(
@@ -133,8 +145,15 @@ export class LeadCaptureAssignmentService {
         anonymousId: dto.anonymousId,
         kind: dto.kind,
         sourceChannel: dto.sourceChannel ?? 'form',
+        sourceUrl: dto.sourceUrl ?? null,
         utmSource: dto.utmSource ?? null,
         utmCampaign: dto.utmCampaign ?? null,
+        utmMedium: dto.utmMedium ?? null,
+        utmContent: dto.utmContent ?? null,
+        utmTerm: dto.utmTerm ?? null,
+        fbclid: dto.fbclid ?? null,
+        gclid: dto.gclid ?? null,
+        ttclid: dto.ttclid ?? null,
       });
     });
   }
@@ -259,8 +278,15 @@ export class LeadCaptureAssignmentService {
             anonymousId: dto.anonymousId,
             kind: 'identified',
             sourceChannel: dto.sourceChannel ?? 'form',
+            sourceUrl: dto.sourceUrl ?? null,
             utmSource: dto.utmSource ?? null,
             utmCampaign: dto.utmCampaign ?? null,
+            utmMedium: dto.utmMedium ?? null,
+            utmContent: dto.utmContent ?? null,
+            utmTerm: dto.utmTerm ?? null,
+            fbclid: dto.fbclid ?? null,
+            gclid: dto.gclid ?? null,
+            ttclid: dto.ttclid ?? null,
           },
         );
 
@@ -277,6 +303,16 @@ export class LeadCaptureAssignmentService {
             email: dto.email ?? null,
             phone: dto.phone ?? null,
             companyName: dto.companyName ?? null,
+            fieldValues: dto.fieldValues ?? {},
+            sourceUrl: dto.sourceUrl ?? null,
+            utmSource: dto.utmSource ?? null,
+            utmCampaign: dto.utmCampaign ?? null,
+            utmMedium: dto.utmMedium ?? null,
+            utmContent: dto.utmContent ?? null,
+            utmTerm: dto.utmTerm ?? null,
+            fbclid: dto.fbclid ?? null,
+            gclid: dto.gclid ?? null,
+            ttclid: dto.ttclid ?? null,
             tags: dto.tags ?? [],
             triggerEventId: dto.submissionEventId ?? null,
           },
@@ -503,8 +539,15 @@ export class LeadCaptureAssignmentService {
       anonymousId: dto.anonymousId,
       kind: 'identified',
       sourceChannel: dto.sourceChannel ?? 'form',
+      sourceUrl: null,
       utmSource: null,
       utmCampaign: null,
+      utmMedium: null,
+      utmContent: null,
+      utmTerm: null,
+      fbclid: null,
+      gclid: null,
+      ttclid: null,
     });
   }
 
@@ -515,8 +558,15 @@ export class LeadCaptureAssignmentService {
       anonymousId: string;
       kind?: 'anonymous' | 'identified';
       sourceChannel: string;
+      sourceUrl?: string | null;
       utmSource?: string | null;
       utmCampaign?: string | null;
+      utmMedium?: string | null;
+      utmContent?: string | null;
+      utmTerm?: string | null;
+      fbclid?: string | null;
+      gclid?: string | null;
+      ttclid?: string | null;
     },
   ) {
     const existing = await tx.visitor.findUnique({
@@ -572,6 +622,7 @@ export class LeadCaptureAssignmentService {
           funnelInstanceId: publication.funnelInstanceId,
           anonymousId: visitor.anonymousId,
           sourceChannel: visitor.sourceChannel,
+          attribution: this.buildAttributionPayload(input),
         },
         occurredAt: seenAt,
         funnelInstanceId: publication.funnelInstanceId,
@@ -587,7 +638,10 @@ export class LeadCaptureAssignmentService {
     tx: TransactionClient,
     publication: FlowPublicationRecord,
     visitor: { id: string },
-    input: CapturePublicLeadDto,
+    input: CapturePublicLeadDto &
+      RuntimeAttributionPayload & {
+        fieldValues?: Record<string, string | null>;
+      },
   ): Promise<LeadCaptureResult> {
     const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
 
@@ -660,6 +714,8 @@ export class LeadCaptureAssignmentService {
           funnelInstanceId: publication.funnelInstanceId,
           visitorId: visitor.id,
           sourceChannel: lead.sourceChannel,
+          attribution: this.buildAttributionPayload(input),
+          fieldValues: input.fieldValues ?? {},
         },
         occurredAt: new Date(),
         visitorId: visitor.id,
@@ -692,6 +748,20 @@ export class LeadCaptureAssignmentService {
     return {
       lead,
       wasCreated: !existing,
+    };
+  }
+
+  private buildAttributionPayload(input: RuntimeAttributionPayload) {
+    return {
+      sourceUrl: input.sourceUrl ?? null,
+      utmSource: input.utmSource ?? null,
+      utmCampaign: input.utmCampaign ?? null,
+      utmMedium: input.utmMedium ?? null,
+      utmContent: input.utmContent ?? null,
+      utmTerm: input.utmTerm ?? null,
+      fbclid: input.fbclid ?? null,
+      gclid: input.gclid ?? null,
+      ttclid: input.ttclid ?? null,
     };
   }
 

@@ -19,19 +19,24 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Resolucion de host por request y preview opcional con `?previewHost=...` solo en desarrollo.
 - Renderer JSON-driven del funnel público con shell visual v2 y capa de adapters:
   - `hero`
-  - `text`
-  - `video`
-  - `cta`
+  - `hook_and_promise`
+  - `urgency_timer`
+  - `social_proof`
+  - `feature_grid`
+  - `offer_pricing`
   - `faq`
-  - `form_placeholder`
+  - `lead_capture_form`
   - `thank_you`
+  - `thank_you_reveal`
+  - `whatsapp_handoff_cta`
   - `sponsor_reveal_placeholder`
 - Adapters públicos listos para asimilación de componentes reciclados:
-  - `social_proof`
   - `testimonial` / `testimonials`
-  - `feature_grid` / `features`
   - `media` / `image`
-  - `offer` / `pricing`
+- Compatibilidad mantenida por normalización:
+  - `form_placeholder` -> `lead_capture_form`
+  - `features` -> `feature_grid`
+  - `offer` / `pricing` -> `offer_pricing`
 - `not-found` limpio para funnels/publicaciones no resueltos.
 - Config publica centralizada en `apps/web/lib/public-env.ts`.
 - Login real en `/login`.
@@ -71,9 +76,11 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - hacer polling simple mientras el estado esta en `provisioning`, `qr_ready` o `connecting`
   - visualizar readiness del bridge de automation y los ultimos dispatches persistidos
 - Islas cliente puntuales para:
-  - `form_placeholder`
+  - `lead_capture_form`
   - `sponsor_reveal_placeholder`
 - Public Funnel Frontend v2 sobre el runtime actual para mejorar hero, CTA, formulario, thank-you, sponsor reveal y handoff sin cambiar el modelo JSON-driven.
+- Lead Capture Form Block v1 como bloque declarativo de primera clase conectado al submit compuesto del runtime público.
+- JSON Block Runtime Expansion v1 para soportar bloques comerciales reales y una normalización clara entre contrato JSON y markup.
 - Component Assimilation v1 con registry de adapters en `apps/web/components/public-funnel/adapters` para desacoplar markup visual del contrato de `blocks_json` y preparar variantes de template futuras.
 - Reveal & handoff v1 sobre el runtime publico:
   - reveal del sponsor asignado en thank-you
@@ -297,7 +304,7 @@ Una vez resuelta la `FunnelPublication`:
 - La web pide el runtime por `host + path`.
 - La API devuelve dominio, publicacion, funnel, template, tracking efectivo, handoff efectivo, step actual y navegacion de steps.
 - La web renderiza `blocks_json` del step actual.
-- Cuando el step contiene `form_placeholder`, la web ejecuta un submit publico que:
+- Cuando el step contiene `lead_capture_form` (o el alias legacy `form_placeholder`), la web ejecuta un submit publico que:
   - registra o actualiza `Visitor`
   - crea o actualiza `Lead`
   - resuelve assignment simple por round robin

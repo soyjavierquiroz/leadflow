@@ -170,10 +170,22 @@ export const submitPublicLeadCapture = async (payload: {
   currentStepId: string;
   anonymousId: string;
   submissionEventId?: string | null;
+  sourceUrl?: string | null;
+  utmSource?: string | null;
+  utmCampaign?: string | null;
+  utmMedium?: string | null;
+  utmContent?: string | null;
+  utmTerm?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
   fullName?: string | null;
   email?: string | null;
   phone?: string | null;
   companyName?: string | null;
+  fieldValues?: Record<string, string | null>;
+  tags?: string[];
+  sourceChannel?: string | null;
 }) => {
   const response = await fetch(
     `${webPublicConfig.urls.api}/v1/public/funnel-runtime/submissions`,
@@ -184,8 +196,8 @@ export const submitPublicLeadCapture = async (payload: {
       },
       body: JSON.stringify({
         ...payload,
-        sourceChannel: "form",
-        tags: ["runtime-v1"],
+        sourceChannel: payload.sourceChannel ?? "form",
+        tags: ["runtime-v1", ...(payload.tags ?? [])],
       }),
     },
   );
