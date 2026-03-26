@@ -17,7 +17,8 @@ La base del monorepo ya incluye:
 - App Shells + UI Base v1 para `Super Admin`, `Team Admin` y `Sponsor / Member`.
 - UI / Product Clarity Pass v1 con shells internos más claros, más operativos y menos abstractos en `admin`, `team` y `member`.
 - Roles & Auth v1 con login real, sesión segura y protección base por superficie.
-- Public Funnel Frontend v1 con mejor jerarquía visual, CTA más claros, thank-you más sólido y reveal/handoff mejor presentados.
+- Public Funnel Frontend v2 con shell pública más sólida, mejor jerarquía visual, mejor lectura móvil y flujo más coherente entre landing, captura, thank-you y reveal.
+- Component Assimilation v1 con adapters públicos listos para absorber componentes reciclados sin rehacer el runtime.
 - Team Operations v1 con acciones mutativas básicas para `Team Admin`.
 - Member Operations v1 con operación real sobre leads asignados, perfil y disponibilidad.
 - Reveal & Handoff v1 con sponsor reveal en thank-you, CTA a WhatsApp y redirect inmediato por estrategia.
@@ -141,6 +142,8 @@ Validacion de stacks:
 - `docs/lead-qualification-timeline-v1.md`
 - `docs/lead-workflows-reminders-playbooks-v1.md`
 - `docs/public-funnel-frontend-v1.md`
+- `docs/public-funnel-frontend-v2.md`
+- `docs/component-assimilation-v1.md`
 - `docs/funnel-tracking-model-v1.md`
 - `docs/funnel-domain-expansion-v1.md`
 - `docs/ownership-publication-template-model-v1.md`
@@ -209,7 +212,7 @@ Modulos disponibles:
 - El payload publico ya devuelve handoff efectivo para el runtime:
   - `thank_you_then_whatsapp`
   - `immediate_whatsapp`
-- Renderer JSON-driven MVP con bloques:
+- Renderer JSON-driven con shell visual v2 y registry de adapters para bloques:
   - `hero`
   - `text`
   - `video`
@@ -218,6 +221,12 @@ Modulos disponibles:
   - `form_placeholder`
   - `thank_you`
   - `sponsor_reveal_placeholder`
+- Adapters preparados para asimilación de componentes reciclados:
+  - `social_proof`
+  - `testimonial` / `testimonials`
+  - `feature_grid` / `features`
+  - `media` / `image`
+  - `offer` / `pricing`
 - Preview local en desarrollo con `?previewHost=...` si hace falta simular otro host.
 - Reveal operativo en el thank-you usando el assignment de la sesion.
 - CTA a WhatsApp con enlace `wa.me` y fallback limpio si falta telefono.
@@ -226,6 +235,7 @@ Modulos disponibles:
   - `/gracias`
   - `/oportunidad`
   - `/oportunidad/gracias`
+- La capa nueva desacopla markup visual del contrato bruto del bloque y deja una base clara para variantes futuras sin cambiar publicación, assignment ni editor.
 
 ## Lead Capture & Assignment v1
 

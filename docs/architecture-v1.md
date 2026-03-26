@@ -17,7 +17,7 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `/(members)` solo como redirect legacy hacia `/member`
 - Runtime publico en `/(site)/[[...slug]]`.
 - Resolucion de host por request y preview opcional con `?previewHost=...` solo en desarrollo.
-- Renderer JSON-driven MVP para bloques de funnel:
+- Renderer JSON-driven del funnel público con shell visual v2 y capa de adapters:
   - `hero`
   - `text`
   - `video`
@@ -26,6 +26,12 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - `form_placeholder`
   - `thank_you`
   - `sponsor_reveal_placeholder`
+- Adapters públicos listos para asimilación de componentes reciclados:
+  - `social_proof`
+  - `testimonial` / `testimonials`
+  - `feature_grid` / `features`
+  - `media` / `image`
+  - `offer` / `pricing`
 - `not-found` limpio para funnels/publicaciones no resueltos.
 - Config publica centralizada en `apps/web/lib/public-env.ts`.
 - Login real en `/login`.
@@ -67,7 +73,8 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 - Islas cliente puntuales para:
   - `form_placeholder`
   - `sponsor_reveal_placeholder`
-- Public Funnel Frontend v1 sobre el runtime actual para mejorar hero, CTA, formulario, thank-you, sponsor reveal y handoff sin cambiar el modelo JSON-driven.
+- Public Funnel Frontend v2 sobre el runtime actual para mejorar hero, CTA, formulario, thank-you, sponsor reveal y handoff sin cambiar el modelo JSON-driven.
+- Component Assimilation v1 con registry de adapters en `apps/web/components/public-funnel/adapters` para desacoplar markup visual del contrato de `blocks_json` y preparar variantes de template futuras.
 - Reveal & handoff v1 sobre el runtime publico:
   - reveal del sponsor asignado en thank-you
   - CTA a WhatsApp con mensaje prellenado
@@ -85,6 +92,10 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
   - empty states
   - status badges
   - cards de sponsor y publicacion
+- Reuso puntual de componentes internos dentro del funnel público cuando aportan claridad visual sin contaminar el runtime:
+  - `section-header`
+  - `kpi-card`
+  - `status-badge`
 - Capa browser-side de tracking para:
   - vistas de funnel y step
   - clicks de CTA

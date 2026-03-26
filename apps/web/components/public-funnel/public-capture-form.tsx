@@ -3,6 +3,14 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  buildCtaClassName,
+  PublicChecklistItem,
+  PublicEyebrow,
+  PublicPill,
+  PublicSectionSurface,
+  cx,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
+import {
   getOrCreateAnonymousId,
   readSubmissionContext,
   persistSubmissionContext,
@@ -242,106 +250,155 @@ export function PublicCaptureForm({
   };
 
   return (
-    <section className="rounded-[2rem] border border-teal-200 bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_28%),linear-gradient(180deg,_rgba(240,253,250,0.96)_0%,_rgba(255,255,255,0.96)_100%)] p-8 shadow-[0_22px_60px_rgba(13,148,136,0.12)]">
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+    <PublicSectionSurface
+      id="public-capture-form"
+      tone="success"
+      className="scroll-mt-8"
+    >
+      <div className="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
         <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-full border border-teal-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-teal-700">
-              Lead capture v1
-            </div>
-            <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">
-              Paso clave de conversión
-            </div>
+          <PublicEyebrow tone="success">Paso de conversión</PublicEyebrow>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <PublicPill tone="success">Menos de 1 minuto</PublicPill>
+            <PublicPill>Seguimiento con contexto</PublicPill>
           </div>
 
-          <h2 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
+          <h2 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
             {title || "Captura de lead"}
           </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700 md:text-base">
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
             {description ||
-              "Déjanos tus datos y continuamos con el siguiente paso del funnel sin perder contexto ni trazabilidad."}
+              "Déjanos tus datos y pasamos al siguiente punto del funnel sin perder el hilo comercial ni la trazabilidad operativa."}
           </p>
 
-          <div className="mt-6 grid gap-3">
+          <div className="mt-7 grid gap-3">
             {[
-              "Capturamos tu lead en la publicación activa.",
-              "Resolvemos assignment y guardamos el contexto de la sesión.",
-              "Te llevamos al siguiente paso o reveal disponible.",
-            ].map((item, index) => (
-              <div
-                key={item}
-                className="flex items-start gap-3 rounded-[1.5rem] border border-teal-100 bg-white/85 px-4 py-4"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white">
-                  {index + 1}
-                </div>
-                <p className="text-sm leading-6 text-slate-700">{item}</p>
-              </div>
+              "Capturamos tu lead en la publicación activa y conservamos la sesión.",
+              "Resolvemos assignment sin sacar al usuario del flujo.",
+              "Mostramos el thank-you o reveal listo para continuar el handoff.",
+            ].map((item) => (
+              <PublicChecklistItem key={item} accent="success">
+                {item}
+              </PublicChecklistItem>
             ))}
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[1.5rem] border border-emerald-200 bg-white/90 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                Lo mínimo necesario
+              </p>
+              <p className="mt-3 text-sm leading-6 text-slate-700">
+                Nombre y un canal de contacto. Con eso ya podemos capturar y
+                mover la oportunidad sin fricción.
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-slate-200 bg-white/90 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Qué evitamos
+              </p>
+              <p className="mt-3 text-sm leading-6 text-slate-700">
+                Formularios largos, ruido técnico y mensajes ambiguos antes de
+                pedir el siguiente paso.
+              </p>
+            </div>
           </div>
         </div>
 
-        <form className="grid gap-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]" onSubmit={handleSubmit}>
+        <form
+          className="grid gap-5 rounded-[1.9rem] border border-white/80 bg-white/92 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]"
+          onSubmit={handleSubmit}
+        >
+          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Datos de contacto
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Completa al menos nombre y un dato de contacto para avanzar con el
+              reveal o el siguiente step.
+            </p>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
-          {resolvedFields.map((field) => (
-            <label
-              key={field.key}
-              className="grid gap-2 text-sm font-medium text-slate-700"
-            >
-              {field.label}
-              <input
-                className="rounded-2xl border border-teal-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500"
-                type={field.type}
-                value={values[field.key]}
-                onChange={(event) => updateValue(field.key, event.target.value)}
-                onFocus={() => trackFormStarted(field.key)}
-                placeholder={field.placeholder}
-                autoComplete={
-                  field.key === "fullName"
-                    ? "name"
-                    : field.key === "phone"
+            {resolvedFields.map((field) => (
+              <label
+                key={field.key}
+                className={cx(
+                  "grid gap-2 text-sm font-medium text-slate-700",
+                  field.key === "fullName" ? "md:col-span-2" : "",
+                )}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span>{field.label}</span>
+                  {field.key === "fullName" ? (
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                      requerido
+                    </span>
+                  ) : null}
+                </span>
+                <input
+                  className="rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                  type={field.type}
+                  value={values[field.key]}
+                  onChange={(event) => updateValue(field.key, event.target.value)}
+                  onFocus={() => trackFormStarted(field.key)}
+                  placeholder={field.placeholder}
+                  autoComplete={
+                    field.key === "fullName"
+                      ? "name"
+                      : field.key === "phone"
+                        ? "tel"
+                        : field.key === "email"
+                          ? "email"
+                          : "organization"
+                  }
+                  inputMode={
+                    field.key === "phone"
                       ? "tel"
                       : field.key === "email"
                         ? "email"
-                        : "organization"
-                }
-              />
-            </label>
-          ))}
+                        : "text"
+                  }
+                />
+              </label>
+            ))}
           </div>
 
           {errorMessage ? (
-            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <p className="rounded-[1.15rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {errorMessage}
             </p>
           ) : null}
 
           {successMessage ? (
-            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            <p className="rounded-[1.15rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
               {successMessage}
             </p>
           ) : null}
 
           <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
-            Completa al menos nombre y un dato de contacto. Con eso ya podemos
-            capturar, enrutar y mantener continuidad del handoff.
+            Priorizamos claridad: pedimos poco, conservamos el contexto del
+            funnel y dejamos listo el siguiente paso comercial.
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className={cx(
+                buildCtaClassName("primary"),
+                "min-w-[12rem] disabled:cursor-not-allowed disabled:opacity-60",
+              )}
             >
               {isSubmitting ? "Enviando..." : "Quiero continuar"}
             </button>
-            <p className="text-sm text-slate-600">
+            <p className="max-w-sm text-sm leading-6 text-slate-600">
               Capturamos el lead, resolvemos assignment y avanzamos al siguiente
-              step si existe.
+              step cuando corresponda.
             </p>
           </div>
         </form>
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }

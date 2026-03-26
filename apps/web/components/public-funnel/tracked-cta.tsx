@@ -42,7 +42,7 @@ export function TrackedCta({
     });
   };
 
-  if (/^https?:\/\//.test(href)) {
+  if (/^https?:\/\//.test(href) || href.startsWith("#")) {
     return (
       <a href={href} className={className} onClick={handleClick}>
         {label}

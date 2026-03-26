@@ -1,6 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { StatusBadge } from "@/components/app-shell/status-badge";
+import {
+  buildCtaClassName,
+  PublicChecklistItem,
+  PublicEyebrow,
+  PublicPill,
+  PublicSectionSurface,
+  PublicStatCard,
+  cx,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import { buildWhatsappUrl, normalizeWhatsappPhone } from "@/lib/public-handoff";
 import { readSubmissionContext } from "@/lib/public-funnel-session";
@@ -24,6 +34,19 @@ const buildHandoffMarker = (
   assignmentId: string,
   suffix: string,
 ) => [eventName, publicationId, stepId, assignmentId, suffix].join(":");
+
+const getInitials = (value: string | null | undefined) => {
+  if (!value) {
+    return "LF";
+  }
+
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((item) => item[0]?.toUpperCase() ?? "")
+    .join("");
+};
 
 export function AssignedSponsorReveal({
   runtime,
@@ -59,6 +82,10 @@ export function AssignedSponsorReveal({
     context?.handoff?.buttonLabel ??
     runtime.handoff.buttonLabel ??
     "Continuar por WhatsApp";
+  const redirectDelaySeconds = Math.max(
+    1,
+    Math.round((runtime.handoff.autoRedirectDelayMs ?? 1200) / 1000),
+  );
 
   const trackHandoff = useCallback(
     ({
@@ -187,78 +214,89 @@ export function AssignedSponsorReveal({
   };
 
   return (
-    <section className="rounded-[2rem] border border-amber-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.16),_transparent_32%),linear-gradient(180deg,_rgba(255,251,235,0.96)_0%,_rgba(255,255,255,0.96)_100%)] p-8 shadow-[0_22px_60px_rgba(245,158,11,0.12)]">
+    <PublicSectionSurface tone="warm">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">
-          Reveal & Handoff
-        </span>
-        <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">
-          Paso final visible
-        </span>
+        <PublicPill tone="warm">Reveal & Handoff</PublicPill>
+        <PublicPill>Paso final visible</PublicPill>
       </div>
 
-      <h2 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
+      <h2 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
         {title}
       </h2>
-      {description ? (
-        <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700">
-          {description}
-        </p>
-      ) : (
-        <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700">
-          Presentamos al sponsor asignado y dejamos clara la continuidad del
-          handoff para que el usuario entienda quién sigue y por dónde.
-        </p>
-      )}
+      <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
+        {description ||
+          "Presentamos al sponsor asignado y dejamos evidente cómo continúa la conversación, para que el cierre del funnel no se sienta técnico ni ambiguo."}
+      </p>
 
-      <div className="mt-6 rounded-[1.75rem] border border-amber-200 bg-white p-5">
+      <div className="mt-6 rounded-[1.85rem] border border-amber-200 bg-white p-5 md:p-6">
         {assignment && sponsor ? (
           <>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-amber-700">
-                  Sponsor asignado
-                </p>
-                <p className="mt-3 text-2xl font-semibold text-slate-950">
-                  {sponsor.displayName}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Tu oportunidad ya fue asignada. El siguiente paso es continuar
-                  la conversación por el canal indicado.
-                </p>
+            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-[1.8rem] border border-amber-200 bg-amber-50/60 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-lg font-semibold text-white">
+                      {getInitials(sponsor.displayName)}
+                    </div>
+                    <div>
+                      <PublicEyebrow tone="warm">Sponsor asignado</PublicEyebrow>
+                      <p className="mt-2 text-2xl font-semibold text-slate-950">
+                        {sponsor.displayName}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Tu oportunidad ya tiene owner y el siguiente paso es
+                        continuar la conversación por el canal indicado.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge value={assignment.status} />
+                    <PublicPill tone="warm">
+                      {handoffMode === "immediate_whatsapp"
+                        ? "WhatsApp inmediato"
+                        : "Thank you + WhatsApp"}
+                    </PublicPill>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  <PublicStatCard
+                    label="Email"
+                    value={sponsor.email ?? "Sin email"}
+                    description="Dato visible para continuidad operativa."
+                    tone="warm"
+                  />
+                  <PublicStatCard
+                    label="WhatsApp"
+                    value={sponsor.phone ?? "Sin teléfono"}
+                    description="Se usa para construir el handoff real."
+                    tone="warm"
+                  />
+                  <PublicStatCard
+                    label="Assignment"
+                    value={assignment.id.slice(0, 8)}
+                    description="Contexto persistido en la sesión del runtime."
+                    tone="warm"
+                  />
+                </div>
               </div>
-              <span className="rounded-full border border-amber-300 bg-amber-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">
-                {handoffMode === "immediate_whatsapp"
-                  ? "WhatsApp inmediato"
-                  : "Thank you + WhatsApp"}
-              </span>
+
+              <div className="rounded-[1.8rem] border border-slate-200 bg-slate-50 p-5">
+                <PublicEyebrow tone="neutral">Qué pasa ahora</PublicEyebrow>
+                <div className="mt-5 grid gap-3">
+                  <PublicChecklistItem accent="warm">
+                    Tu lead ya fue capturado y asociado a esta sesión.
+                  </PublicChecklistItem>
+                  <PublicChecklistItem accent="warm">
+                    El sponsor asignado ya puede continuar la conversación.
+                  </PublicChecklistItem>
+                  <PublicChecklistItem accent="warm">
+                    El CTA final mantiene tracking y continuidad del handoff.
+                  </PublicChecklistItem>
+                </div>
+              </div>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                  Estado
-                </p>
-                <p className="mt-2 text-sm font-semibold text-slate-900">
-                  {assignment.status}
-                </p>
-              </div>
-              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                  Email
-                </p>
-                <p className="mt-2 text-sm font-semibold text-slate-900">
-                  {sponsor.email ?? "Sin email"}
-                </p>
-              </div>
-              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                  WhatsApp
-                </p>
-                <p className="mt-2 text-sm font-semibold text-slate-900">
-                  {sponsor.phone ?? "Sin telefono"}
-                </p>
-              </div>
-            </div>
+
             <div className="mt-5 grid gap-3 md:grid-cols-3">
               {[
                 "Assignment resuelto y asociado a esta sesión.",
@@ -273,17 +311,21 @@ export function AssignedSponsorReveal({
                 </div>
               ))}
             </div>
+
             {whatsappUrl ? (
-              <div className="mt-5 rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5">
+              <div className="mt-5 rounded-[1.85rem] border border-emerald-200 bg-emerald-50 p-5">
                 <p className="text-sm leading-6 text-emerald-950">
                   {handoffMode === "immediate_whatsapp"
-                    ? "Vamos a abrir WhatsApp automáticamente para continuar con tu sponsor asignado."
+                    ? `Vamos a abrir WhatsApp automáticamente en ${redirectDelaySeconds}s para continuar con tu sponsor asignado.`
                     : "Tu sponsor ya está listo para continuar contigo por WhatsApp."}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <a
                     href={whatsappUrl}
-                    className="inline-flex items-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                    className={cx(
+                      buildCtaClassName("primary"),
+                      "bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-600",
+                    )}
                     onClick={handleWhatsappClick}
                   >
                     {handoffButtonLabel}
@@ -291,8 +333,8 @@ export function AssignedSponsorReveal({
                   <p className="text-sm text-emerald-900">
                     {runtime.handoff.autoRedirect &&
                     handoffMode === "immediate_whatsapp"
-                      ? "Redirigiendo ahora..."
-                      : "Si no se abre automáticamente, usa el botón."}
+                        ? "Redirigiendo ahora..."
+                        : "Si no se abre automáticamente, usa el botón."}
                   </p>
                 </div>
               </div>
@@ -307,7 +349,7 @@ export function AssignedSponsorReveal({
             )}
           </>
         ) : (
-          <>
+          <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
             <p className="text-sm font-medium text-slate-700">
               Todavía no hay un sponsor asignado en esta sesión.
             </p>
@@ -315,9 +357,9 @@ export function AssignedSponsorReveal({
               Completa el formulario del funnel para resolver el assignment y
               ver aquí el reveal con el CTA de handoff.
             </p>
-          </>
+          </div>
         )}
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }
