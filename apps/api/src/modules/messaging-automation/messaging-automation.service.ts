@@ -459,7 +459,9 @@ export class MessagingAutomationService {
               domain: {
                 id: assignment.funnelPublication.domain.id,
                 host: assignment.funnelPublication.domain.host,
-                kind: assignment.funnelPublication.domain.kind,
+                normalizedHost:
+                  assignment.funnelPublication.domain.normalizedHost,
+                domainType: assignment.funnelPublication.domain.domainType,
               },
             }
           : null,

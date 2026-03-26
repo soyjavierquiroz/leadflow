@@ -18,6 +18,18 @@ function hashPassword(password) {
   return `scrypt$${salt}$${derivedKey}`;
 }
 
+function normalizeHost(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    .split('/')[0]
+    .split('?')[0]
+    .split('#')[0]
+    .replace(/:\d+$/, '')
+    .replace(/\.+$/, '');
+}
+
 async function main() {
   const workspace = await prisma.workspace.upsert({
     where: { slug: 'leadflow-dev' },
@@ -326,21 +338,55 @@ async function main() {
   });
 
   const domain = await prisma.domain.upsert({
-    where: { host: 'localhost' },
+    where: { normalizedHost: 'localhost' },
     update: {
       workspaceId: workspace.id,
       teamId: team.id,
+      host: 'localhost',
+      normalizedHost: 'localhost',
       status: 'active',
-      kind: 'apex',
+      domainType: 'system_subdomain',
       isPrimary: true,
+      canonicalHost: 'localhost',
+      redirectToPrimary: false,
     },
     create: {
       workspaceId: workspace.id,
       teamId: team.id,
       host: 'localhost',
+      normalizedHost: 'localhost',
       status: 'active',
-      kind: 'apex',
+      domainType: 'system_subdomain',
       isPrimary: true,
+      canonicalHost: 'localhost',
+      redirectToPrimary: false,
+    },
+  });
+
+  const secondaryDomainHost = 'promo.acme.test';
+  const secondaryDomain = await prisma.domain.upsert({
+    where: { normalizedHost: normalizeHost(secondaryDomainHost) },
+    update: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      host: secondaryDomainHost,
+      normalizedHost: normalizeHost(secondaryDomainHost),
+      status: 'active',
+      domainType: 'custom_subdomain',
+      isPrimary: false,
+      canonicalHost: secondaryDomainHost,
+      redirectToPrimary: false,
+    },
+    create: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      host: secondaryDomainHost,
+      normalizedHost: normalizeHost(secondaryDomainHost),
+      status: 'active',
+      domainType: 'custom_subdomain',
+      isPrimary: false,
+      canonicalHost: secondaryDomainHost,
+      redirectToPrimary: false,
     },
   });
 
@@ -869,6 +915,35 @@ async function main() {
       pathPrefix: '/oportunidad',
       status: 'active',
       isPrimary: false,
+    },
+  });
+
+  await prisma.funnelPublication.upsert({
+    where: {
+      domainId_pathPrefix: {
+        domainId: secondaryDomain.id,
+        pathPrefix: '/',
+      },
+    },
+    update: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      funnelInstanceId: funnelInstance.id,
+      trackingProfileId: trackingProfile.id,
+      handoffStrategyId: thankYouHandoffStrategy.id,
+      status: 'active',
+      isPrimary: true,
+    },
+    create: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      domainId: secondaryDomain.id,
+      funnelInstanceId: funnelInstance.id,
+      trackingProfileId: trackingProfile.id,
+      handoffStrategyId: thankYouHandoffStrategy.id,
+      pathPrefix: '/',
+      status: 'active',
+      isPrimary: true,
     },
   });
 

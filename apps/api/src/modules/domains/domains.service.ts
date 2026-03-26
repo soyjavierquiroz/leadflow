@@ -1,6 +1,15 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import { buildEntity } from '../shared/domain.factory';
 import { DOMAIN_REPOSITORY } from '../shared/domain.tokens';
+import {
+  hasNormalizedDomainHost,
+  normalizeDomainHost,
+} from '../shared/publication-resolution.utils';
 import type { CreateDomainDto } from './dto/create-domain.dto';
 import type {
   DomainEntity,
@@ -16,13 +25,27 @@ export class DomainsService {
   ) {}
 
   createDraft(dto: CreateDomainDto): DomainEntity {
+    if (!hasNormalizedDomainHost(dto.host)) {
+      throw new BadRequestException({
+        code: 'HOST_REQUIRED',
+        message: 'A valid host is required.',
+      });
+    }
+
+    const normalizedHost = normalizeDomainHost(dto.host);
+
     return buildEntity<DomainEntity>({
       workspaceId: dto.workspaceId,
       teamId: dto.teamId,
-      host: dto.host,
+      host: dto.host.trim(),
+      normalizedHost,
       status: 'draft',
-      kind: dto.kind ?? 'apex',
+      domainType: dto.domainType ?? 'custom_apex',
       isPrimary: dto.isPrimary ?? false,
+      canonicalHost: dto.canonicalHost
+        ? normalizeDomainHost(dto.canonicalHost)
+        : null,
+      redirectToPrimary: dto.redirectToPrimary ?? false,
     });
   }
 

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { buildEntity } from '../shared/domain.factory';
 import { FUNNEL_PUBLICATION_REPOSITORY } from '../shared/domain.tokens';
+import { normalizePublicationPathPrefix } from '../shared/publication-resolution.utils';
 import { mapFunnelPublicationRecord } from '../../prisma/prisma.mappers';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateFunnelPublicationDto } from './dto/create-funnel-publication.dto';
@@ -35,7 +36,7 @@ export class FunnelPublicationsService {
       funnelInstanceId: dto.funnelInstanceId,
       trackingProfileId: dto.trackingProfileId ?? null,
       handoffStrategyId: dto.handoffStrategyId ?? null,
-      pathPrefix: dto.pathPrefix,
+      pathPrefix: this.normalizePathPrefix(dto.pathPrefix),
       status: 'draft',
       isPrimary: dto.isPrimary ?? false,
     });
@@ -333,19 +334,13 @@ export class FunnelPublicationsService {
   }
 
   private normalizePathPrefix(value: string) {
-    const trimmed = value.trim();
-
-    if (!trimmed) {
+    if (!value.trim()) {
       throw new BadRequestException({
         code: 'PATH_PREFIX_REQUIRED',
         message: 'A path prefix is required.',
       });
     }
 
-    const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    const normalized =
-      withLeadingSlash === '/' ? '/' : withLeadingSlash.replace(/\/+$/, '');
-
-    return normalized || '/';
+    return normalizePublicationPathPrefix(value);
   }
 }

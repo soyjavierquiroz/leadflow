@@ -84,9 +84,12 @@ export type DomainRecord = {
   workspaceId: string;
   teamId: string;
   host: string;
+  normalizedHost: string;
   status: string;
-  kind: string;
+  domainType: string;
   isPrimary: boolean;
+  canonicalHost: string | null;
+  redirectToPrimary: boolean;
   createdAt: string;
   updatedAt: string;
 };

@@ -61,7 +61,10 @@ export type EventAggregateType =
   | 'assignment'
   | 'event';
 
-export type DomainKind = 'apex' | 'subdomain' | 'custom';
+export type DomainType =
+  | 'system_subdomain'
+  | 'custom_apex'
+  | 'custom_subdomain';
 export type TrackingProvider = 'meta' | 'tiktok' | 'custom';
 export type DeduplicationMode =
   | 'browser_server'

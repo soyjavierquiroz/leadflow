@@ -161,9 +161,12 @@ export const mapDomainRecord = (record: DomainRecord): DomainEntity => ({
   workspaceId: record.workspaceId,
   teamId: record.teamId,
   host: record.host,
+  normalizedHost: record.normalizedHost,
   status: record.status,
-  kind: record.kind,
+  domainType: record.domainType,
   isPrimary: record.isPrimary,
+  canonicalHost: record.canonicalHost,
+  redirectToPrimary: record.redirectToPrimary,
   createdAt: toIso(record.createdAt),
   updatedAt: toIso(record.updatedAt),
 });

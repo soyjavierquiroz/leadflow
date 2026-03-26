@@ -318,15 +318,39 @@ La arquitectura ya implementa:
 
 ## Runtime publico v1
 
+### Modelo de publicacion externa v1
+
+- `team` puede tener multiples `domains`
+- cada `domain` puede tener multiples `funnel_publications`
+- `Domain.host` conserva el host configurado para UI y trazabilidad
+- `Domain.normalizedHost` es la clave operativa para lookup server-side
+- `Domain.domainType` diferencia:
+  - `system_subdomain`
+  - `custom_apex`
+  - `custom_subdomain`
+- `Domain.isPrimary` marca el host principal del team
+- `Domain.canonicalHost` y `Domain.redirectToPrimary` quedan como metadata de canonicalidad para la siguiente fase
+- `FunnelPublication.pathPrefix` se persiste normalizado y define el binding publico dentro del mismo host
+- la unicidad operativa queda en `normalizedHost + pathPrefix`
+
 ### Resolucion `host + path`
 
 El runtime publico sigue estas reglas:
 
-- match exacto por `host`
-- normalizacion de path
-- solo publicaciones activas
-- gana la ruta mas especifica
-- fallback operativo a `/` si la publicacion root activa aplica
+1. normalizar el `host` entrante y buscar `Domain.normalizedHost` exacto
+2. normalizar el `path` entrante hacia un `pathPrefix` comparable
+3. considerar solo domains activos, publicaciones activas e instancias activas
+4. tomar las publicaciones cuyo `pathPrefix` sea prefijo valido del request
+5. elegir longest-prefix-match
+6. si existe publicacion activa en `/`, funciona como fallback natural
+7. si no hay match, responder `404`
+
+Precedencia:
+
+- mismo host siempre gana sobre cualquier otro host porque el lookup es exacto
+- dentro del host, `/oportunidad/webinar` gana sobre `/oportunidad`
+- dentro del host, `/oportunidad` gana sobre `/`
+- no se permiten duplicados del mismo `host + pathPrefix`
 
 ### Resolucion de step
 

@@ -22,8 +22,11 @@ export type PublicFunnelRuntimePayload = {
   domain: {
     id: string;
     host: string;
-    kind: string;
+    normalizedHost: string;
+    domainType: string;
     isPrimary: boolean;
+    canonicalHost: string | null;
+    redirectToPrimary: boolean;
   };
   publication: {
     id: string;

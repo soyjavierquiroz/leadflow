@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { mapFunnelPublicationRecord } from '../prisma.mappers';
+import { normalizePublicationPathPrefix } from '../../modules/shared/publication-resolution.utils';
 import type { CreateFunnelPublicationDto } from '../../modules/funnel-publications/dto/create-funnel-publication.dto';
 import type {
   FunnelPublication,
@@ -62,7 +63,7 @@ export class FunnelPublicationPrismaRepository implements FunnelPublicationRepos
         funnelInstanceId: data.funnelInstanceId,
         trackingProfileId: data.trackingProfileId ?? null,
         handoffStrategyId: data.handoffStrategyId ?? null,
-        pathPrefix: data.pathPrefix,
+        pathPrefix: normalizePublicationPathPrefix(data.pathPrefix),
         status: 'draft',
         isPrimary: data.isPrimary ?? false,
       },
@@ -82,7 +83,7 @@ export class FunnelPublicationPrismaRepository implements FunnelPublicationRepos
         funnelInstanceId: entity.funnelInstanceId,
         trackingProfileId: entity.trackingProfileId,
         handoffStrategyId: entity.handoffStrategyId,
-        pathPrefix: entity.pathPrefix,
+        pathPrefix: normalizePublicationPathPrefix(entity.pathPrefix),
         status: entity.status,
         isPrimary: entity.isPrimary,
         createdAt: new Date(entity.createdAt),
@@ -94,7 +95,7 @@ export class FunnelPublicationPrismaRepository implements FunnelPublicationRepos
         funnelInstanceId: entity.funnelInstanceId,
         trackingProfileId: entity.trackingProfileId,
         handoffStrategyId: entity.handoffStrategyId,
-        pathPrefix: entity.pathPrefix,
+        pathPrefix: normalizePublicationPathPrefix(entity.pathPrefix),
         status: entity.status,
         isPrimary: entity.isPrimary,
       },

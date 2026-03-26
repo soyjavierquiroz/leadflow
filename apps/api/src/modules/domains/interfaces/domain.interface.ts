@@ -2,7 +2,7 @@ import type { CreateDomainDto } from '../dto/create-domain.dto';
 import type {
   BaseDomainEntity,
   DomainId,
-  DomainKind,
+  DomainType,
   RepositoryPort,
   TeamScoped,
   WorkspaceScoped,
@@ -13,9 +13,12 @@ export type DomainStatus = 'draft' | 'active' | 'archived';
 export interface DomainEntity
   extends BaseDomainEntity, WorkspaceScoped, TeamScoped {
   host: string;
+  normalizedHost: string;
   status: DomainStatus;
-  kind: DomainKind;
+  domainType: DomainType;
   isPrimary: boolean;
+  canonicalHost: string | null;
+  redirectToPrimary: boolean;
 }
 
 export interface DomainRepository extends RepositoryPort<

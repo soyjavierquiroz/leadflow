@@ -203,7 +203,7 @@ Modulos disponibles:
 
 - Prisma integrado en `apps/api/prisma/schema.prisma`.
 - Migracion v2 aplicada para ownership/publicacion/templates.
-- Seed de desarrollo con workspace, team, domain, funnel template, funnel instance, funnel steps, publicaciones activas en `/` y `/oportunidad`, tracking profile, handoff strategy, compatibilidad con funnel legacy y usuarios demo autenticables.
+- Seed de desarrollo con workspace, team, domains, funnel template, funnel instance, funnel steps, publicaciones activas en `/` y `/oportunidad`, tracking profile, handoff strategy, compatibilidad con funnel legacy y usuarios demo autenticables.
 - Endpoints de validacion expuestos:
   - `GET /v1/workspaces`
   - `GET /v1/teams`
@@ -217,7 +217,13 @@ Modulos disponibles:
 
 ## Runtime publico v1
 
-- Resolucion publica implementada por `host + path` con match exacto de host, path normalizado y precedencia por ruta mas especifica.
+- Resolucion publica implementada por `host + path` con `normalizedHost` exacto, `pathPrefix` normalizado y precedencia por ruta mas especifica.
+- Modelo de publicacion preparado para dominios externos reales:
+  - `team` 1:N `domains`
+  - `domain` 1:N `funnel_publications`
+  - `Domain.normalizedHost` como clave operativa de resolucion
+  - `Domain.domainType` con `system_subdomain`, `custom_apex`, `custom_subdomain`
+  - metadata opcional de canonicalidad con `canonicalHost` y `redirectToPrimary`
 - Endpoints publicos disponibles:
   - `GET /v1/public/funnel-runtime/resolve?host=...&path=...`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`

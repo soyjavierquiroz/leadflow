@@ -1,9 +1,11 @@
-import type { DomainKind } from '../../shared/domain.types';
+import type { DomainType } from '../../shared/domain.types';
 
 export class CreateDomainDto {
   readonly workspaceId!: string;
   readonly teamId!: string;
   readonly host!: string;
-  readonly kind?: DomainKind;
+  readonly domainType?: DomainType;
   readonly isPrimary?: boolean;
+  readonly canonicalHost?: string | null;
+  readonly redirectToPrimary?: boolean;
 }

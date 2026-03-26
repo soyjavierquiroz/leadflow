@@ -1,14 +1,19 @@
 import {
   buildPublicationStepPath,
+  comparePublicationPathPrefix,
   matchesPublicationPath,
   normalizeHost,
   normalizePath,
+  normalizePublicationPathPrefix,
   resolveRelativeStepPath,
 } from './public-funnel-runtime.utils';
 
 describe('public funnel runtime utils', () => {
-  it('normalizes hosts without ports', () => {
+  it('normalizes hosts without ports, protocol or paths', () => {
     expect(normalizeHost('LOCALHOST:3000')).toBe('localhost');
+    expect(normalizeHost('https://Promo.Example.com/oferta?x=1')).toBe(
+      'promo.example.com',
+    );
   });
 
   it('normalizes empty and nested paths', () => {
@@ -17,6 +22,13 @@ describe('public funnel runtime utils', () => {
     expect(normalizePath('//oportunidad//gracias//')).toBe(
       '/oportunidad/gracias',
     );
+  });
+
+  it('normalizes publication prefixes through the same path rules', () => {
+    expect(normalizePublicationPathPrefix(' oportunidad/ ')).toBe(
+      '/oportunidad',
+    );
+    expect(normalizePublicationPathPrefix('/')).toBe('/');
   });
 
   it('matches root and specific publication prefixes', () => {
@@ -43,5 +55,14 @@ describe('public funnel runtime utils', () => {
     expect(buildPublicationStepPath('/oportunidad', 'gracias', false)).toBe(
       '/oportunidad/gracias',
     );
+  });
+
+  it('orders more specific publication prefixes first', () => {
+    expect(comparePublicationPathPrefix('/', '/oportunidad')).toBeGreaterThan(
+      0,
+    );
+    expect(
+      comparePublicationPathPrefix('/oportunidad', '/oportunidad/gracias'),
+    ).toBeGreaterThan(0);
   });
 });

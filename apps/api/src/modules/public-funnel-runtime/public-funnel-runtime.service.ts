@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
@@ -7,6 +11,7 @@ import type {
 } from './public-funnel-runtime.types';
 import {
   buildPublicationStepPath,
+  comparePublicationPathPrefix,
   matchesPublicationPath,
   normalizeHost,
   normalizePath,
@@ -55,11 +60,18 @@ export class PublicFunnelRuntimeService {
     const normalizedHost = normalizeHost(host);
     const normalizedPath = normalizePath(path);
 
+    if (!normalizedHost) {
+      throw new BadRequestException({
+        code: 'HOST_REQUIRED',
+        message: 'A host is required to resolve a public publication.',
+      });
+    }
+
     const publications = await this.prisma.funnelPublication.findMany({
       where: {
         status: 'active',
         domain: {
-          host: normalizedHost,
+          normalizedHost,
           status: 'active',
         },
         funnelInstance: {
@@ -73,8 +85,8 @@ export class PublicFunnelRuntimeService {
       .filter((publication) =>
         matchesPublicationPath(normalizedPath, publication.pathPrefix),
       )
-      .sort(
-        (left, right) => right.pathPrefix.length - left.pathPrefix.length,
+      .sort((left, right) =>
+        comparePublicationPathPrefix(left.pathPrefix, right.pathPrefix),
       )[0];
 
     if (!matchingPublication) {
@@ -199,8 +211,11 @@ export class PublicFunnelRuntimeService {
       domain: {
         id: publication.domain.id,
         host: publication.domain.host,
-        kind: publication.domain.kind,
+        normalizedHost: publication.domain.normalizedHost,
+        domainType: publication.domain.domainType,
         isPrimary: publication.domain.isPrimary,
+        canonicalHost: publication.domain.canonicalHost,
+        redirectToPrimary: publication.domain.redirectToPrimary,
       },
       publication: {
         id: publication.id,

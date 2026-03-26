@@ -56,10 +56,10 @@ enum DomainStatus {
   archived
 }
 
-enum DomainKind {
-  apex
-  subdomain
-  custom
+enum DomainType {
+  system_subdomain
+  custom_apex
+  custom_subdomain
 }
 
 enum FunnelTemplateStatus {
@@ -443,15 +443,20 @@ model Domain {
   id                 String              @id @default(uuid())
   workspaceId        String
   teamId             String
-  host               String              @unique
+  host               String
+  normalizedHost     String              @unique
   status             DomainStatus
-  kind               DomainKind
+  domainType         DomainType
   isPrimary          Boolean             @default(false)
+  canonicalHost      String?
+  redirectToPrimary  Boolean             @default(false)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team               Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
   funnelPublications FunnelPublication[]
+
+  @@index([teamId, isPrimary])
 }
 
 model FunnelTemplate {
@@ -553,6 +558,7 @@ model FunnelPublication {
   automationDispatches AutomationDispatch[]
 
   @@unique([domainId, pathPrefix])
+  @@index([domainId, status, pathPrefix])
 }
 
 model TrackingProfile {
