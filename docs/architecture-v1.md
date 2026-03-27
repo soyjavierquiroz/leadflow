@@ -341,8 +341,8 @@ La arquitectura ya implementa:
 
 Hostnames fijos del SaaS:
 
-- `proxy-fallback.exitosos.com`: origin fijo que Cloudflare usa para llegar al runtime
-- `customers.exitosos.com`: target DNS único que Leadflow entrega a clientes
+- `proxy-fallback.leadflow.kurukin.com`: origin fijo que Cloudflare usa para llegar al runtime
+- `customers.leadflow.kurukin.com`: target DNS único que Leadflow entrega a clientes
 
 Flujo:
 
@@ -448,14 +448,12 @@ Decision de transicion:
   - `leadflow_core`
   - `leadflow_automation` (placeholder)
 - Routing Traefik por host:
-  - `members.exitosos.com` -> `web` (router explícito)
-  - `admin.exitosos.com` -> `web` (router explícito)
-  - `api.exitosos.com` -> `api` (router explícito)
+  - `leadflow.kurukin.com` -> `web` (router explícito)
+  - `api.leadflow.kurukin.com` -> `api` (router explícito)
   - `HostRegexp({host:.+})` -> `web` (router catch-all público)
 - El catch-all sirve:
-  - host público principal del SaaS
-  - `proxy-fallback.exitosos.com`
-  - `customers.exitosos.com`
+  - `customers.leadflow.kurukin.com`
+  - `proxy-fallback.leadflow.kurukin.com`
   - cualquier custom hostname proxied desde Cloudflare
 - No se agregan dominios cliente uno por uno al stack.
 

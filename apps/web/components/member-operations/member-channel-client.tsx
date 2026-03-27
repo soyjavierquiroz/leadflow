@@ -540,7 +540,7 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
                     automationWebhookUrl: event.target.value,
                   }))
                 }
-                placeholder="https://n8n.exitosos.com/webhook/leadflow/member-ana"
+                placeholder="https://n8n.leadflow.kurukin.com/webhook/leadflow/member-ana"
                 className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
               />
             </label>
@@ -603,7 +603,9 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
           ) : null}
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-            <p className="font-medium text-slate-900">Qué pasa hoy con el funnel</p>
+            <p className="font-medium text-slate-900">
+              Qué pasa hoy con el funnel
+            </p>
             <p className="mt-2">
               Esta fase no cambia todavía el handoff comercial final. Aunque el
               sponsor conecte su WhatsApp real, Reveal & Handoff sigue operando

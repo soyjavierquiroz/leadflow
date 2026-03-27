@@ -52,7 +52,8 @@ type AuthSessionCookie = {
 };
 
 const authApiBaseUrl = `${webPublicConfig.urls.api}/v1`;
-const authCookieName = process.env.AUTH_COOKIE_NAME?.trim() || "leadflow_session";
+const authCookieName =
+  process.env.AUTH_COOKIE_NAME?.trim() || "leadflow_session";
 const authCookieDomain = webPublicConfig.baseDomain ?? undefined;
 const authCookieSecure =
   (process.env.NODE_ENV ?? "development") === "production" ||
@@ -239,9 +240,7 @@ export const getHomePathForRole = (role: AppUserRole) => {
   }
 };
 
-export const isLoginApiResponse = (
-  value: unknown,
-): value is LoginApiResponse =>
+export const isLoginApiResponse = (value: unknown): value is LoginApiResponse =>
   typeof value === "object" &&
   value !== null &&
   "redirectPath" in value &&
@@ -269,14 +268,6 @@ export const getLogoutErrorMessage = (payload: unknown) =>
   getAuthErrorMessage(payload) ?? "No pudimos cerrar la sesión.";
 
 export const resolveAuthRedirectTarget = (redirectPath: string) => {
-  if (redirectPath.startsWith("/admin") || redirectPath.startsWith("/team")) {
-    return new URL(redirectPath, webPublicConfig.urls.admin).toString();
-  }
-
-  if (redirectPath.startsWith("/member")) {
-    return new URL(redirectPath, webPublicConfig.urls.members).toString();
-  }
-
   return new URL(redirectPath, webPublicConfig.urls.site).toString();
 };
 

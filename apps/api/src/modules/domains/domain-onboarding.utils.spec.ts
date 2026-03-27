@@ -20,10 +20,10 @@ describe('domain onboarding utils', () => {
     const instructions = buildDomainDnsInstructions({
       host: 'promo.cliente.com',
       domainType: 'custom_subdomain',
-      dnsTarget: 'customers.exitosos.com',
+      dnsTarget: 'customers.leadflow.kurukin.com',
       verificationMethod: 'cname',
       cloudflareStatusJson: null,
-      fallbackOrigin: 'proxy-fallback.exitosos.com',
+      fallbackOrigin: 'proxy-fallback.leadflow.kurukin.com',
     });
 
     expect(instructions).toEqual(
@@ -31,7 +31,7 @@ describe('domain onboarding utils', () => {
         expect.objectContaining({
           type: 'cname',
           host: 'promo.cliente.com',
-          value: 'customers.exitosos.com',
+          value: 'customers.leadflow.kurukin.com',
         }),
       ]),
     );
@@ -46,13 +46,13 @@ describe('domain onboarding utils', () => {
   it('marks a managed custom hostname as active when hostname and ssl are active', () => {
     const lifecycle = deriveDomainLifecycle({
       domainType: 'custom_subdomain',
-      dnsTarget: 'customers.exitosos.com',
+      dnsTarget: 'customers.leadflow.kurukin.com',
       cloudflareCustomHostnameId: 'cf-hostname-1',
       cloudflareStatusJson: {
         id: 'cf-hostname-1',
         hostname: 'promo.cliente.com',
         status: 'active',
-        customOriginServer: 'proxy-fallback.exitosos.com',
+        customOriginServer: 'proxy-fallback.leadflow.kurukin.com',
         verificationErrors: [],
         ownershipVerification: null,
         ssl: {
@@ -76,7 +76,7 @@ describe('domain onboarding utils', () => {
   it('keeps a custom hostname in pending_dns before Cloudflare activation', () => {
     const lifecycle = deriveDomainLifecycle({
       domainType: 'custom_subdomain',
-      dnsTarget: 'customers.exitosos.com',
+      dnsTarget: 'customers.leadflow.kurukin.com',
       cloudflareCustomHostnameId: null,
       cloudflareStatusJson: null,
     });

@@ -505,7 +505,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                 </select>
                 <span className="text-xs font-normal leading-5 text-slate-500">
                   Recomendado: <code>custom_subdomain</code> para flujo simple
-                  vía CNAME a <code>customers.exitosos.com</code>.
+                  vía CNAME a <code>customers.leadflow.kurukin.com</code>.
                 </span>
               </label>
 

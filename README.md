@@ -43,8 +43,9 @@ No hay deploy aplicado en esta fase.
 
 ## Nota de login
 
-- El login web usa flujo server-first: el formulario de `/login` envía a una `server action` de Next, esa acción llama a `POST https://api.exitosos.com/v1/auth/login`, persiste la cookie de sesión en el servidor de Next y resuelve el redirect final por rol sin depender de `fetch` cliente ni `window.location`.
-- El logout web usa flujo server-first: el botón envía a una `server action` de Next, esa acción llama a `POST https://api.exitosos.com/v1/auth/logout`, limpia la cookie de sesión del lado Next y redirige a `/login` sin depender de navegación JS en cliente.
+- El login web usa flujo server-first: el formulario de `/login` envía a una `server action` de Next, esa acción llama a `POST https://api.leadflow.kurukin.com/v1/auth/login`, persiste la cookie de sesión en el servidor de Next y resuelve el redirect final por rol sin depender de `fetch` cliente ni `window.location`.
+- El logout web usa flujo server-first: el botón envía a una `server action` de Next, esa acción llama a `POST https://api.leadflow.kurukin.com/v1/auth/logout`, limpia la cookie de sesión del lado Next y redirige a `/login` sin depender de navegación JS en cliente.
+- Los redirects internos de `admin`, `team` y `member` resuelven sobre un único host de app: `https://leadflow.kurukin.com`.
 
 ## Stack tecnico
 
@@ -55,10 +56,10 @@ No hay deploy aplicado en esta fase.
 
 ## Estrategia de dominio
 
-- `exitosos.com` es dominio temporal de staging.
-- El dominio de lanzamiento sera distinto y se definira en ventana de release.
+- Dominio base actual del sistema: `leadflow.kurukin.com`.
+- API fija del sistema: `api.leadflow.kurukin.com`.
 - El codigo de aplicacion debe ser domain-agnostic.
-- El dominio vive solo en configuracion centralizada (`*.env.example`, variables de stack) y documentacion de staging.
+- El dominio vive solo en configuracion centralizada (`*.env.example`, variables de stack) y documentacion operativa.
 
 Hosts funcionales esperados por convencion:
 
@@ -131,8 +132,10 @@ Validacion de stacks:
 ## Documentacion clave
 
 - `docs/architecture-v1.md`
+- `docs/base-domain-migration-kurukin-v1.md`
 - `docs/domain-model-v1.md`
 - `docs/cloudflare-saas-runtime-architecture-v2.md`
+- `docs/simple-saas-domain-activation-v1.md`
 - `docs/persistence-v1.md`
 - `docs/public-funnel-runtime-v1.md`
 - `docs/lead-capture-assignment-flows-v1.md`
@@ -220,9 +223,9 @@ Modulos disponibles:
 
 - Resolucion publica implementada por `host + path` con `normalizedHost` exacto, `pathPrefix` normalizado y precedencia por ruta mas especifica.
 - Runtime SaaS v2 para dominios externos:
-  - `customers.exitosos.com` es el `CNAME target` único para clientes
-  - `proxy-fallback.exitosos.com` es el `fallback origin` fijo usado por Cloudflare
-  - Traefik usa router público catch-all y deja routers explícitos solo para `admin`, `members` y `api`
+  - `customers.leadflow.kurukin.com` es el `CNAME target` único para clientes
+  - `proxy-fallback.leadflow.kurukin.com` es el `fallback origin` fijo usado por Cloudflare
+  - Traefik usa router público catch-all y deja routers explícitos solo para `leadflow.kurukin.com` y `api.leadflow.kurukin.com`
   - no se enumeran dominios cliente en YAML/labels del stack
 - Modelo de publicacion preparado para dominios externos reales:
   - `team` 1:N `domains`
@@ -586,9 +589,9 @@ Modulos disponibles:
 - Flujo alineado al runtime SaaS v2:
   - el team registra el hostname del cliente en Leadflow
   - Leadflow crea/actualiza el custom hostname en Cloudflare
-  - Leadflow devuelve un único `CNAME target`: `customers.exitosos.com`
+  - Leadflow devuelve un único `CNAME target`: `customers.leadflow.kurukin.com`
   - Cloudflare edge presenta el cert del dominio del cliente
-  - Cloudflare reenvía al origin fijo `proxy-fallback.exitosos.com`
+  - Cloudflare reenvía al origin fijo `proxy-fallback.leadflow.kurukin.com`
   - la UI muestra hostname solicitado, CNAME target, estado Cloudflare, estado SSL y refresh
   - el resolver final de funnels sigue ocurriendo por `host + path`
   - `domains`
@@ -621,8 +624,8 @@ Modulos disponibles:
   - Web: `node apps/web/server.js` (Next standalone, produccion)
   - API: `node apps/api/dist/main.js` (Nest compilado, produccion)
 - TLS para Cloudflare Full (strict) en stack local:
-  - Routers explícitos para `members`, `admin` y `api`.
-  - Router público catch-all para `site`, `customers.exitosos.com`, `proxy-fallback.exitosos.com` y tráfico proxied de clientes.
+  - Routers explícitos para `leadflow.kurukin.com` y `api.leadflow.kurukin.com`.
+  - Router público catch-all para `customers.leadflow.kurukin.com`, `proxy-fallback.leadflow.kurukin.com` y tráfico proxied de clientes.
   - Certificados de origen enfocados en hostnames fijos del SaaS, no en dominios cliente individuales.
 - Deploy aun no ejecutado.
 

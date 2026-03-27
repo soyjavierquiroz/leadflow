@@ -50,20 +50,13 @@ export const getApiRuntimeConfig = (
 ): ApiRuntimeConfig => {
   const port = parseNumber(env.API_PORT, 3001);
   const baseDomain = sanitizeEnv(env.APP_BASE_DOMAIN);
+  const siteUrlFallback = baseDomain
+    ? toHttpsUrl(baseDomain)
+    : 'http://localhost:3000';
 
-  const siteUrl =
-    env.SITE_URL ??
-    (baseDomain ? toHttpsUrl(baseDomain) : 'http://localhost:3000');
-  const membersUrl =
-    env.MEMBERS_URL ??
-    (baseDomain
-      ? toHttpsUrl(`members.${baseDomain}`)
-      : 'http://localhost:3000/members');
-  const adminUrl =
-    env.ADMIN_URL ??
-    (baseDomain
-      ? toHttpsUrl(`admin.${baseDomain}`)
-      : 'http://localhost:3000/admin');
+  const siteUrl = sanitizeEnv(env.SITE_URL) ?? siteUrlFallback;
+  const membersUrl = sanitizeEnv(env.MEMBERS_URL) ?? siteUrl;
+  const adminUrl = sanitizeEnv(env.ADMIN_URL) ?? siteUrl;
   const apiUrl =
     env.API_BASE_URL ??
     (baseDomain ? toHttpsUrl(`api.${baseDomain}`) : `http://localhost:${port}`);

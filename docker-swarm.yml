@@ -20,7 +20,11 @@ services:
       restart_policy:
         condition: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -31,26 +35,26 @@ services:
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:-staging}
-      APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-staging.example.com}
+      APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-leadflow.kurukin.com}
 
       API_NAME: leadflow-api
       API_VERSION: 0.2.0
       API_HOST: 0.0.0.0
       API_PORT: 3001
       API_GLOBAL_PREFIX: v1
-      API_BASE_URL: ${API_URL}
+      API_BASE_URL: ${API_URL:-https://api.leadflow.kurukin.com}
 
-      SITE_URL: ${SITE_URL}
-      MEMBERS_URL: ${MEMBERS_URL}
-      ADMIN_URL: ${ADMIN_URL}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      SITE_URL: ${SITE_URL:-https://leadflow.kurukin.com}
+      MEMBERS_URL: ${MEMBERS_URL:-https://leadflow.kurukin.com}
+      ADMIN_URL: ${ADMIN_URL:-https://leadflow.kurukin.com}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://leadflow.kurukin.com}
 
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
 
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
       CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID}
-      CLOUDFLARE_SAAS_FALLBACK_ORIGIN: ${CLOUDFLARE_SAAS_FALLBACK_ORIGIN}
-      CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET: ${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET}
+      CLOUDFLARE_SAAS_FALLBACK_ORIGIN: ${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kurukin.com}
+      CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET: ${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.leadflow.kurukin.com}
       CLOUDFLARE_API_BASE_URL: ${CLOUDFLARE_API_BASE_URL:-https://api.cloudflare.com/client/v4}
       CLOUDFLARE_REQUEST_TIMEOUT_MS: ${CLOUDFLARE_REQUEST_TIMEOUT_MS:-10000}
 
@@ -78,7 +82,11 @@ services:
         - traefik.http.routers.leadflow-api.tls.certresolver=le
         - traefik.http.services.leadflow-api.loadbalancer.server.port=3001
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:3001/health >/dev/null 2>&1 || exit 1",
+        ]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -90,12 +98,12 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_APP_NAME: Leadflow
       NEXT_PUBLIC_APP_ENV: ${APP_ENV:-staging}
-      NEXT_PUBLIC_APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-staging.example.com}
+      NEXT_PUBLIC_APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-leadflow.kurukin.com}
 
-      NEXT_PUBLIC_SITE_URL: ${SITE_URL}
-      NEXT_PUBLIC_MEMBERS_URL: ${MEMBERS_URL}
-      NEXT_PUBLIC_ADMIN_URL: ${ADMIN_URL}
-      NEXT_PUBLIC_API_URL: ${API_URL}
+      NEXT_PUBLIC_SITE_URL: ${SITE_URL:-https://leadflow.kurukin.com}
+      NEXT_PUBLIC_MEMBERS_URL: ${MEMBERS_URL:-https://leadflow.kurukin.com}
+      NEXT_PUBLIC_ADMIN_URL: ${ADMIN_URL:-https://leadflow.kurukin.com}
+      NEXT_PUBLIC_API_URL: ${API_URL:-https://api.leadflow.kurukin.com}
     networks:
       - leadflow_core
       - traefik_public
@@ -113,35 +121,28 @@ services:
         - traefik.enable=true
         - traefik.docker.network=traefik_public
 
+        - traefik.http.routers.leadflow-site.rule=Host(`${LEADFLOW_SITE_HOST}`)
+        - traefik.http.routers.leadflow-site.priority=200
+        - traefik.http.routers.leadflow-site.entrypoints=websecure
+        - traefik.http.routers.leadflow-site.tls=true
+        - traefik.http.routers.leadflow-site.tls.certresolver=le
+        - traefik.http.routers.leadflow-site.service=leadflow-web
+
         - traefik.http.routers.leadflow-public.rule=HostRegexp(`{host:.+}`)
         - traefik.http.routers.leadflow-public.priority=1
         - traefik.http.routers.leadflow-public.entrypoints=websecure
         - traefik.http.routers.leadflow-public.tls=true
         - traefik.http.routers.leadflow-public.tls.certresolver=le
-        - traefik.http.routers.leadflow-public.tls.domains[0].main=${LEADFLOW_SAAS_CUSTOMERS_HOST:-customers.exitosos.com}
-        - traefik.http.routers.leadflow-public.tls.domains[0].sans=${LEADFLOW_SAAS_FALLBACK_HOST:-proxy-fallback.exitosos.com},${LEADFLOW_SITE_HOST}
+        - traefik.http.routers.leadflow-public.tls.domains[0].main=${LEADFLOW_SAAS_CUSTOMERS_HOST:-customers.leadflow.kurukin.com}
+        - traefik.http.routers.leadflow-public.tls.domains[0].sans=${LEADFLOW_SAAS_FALLBACK_HOST:-proxy-fallback.leadflow.kurukin.com}
         - traefik.http.routers.leadflow-public.service=leadflow-web
-
-        - traefik.http.routers.leadflow-members.rule=Host(`${LEADFLOW_MEMBERS_HOST}`)
-        - traefik.http.routers.leadflow-members.priority=200
-        - traefik.http.routers.leadflow-members.entrypoints=websecure
-        - traefik.http.routers.leadflow-members.tls=true
-        - traefik.http.routers.leadflow-members.tls.certresolver=le
-        - traefik.http.routers.leadflow-members.service=leadflow-web
-
-        - traefik.http.routers.leadflow-admin.rule=Host(`${LEADFLOW_ADMIN_HOST}`)
-        - traefik.http.routers.leadflow-admin.priority=200
-        - traefik.http.routers.leadflow-admin.entrypoints=websecure
-        - traefik.http.routers.leadflow-admin.tls=true
-        - traefik.http.routers.leadflow-admin.tls.certresolver=le
-        - traefik.http.routers.leadflow-admin.service=leadflow-web
 
         - traefik.http.services.leadflow-web.loadbalancer.server.port=3000
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- --header='Host: ${LEADFLOW_SITE_HOST}' http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"
+          "wget -qO- --header='Host: ${LEADFLOW_SITE_HOST}' http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1",
         ]
       interval: 30s
       timeout: 5s

@@ -12,11 +12,11 @@ Reestructurar Leadflow para que el onboarding de dominios siga un patrón SaaS s
 
 ## Hostnames fijos del SaaS
 
-- `proxy-fallback.exitosos.com`
+- `proxy-fallback.leadflow.kurukin.com`
   - `fallback origin` fijo
   - se configura como `custom_origin_server` en Cloudflare
   - es el hostname que necesita TLS válido en origen
-- `customers.exitosos.com`
+- `customers.leadflow.kurukin.com`
   - `CNAME target` único para clientes
   - Leadflow lo devuelve en `/team/domains`
   - no crea routers dedicados por cliente
@@ -25,7 +25,7 @@ Reestructurar Leadflow para que el onboarding de dominios siga un patrón SaaS s
 
 1. Team admin registra un `custom_subdomain`.
 2. Leadflow crea o actualiza el custom hostname en Cloudflare.
-3. Leadflow devuelve un único `CNAME target`: `customers.exitosos.com`.
+3. Leadflow devuelve un único `CNAME target`: `customers.leadflow.kurukin.com`.
 4. El cliente crea el CNAME de su hostname hacia ese target.
 5. Team admin pulsa `Refresh`.
 6. Leadflow reimpulsa la validación y consulta el estado en Cloudflare.
@@ -37,7 +37,7 @@ Reestructurar Leadflow para que el onboarding de dominios siga un patrón SaaS s
 
 - termina TLS del dominio del cliente
 - emite y presenta el certificado del custom hostname
-- reenvía tráfico hacia `proxy-fallback.exitosos.com`
+- reenvía tráfico hacia `proxy-fallback.leadflow.kurukin.com`
 
 ### Fallback origin
 
@@ -47,22 +47,20 @@ Reestructurar Leadflow para que el onboarding de dominios siga un patrón SaaS s
 
 ### Leadflow
 
-- mantiene routers explícitos solo para `admin`, `members` y `api`
+- mantiene routers explícitos para `leadflow.kurukin.com` y `api.leadflow.kurukin.com`
 - usa un router público catch-all para el tráfico del sitio y clientes
 - resuelve tenant/publicación por `host + path`
 
 ## Cómo queda Traefik
 
-- `leadflow-api`: router explícito por host y prioridad alta
-- `leadflow-members`: router explícito por host y prioridad alta
-- `leadflow-admin`: router explícito por host y prioridad alta
+- `leadflow-site`: router explícito por `leadflow.kurukin.com`
+- `leadflow-api`: router explícito por `api.leadflow.kurukin.com`
 - `leadflow-public`: router catch-all `HostRegexp({host:.+})` con prioridad baja
 
 El catch-all sirve:
 
-- host público principal del SaaS
-- `proxy-fallback.exitosos.com`
-- `customers.exitosos.com`
+- `proxy-fallback.leadflow.kurukin.com`
+- `customers.leadflow.kurukin.com`
 - cualquier hostname cliente proxied por Cloudflare
 
 ## Cómo queda `/team/domains`
@@ -77,7 +75,7 @@ El catch-all sirve:
 
 ## Qué pasos manuales quedan
 
-- el cliente debe crear el CNAME hacia `customers.exitosos.com`
+- el cliente debe crear el CNAME hacia `customers.leadflow.kurukin.com`
 - el team debe usar `Refresh` hasta que Cloudflare refleje el cambio DNS
 - si se intenta `custom_apex`, el DNS del cliente debe soportar flattening/ALIAS
 - la cuenta Cloudflare del entorno debe tener `zone` y `token` configurados

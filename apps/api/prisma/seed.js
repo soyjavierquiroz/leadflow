@@ -141,7 +141,7 @@ async function main() {
       pairingCode: null,
       pairingExpiresAt: null,
       automationWebhookUrl:
-        'https://n8n.exitosos.com/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
+        'https://n8n.leadflow.kurukin.com/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
       automationEnabled: true,
       metadataJson: {
         seeded: true,
@@ -167,7 +167,7 @@ async function main() {
       pairingCode: null,
       pairingExpiresAt: null,
       automationWebhookUrl:
-        'https://n8n.exitosos.com/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
+        'https://n8n.leadflow.kurukin.com/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
       automationEnabled: true,
       metadataJson: {
         seeded: true,
@@ -403,7 +403,7 @@ async function main() {
         id: 'cf-custom-hostname-promo-acme-test',
         hostname: secondaryDomainHost,
         status: 'active',
-        customOriginServer: 'proxy-fallback.exitosos.com',
+        customOriginServer: 'proxy-fallback.leadflow.kurukin.com',
         verificationErrors: [],
         ownershipVerification: null,
         ssl: {
@@ -416,7 +416,7 @@ async function main() {
         error: null,
         raw: null,
       },
-      dnsTarget: 'customers.exitosos.com',
+      dnsTarget: 'customers.leadflow.kurukin.com',
       lastCloudflareSyncAt: new Date(),
       activatedAt: new Date(),
     },
@@ -439,7 +439,7 @@ async function main() {
         id: 'cf-custom-hostname-promo-acme-test',
         hostname: secondaryDomainHost,
         status: 'active',
-        customOriginServer: 'proxy-fallback.exitosos.com',
+        customOriginServer: 'proxy-fallback.leadflow.kurukin.com',
         verificationErrors: [],
         ownershipVerification: null,
         ssl: {
@@ -452,7 +452,7 @@ async function main() {
         error: null,
         raw: null,
       },
-      dnsTarget: 'customers.exitosos.com',
+      dnsTarget: 'customers.leadflow.kurukin.com',
       lastCloudflareSyncAt: new Date(),
       activatedAt: new Date(),
     },
@@ -477,7 +477,7 @@ async function main() {
       verificationMethod: 'cname',
       cloudflareCustomHostnameId: null,
       cloudflareStatusJson: null,
-      dnsTarget: 'customers.exitosos.com',
+      dnsTarget: 'customers.leadflow.kurukin.com',
       lastCloudflareSyncAt: null,
       activatedAt: null,
     },
@@ -497,7 +497,7 @@ async function main() {
       verificationMethod: 'cname',
       cloudflareCustomHostnameId: null,
       cloudflareStatusJson: null,
-      dnsTarget: 'customers.exitosos.com',
+      dnsTarget: 'customers.leadflow.kurukin.com',
       lastCloudflareSyncAt: null,
       activatedAt: null,
     },
@@ -648,7 +648,8 @@ async function main() {
             type: 'hero',
             key: 'hero-main',
             eyebrow: 'Leadflow Revenue Engine',
-            title: 'Funnels públicos listos para capturar y derivar oportunidades reales',
+            title:
+              'Funnels públicos listos para capturar y derivar oportunidades reales',
             description:
               'Este template base publica funnels por host + path y compone bloques comerciales reutilizables sin romper el runtime estándar.',
           },
@@ -750,7 +751,8 @@ async function main() {
             type: 'hero',
             key: 'hero-main',
             eyebrow: 'Leadflow Revenue Engine',
-            title: 'Funnels públicos listos para capturar y derivar oportunidades reales',
+            title:
+              'Funnels públicos listos para capturar y derivar oportunidades reales',
             description:
               'Este template base publica funnels por host + path y compone bloques comerciales reutilizables sin romper el runtime estándar.',
           },
@@ -917,7 +919,8 @@ async function main() {
         },
         settingsJson: {
           title: 'Landing principal',
-          summary: 'Entrada del funnel publicado usando intake pack compatible.',
+          summary:
+            'Entrada del funnel publicado usando intake pack compatible.',
         },
       },
       {
