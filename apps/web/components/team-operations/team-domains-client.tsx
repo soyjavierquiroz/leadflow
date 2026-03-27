@@ -110,6 +110,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
     sortRows(initialRows.map(normalizeRecord)),
   );
   const [isPending, startTransition] = useTransition();
+  const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -151,41 +152,43 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
     );
   };
 
-  const handleCreate = () => {
+  const handleCreateDomain = async () => {
     resetMessages();
 
-    startTransition(async () => {
-      try {
-        const record = await teamOperationRequest<DomainRecord>("/domains", {
-          method: "POST",
-          body: JSON.stringify({
-            host: createState.host,
-            domainType: createState.domainType,
-            verificationMethod: resolveDefaultVerificationMethod(
-              createState.domainType,
-            ),
-            isPrimary: createState.isPrimary,
-            canonicalHost: createState.canonicalHost || null,
-            redirectToPrimary: createState.redirectToPrimary,
-          }),
-        });
+    setIsCreating(true);
 
-        upsertRow(record);
-        setSuccessMessage(
-          record.onboardingStatus === "active"
-            ? "Dominio activado y listo para publicar."
-            : "Dominio registrado. Revisa las instrucciones DNS para completar el onboarding.",
-        );
-        setIsCreateOpen(false);
-        setCreateState(buildCreateState());
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "No pudimos registrar el dominio.",
-        );
-      }
-    });
+    try {
+      const record = await teamOperationRequest<DomainRecord>("/domains", {
+        method: "POST",
+        body: JSON.stringify({
+          host: createState.host,
+          domainType: createState.domainType,
+          verificationMethod: resolveDefaultVerificationMethod(
+            createState.domainType,
+          ),
+          isPrimary: createState.isPrimary,
+          canonicalHost: createState.canonicalHost || null,
+          redirectToPrimary: createState.redirectToPrimary,
+        }),
+      });
+
+      upsertRow(record);
+      setSuccessMessage(
+        record.onboardingStatus === "active"
+          ? "Dominio activado y listo para publicar."
+          : "Dominio registrado. Revisa las instrucciones DNS para completar el onboarding.",
+      );
+      setIsCreateOpen(false);
+      setCreateState(buildCreateState());
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos registrar el dominio.",
+      );
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleRefresh = (domain: DomainRecord) => {
@@ -663,9 +666,9 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
             onChange={setCreateState}
             submitLabel="Crear dominio"
             helperText="Recomendado: custom_subdomain vía CNAME a customers.leadflow.kurukin.com."
-            isPending={isPending}
+            isBusy={isCreating}
             onCancel={() => setIsCreateOpen(false)}
-            onSubmit={handleCreate}
+            onSubmit={handleCreateDomain}
           />
         </ModalShell>
       ) : null}
@@ -685,7 +688,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                 ? "Este dominio todavía no creó onboarding, así que el host puede ajustarse desde Editar."
                 : "Host bloqueado: Leadflow exige recreate-onboarding para cambiar el hostname cuando ya existe target/custom hostname."
             }
-            isPending={isPending}
+            isBusy={isPending}
             onCancel={() => setEditingDomain(null)}
             onSubmit={handleEdit}
             disableHost={!canEditHostInPatch(editingDomain)}
@@ -704,7 +707,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
             onChange={setRecreateState}
             submitLabel="Recrear onboarding"
             helperText="Úsalo para limpiar registros heredados como proxy-fallback.exitosos.com y regenerar el target sano del SaaS."
-            isPending={isPending}
+            isBusy={isPending}
             onCancel={() => setRecreateDomain(null)}
             onSubmit={handleRecreate}
           />
@@ -755,7 +758,7 @@ type DomainFormProps = {
   onChange: Dispatch<SetStateAction<DomainFormState>>;
   submitLabel: string;
   helperText: string;
-  isPending: boolean;
+  isBusy: boolean;
   onCancel: () => void;
   onSubmit: () => void;
   disableHost?: boolean;
@@ -766,7 +769,7 @@ function DomainForm({
   onChange,
   submitLabel,
   helperText,
-  isPending,
+  isBusy,
   onCancel,
   onSubmit,
   disableHost = false,
@@ -870,7 +873,7 @@ function DomainForm({
         <button
           type="button"
           onClick={onSubmit}
-          disabled={isPending || state.host.trim().length === 0}
+          disabled={isBusy || state.host.trim().length === 0}
           className={primaryButtonClassName}
         >
           {submitLabel}

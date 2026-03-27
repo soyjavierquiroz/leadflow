@@ -49,6 +49,20 @@ Validaciones implementadas:
   - dominio activo
   - funnel instance activo
 
+### Domain
+El team admin puede:
+- listar dominios del team
+- crear dominios nuevos
+- editar metadata operativa segura
+- refrescar onboarding
+- recrear onboarding cuando existe configuracion heredada o inconsistente
+- eliminar dominios y sus publicaciones asociadas por cascada
+
+Nota de UX operativa:
+- la mutacion de crear dominio en `/team/domains` se ejecuta desde cliente con `fetch` directo al API y loading state explicito del modal
+- no usa `startTransition` para envolver el request async de creacion
+- esto evita congelar la UI antes de que salga la peticion HTTP
+
 ### Sponsor
 El team admin puede:
 - listar sponsors del team
@@ -96,6 +110,11 @@ El team admin puede:
 ## Endpoints relevantes
 
 ### Nuevos o ampliados para Team Operations
+- `POST /v1/domains`
+- `PATCH /v1/domains/:id`
+- `DELETE /v1/domains/:id`
+- `POST /v1/domains/:id/refresh`
+- `POST /v1/domains/:id/recreate-onboarding`
 - `GET /v1/tracking-profiles`
 - `GET /v1/handoff-strategies`
 - `POST /v1/funnel-instances`
