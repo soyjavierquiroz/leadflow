@@ -341,20 +341,20 @@ export class DomainsService {
       teamId: string;
     },
     domainId: string,
-    dto: RecreateDomainOnboardingDto,
+    dto?: RecreateDomainOnboardingDto,
   ): Promise<DomainSummary> {
     const existingRecord = await this.findDomainRecord(scope, domainId);
     const existing = mapDomainRecord(existingRecord);
-    const nextHost = dto.host?.trim() ?? existing.host;
+    const nextHost = dto?.host?.trim() ?? existing.host;
     const normalizedHost = this.assertAndNormalizeHost(nextHost);
-    const domainType = dto.domainType ?? existing.domainType;
+    const domainType = dto?.domainType ?? existing.domainType;
 
     if (normalizedHost !== existing.normalizedHost) {
       await this.assertHostAvailable(normalizedHost, existing.id);
     }
 
     const verificationMethod =
-      dto.verificationMethod ??
+      dto?.verificationMethod ??
       existing.verificationMethod ??
       defaultVerificationMethodForDomainType(domainType);
     const dnsTarget = this.resolveDnsTarget(domainType);
@@ -368,7 +368,7 @@ export class DomainsService {
     await this.deleteCloudflareCustomHostname(existing);
 
     const record = await this.prisma.$transaction(async (tx) => {
-      if (dto.isPrimary === true) {
+      if (dto?.isPrimary === true) {
         await tx.domain.updateMany({
           where: {
             teamId: scope.teamId,
@@ -387,15 +387,15 @@ export class DomainsService {
           host: nextHost,
           normalizedHost,
           domainType,
-          isPrimary: dto.isPrimary ?? existing.isPrimary,
+          isPrimary: dto?.isPrimary ?? existing.isPrimary,
           canonicalHost:
-            dto.canonicalHost !== undefined
+            dto?.canonicalHost !== undefined
               ? dto.canonicalHost
                 ? normalizeDomainHost(dto.canonicalHost)
                 : null
               : existing.canonicalHost,
           redirectToPrimary:
-            dto.redirectToPrimary ?? existing.redirectToPrimary,
+            dto?.redirectToPrimary ?? existing.redirectToPrimary,
           verificationMethod,
           status: baseLifecycle.status,
           onboardingStatus: baseLifecycle.onboardingStatus,

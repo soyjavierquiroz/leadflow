@@ -107,7 +107,7 @@ export class DomainsController {
   recreateOnboarding(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Param('id') domainId: string,
-    @Body() dto: RecreateDomainOnboardingDto,
+    @Body() dto?: RecreateDomainOnboardingDto,
   ) {
     return this.domainsService.recreateOnboardingForTeam(
       {
