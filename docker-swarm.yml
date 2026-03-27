@@ -129,7 +129,7 @@ services:
         - traefik.http.routers.leadflow-site.service=leadflow-web
 
         - traefik.http.routers.leadflow-public.rule=HostRegexp(`{host:.+}`)
-        - traefik.http.routers.leadflow-public.priority=1
+        - traefik.http.routers.leadflow-public.priority=-100
         - traefik.http.routers.leadflow-public.entrypoints=websecure
         - traefik.http.routers.leadflow-public.tls=true
         - traefik.http.routers.leadflow-public.tls.certresolver=le
