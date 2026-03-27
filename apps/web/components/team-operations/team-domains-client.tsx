@@ -1,5 +1,6 @@
 "use client";
 
+import type { Dispatch, SetStateAction } from "react";
 import { useState, useTransition } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
@@ -23,11 +24,20 @@ type DomainFormState = {
   redirectToPrimary: boolean;
 };
 
+type DeleteDomainResponse = {
+  id: string;
+  host: string;
+  deleted: true;
+};
+
 const buttonClassName =
   "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+
+const dangerButtonClassName =
+  "rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60";
 
 const buildCreateState = (): DomainFormState => ({
   host: "",
@@ -37,9 +47,26 @@ const buildCreateState = (): DomainFormState => ({
   redirectToPrimary: false,
 });
 
+const buildStateFromRecord = (record: DomainRecord): DomainFormState => ({
+  host: record.host,
+  domainType: record.domainType as DomainFormState["domainType"],
+  isPrimary: record.isPrimary,
+  canonicalHost: record.canonicalHost ?? "",
+  redirectToPrimary: record.redirectToPrimary,
+});
+
+const sortRows = (rows: DomainRecord[]) =>
+  [...rows].sort((left, right) =>
+    left.normalizedHost.localeCompare(right.normalizedHost),
+  );
+
 const normalizeRecord = (record: DomainRecord): DomainRecord => ({
   ...record,
   dnsInstructions: record.dnsInstructions ?? [],
+  operationalStatus: record.operationalStatus ?? record.onboardingStatus,
+  isLegacyConfiguration: record.isLegacyConfiguration ?? false,
+  recreateRequired: record.recreateRequired ?? false,
+  legacyReason: record.legacyReason ?? null,
 });
 
 const resolveDefaultVerificationMethod = (
@@ -74,18 +101,54 @@ const describeDomainType = (domainType: DomainRecord["domainType"]) => {
   }
 };
 
+const canEditHostInPatch = (domain: DomainRecord) =>
+  domain.cloudflareCustomHostnameId === null &&
+  domain.onboardingStatus === "draft";
+
 export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
-  const [rows, setRows] = useState(initialRows.map(normalizeRecord));
+  const [rows, setRows] = useState(() =>
+    sortRows(initialRows.map(normalizeRecord)),
+  );
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createState, setCreateState] =
     useState<DomainFormState>(buildCreateState);
+  const [editingDomain, setEditingDomain] = useState<DomainRecord | null>(null);
+  const [editState, setEditState] = useState<DomainFormState>(buildCreateState);
+  const [recreateDomain, setRecreateDomain] = useState<DomainRecord | null>(
+    null,
+  );
+  const [recreateState, setRecreateState] =
+    useState<DomainFormState>(buildCreateState);
+  const [deleteDomain, setDeleteDomain] = useState<DomainRecord | null>(null);
 
   const resetMessages = () => {
     setErrorMessage(null);
     setSuccessMessage(null);
+  };
+
+  const upsertRow = (record: DomainRecord) => {
+    const normalized = normalizeRecord(record);
+
+    setRows((current) =>
+      sortRows(
+        [
+          ...current
+            .filter((item) => item.id !== normalized.id)
+            .map((item) =>
+              normalized.isPrimary
+                ? {
+                    ...item,
+                    isPrimary: false,
+                  }
+                : item,
+            ),
+          normalized,
+        ].map((item) => normalizeRecord(item)),
+      ),
+    );
   };
 
   const handleCreate = () => {
@@ -107,21 +170,9 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
           }),
         });
 
-        const normalized = normalizeRecord(record);
-
-        setRows((current) => [
-          ...current.map((item) =>
-            normalized.isPrimary
-              ? {
-                  ...item,
-                  isPrimary: false,
-                }
-              : item,
-          ),
-          normalized,
-        ]);
+        upsertRow(record);
         setSuccessMessage(
-          normalized.onboardingStatus === "active"
+          record.onboardingStatus === "active"
             ? "Dominio activado y listo para publicar."
             : "Dominio registrado. Revisa las instrucciones DNS para completar el onboarding.",
         );
@@ -150,11 +201,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
           },
         );
 
-        setRows((current) =>
-          current.map((item) =>
-            item.id === domain.id ? normalizeRecord(record) : item,
-          ),
-        );
+        upsertRow(record);
         setSuccessMessage("Estado del dominio refrescado.");
       } catch (error) {
         setErrorMessage(
@@ -166,33 +213,40 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
     });
   };
 
-  const handlePromotePrimary = (domain: DomainRecord) => {
+  const handleEdit = () => {
+    if (!editingDomain) {
+      return;
+    }
+
     resetMessages();
 
     startTransition(async () => {
       try {
+        const body: Record<string, unknown> = {
+          domainType: editState.domainType,
+          verificationMethod: resolveDefaultVerificationMethod(
+            editState.domainType,
+          ),
+          isPrimary: editState.isPrimary,
+          canonicalHost: editState.canonicalHost || null,
+          redirectToPrimary: editState.redirectToPrimary,
+        };
+
+        if (canEditHostInPatch(editingDomain)) {
+          body.host = editState.host;
+        }
+
         const record = await teamOperationRequest<DomainRecord>(
-          `/domains/${domain.id}`,
+          `/domains/${editingDomain.id}`,
           {
             method: "PATCH",
-            body: JSON.stringify({
-              isPrimary: true,
-              canonicalHost: domain.canonicalHost ?? domain.normalizedHost,
-            }),
+            body: JSON.stringify(body),
           },
         );
 
-        setRows((current) =>
-          current.map((item) =>
-            item.id === domain.id
-              ? normalizeRecord(record)
-              : {
-                  ...item,
-                  isPrimary: false,
-                },
-          ),
-        );
-        setSuccessMessage("Dominio marcado como principal.");
+        upsertRow(record);
+        setEditingDomain(null);
+        setSuccessMessage("Dominio actualizado.");
       } catch (error) {
         setErrorMessage(
           error instanceof Error
@@ -203,12 +257,83 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
     });
   };
 
+  const handleRecreate = () => {
+    if (!recreateDomain) {
+      return;
+    }
+
+    resetMessages();
+
+    startTransition(async () => {
+      try {
+        const record = await teamOperationRequest<DomainRecord>(
+          `/domains/${recreateDomain.id}/recreate-onboarding`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              host: recreateState.host,
+              domainType: recreateState.domainType,
+              verificationMethod: resolveDefaultVerificationMethod(
+                recreateState.domainType,
+              ),
+              isPrimary: recreateState.isPrimary,
+              canonicalHost: recreateState.canonicalHost || null,
+              redirectToPrimary: recreateState.redirectToPrimary,
+            }),
+          },
+        );
+
+        upsertRow(record);
+        setRecreateDomain(null);
+        setSuccessMessage(
+          "Onboarding recreado. Leadflow limpió el custom hostname anterior y generó el target nuevo del flujo SaaS.",
+        );
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No pudimos recrear el onboarding.",
+        );
+      }
+    });
+  };
+
+  const handleDelete = () => {
+    if (!deleteDomain) {
+      return;
+    }
+
+    resetMessages();
+
+    startTransition(async () => {
+      try {
+        const response = await teamOperationRequest<DeleteDomainResponse>(
+          `/domains/${deleteDomain.id}`,
+          {
+            method: "DELETE",
+            body: JSON.stringify({}),
+          },
+        );
+
+        setRows((current) => current.filter((item) => item.id !== response.id));
+        setDeleteDomain(null);
+        setSuccessMessage(`Dominio ${response.host} eliminado.`);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No pudimos eliminar el dominio.",
+        );
+      }
+    });
+  };
+
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Team Admin / Domains"
-        title="Onboarding de dominios externos"
-        description="Aquí el team registra hostnames, obtiene un único CNAME target del SaaS y monitorea estado Cloudflare + SSL antes de publicar funnels por host + path."
+        title="Domain management"
+        description="Aquí el team limpia dominios heredados, recrea onboarding en Cloudflare y mantiene el flujo SaaS simple sobre customers.leadflow.kurukin.com."
         actions={
           <button
             type="button"
@@ -237,101 +362,135 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
           hint="Hosts del team entre operación interna y onboarding SaaS."
         />
         <KpiCard
-          label="Activos"
-          value={formatCompactNumber(
-            rows.filter((item) => item.onboardingStatus === "active").length,
-          )}
-          hint="Dominios ya listos para soportar publicaciones reales."
-        />
-        <KpiCard
-          label="Pendientes DNS"
-          value={formatCompactNumber(
-            rows.filter((item) => item.onboardingStatus === "pending_dns")
-              .length,
-          )}
-          hint="Todavía requieren acción del cliente o del team sobre DNS."
-        />
-        <KpiCard
-          label="Pendientes validación"
+          label="Sanos"
           value={formatCompactNumber(
             rows.filter(
-              (item) => item.onboardingStatus === "pending_validation",
+              (item) =>
+                item.operationalStatus === "active" && !item.recreateRequired,
             ).length,
           )}
-          hint="Cloudflare ya recibió el hostname pero aún no termina verificación/TLS."
+          hint="Dominios activos en el modelo nuevo, sin target legado."
+        />
+        <KpiCard
+          label="Recreate required"
+          value={formatCompactNumber(
+            rows.filter((item) => item.recreateRequired).length,
+          )}
+          hint="Registros heredados o inconsistentes que deben re-onboardearse."
+        />
+        <KpiCard
+          label="Pendientes"
+          value={formatCompactNumber(
+            rows.filter(
+              (item) =>
+                item.operationalStatus === "pending_dns" ||
+                item.operationalStatus === "pending_validation",
+            ).length,
+          )}
+          hint="Todavía requieren acción DNS o validación en Cloudflare."
         />
       </section>
 
       <DataTable
         columns={[
           {
-            key: "domain",
-            header: "Hostname solicitado",
+            key: "hostname",
+            header: "Hostname",
             render: (row) => (
-              <div>
+              <div className="space-y-2">
                 <p className="font-semibold text-slate-950">
                   {row.requestedHostname}
                 </p>
+                <div className="flex flex-wrap gap-2">
+                  {row.isPrimary ? <StatusBadge value="primary" /> : null}
+                  {row.isLegacyConfiguration ? (
+                    <StatusBadge value="legacy" />
+                  ) : null}
+                  {row.recreateRequired ? (
+                    <StatusBadge value="recreate_required" />
+                  ) : null}
+                </div>
                 <p className="text-xs text-slate-500">
-                  {row.domainType.replace(/_/g, " ")}
-                  {row.isPrimary ? " • principal" : ""}
+                  Canonical: {row.canonicalHost ?? "sin definir"}
                 </p>
               </div>
             ),
           },
           {
-            key: "dns",
-            header: "CNAME target",
+            key: "type",
+            header: "Domain type",
             render: (row) => (
-              <div>
+              <div className="space-y-2">
+                <StatusBadge value={row.domainType} />
+                <p className="text-xs text-slate-500">
+                  Verificación: {formatStatus(row.verificationMethod)}
+                </p>
+              </div>
+            ),
+          },
+          {
+            key: "target",
+            header: "DNS target actual",
+            render: (row) => (
+              <div className="space-y-2">
                 <p className="font-medium text-slate-950">
-                  {row.cnameTarget ?? row.dnsTarget ?? "No aplica"}
+                  {row.dnsTarget ?? "No aplica"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Fallback origin:{" "}
-                  {row.fallbackOrigin ?? "Gestionado internamente"}
+                  {row.recreateRequired
+                    ? "Target sano esperado: customers.leadflow.kurukin.com"
+                    : `Fallback interno: ${row.fallbackOrigin ?? "no aplica"}`}
                 </p>
               </div>
             ),
           },
           {
             key: "cloudflare",
-            header: "Cloudflare",
+            header: "Cloudflare status",
             render: (row) => (
               <div className="space-y-2">
                 <StatusBadge
                   value={row.cloudflareHostnameStatus ?? row.onboardingStatus}
                 />
                 <p className="text-xs text-slate-500">
-                  {row.cloudflareErrorMessage
-                    ? row.cloudflareErrorMessage
-                    : `Metodo simple: ${formatStatus(row.verificationMethod)}`}
+                  {row.cloudflareErrorMessage ??
+                    row.legacyReason ??
+                    "Sin errores reportados por Cloudflare."}
                 </p>
               </div>
             ),
           },
           {
             key: "ssl",
-            header: "SSL",
+            header: "SSL status",
             render: (row) => (
               <div className="space-y-2">
-                <StatusBadge value={row.sslStatus} />
+                <StatusBadge value={row.cloudflareSslStatus ?? row.sslStatus} />
                 <p className="text-xs text-slate-500">
-                  Estado Cloudflare SSL:{" "}
-                  {formatStatus(row.cloudflareSslStatus ?? row.sslStatus)}
+                  Estado interno: {formatStatus(row.sslStatus)}
                 </p>
               </div>
             ),
           },
           {
-            key: "onboarding",
+            key: "status",
             header: "Estado",
             render: (row) => (
               <div className="space-y-2">
-                <StatusBadge value={row.onboardingStatus} />
+                <StatusBadge value={row.operationalStatus} />
                 <p className="text-xs text-slate-500">
-                  Sync: {formatDateTime(row.lastCloudflareSyncAt)}
+                  Onboarding persistido: {formatStatus(row.onboardingStatus)}
                 </p>
+              </div>
+            ),
+          },
+          {
+            key: "sync",
+            header: "Last sync",
+            render: (row) => (
+              <div className="space-y-2 text-xs text-slate-500">
+                <p>Último sync: {formatDateTime(row.lastCloudflareSyncAt)}</p>
+                <p>Activado: {formatDateTime(row.activatedAt)}</p>
               </div>
             ),
           },
@@ -348,19 +507,41 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                 >
                   Refresh
                 </button>
-                {!row.isPrimary ? (
-                  <button
-                    type="button"
-                    onClick={() => handlePromotePrimary(row)}
-                    disabled={isPending}
-                    className={buttonClassName}
-                  >
-                    Marcar principal
-                  </button>
-                ) : null}
-                <p className="w-full text-xs text-slate-500">
-                  Activado: {formatDateTime(row.activatedAt)}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetMessages();
+                    setEditingDomain(row);
+                    setEditState(buildStateFromRecord(row));
+                  }}
+                  disabled={isPending}
+                  className={buttonClassName}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetMessages();
+                    setRecreateDomain(row);
+                    setRecreateState(buildStateFromRecord(row));
+                  }}
+                  disabled={isPending}
+                  className={primaryButtonClassName}
+                >
+                  Recrear onboarding
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetMessages();
+                    setDeleteDomain(row);
+                  }}
+                  disabled={isPending}
+                  className={dangerButtonClassName}
+                >
+                  Eliminar
+                </button>
               </div>
             ),
           },
@@ -388,31 +569,34 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                   {describeDomainType(domain.domainType)}
                 </p>
               </div>
-              <StatusBadge value={domain.onboardingStatus} />
+              <div className="flex flex-wrap justify-end gap-2">
+                <StatusBadge value={domain.operationalStatus} />
+                {domain.isLegacyConfiguration ? (
+                  <StatusBadge value="legacy" />
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-5 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
               <p>
-                <span className="font-semibold text-slate-950">
-                  Hostname solicitado:
-                </span>{" "}
+                <span className="font-semibold text-slate-950">Hostname:</span>{" "}
                 {domain.requestedHostname}
               </p>
               <p>
                 <span className="font-semibold text-slate-950">
-                  CNAME target único:
+                  Domain type:
                 </span>{" "}
-                {domain.cnameTarget ?? domain.dnsTarget ?? "No aplica"}
+                {domain.domainType}
               </p>
               <p>
                 <span className="font-semibold text-slate-950">
-                  Fallback origin fijo:
+                  DNS target actual:
                 </span>{" "}
-                {domain.fallbackOrigin ?? "No aplica"}
+                {domain.dnsTarget ?? "No aplica"}
               </p>
               <p>
                 <span className="font-semibold text-slate-950">
-                  Cloudflare:
+                  Cloudflare status:
                 </span>{" "}
                 {formatStatus(
                   domain.cloudflareHostnameStatus ?? domain.onboardingStatus,
@@ -422,11 +606,20 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                 <span className="font-semibold text-slate-950">SSL:</span>{" "}
                 {formatStatus(domain.cloudflareSslStatus ?? domain.sslStatus)}
               </p>
+              <p>
+                <span className="font-semibold text-slate-950">Last sync:</span>{" "}
+                {formatDateTime(domain.lastCloudflareSyncAt)}
+              </p>
+              {domain.legacyReason ? (
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                  {domain.legacyReason}
+                </p>
+              ) : null}
             </div>
 
             <div className="mt-5 space-y-3">
               {(domain.dnsInstructions ?? []).length > 0 ? (
-                (domain.dnsInstructions ?? []).map((instruction) => (
+                domain.dnsInstructions?.map((instruction) => (
                   <div
                     key={instruction.id}
                     className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
@@ -465,124 +658,224 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
           description="Leadflow registra el hostname, crea el custom hostname en Cloudflare cuando está configurado y devuelve un único target DNS para el flujo SaaS simple."
           onClose={() => setIsCreateOpen(false)}
         >
-          <div className="space-y-4">
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Host
-              <input
-                value={createState.host}
-                onChange={(event) =>
-                  setCreateState((current) => ({
-                    ...current,
-                    host: event.target.value,
-                  }))
-                }
-                placeholder="promo.cliente.com"
-                className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
-              />
-            </label>
+          <DomainForm
+            state={createState}
+            onChange={setCreateState}
+            submitLabel="Crear dominio"
+            helperText="Recomendado: custom_subdomain vía CNAME a customers.leadflow.kurukin.com."
+            isPending={isPending}
+            onCancel={() => setIsCreateOpen(false)}
+            onSubmit={handleCreate}
+          />
+        </ModalShell>
+      ) : null}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-2 text-sm font-medium text-slate-700">
-                Tipo de dominio
-                <select
-                  value={createState.domainType}
-                  onChange={(event) =>
-                    setCreateState((current) => {
-                      const domainType = event.target
-                        .value as DomainFormState["domainType"];
+      {editingDomain ? (
+        <ModalShell
+          title={`Editar ${editingDomain.host}`}
+          description="Edita metadata operativa del dominio. Si necesitas cambiar el hostname de un registro ya onboardeado, usa la acción de recrear onboarding."
+          onClose={() => setEditingDomain(null)}
+        >
+          <DomainForm
+            state={editState}
+            onChange={setEditState}
+            submitLabel="Guardar cambios"
+            helperText={
+              canEditHostInPatch(editingDomain)
+                ? "Este dominio todavía no creó onboarding, así que el host puede ajustarse desde Editar."
+                : "Host bloqueado: Leadflow exige recreate-onboarding para cambiar el hostname cuando ya existe target/custom hostname."
+            }
+            isPending={isPending}
+            onCancel={() => setEditingDomain(null)}
+            onSubmit={handleEdit}
+            disableHost={!canEditHostInPatch(editingDomain)}
+          />
+        </ModalShell>
+      ) : null}
 
-                      return {
-                        ...current,
-                        domainType,
-                      };
-                    })
-                  }
-                  className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
-                >
-                  <option value="custom_subdomain">custom_subdomain</option>
-                  <option value="custom_apex">custom_apex</option>
-                  <option value="system_subdomain">system_subdomain</option>
-                </select>
-                <span className="text-xs font-normal leading-5 text-slate-500">
-                  Recomendado: <code>custom_subdomain</code> para flujo simple
-                  vía CNAME a <code>customers.leadflow.kurukin.com</code>.
-                </span>
-              </label>
+      {recreateDomain ? (
+        <ModalShell
+          title={`Recrear onboarding de ${recreateDomain.host}`}
+          description="Leadflow elimina el custom hostname viejo en Cloudflare, limpia targets heredados y crea un onboarding nuevo sobre customers.leadflow.kurukin.com."
+          onClose={() => setRecreateDomain(null)}
+        >
+          <DomainForm
+            state={recreateState}
+            onChange={setRecreateState}
+            submitLabel="Recrear onboarding"
+            helperText="Úsalo para limpiar registros heredados como proxy-fallback.exitosos.com y regenerar el target sano del SaaS."
+            isPending={isPending}
+            onCancel={() => setRecreateDomain(null)}
+            onSubmit={handleRecreate}
+          />
+        </ModalShell>
+      ) : null}
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                <p className="font-medium text-slate-950">Flujo operativo</p>
-                <p className="mt-2 leading-6">
-                  Leadflow prioriza CNAME simple para subdominios. El refresh
-                  vuelve a consultar y reimpulsar la validación en Cloudflare
-                  sin pedir TXT manual por defecto.
-                </p>
-              </div>
+      {deleteDomain ? (
+        <ModalShell
+          title={`Eliminar ${deleteDomain.host}`}
+          description="Esta acción borra el dominio del team y también intenta limpiar su custom hostname en Cloudflare antes de eliminar el registro local."
+          onClose={() => setDeleteDomain(null)}
+        >
+          <div className="space-y-5">
+            <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-800">
+              <p>
+                Se eliminará <strong>{deleteDomain.host}</strong>. Si el dominio
+                estaba asociado a publicaciones, Prisma también las eliminará
+                por cascada.
+              </p>
             </div>
 
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Canonical host
-              <input
-                value={createState.canonicalHost}
-                onChange={(event) =>
-                  setCreateState((current) => ({
-                    ...current,
-                    canonicalHost: event.target.value,
-                  }))
-                }
-                placeholder="promo.cliente.com"
-                className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
-              />
-            </label>
-
-            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={createState.isPrimary}
-                onChange={(event) =>
-                  setCreateState((current) => ({
-                    ...current,
-                    isPrimary: event.target.checked,
-                  }))
-                }
-              />
-              Marcar como dominio principal del team
-            </label>
-
-            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={createState.redirectToPrimary}
-                onChange={(event) =>
-                  setCreateState((current) => ({
-                    ...current,
-                    redirectToPrimary: event.target.checked,
-                  }))
-                }
-              />
-              Preparar redirect al canonical host cuando ese flujo quede
-              habilitado
-            </label>
-
-            <div className="flex flex-wrap justify-end gap-3 pt-2">
+            <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={() => setDeleteDomain(null)}
                 className={buttonClassName}
               >
                 Cancelar
               </button>
               <button
                 type="button"
-                onClick={handleCreate}
-                disabled={isPending || createState.host.trim().length === 0}
-                className={primaryButtonClassName}
+                onClick={handleDelete}
+                disabled={isPending}
+                className={dangerButtonClassName}
               >
-                Crear dominio
+                Eliminar dominio
               </button>
             </div>
           </div>
         </ModalShell>
       ) : null}
+    </div>
+  );
+}
+
+type DomainFormProps = {
+  state: DomainFormState;
+  onChange: Dispatch<SetStateAction<DomainFormState>>;
+  submitLabel: string;
+  helperText: string;
+  isPending: boolean;
+  onCancel: () => void;
+  onSubmit: () => void;
+  disableHost?: boolean;
+};
+
+function DomainForm({
+  state,
+  onChange,
+  submitLabel,
+  helperText,
+  isPending,
+  onCancel,
+  onSubmit,
+  disableHost = false,
+}: DomainFormProps) {
+  return (
+    <div className="space-y-4">
+      <label className="grid gap-2 text-sm font-medium text-slate-700">
+        Host
+        <input
+          value={state.host}
+          onChange={(event) =>
+            onChange((current) => ({
+              ...current,
+              host: event.target.value,
+            }))
+          }
+          disabled={disableHost}
+          placeholder="promo.cliente.com"
+          className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+        />
+      </label>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="grid gap-2 text-sm font-medium text-slate-700">
+          Tipo de dominio
+          <select
+            value={state.domainType}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                domainType: event.target.value as DomainFormState["domainType"],
+              }))
+            }
+            className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
+          >
+            <option value="custom_subdomain">custom_subdomain</option>
+            <option value="custom_apex">custom_apex</option>
+            <option value="system_subdomain">system_subdomain</option>
+          </select>
+          <span className="text-xs font-normal leading-5 text-slate-500">
+            {helperText}
+          </span>
+        </label>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <p className="font-medium text-slate-950">Flujo operativo</p>
+          <p className="mt-2 leading-6">
+            Leadflow entrega siempre el target público del SaaS y mantiene el
+            fallback origin interno fuera del DNS del cliente.
+          </p>
+        </div>
+      </div>
+
+      <label className="grid gap-2 text-sm font-medium text-slate-700">
+        Canonical host
+        <input
+          value={state.canonicalHost}
+          onChange={(event) =>
+            onChange((current) => ({
+              ...current,
+              canonicalHost: event.target.value,
+            }))
+          }
+          placeholder="promo.cliente.com"
+          className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
+        />
+      </label>
+
+      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={state.isPrimary}
+          onChange={(event) =>
+            onChange((current) => ({
+              ...current,
+              isPrimary: event.target.checked,
+            }))
+          }
+        />
+        Marcar como dominio principal del team
+      </label>
+
+      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={state.redirectToPrimary}
+          onChange={(event) =>
+            onChange((current) => ({
+              ...current,
+              redirectToPrimary: event.target.checked,
+            }))
+          }
+        />
+        Preparar redirect al canonical host cuando ese flujo quede habilitado
+      </label>
+
+      <div className="flex flex-wrap justify-end gap-3 pt-2">
+        <button type="button" onClick={onCancel} className={buttonClassName}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={isPending || state.host.trim().length === 0}
+          className={primaryButtonClassName}
+        >
+          {submitLabel}
+        </button>
+      </div>
     </div>
   );
 }

@@ -16,6 +16,7 @@ const toneByValue = (value: string) => {
     case "pending":
     case "pending_dns":
     case "pending_validation":
+    case "recreate_required":
     case "due_today":
     case "first_contact":
     case "high_intent_close":
@@ -34,7 +35,10 @@ const toneByValue = (value: string) => {
     case "overdue":
     case "error":
     case "failed":
+    case "legacy":
       return "border-rose-200 bg-rose-50 text-rose-700";
+    case "primary":
+      return "border-indigo-200 bg-indigo-50 text-indigo-700";
     case "warm":
       return "border-orange-200 bg-orange-50 text-orange-700";
     case "hot":

@@ -160,9 +160,37 @@ export class CloudflareSaasClient {
   }
 
   async deleteCustomHostname(customHostnameId: string) {
-    await this.request(`/custom_hostnames/${customHostnameId}`, {
-      method: 'DELETE',
-    });
+    const response = await this.request(
+      `/custom_hostnames/${customHostnameId}`,
+      {
+        method: 'DELETE',
+      },
+    );
+
+    const payload = response.data as CloudflareEnvelope | null;
+
+    if (response.status === 404) {
+      throw new CloudflareSaasClientError(
+        'Cloudflare custom hostname was not found.',
+        404,
+        {
+          payload: response.data,
+          url: response.url,
+        },
+      );
+    }
+
+    if (!payload?.success) {
+      const errorMessage =
+        Array.isArray(payload?.errors) && payload.errors.length > 0
+          ? JSON.stringify(payload.errors)
+          : 'No pudimos eliminar el custom hostname en Cloudflare.';
+
+      throw new CloudflareSaasClientError(errorMessage, response.status, {
+        payload: response.data,
+        url: response.url,
+      });
+    }
   }
 
   private buildPayload(input: {

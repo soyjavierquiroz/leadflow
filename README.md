@@ -225,6 +225,7 @@ Modulos disponibles:
 - Runtime SaaS v2 para dominios externos:
   - `customers.leadflow.kurukin.com` es el `CNAME target` único para clientes
   - `proxy-fallback.leadflow.kurukin.com` es el `fallback origin` fijo usado por Cloudflare
+  - `proxy-fallback.leadflow.kurukin.com` no se expone como target del cliente; si aparece un target legado como `proxy-fallback.exitosos.com`, Leadflow lo marca `legacy` y exige recreate
   - Traefik usa router público catch-all y deja routers explícitos solo para `leadflow.kurukin.com` y `api.leadflow.kurukin.com`
   - no se enumeran dominios cliente en YAML/labels del stack
 - Modelo de publicacion preparado para dominios externos reales:
@@ -476,7 +477,9 @@ Modulos disponibles:
 - Endpoints operativos agregados o ampliados:
   - `POST /v1/domains`
   - `PATCH /v1/domains/:id`
+  - `DELETE /v1/domains/:id`
   - `POST /v1/domains/:id/refresh`
+  - `POST /v1/domains/:id/recreate-onboarding`
   - `GET /v1/tracking-profiles`
   - `GET /v1/handoff-strategies`
   - `POST /v1/funnel-instances`
@@ -488,7 +491,10 @@ Modulos disponibles:
   - `PATCH /v1/rotation-pools/members/:memberId`
 - Operaciones habilitadas:
   - registrar domains y devolver instrucciones DNS operativas
+  - editar metadata del domain sin mutar silenciosamente el hostname activo
+  - eliminar domains y limpiar el custom hostname de Cloudflare cuando exista
   - refrescar onboarding real contra Cloudflare SaaS cuando hay configuración
+  - recrear onboarding para limpiar targets heredados, regenerar `dnsTarget` y re-sincronizar estados
   - crear funnel instances desde templates aprobados
   - activar o pausar funnels operativos
   - crear publicaciones y validar conflictos `host + path`
@@ -592,7 +598,9 @@ Modulos disponibles:
   - Leadflow devuelve un único `CNAME target`: `customers.leadflow.kurukin.com`
   - Cloudflare edge presenta el cert del dominio del cliente
   - Cloudflare reenvía al origin fijo `proxy-fallback.leadflow.kurukin.com`
-  - la UI muestra hostname solicitado, CNAME target, estado Cloudflare, estado SSL y refresh
+  - la UI muestra hostname solicitado, domain type, target actual, estado Cloudflare, estado SSL, last sync y acciones CRUD/re-onboard
+  - si un dominio conserva `dnsTarget` o `custom_origin_server` legado, la UI lo marca `legacy` + `recreate required`
+  - `PATCH /v1/domains/:id` no permite cambiar el host de dominios ya onboardeados; ese cambio debe hacerse con `POST /v1/domains/:id/recreate-onboarding`
   - el resolver final de funnels sigue ocurriendo por `host + path`
   - `domains`
   - `sponsors`

@@ -52,6 +52,10 @@ export interface DomainSummary extends DomainEntity {
   cloudflareHostnameStatus: string | null;
   cloudflareSslStatus: string | null;
   cloudflareErrorMessage: string | null;
+  operationalStatus: DomainOnboardingStatus | 'legacy' | 'recreate_required';
+  isLegacyConfiguration: boolean;
+  recreateRequired: boolean;
+  legacyReason: string | null;
   dnsInstructions: DomainDnsInstruction[];
 }
 

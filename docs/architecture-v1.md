@@ -334,6 +334,7 @@ La arquitectura ya implementa:
 - `Domain.canonicalHost` y `Domain.redirectToPrimary` quedan como metadata de canonicalidad para la siguiente fase
 - `Domain.verificationStatus`, `Domain.sslStatus`, `Domain.cloudflareCustomHostnameId`, `Domain.cloudflareStatusJson`, `Domain.dnsTarget` y `Domain.verificationMethod` cubren onboarding Cloudflare SaaS v1
 - `Domain.dnsTarget` queda alineado al target público del cliente (`customers.<saas>`) y deja de representar el fallback origin
+- `DomainSummary` expone `operationalStatus`, `isLegacyConfiguration`, `recreateRequired` y `legacyReason` para que la UI detecte registros heredados sin tratarlos como flujo sano
 - `FunnelPublication.pathPrefix` se persiste normalizado y define el binding publico dentro del mismo host
 - la unicidad operativa queda en `normalizedHost + pathPrefix`
 
@@ -352,15 +353,20 @@ Flujo:
 4. Leadflow devuelve un `CNAME target` único para el flujo principal
 5. Cloudflare edge termina TLS del hostname del cliente y reenvía al `fallback origin`
 6. `Refresh` reimpulsa la validación y consulta del custom hostname
-7. cuando hostname + SSL quedan en `active`, el domain pasa a operación
+7. si el registro quedó con `dnsTarget` o `custom_origin_server` legado, Leadflow lo marca `legacy` y `recreate required`
+8. `Recreate onboarding` elimina el custom hostname viejo, crea uno nuevo bajo el flujo actual y regenera `dnsTarget`
+9. cuando hostname + SSL quedan en `active` y el target coincide con `customers.leadflow.kurukin.com`, el domain pasa a operación
 
 La UI devuelve:
 
 - hostname solicitado
+- domain type
 - CNAME target único
 - estado Cloudflare
 - estado SSL
-- refresh
+- last sync
+- acciones `Editar`, `Eliminar`, `Refresh` y `Recrear onboarding`
+- badges `legacy` y `recreate required` cuando aplica
 
 Estados v1:
 
@@ -373,6 +379,7 @@ Reglas por tipo:
 - `custom_subdomain`: flujo principal por `CNAME` hacia el target SaaS
 - `custom_apex`: onboarding modelado y documentado; la activación final depende de soporte real de apex proxying
 - `system_subdomain`: host gestionado internamente por Leadflow
+- nunca se expone `proxy-fallback.leadflow.kurukin.com` como target DNS del cliente; ese host queda solo como origin interno de Cloudflare
 
 ### Resolucion `host + path`
 

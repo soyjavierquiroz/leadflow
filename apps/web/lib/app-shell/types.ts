@@ -102,6 +102,10 @@ export type DomainRecord = {
   cloudflareHostnameStatus: string | null;
   cloudflareSslStatus: string | null;
   cloudflareErrorMessage: string | null;
+  operationalStatus: string;
+  isLegacyConfiguration: boolean;
+  recreateRequired: boolean;
+  legacyReason: string | null;
   dnsTarget: string | null;
   lastCloudflareSyncAt: string | null;
   activatedAt: string | null;

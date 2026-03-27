@@ -17,6 +17,7 @@ import {
 } from '../shared/publication-resolution.utils';
 import type { CreateDomainDto } from './dto/create-domain.dto';
 import type { CreateTeamDomainDto } from './dto/create-team-domain.dto';
+import type { RecreateDomainOnboardingDto } from './dto/recreate-domain-onboarding.dto';
 import {
   CloudflareSaasClient,
   CloudflareSaasClientError,
@@ -33,6 +34,12 @@ import type {
   DomainRepository,
 } from './interfaces/domain.interface';
 import type { UpdateTeamDomainDto } from './dto/update-team-domain.dto';
+
+type DeleteDomainResult = {
+  id: string;
+  host: string;
+  deleted: true;
+};
 
 const toNullableJsonInput = (
   value: DomainEntity['cloudflareStatusJson'],
@@ -211,6 +218,20 @@ export class DomainsService {
     const normalizedHost = this.assertAndNormalizeHost(host);
 
     if (
+      normalizedHost !== existing.normalizedHost &&
+      usesCloudflareSaas(existing.domainType) &&
+      (existing.cloudflareCustomHostnameId !== null ||
+        existing.dnsTarget !== null ||
+        existing.onboardingStatus !== 'draft')
+    ) {
+      throw new ConflictException({
+        code: 'DOMAIN_HOST_CHANGE_REQUIRES_RECREATE',
+        message:
+          'Changing the hostname of an onboarded domain requires recreate-onboarding so Leadflow can clean up the previous Cloudflare custom hostname safely.',
+      });
+    }
+
+    if (
       existing.cloudflareCustomHostnameId &&
       usesCloudflareSaas(existing.domainType) !== usesCloudflareSaas(domainType)
     ) {
@@ -275,6 +296,29 @@ export class DomainsService {
     return this.toSummary(synced);
   }
 
+  async deleteForTeam(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+    },
+    domainId: string,
+  ): Promise<DeleteDomainResult> {
+    const record = await this.findDomainRecord(scope, domainId);
+    const domain = mapDomainRecord(record);
+
+    await this.deleteCloudflareCustomHostname(domain);
+
+    await this.prisma.domain.delete({
+      where: { id: domain.id },
+    });
+
+    return {
+      id: domain.id,
+      host: domain.host,
+      deleted: true,
+    };
+  }
+
   async refreshForTeam(
     scope: {
       workspaceId: string;
@@ -285,6 +329,89 @@ export class DomainsService {
     const record = await this.findDomainRecord(scope, domainId);
     const synced = await this.syncDomainToCloudflare(mapDomainRecord(record), {
       mode: 'refresh',
+      allowCreate: true,
+    });
+
+    return this.toSummary(synced);
+  }
+
+  async recreateOnboardingForTeam(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+    },
+    domainId: string,
+    dto: RecreateDomainOnboardingDto,
+  ): Promise<DomainSummary> {
+    const existingRecord = await this.findDomainRecord(scope, domainId);
+    const existing = mapDomainRecord(existingRecord);
+    const nextHost = dto.host?.trim() ?? existing.host;
+    const normalizedHost = this.assertAndNormalizeHost(nextHost);
+    const domainType = dto.domainType ?? existing.domainType;
+
+    if (normalizedHost !== existing.normalizedHost) {
+      await this.assertHostAvailable(normalizedHost, existing.id);
+    }
+
+    const verificationMethod =
+      dto.verificationMethod ??
+      existing.verificationMethod ??
+      defaultVerificationMethodForDomainType(domainType);
+    const dnsTarget = this.resolveDnsTarget(domainType);
+    const baseLifecycle = deriveDomainLifecycle({
+      domainType,
+      dnsTarget,
+      cloudflareCustomHostnameId: null,
+      cloudflareStatusJson: null,
+    });
+
+    await this.deleteCloudflareCustomHostname(existing);
+
+    const record = await this.prisma.$transaction(async (tx) => {
+      if (dto.isPrimary === true) {
+        await tx.domain.updateMany({
+          where: {
+            teamId: scope.teamId,
+            isPrimary: true,
+            NOT: { id: existing.id },
+          },
+          data: {
+            isPrimary: false,
+          },
+        });
+      }
+
+      return tx.domain.update({
+        where: { id: existing.id },
+        data: {
+          host: nextHost,
+          normalizedHost,
+          domainType,
+          isPrimary: dto.isPrimary ?? existing.isPrimary,
+          canonicalHost:
+            dto.canonicalHost !== undefined
+              ? dto.canonicalHost
+                ? normalizeDomainHost(dto.canonicalHost)
+                : null
+              : existing.canonicalHost,
+          redirectToPrimary:
+            dto.redirectToPrimary ?? existing.redirectToPrimary,
+          verificationMethod,
+          status: baseLifecycle.status,
+          onboardingStatus: baseLifecycle.onboardingStatus,
+          verificationStatus: baseLifecycle.verificationStatus,
+          sslStatus: baseLifecycle.sslStatus,
+          cloudflareCustomHostnameId: null,
+          cloudflareStatusJson: Prisma.DbNull,
+          dnsTarget,
+          lastCloudflareSyncAt: null,
+          activatedAt: null,
+        },
+      });
+    });
+
+    const synced = await this.syncDomainToCloudflare(mapDomainRecord(record), {
+      mode: 'create',
       allowCreate: true,
     });
 
@@ -349,6 +476,31 @@ export class DomainsService {
     }
 
     return record;
+  }
+
+  private async deleteCloudflareCustomHostname(domain: DomainEntity) {
+    if (
+      !usesCloudflareSaas(domain.domainType) ||
+      !domain.cloudflareCustomHostnameId ||
+      !this.cloudflareSaasClient.isConfigured()
+    ) {
+      return;
+    }
+
+    try {
+      await this.cloudflareSaasClient.deleteCustomHostname(
+        domain.cloudflareCustomHostnameId,
+      );
+    } catch (error) {
+      if (
+        error instanceof CloudflareSaasClientError &&
+        (error.status === 404 || error.status === 409)
+      ) {
+        return;
+      }
+
+      throw error;
+    }
   }
 
   private async syncDomainToCloudflare(

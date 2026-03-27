@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -12,6 +13,7 @@ import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
 import type { CreateTeamDomainDto } from './dto/create-team-domain.dto';
+import type { RecreateDomainOnboardingDto } from './dto/recreate-domain-onboarding.dto';
 import type { UpdateTeamDomainDto } from './dto/update-team-domain.dto';
 import { DomainsService } from './domains.service';
 
@@ -70,6 +72,21 @@ export class DomainsController {
     );
   }
 
+  @Delete(':id')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  remove(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') domainId: string,
+  ) {
+    return this.domainsService.deleteForTeam(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+      },
+      domainId,
+    );
+  }
+
   @Post(':id/refresh')
   @RequireRoles(UserRole.TEAM_ADMIN)
   refresh(
@@ -82,6 +99,23 @@ export class DomainsController {
         teamId: user.teamId!,
       },
       domainId,
+    );
+  }
+
+  @Post(':id/recreate-onboarding')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  recreateOnboarding(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') domainId: string,
+    @Body() dto: RecreateDomainOnboardingDto,
+  ) {
+    return this.domainsService.recreateOnboardingForTeam(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+      },
+      domainId,
+      dto,
     );
   }
 }

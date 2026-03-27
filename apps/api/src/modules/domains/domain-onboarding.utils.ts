@@ -52,6 +52,12 @@ export type CloudflareSaasRuntimeHosts = {
   customerCnameTarget: string | null;
 };
 
+export type DomainLegacyState = {
+  isLegacyConfiguration: boolean;
+  recreateRequired: boolean;
+  legacyReason: string | null;
+};
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -72,6 +78,9 @@ const normalizeStatus = (value: string | null) =>
     ?.trim()
     .toLowerCase()
     .replace(/[\s-]+/g, '_') ?? null;
+
+const normalizeHostValue = (value: string | null | undefined) =>
+  value?.trim().toLowerCase().replace(/\.+$/, '') ?? null;
 
 const toInstructionId = (value: string) =>
   value
@@ -383,6 +392,61 @@ export const deriveDomainLifecycle = (input: {
   };
 };
 
+export const deriveLegacyDomainState = (
+  domain: Pick<
+    DomainEntity,
+    'domainType' | 'dnsTarget' | 'cloudflareStatusJson'
+  >,
+  runtimeHosts: CloudflareSaasRuntimeHosts,
+): DomainLegacyState => {
+  if (!usesCloudflareSaas(domain.domainType)) {
+    return {
+      isLegacyConfiguration: false,
+      recreateRequired: false,
+      legacyReason: null,
+    };
+  }
+
+  const snapshot = normalizeCloudflareCustomHostnameSnapshot(
+    domain.cloudflareStatusJson,
+  );
+  const expectedDnsTarget = normalizeHostValue(
+    runtimeHosts.customerCnameTarget,
+  );
+  const expectedFallbackOrigin = normalizeHostValue(
+    runtimeHosts.fallbackOrigin,
+  );
+  const actualDnsTarget = normalizeHostValue(domain.dnsTarget);
+  const actualFallbackOrigin = normalizeHostValue(snapshot?.customOriginServer);
+  const reasons: string[] = [];
+
+  if (
+    actualDnsTarget &&
+    expectedDnsTarget &&
+    actualDnsTarget !== expectedDnsTarget
+  ) {
+    reasons.push(
+      `DNS target legado detectado: ${domain.dnsTarget}. El target sano es ${runtimeHosts.customerCnameTarget}.`,
+    );
+  }
+
+  if (
+    actualFallbackOrigin &&
+    expectedFallbackOrigin &&
+    actualFallbackOrigin !== expectedFallbackOrigin
+  ) {
+    reasons.push(
+      `Cloudflare sigue usando el fallback origin legado ${snapshot?.customOriginServer}. Debe migrarse a ${runtimeHosts.fallbackOrigin}.`,
+    );
+  }
+
+  return {
+    isLegacyConfiguration: reasons.length > 0,
+    recreateRequired: reasons.length > 0,
+    legacyReason: reasons.length > 0 ? reasons.join(' ') : null,
+  };
+};
+
 export const buildDomainSummary = (
   domain: DomainEntity,
   runtimeHosts: CloudflareSaasRuntimeHosts,
@@ -390,6 +454,7 @@ export const buildDomainSummary = (
   const snapshot = normalizeCloudflareCustomHostnameSnapshot(
     domain.cloudflareStatusJson,
   );
+  const legacyState = deriveLegacyDomainState(domain, runtimeHosts);
   const fallbackOrigin =
     snapshot?.customOriginServer ??
     (usesCloudflareSaas(domain.domainType)
@@ -407,6 +472,12 @@ export const buildDomainSummary = (
     cloudflareHostnameStatus: normalizeStatus(snapshot?.status ?? null),
     cloudflareSslStatus: normalizeStatus(snapshot?.ssl.status ?? null),
     cloudflareErrorMessage: snapshot?.error?.message ?? null,
+    operationalStatus: legacyState.recreateRequired
+      ? 'recreate_required'
+      : domain.onboardingStatus,
+    isLegacyConfiguration: legacyState.isLegacyConfiguration,
+    recreateRequired: legacyState.recreateRequired,
+    legacyReason: legacyState.legacyReason,
     dnsInstructions: buildDomainDnsInstructions({
       host: domain.host,
       domainType: domain.domainType,

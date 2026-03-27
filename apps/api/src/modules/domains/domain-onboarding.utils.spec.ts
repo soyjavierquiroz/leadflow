@@ -1,6 +1,7 @@
 import {
   buildDomainDnsInstructions,
   defaultVerificationMethodForDomainType,
+  deriveLegacyDomainState,
   deriveDomainLifecycle,
   toCloudflareSslMethod,
 } from './domain-onboarding.utils';
@@ -85,5 +86,41 @@ describe('domain onboarding utils', () => {
     expect(lifecycle.onboardingStatus).toBe('pending_dns');
     expect(lifecycle.verificationStatus).toBe('pending');
     expect(lifecycle.sslStatus).toBe('pending');
+  });
+
+  it('marks legacy dns targets as requiring recreation', () => {
+    const legacy = deriveLegacyDomainState(
+      {
+        host: 'www.retodetransformacion.com',
+        domainType: 'custom_subdomain',
+        dnsTarget: 'proxy-fallback.exitosos.com',
+        cloudflareStatusJson: {
+          id: 'cf-hostname-legacy',
+          hostname: 'www.retodetransformacion.com',
+          status: 'active',
+          customOriginServer: 'proxy-fallback.exitosos.com',
+          verificationErrors: [],
+          ownershipVerification: null,
+          ssl: {
+            status: 'active',
+            method: 'http',
+            type: 'dv',
+            validationErrors: [],
+            validationRecords: [],
+          },
+          error: null,
+          raw: null,
+        },
+      },
+      {
+        customerCnameTarget: 'customers.leadflow.kurukin.com',
+        fallbackOrigin: 'proxy-fallback.leadflow.kurukin.com',
+      },
+    );
+
+    expect(legacy.isLegacyConfiguration).toBe(true);
+    expect(legacy.recreateRequired).toBe(true);
+    expect(legacy.legacyReason).toContain('DNS target legado');
+    expect(legacy.legacyReason).toContain('fallback origin legado');
   });
 });
