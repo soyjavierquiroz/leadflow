@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { mapDomainRecord } from '../prisma.mappers';
 import {
@@ -10,6 +11,16 @@ import type {
   DomainEntity,
   DomainRepository,
 } from '../../modules/domains/interfaces/domain.interface';
+
+const toNullableJsonInput = (
+  value: DomainEntity['cloudflareStatusJson'],
+): Prisma.InputJsonValue | typeof Prisma.DbNull => {
+  if (value === null) {
+    return Prisma.DbNull;
+  }
+
+  return value as Prisma.InputJsonValue;
+};
 
 @Injectable()
 export class DomainPrismaRepository implements DomainRepository {
@@ -73,10 +84,19 @@ export class DomainPrismaRepository implements DomainRepository {
         host: data.host.trim(),
         normalizedHost,
         status: 'draft',
+        onboardingStatus: 'draft',
         domainType: data.domainType ?? 'custom_apex',
         isPrimary: data.isPrimary ?? false,
         canonicalHost,
         redirectToPrimary: data.redirectToPrimary ?? false,
+        verificationStatus: 'unverified',
+        sslStatus: 'unconfigured',
+        verificationMethod: data.verificationMethod ?? 'none',
+        cloudflareCustomHostnameId: null,
+        cloudflareStatusJson: Prisma.DbNull,
+        dnsTarget: null,
+        lastCloudflareSyncAt: null,
+        activatedAt: null,
       },
     });
 
@@ -105,10 +125,21 @@ export class DomainPrismaRepository implements DomainRepository {
         host: entity.host.trim(),
         normalizedHost,
         status: entity.status,
+        onboardingStatus: entity.onboardingStatus,
         domainType: entity.domainType,
         isPrimary: entity.isPrimary,
         canonicalHost,
         redirectToPrimary: entity.redirectToPrimary,
+        verificationStatus: entity.verificationStatus,
+        sslStatus: entity.sslStatus,
+        verificationMethod: entity.verificationMethod,
+        cloudflareCustomHostnameId: entity.cloudflareCustomHostnameId,
+        cloudflareStatusJson: toNullableJsonInput(entity.cloudflareStatusJson),
+        dnsTarget: entity.dnsTarget,
+        lastCloudflareSyncAt: entity.lastCloudflareSyncAt
+          ? new Date(entity.lastCloudflareSyncAt)
+          : null,
+        activatedAt: entity.activatedAt ? new Date(entity.activatedAt) : null,
         createdAt: new Date(entity.createdAt),
         updatedAt: new Date(entity.updatedAt),
       },
@@ -117,10 +148,21 @@ export class DomainPrismaRepository implements DomainRepository {
         host: entity.host.trim(),
         normalizedHost,
         status: entity.status,
+        onboardingStatus: entity.onboardingStatus,
         domainType: entity.domainType,
         isPrimary: entity.isPrimary,
         canonicalHost,
         redirectToPrimary: entity.redirectToPrimary,
+        verificationStatus: entity.verificationStatus,
+        sslStatus: entity.sslStatus,
+        verificationMethod: entity.verificationMethod,
+        cloudflareCustomHostnameId: entity.cloudflareCustomHostnameId,
+        cloudflareStatusJson: toNullableJsonInput(entity.cloudflareStatusJson),
+        dnsTarget: entity.dnsTarget,
+        lastCloudflareSyncAt: entity.lastCloudflareSyncAt
+          ? new Date(entity.lastCloudflareSyncAt)
+          : null,
+        activatedAt: entity.activatedAt ? new Date(entity.activatedAt) : null,
       },
     });
 

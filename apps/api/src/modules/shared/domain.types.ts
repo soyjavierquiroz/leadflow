@@ -65,6 +65,19 @@ export type DomainType =
   | 'system_subdomain'
   | 'custom_apex'
   | 'custom_subdomain';
+export type DomainOnboardingStatus =
+  | 'draft'
+  | 'pending_dns'
+  | 'pending_validation'
+  | 'active'
+  | 'error';
+export type DomainVerificationStatus =
+  | 'unverified'
+  | 'pending'
+  | 'verified'
+  | 'failed';
+export type DomainSslStatus = 'unconfigured' | 'pending' | 'active' | 'failed';
+export type DomainVerificationMethod = 'none' | 'cname' | 'txt' | 'http';
 export type TrackingProvider = 'meta' | 'tiktok' | 'custom';
 export type DeduplicationMode =
   | 'browser_server'

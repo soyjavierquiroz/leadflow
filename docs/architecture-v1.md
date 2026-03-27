@@ -324,14 +324,43 @@ La arquitectura ya implementa:
 - cada `domain` puede tener multiples `funnel_publications`
 - `Domain.host` conserva el host configurado para UI y trazabilidad
 - `Domain.normalizedHost` es la clave operativa para lookup server-side
+- `Domain.status` mantiene el estado operativo para resolucion
+- `Domain.onboardingStatus` modela el ciclo SaaS del domain
 - `Domain.domainType` diferencia:
   - `system_subdomain`
   - `custom_apex`
   - `custom_subdomain`
 - `Domain.isPrimary` marca el host principal del team
 - `Domain.canonicalHost` y `Domain.redirectToPrimary` quedan como metadata de canonicalidad para la siguiente fase
+- `Domain.verificationStatus`, `Domain.sslStatus`, `Domain.cloudflareCustomHostnameId`, `Domain.cloudflareStatusJson`, `Domain.dnsTarget` y `Domain.verificationMethod` cubren onboarding Cloudflare SaaS v1
 - `FunnelPublication.pathPrefix` se persiste normalizado y define el binding publico dentro del mismo host
 - la unicidad operativa queda en `normalizedHost + pathPrefix`
+
+### Cloudflare SaaS Domain Onboarding v1
+
+Flujo:
+
+1. el team registra el domain en `/team/domains`
+2. Leadflow persiste el `Domain`
+3. si hay configuración Cloudflare, la API crea o actualiza el custom hostname
+4. Leadflow guarda estado neutral:
+   - `onboardingStatus`
+   - `verificationStatus`
+   - `sslStatus`
+5. la UI devuelve instrucciones DNS claras
+6. cuando hostname + SSL quedan en `active`, el domain pasa a operación
+
+Estados v1:
+
+- `onboardingStatus`: `draft`, `pending_dns`, `pending_validation`, `active`, `error`
+- `verificationStatus`: `unverified`, `pending`, `verified`, `failed`
+- `sslStatus`: `unconfigured`, `pending`, `active`, `failed`
+
+Reglas por tipo:
+
+- `custom_subdomain`: flujo principal por `CNAME` hacia el target SaaS
+- `custom_apex`: onboarding modelado y documentado; la activación final depende de soporte real de apex proxying
+- `system_subdomain`: host gestionado internamente por Leadflow
 
 ### Resolucion `host + path`
 

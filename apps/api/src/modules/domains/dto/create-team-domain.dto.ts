@@ -3,11 +3,9 @@ import type {
   DomainVerificationMethod,
 } from '../../shared/domain.types';
 
-export class CreateDomainDto {
-  readonly workspaceId!: string;
-  readonly teamId!: string;
+export class CreateTeamDomainDto {
   readonly host!: string;
-  readonly domainType?: DomainType;
+  readonly domainType!: DomainType;
   readonly isPrimary?: boolean;
   readonly canonicalHost?: string | null;
   readonly redirectToPrimary?: boolean;

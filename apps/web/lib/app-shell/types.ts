@@ -86,10 +86,28 @@ export type DomainRecord = {
   host: string;
   normalizedHost: string;
   status: string;
+  onboardingStatus: string;
   domainType: string;
   isPrimary: boolean;
   canonicalHost: string | null;
   redirectToPrimary: boolean;
+  verificationStatus: string;
+  sslStatus: string;
+  verificationMethod: string;
+  cloudflareCustomHostnameId: string | null;
+  cloudflareStatusJson: unknown;
+  dnsTarget: string | null;
+  lastCloudflareSyncAt: string | null;
+  activatedAt: string | null;
+  dnsInstructions?: Array<{
+    id: string;
+    type: string;
+    host: string | null;
+    value: string;
+    status: string;
+    label: string;
+    detail: string | null;
+  }>;
   createdAt: string;
   updatedAt: string;
 };

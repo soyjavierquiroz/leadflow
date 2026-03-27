@@ -56,10 +56,39 @@ enum DomainStatus {
   archived
 }
 
+enum DomainOnboardingStatus {
+  draft
+  pending_dns
+  pending_validation
+  active
+  error
+}
+
 enum DomainType {
   system_subdomain
   custom_apex
   custom_subdomain
+}
+
+enum DomainVerificationStatus {
+  unverified
+  pending
+  verified
+  failed
+}
+
+enum DomainSslStatus {
+  unconfigured
+  pending
+  active
+  failed
+}
+
+enum DomainVerificationMethod {
+  none
+  cname
+  txt
+  http
 }
 
 enum FunnelTemplateStatus {
@@ -446,10 +475,19 @@ model Domain {
   host               String
   normalizedHost     String              @unique
   status             DomainStatus
+  onboardingStatus   DomainOnboardingStatus @default(draft)
   domainType         DomainType
   isPrimary          Boolean             @default(false)
   canonicalHost      String?
   redirectToPrimary  Boolean             @default(false)
+  verificationStatus DomainVerificationStatus @default(unverified)
+  sslStatus          DomainSslStatus     @default(unconfigured)
+  verificationMethod DomainVerificationMethod @default(none)
+  cloudflareCustomHostnameId String?     @unique
+  cloudflareStatusJson Json?
+  dnsTarget          String?
+  lastCloudflareSyncAt DateTime?
+  activatedAt        DateTime?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -457,6 +495,7 @@ model Domain {
   funnelPublications FunnelPublication[]
 
   @@index([teamId, isPrimary])
+  @@index([teamId, onboardingStatus])
 }
 
 model FunnelTemplate {

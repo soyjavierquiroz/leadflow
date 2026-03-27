@@ -224,6 +224,7 @@ Modulos disponibles:
   - `Domain.normalizedHost` como clave operativa de resolucion
   - `Domain.domainType` con `system_subdomain`, `custom_apex`, `custom_subdomain`
   - metadata opcional de canonicalidad con `canonicalHost` y `redirectToPrimary`
+  - onboarding SaaS con `onboardingStatus`, `verificationStatus`, `sslStatus`, `cloudflareCustomHostnameId`, `cloudflareStatusJson`, `dnsTarget` y `verificationMethod`
 - Endpoints publicos disponibles:
   - `GET /v1/public/funnel-runtime/resolve?host=...&path=...`
   - `GET /v1/public/funnel-runtime/publications/:publicationId`
@@ -458,11 +459,15 @@ Modulos disponibles:
 
 - Superficie `Team Admin` conectada con operaciones reales en:
   - `/team/funnels`
+  - `/team/domains`
   - `/team/publications`
   - `/team/sponsors`
   - `/team/pools`
   - `/team/leads`
 - Endpoints operativos agregados o ampliados:
+  - `POST /v1/domains`
+  - `PATCH /v1/domains/:id`
+  - `POST /v1/domains/:id/refresh`
   - `GET /v1/tracking-profiles`
   - `GET /v1/handoff-strategies`
   - `POST /v1/funnel-instances`
@@ -473,6 +478,8 @@ Modulos disponibles:
   - `GET /v1/rotation-pools/members`
   - `PATCH /v1/rotation-pools/members/:memberId`
 - Operaciones habilitadas:
+  - registrar domains y devolver instrucciones DNS operativas
+  - refrescar onboarding real contra Cloudflare SaaS cuando hay configuración
   - crear funnel instances desde templates aprobados
   - activar o pausar funnels operativos
   - crear publicaciones y validar conflictos `host + path`
@@ -535,6 +542,7 @@ Modulos disponibles:
   - `/admin/publications`
   - `/team`
   - `/team/funnels`
+  - `/team/domains`
   - `/team/publications`
   - `/team/sponsors`
   - `/team/pools`
@@ -555,9 +563,25 @@ Modulos disponibles:
   - `publication-card`
 - Datos reales conectados cuando la API esta disponible:
   - `workspaces`
+  - `domains`
   - `funnel-templates`
   - `funnel-instances`
   - `funnel-publications`
+
+## Cloudflare SaaS Domain Onboarding v1
+
+- Variables de entorno API:
+  - `CLOUDFLARE_API_TOKEN`
+  - `CLOUDFLARE_ZONE_ID`
+  - `CLOUDFLARE_SAAS_FALLBACK_ORIGIN`
+  - `CLOUDFLARE_API_BASE_URL` opcional
+  - `CLOUDFLARE_REQUEST_TIMEOUT_MS` opcional
+- Flujo v1:
+  - el team registra el domain en Leadflow
+  - Leadflow intenta crear/gestionar el custom hostname en Cloudflare por API
+  - Leadflow guarda estado neutral de onboarding y metadata acotada del vendor
+  - la UI muestra instrucciones DNS claras por tipo de domain
+  - el resolver final de funnels sigue ocurriendo por `host + path`
   - `domains`
   - `sponsors`
   - `rotation-pools`

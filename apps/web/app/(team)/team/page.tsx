@@ -34,16 +34,16 @@ export default async function TeamPage() {
         actions={
           <>
             <Link
-              href="/team/publications"
+              href="/team/domains"
               className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
-              Revisar publicaciones
+              Onboard domains
             </Link>
             <Link
-              href="/team/leads"
+              href="/team/publications"
               className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
             >
-              Abrir bandeja de leads
+              Revisar publicaciones
             </Link>
           </>
         }
@@ -144,11 +144,13 @@ export default async function TeamPage() {
                   key={sponsor.id}
                   sponsor={sponsor}
                   leadCount={
-                    teamLeads.filter((lead) => lead.sponsorId === sponsor.id).length
+                    teamLeads.filter((lead) => lead.sponsorId === sponsor.id)
+                      .length
                   }
                   assignmentCount={
-                    data.assignments.filter((item) => item.sponsorId === sponsor.id)
-                      .length
+                    data.assignments.filter(
+                      (item) => item.sponsorId === sponsor.id,
+                    ).length
                   }
                 />
               ))}

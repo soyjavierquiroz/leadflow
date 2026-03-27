@@ -2,7 +2,7 @@ import { LeadsService } from './leads.service';
 
 describe('LeadsService', () => {
   it('creates a draft lead aggregate', () => {
-    const service = new LeadsService();
+    const service = new LeadsService({} as never);
 
     const result = service.createDraft({
       workspaceId: 'workspace-1',

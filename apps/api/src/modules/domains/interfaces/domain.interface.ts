@@ -2,7 +2,12 @@ import type { CreateDomainDto } from '../dto/create-domain.dto';
 import type {
   BaseDomainEntity,
   DomainId,
+  DomainOnboardingStatus,
+  DomainSslStatus,
   DomainType,
+  DomainVerificationMethod,
+  DomainVerificationStatus,
+  JsonValue,
   RepositoryPort,
   TeamScoped,
   WorkspaceScoped,
@@ -15,10 +20,33 @@ export interface DomainEntity
   host: string;
   normalizedHost: string;
   status: DomainStatus;
+  onboardingStatus: DomainOnboardingStatus;
   domainType: DomainType;
   isPrimary: boolean;
   canonicalHost: string | null;
   redirectToPrimary: boolean;
+  verificationStatus: DomainVerificationStatus;
+  sslStatus: DomainSslStatus;
+  verificationMethod: DomainVerificationMethod;
+  cloudflareCustomHostnameId: string | null;
+  cloudflareStatusJson: JsonValue | null;
+  dnsTarget: string | null;
+  lastCloudflareSyncAt: string | null;
+  activatedAt: string | null;
+}
+
+export interface DomainDnsInstruction {
+  id: string;
+  type: 'cname' | 'txt' | 'http' | 'info';
+  host: string | null;
+  value: string;
+  status: 'required' | 'optional' | 'managed' | 'pending_support';
+  label: string;
+  detail: string | null;
+}
+
+export interface DomainSummary extends DomainEntity {
+  dnsInstructions: DomainDnsInstruction[];
 }
 
 export interface DomainRepository extends RepositoryPort<

@@ -163,10 +163,23 @@ export const mapDomainRecord = (record: DomainRecord): DomainEntity => ({
   host: record.host,
   normalizedHost: record.normalizedHost,
   status: record.status,
+  onboardingStatus: record.onboardingStatus,
   domainType: record.domainType,
   isPrimary: record.isPrimary,
   canonicalHost: record.canonicalHost,
   redirectToPrimary: record.redirectToPrimary,
+  verificationStatus: record.verificationStatus,
+  sslStatus: record.sslStatus,
+  verificationMethod: record.verificationMethod,
+  cloudflareCustomHostnameId: record.cloudflareCustomHostnameId,
+  cloudflareStatusJson: record.cloudflareStatusJson
+    ? toJson(record.cloudflareStatusJson)
+    : null,
+  dnsTarget: record.dnsTarget,
+  lastCloudflareSyncAt: record.lastCloudflareSyncAt
+    ? toIso(record.lastCloudflareSyncAt)
+    : null,
+  activatedAt: record.activatedAt ? toIso(record.activatedAt) : null,
   createdAt: toIso(record.createdAt),
   updatedAt: toIso(record.updatedAt),
 });

@@ -14,6 +14,11 @@ const teamNav = [
     description: "Embudos activos, readiness y salida al mercado.",
   },
   {
+    href: "/team/domains",
+    label: "Domains",
+    description: "Onboarding SaaS de dominios externos y su estado DNS/TLS.",
+  },
+  {
     href: "/team/publications",
     label: "Publicaciones",
     description: "Rutas activas donde ya está captando el funnel.",
@@ -44,11 +49,11 @@ export default async function TeamLayout({
   const snapshot = await getAppShellSnapshot();
 
   return (
-      <AppShellLayout
-        areaLabel="Team Admin"
-        areaDescription="Centro operativo del equipo para revisar captación, capacidad, asignación y seguimiento comercial."
-        topBarTitle={snapshot.currentTeam.name}
-        personaLabel="Team Admin"
+    <AppShellLayout
+      areaLabel="Team Admin"
+      areaDescription="Centro operativo del equipo para revisar captación, capacidad, asignación y seguimiento comercial."
+      topBarTitle={snapshot.currentTeam.name}
+      personaLabel="Team Admin"
       workspaceName={snapshot.workspace.name}
       sourceMode={snapshot.sourceMode}
       currentUser={snapshot.currentUser}
