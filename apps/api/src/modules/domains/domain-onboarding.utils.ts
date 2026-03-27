@@ -47,6 +47,11 @@ export type CloudflareCustomHostnameSnapshot = {
   raw: JsonValue | null;
 };
 
+export type CloudflareSaasRuntimeHosts = {
+  fallbackOrigin: string | null;
+  customerCnameTarget: string | null;
+};
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -94,10 +99,11 @@ export const toCloudflareSslMethod = (
   verificationMethod: DomainVerificationMethod,
 ) => {
   switch (verificationMethod) {
+    case 'cname':
+      return 'http';
     case 'http':
       return 'http';
     case 'txt':
-    case 'cname':
       return 'txt';
     default:
       return 'txt';
@@ -186,6 +192,7 @@ export const buildDomainDnsInstructions = (input: {
   dnsTarget: string | null;
   verificationMethod: DomainVerificationMethod;
   cloudflareStatusJson: JsonValue | null;
+  fallbackOrigin: string | null;
 }): DomainDnsInstruction[] => {
   const instructions: DomainDnsInstruction[] = [];
   const snapshot = normalizeCloudflareCustomHostnameSnapshot(
@@ -213,7 +220,9 @@ export const buildDomainDnsInstructions = (input: {
       value: input.dnsTarget,
       status: 'required',
       label: 'CNAME required',
-      detail: 'Apunta el subdominio del cliente al target SaaS de Leadflow.',
+      detail: input.fallbackOrigin
+        ? `Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo ${input.fallbackOrigin}.`
+        : 'Apunta el subdominio del cliente al target publico del SaaS de Leadflow.',
     });
   }
 
@@ -224,11 +233,11 @@ export const buildDomainDnsInstructions = (input: {
       host: input.host,
       value:
         input.dnsTarget ??
-        'El dominio apex requiere soporte de apex proxying / flattening en Cloudflare.',
+        'El dominio apex requiere soporte de flattening/ALIAS para apuntar al target publico del SaaS.',
       status: 'pending_support',
       label: 'Apex onboarding',
       detail:
-        'En v1 dejamos el onboarding y la validación listos, pero la activación final del apex depende de la configuración/plan de Cloudflare.',
+        'El flujo SaaS sigue disponible, pero el apex depende de flattening/ALIAS en el DNS del cliente. Si no existe ese soporte, recomendamos custom_subdomain.',
     });
   }
 
@@ -374,13 +383,37 @@ export const deriveDomainLifecycle = (input: {
   };
 };
 
-export const toDomainSummary = (domain: DomainEntity): DomainSummary => ({
-  ...domain,
-  dnsInstructions: buildDomainDnsInstructions({
-    host: domain.host,
-    domainType: domain.domainType,
-    dnsTarget: domain.dnsTarget,
-    verificationMethod: domain.verificationMethod,
-    cloudflareStatusJson: domain.cloudflareStatusJson,
-  }),
-});
+export const buildDomainSummary = (
+  domain: DomainEntity,
+  runtimeHosts: CloudflareSaasRuntimeHosts,
+): DomainSummary => {
+  const snapshot = normalizeCloudflareCustomHostnameSnapshot(
+    domain.cloudflareStatusJson,
+  );
+  const fallbackOrigin =
+    snapshot?.customOriginServer ??
+    (usesCloudflareSaas(domain.domainType)
+      ? runtimeHosts.fallbackOrigin
+      : null);
+
+  return {
+    ...domain,
+    requestedHostname: domain.host,
+    cnameTarget:
+      domain.domainType === 'custom_subdomain'
+        ? (domain.dnsTarget ?? runtimeHosts.customerCnameTarget)
+        : null,
+    fallbackOrigin,
+    cloudflareHostnameStatus: normalizeStatus(snapshot?.status ?? null),
+    cloudflareSslStatus: normalizeStatus(snapshot?.ssl.status ?? null),
+    cloudflareErrorMessage: snapshot?.error?.message ?? null,
+    dnsInstructions: buildDomainDnsInstructions({
+      host: domain.host,
+      domainType: domain.domainType,
+      dnsTarget: domain.dnsTarget,
+      verificationMethod: domain.verificationMethod,
+      cloudflareStatusJson: domain.cloudflareStatusJson,
+      fallbackOrigin,
+    }),
+  };
+};

@@ -84,6 +84,7 @@ export type DomainRecord = {
   workspaceId: string;
   teamId: string;
   host: string;
+  requestedHostname: string;
   normalizedHost: string;
   status: string;
   onboardingStatus: string;
@@ -96,6 +97,11 @@ export type DomainRecord = {
   verificationMethod: string;
   cloudflareCustomHostnameId: string | null;
   cloudflareStatusJson: unknown;
+  cnameTarget: string | null;
+  fallbackOrigin: string | null;
+  cloudflareHostnameStatus: string | null;
+  cloudflareSslStatus: string | null;
+  cloudflareErrorMessage: string | null;
   dnsTarget: string | null;
   lastCloudflareSyncAt: string | null;
   activatedAt: string | null;

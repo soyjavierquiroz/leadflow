@@ -18,13 +18,10 @@ type TeamDomainsClientProps = {
 type DomainFormState = {
   host: string;
   domainType: "system_subdomain" | "custom_apex" | "custom_subdomain";
-  verificationMethod: "none" | "cname" | "txt" | "http";
   isPrimary: boolean;
   canonicalHost: string;
   redirectToPrimary: boolean;
 };
-
-type DnsInstruction = NonNullable<DomainRecord["dnsInstructions"]>[number];
 
 const buttonClassName =
   "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
@@ -35,7 +32,6 @@ const primaryButtonClassName =
 const buildCreateState = (): DomainFormState => ({
   host: "",
   domainType: "custom_subdomain",
-  verificationMethod: "cname",
   isPrimary: false,
   canonicalHost: "",
   redirectToPrimary: false,
@@ -59,16 +55,23 @@ const resolveDefaultVerificationMethod = (
   }
 };
 
-const describeInstruction = (instruction: DnsInstruction) => {
-  if (instruction.type === "http") {
-    return `${instruction.label}: servir ${instruction.host}`;
+const formatStatus = (value: string | null | undefined) => {
+  if (!value) {
+    return "sin dato";
   }
 
-  if (instruction.host) {
-    return `${instruction.label}: ${instruction.type.toUpperCase()} ${instruction.host} -> ${instruction.value}`;
-  }
+  return value.replace(/_/g, " ");
+};
 
-  return `${instruction.label}: ${instruction.value}`;
+const describeDomainType = (domainType: DomainRecord["domainType"]) => {
+  switch (domainType) {
+    case "custom_subdomain":
+      return "Flujo recomendado: CNAME simple al target unico del SaaS.";
+    case "custom_apex":
+      return "Caso avanzado: requiere flattening/ALIAS en el DNS del cliente.";
+    default:
+      return "Hostname gestionado por Leadflow.";
+  }
 };
 
 export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
@@ -95,7 +98,9 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
           body: JSON.stringify({
             host: createState.host,
             domainType: createState.domainType,
-            verificationMethod: createState.verificationMethod,
+            verificationMethod: resolveDefaultVerificationMethod(
+              createState.domainType,
+            ),
             isPrimary: createState.isPrimary,
             canonicalHost: createState.canonicalHost || null,
             redirectToPrimary: createState.redirectToPrimary,
@@ -203,7 +208,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
       <SectionHeader
         eyebrow="Team Admin / Domains"
         title="Onboarding de dominios externos"
-        description="Aquí el team registra dominios, ve el estado real de validación/TLS y recibe instrucciones DNS claras antes de publicar funnels por host + path."
+        description="Aquí el team registra hostnames, obtiene un único CNAME target del SaaS y monitorea estado Cloudflare + SSL antes de publicar funnels por host + path."
         actions={
           <button
             type="button"
@@ -261,10 +266,12 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
         columns={[
           {
             key: "domain",
-            header: "Dominio",
+            header: "Hostname solicitado",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">{row.host}</p>
+                <p className="font-semibold text-slate-950">
+                  {row.requestedHostname}
+                </p>
                 <p className="text-xs text-slate-500">
                   {row.domainType.replace(/_/g, " ")}
                   {row.isPrimary ? " • principal" : ""}
@@ -273,61 +280,57 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
             ),
           },
           {
-            key: "onboarding",
-            header: "Onboarding",
-            render: (row) => (
-              <div className="space-y-2">
-                <StatusBadge value={row.onboardingStatus} />
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge value={row.verificationStatus} />
-                  <StatusBadge value={row.sslStatus} />
-                </div>
-              </div>
-            ),
-          },
-          {
             key: "dns",
-            header: "DNS target",
+            header: "CNAME target",
             render: (row) => (
               <div>
                 <p className="font-medium text-slate-950">
-                  {row.dnsTarget ?? "Gestionado internamente"}
+                  {row.cnameTarget ?? row.dnsTarget ?? "No aplica"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Método: {row.verificationMethod.replace(/_/g, " ")}
+                  Fallback origin:{" "}
+                  {row.fallbackOrigin ?? "Gestionado internamente"}
                 </p>
               </div>
             ),
           },
           {
-            key: "instructions",
-            header: "Instrucciones",
+            key: "cloudflare",
+            header: "Cloudflare",
             render: (row) => (
               <div className="space-y-2">
-                {(row.dnsInstructions ?? []).slice(0, 2).map((instruction) => (
-                  <p
-                    key={instruction.id}
-                    className="text-xs leading-5 text-slate-600"
-                  >
-                    {describeInstruction(instruction)}
-                  </p>
-                ))}
-                {(row.dnsInstructions ?? []).length === 0 ? (
-                  <p className="text-xs text-slate-500">
-                    Sin instrucciones adicionales.
-                  </p>
-                ) : null}
+                <StatusBadge
+                  value={row.cloudflareHostnameStatus ?? row.onboardingStatus}
+                />
+                <p className="text-xs text-slate-500">
+                  {row.cloudflareErrorMessage
+                    ? row.cloudflareErrorMessage
+                    : `Metodo simple: ${formatStatus(row.verificationMethod)}`}
+                </p>
               </div>
             ),
           },
           {
-            key: "sync",
-            header: "Último sync",
+            key: "ssl",
+            header: "SSL",
             render: (row) => (
-              <div>
-                <p>{formatDateTime(row.lastCloudflareSyncAt)}</p>
+              <div className="space-y-2">
+                <StatusBadge value={row.sslStatus} />
                 <p className="text-xs text-slate-500">
-                  Activado: {formatDateTime(row.activatedAt)}
+                  Estado Cloudflare SSL:{" "}
+                  {formatStatus(row.cloudflareSslStatus ?? row.sslStatus)}
+                </p>
+              </div>
+            ),
+          },
+          {
+            key: "onboarding",
+            header: "Estado",
+            render: (row) => (
+              <div className="space-y-2">
+                <StatusBadge value={row.onboardingStatus} />
+                <p className="text-xs text-slate-500">
+                  Sync: {formatDateTime(row.lastCloudflareSyncAt)}
                 </p>
               </div>
             ),
@@ -355,6 +358,9 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                     Marcar principal
                   </button>
                 ) : null}
+                <p className="w-full text-xs text-slate-500">
+                  Activado: {formatDateTime(row.activatedAt)}
+                </p>
               </div>
             ),
           },
@@ -379,14 +385,43 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                   {domain.host}
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {domain.domainType === "custom_subdomain"
-                    ? "Subdominio externo con flujo principal vía CNAME hacia el target SaaS."
-                    : domain.domainType === "custom_apex"
-                      ? "Dominio apex externo: v1 deja el onboarding modelado y documenta claramente que la activación final depende de soporte real de apex proxying."
-                      : "Subdominio gestionado internamente por Leadflow."}
+                  {describeDomainType(domain.domainType)}
                 </p>
               </div>
               <StatusBadge value={domain.onboardingStatus} />
+            </div>
+
+            <div className="mt-5 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p>
+                <span className="font-semibold text-slate-950">
+                  Hostname solicitado:
+                </span>{" "}
+                {domain.requestedHostname}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-950">
+                  CNAME target único:
+                </span>{" "}
+                {domain.cnameTarget ?? domain.dnsTarget ?? "No aplica"}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-950">
+                  Fallback origin fijo:
+                </span>{" "}
+                {domain.fallbackOrigin ?? "No aplica"}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-950">
+                  Cloudflare:
+                </span>{" "}
+                {formatStatus(
+                  domain.cloudflareHostnameStatus ?? domain.onboardingStatus,
+                )}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-950">SSL:</span>{" "}
+                {formatStatus(domain.cloudflareSslStatus ?? domain.sslStatus)}
+              </p>
             </div>
 
             <div className="mt-5 space-y-3">
@@ -427,7 +462,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
       {isCreateOpen ? (
         <ModalShell
           title="Registrar dominio"
-          description="Leadflow guarda el dominio, intenta crear el custom hostname en Cloudflare si hay configuración disponible y devuelve las instrucciones DNS necesarias."
+          description="Leadflow registra el hostname, crea el custom hostname en Cloudflare cuando está configurado y devuelve un único target DNS para el flujo SaaS simple."
           onClose={() => setIsCreateOpen(false)}
         >
           <div className="space-y-4">
@@ -459,8 +494,6 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                       return {
                         ...current,
                         domainType,
-                        verificationMethod:
-                          resolveDefaultVerificationMethod(domainType),
                       };
                     })
                   }
@@ -470,27 +503,20 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                   <option value="custom_apex">custom_apex</option>
                   <option value="system_subdomain">system_subdomain</option>
                 </select>
+                <span className="text-xs font-normal leading-5 text-slate-500">
+                  Recomendado: <code>custom_subdomain</code> para flujo simple
+                  vía CNAME a <code>customers.exitosos.com</code>.
+                </span>
               </label>
 
-              <label className="grid gap-2 text-sm font-medium text-slate-700">
-                Método de verificación
-                <select
-                  value={createState.verificationMethod}
-                  onChange={(event) =>
-                    setCreateState((current) => ({
-                      ...current,
-                      verificationMethod: event.target
-                        .value as DomainFormState["verificationMethod"],
-                    }))
-                  }
-                  className="rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-500"
-                >
-                  <option value="cname">cname</option>
-                  <option value="txt">txt</option>
-                  <option value="http">http</option>
-                  <option value="none">none</option>
-                </select>
-              </label>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <p className="font-medium text-slate-950">Flujo operativo</p>
+                <p className="mt-2 leading-6">
+                  Leadflow prioriza CNAME simple para subdominios. El refresh
+                  vuelve a consultar y reimpulsar la validación en Cloudflare
+                  sin pedir TXT manual por defecto.
+                </p>
+              </div>
             </div>
 
             <label className="grid gap-2 text-sm font-medium text-slate-700">

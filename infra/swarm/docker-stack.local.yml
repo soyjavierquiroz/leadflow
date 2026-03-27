@@ -67,19 +67,22 @@ services:
         - traefik.enable=true
         - traefik.docker.network=traefik_public
         - traefik.http.services.leadflow-web.loadbalancer.server.port=3000
-        - traefik.http.routers.leadflow-site.rule=Host(`${LEADFLOW_SITE_HOST:-staging.example.com}`)
-        - traefik.http.routers.leadflow-site.entrypoints=websecure
-        - traefik.http.routers.leadflow-site.tls=true
-        - traefik.http.routers.leadflow-site.tls.certresolver=le
-        - traefik.http.routers.leadflow-site.tls.domains[0].main=${LEADFLOW_SITE_HOST:-staging.example.com}
-        - traefik.http.routers.leadflow-site.tls.domains[0].sans=${LEADFLOW_MEMBERS_HOST:-members.staging.example.com},${LEADFLOW_ADMIN_HOST:-admin.staging.example.com},${LEADFLOW_API_HOST:-api.staging.example.com}
-        - traefik.http.routers.leadflow-site.service=leadflow-web
+        - traefik.http.routers.leadflow-public.rule=HostRegexp(`{host:.+}`)
+        - traefik.http.routers.leadflow-public.priority=1
+        - traefik.http.routers.leadflow-public.entrypoints=websecure
+        - traefik.http.routers.leadflow-public.tls=true
+        - traefik.http.routers.leadflow-public.tls.certresolver=le
+        - traefik.http.routers.leadflow-public.tls.domains[0].main=${LEADFLOW_SAAS_CUSTOMERS_HOST:-customers.staging.example.com}
+        - traefik.http.routers.leadflow-public.tls.domains[0].sans=${LEADFLOW_SAAS_FALLBACK_HOST:-proxy-fallback.staging.example.com},${LEADFLOW_SITE_HOST:-staging.example.com}
+        - traefik.http.routers.leadflow-public.service=leadflow-web
         - traefik.http.routers.leadflow-members.rule=Host(`${LEADFLOW_MEMBERS_HOST:-members.staging.example.com}`)
+        - traefik.http.routers.leadflow-members.priority=200
         - traefik.http.routers.leadflow-members.entrypoints=websecure
         - traefik.http.routers.leadflow-members.tls=true
         - traefik.http.routers.leadflow-members.tls.certresolver=le
         - traefik.http.routers.leadflow-members.service=leadflow-web
         - traefik.http.routers.leadflow-admin.rule=Host(`${LEADFLOW_ADMIN_HOST:-admin.staging.example.com}`)
+        - traefik.http.routers.leadflow-admin.priority=200
         - traefik.http.routers.leadflow-admin.entrypoints=websecure
         - traefik.http.routers.leadflow-admin.tls=true
         - traefik.http.routers.leadflow-admin.tls.certresolver=le
@@ -108,6 +111,8 @@ services:
       ADMIN_URL: ${ADMIN_URL:-https://admin.staging.example.com}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://staging.example.com,https://members.staging.example.com,https://admin.staging.example.com}
       DATABASE_URL: postgresql://${POSTGRES_USER:-leadflow}:${POSTGRES_PASSWORD:-leadflow}@db:5432/${POSTGRES_DB:-leadflow}?schema=public
+      CLOUDFLARE_SAAS_FALLBACK_ORIGIN: ${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.staging.example.com}
+      CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET: ${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.staging.example.com}
     networks:
       - traefik_public
       - leadflow_core
@@ -131,6 +136,7 @@ services:
         - traefik.docker.network=traefik_public
         - traefik.http.services.leadflow-api.loadbalancer.server.port=3001
         - traefik.http.routers.leadflow-api.rule=Host(`${LEADFLOW_API_HOST:-api.staging.example.com}`)
+        - traefik.http.routers.leadflow-api.priority=200
         - traefik.http.routers.leadflow-api.entrypoints=websecure
         - traefik.http.routers.leadflow-api.tls=true
         - traefik.http.routers.leadflow-api.tls.certresolver=le

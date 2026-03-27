@@ -46,6 +46,12 @@ export interface DomainDnsInstruction {
 }
 
 export interface DomainSummary extends DomainEntity {
+  requestedHostname: string;
+  cnameTarget: string | null;
+  fallbackOrigin: string | null;
+  cloudflareHostnameStatus: string | null;
+  cloudflareSslStatus: string | null;
+  cloudflareErrorMessage: string | null;
   dnsInstructions: DomainDnsInstruction[];
 }
 

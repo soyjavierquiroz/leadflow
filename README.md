@@ -132,6 +132,7 @@ Validacion de stacks:
 
 - `docs/architecture-v1.md`
 - `docs/domain-model-v1.md`
+- `docs/cloudflare-saas-runtime-architecture-v2.md`
 - `docs/persistence-v1.md`
 - `docs/public-funnel-runtime-v1.md`
 - `docs/lead-capture-assignment-flows-v1.md`
@@ -218,6 +219,11 @@ Modulos disponibles:
 ## Runtime publico v1
 
 - Resolucion publica implementada por `host + path` con `normalizedHost` exacto, `pathPrefix` normalizado y precedencia por ruta mas especifica.
+- Runtime SaaS v2 para dominios externos:
+  - `customers.exitosos.com` es el `CNAME target` único para clientes
+  - `proxy-fallback.exitosos.com` es el `fallback origin` fijo usado por Cloudflare
+  - Traefik usa router público catch-all y deja routers explícitos solo para `admin`, `members` y `api`
+  - no se enumeran dominios cliente en YAML/labels del stack
 - Modelo de publicacion preparado para dominios externos reales:
   - `team` 1:N `domains`
   - `domain` 1:N `funnel_publications`
@@ -574,13 +580,16 @@ Modulos disponibles:
   - `CLOUDFLARE_API_TOKEN`
   - `CLOUDFLARE_ZONE_ID`
   - `CLOUDFLARE_SAAS_FALLBACK_ORIGIN`
+  - `CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET`
   - `CLOUDFLARE_API_BASE_URL` opcional
   - `CLOUDFLARE_REQUEST_TIMEOUT_MS` opcional
-- Flujo v1:
-  - el team registra el domain en Leadflow
-  - Leadflow intenta crear/gestionar el custom hostname en Cloudflare por API
-  - Leadflow guarda estado neutral de onboarding y metadata acotada del vendor
-  - la UI muestra instrucciones DNS claras por tipo de domain
+- Flujo alineado al runtime SaaS v2:
+  - el team registra el hostname del cliente en Leadflow
+  - Leadflow crea/actualiza el custom hostname en Cloudflare
+  - Leadflow devuelve un único `CNAME target`: `customers.exitosos.com`
+  - Cloudflare edge presenta el cert del dominio del cliente
+  - Cloudflare reenvía al origin fijo `proxy-fallback.exitosos.com`
+  - la UI muestra hostname solicitado, CNAME target, estado Cloudflare, estado SSL y refresh
   - el resolver final de funnels sigue ocurriendo por `host + path`
   - `domains`
   - `sponsors`
@@ -612,8 +621,9 @@ Modulos disponibles:
   - Web: `node apps/web/server.js` (Next standalone, produccion)
   - API: `node apps/api/dist/main.js` (Nest compilado, produccion)
 - TLS para Cloudflare Full (strict) en stack local:
-  - Routers `site`, `members`, `admin`, `api` con `tls.certresolver=le`.
-  - Dominio principal y SANs explicitos en `leadflow-site` para cubrir apex y subdominios operativos.
+  - Routers explícitos para `members`, `admin` y `api`.
+  - Router público catch-all para `site`, `customers.exitosos.com`, `proxy-fallback.exitosos.com` y tráfico proxied de clientes.
+  - Certificados de origen enfocados en hostnames fijos del SaaS, no en dominios cliente individuales.
 - Deploy aun no ejecutado.
 
 ## Nota operativa

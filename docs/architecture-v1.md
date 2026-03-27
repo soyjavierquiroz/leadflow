@@ -333,22 +333,34 @@ La arquitectura ya implementa:
 - `Domain.isPrimary` marca el host principal del team
 - `Domain.canonicalHost` y `Domain.redirectToPrimary` quedan como metadata de canonicalidad para la siguiente fase
 - `Domain.verificationStatus`, `Domain.sslStatus`, `Domain.cloudflareCustomHostnameId`, `Domain.cloudflareStatusJson`, `Domain.dnsTarget` y `Domain.verificationMethod` cubren onboarding Cloudflare SaaS v1
+- `Domain.dnsTarget` queda alineado al target público del cliente (`customers.<saas>`) y deja de representar el fallback origin
 - `FunnelPublication.pathPrefix` se persiste normalizado y define el binding publico dentro del mismo host
 - la unicidad operativa queda en `normalizedHost + pathPrefix`
 
 ### Cloudflare SaaS Domain Onboarding v1
+
+Hostnames fijos del SaaS:
+
+- `proxy-fallback.exitosos.com`: origin fijo que Cloudflare usa para llegar al runtime
+- `customers.exitosos.com`: target DNS único que Leadflow entrega a clientes
 
 Flujo:
 
 1. el team registra el domain en `/team/domains`
 2. Leadflow persiste el `Domain`
 3. si hay configuración Cloudflare, la API crea o actualiza el custom hostname
-4. Leadflow guarda estado neutral:
-   - `onboardingStatus`
-   - `verificationStatus`
-   - `sslStatus`
-5. la UI devuelve instrucciones DNS claras
-6. cuando hostname + SSL quedan en `active`, el domain pasa a operación
+4. Leadflow devuelve un `CNAME target` único para el flujo principal
+5. Cloudflare edge termina TLS del hostname del cliente y reenvía al `fallback origin`
+6. `Refresh` reimpulsa la validación y consulta del custom hostname
+7. cuando hostname + SSL quedan en `active`, el domain pasa a operación
+
+La UI devuelve:
+
+- hostname solicitado
+- CNAME target único
+- estado Cloudflare
+- estado SSL
+- refresh
 
 Estados v1:
 
@@ -436,10 +448,16 @@ Decision de transicion:
   - `leadflow_core`
   - `leadflow_automation` (placeholder)
 - Routing Traefik por host:
-  - `exitosos.com` -> `web`
-  - `members.exitosos.com` -> `web`
-  - `admin.exitosos.com` -> `web`
-  - `api.exitosos.com` -> `api`
+  - `members.exitosos.com` -> `web` (router explícito)
+  - `admin.exitosos.com` -> `web` (router explícito)
+  - `api.exitosos.com` -> `api` (router explícito)
+  - `HostRegexp({host:.+})` -> `web` (router catch-all público)
+- El catch-all sirve:
+  - host público principal del SaaS
+  - `proxy-fallback.exitosos.com`
+  - `customers.exitosos.com`
+  - cualquier custom hostname proxied desde Cloudflare
+- No se agregan dominios cliente uno por uno al stack.
 
 ## Fuera de alcance en esta fase
 

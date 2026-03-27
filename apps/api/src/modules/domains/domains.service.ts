@@ -22,9 +22,9 @@ import {
   CloudflareSaasClientError,
 } from './cloudflare-saas.client';
 import {
+  buildDomainSummary,
   defaultVerificationMethodForDomainType,
   deriveDomainLifecycle,
-  toDomainSummary,
   usesCloudflareSaas,
 } from './domain-onboarding.utils';
 import type {
@@ -63,7 +63,7 @@ export class DomainsService {
     }
 
     const normalizedHost = normalizeDomainHost(dto.host);
-    const domainType = dto.domainType ?? 'custom_apex';
+    const domainType = dto.domainType ?? 'custom_subdomain';
     const verificationMethod =
       dto.verificationMethod ??
       defaultVerificationMethodForDomainType(domainType);
@@ -111,17 +111,19 @@ export class DomainsService {
 
     if (filters?.teamId) {
       return (await this.repository.findByTeamId(filters.teamId)).map(
-        toDomainSummary,
+        (domain) => this.toSummary(domain),
       );
     }
 
     if (filters?.workspaceId) {
       return (await this.repository.findByWorkspaceId(filters.workspaceId)).map(
-        toDomainSummary,
+        (domain) => this.toSummary(domain),
       );
     }
 
-    return (await this.repository.findAll()).map(toDomainSummary);
+    return (await this.repository.findAll()).map((domain) =>
+      this.toSummary(domain),
+    );
   }
 
   async createForTeam(
@@ -138,9 +140,7 @@ export class DomainsService {
     const verificationMethod =
       dto.verificationMethod ??
       defaultVerificationMethodForDomainType(domainType);
-    const dnsTarget = usesCloudflareSaas(domainType)
-      ? this.cloudflareSaasClient.getFallbackOrigin()
-      : null;
+    const dnsTarget = this.resolveDnsTarget(domainType);
     const baseLifecycle = deriveDomainLifecycle({
       domainType,
       dnsTarget,
@@ -193,7 +193,7 @@ export class DomainsService {
       allowCreate: true,
     });
 
-    return toDomainSummary(synced);
+    return this.toSummary(synced);
   }
 
   async updateForTeam(
@@ -229,9 +229,7 @@ export class DomainsService {
       dto.verificationMethod ??
       existing.verificationMethod ??
       defaultVerificationMethodForDomainType(domainType);
-    const dnsTarget = usesCloudflareSaas(domainType)
-      ? this.cloudflareSaasClient.getFallbackOrigin()
-      : null;
+    const dnsTarget = this.resolveDnsTarget(domainType);
 
     const record = await this.prisma.$transaction(async (tx) => {
       if (dto.isPrimary) {
@@ -274,7 +272,7 @@ export class DomainsService {
       allowCreate: true,
     });
 
-    return toDomainSummary(synced);
+    return this.toSummary(synced);
   }
 
   async refreshForTeam(
@@ -290,7 +288,7 @@ export class DomainsService {
       allowCreate: true,
     });
 
-    return toDomainSummary(synced);
+    return this.toSummary(synced);
   }
 
   private assertAndNormalizeHost(host: string) {
@@ -374,8 +372,7 @@ export class DomainsService {
 
       return await this.applyDerivedState({
         ...domain,
-        dnsTarget:
-          domain.dnsTarget ?? this.cloudflareSaasClient.getFallbackOrigin(),
+        dnsTarget: domain.dnsTarget ?? this.resolveDnsTarget(domain.domainType),
       });
     }
 
@@ -393,6 +390,11 @@ export class DomainsService {
               )
             : await this.cloudflareSaasClient.refreshCustomHostname(
                 domain.cloudflareCustomHostnameId,
+                {
+                  hostname: domain.host,
+                  domainType: domain.domainType,
+                  verificationMethod: domain.verificationMethod,
+                },
               )
           : options.allowCreate
             ? await this.cloudflareSaasClient.createCustomHostname({
@@ -412,10 +414,7 @@ export class DomainsService {
           snapshot.id ?? domain.cloudflareCustomHostnameId,
         cloudflareStatusJson:
           snapshot as unknown as DomainEntity['cloudflareStatusJson'],
-        dnsTarget:
-          domain.dnsTarget ??
-          snapshot.customOriginServer ??
-          this.cloudflareSaasClient.getFallbackOrigin(),
+        dnsTarget: domain.dnsTarget ?? this.resolveDnsTarget(domain.domainType),
         lastCloudflareSyncAt: new Date().toISOString(),
       });
     } catch (error) {
@@ -432,8 +431,7 @@ export class DomainsService {
           },
           raw: error.details ?? null,
         } as DomainEntity['cloudflareStatusJson'],
-        dnsTarget:
-          domain.dnsTarget ?? this.cloudflareSaasClient.getFallbackOrigin(),
+        dnsTarget: domain.dnsTarget ?? this.resolveDnsTarget(domain.domainType),
         lastCloudflareSyncAt: new Date().toISOString(),
       });
     }
@@ -472,5 +470,18 @@ export class DomainsService {
     });
 
     return mapDomainRecord(record);
+  }
+
+  private resolveDnsTarget(domainType: DomainEntity['domainType']) {
+    return usesCloudflareSaas(domainType)
+      ? this.cloudflareSaasClient.getCustomerCnameTarget()
+      : null;
+  }
+
+  private toSummary(domain: DomainEntity): DomainSummary {
+    return buildDomainSummary(domain, {
+      fallbackOrigin: this.cloudflareSaasClient.getFallbackOrigin(),
+      customerCnameTarget: this.cloudflareSaasClient.getCustomerCnameTarget(),
+    });
   }
 }

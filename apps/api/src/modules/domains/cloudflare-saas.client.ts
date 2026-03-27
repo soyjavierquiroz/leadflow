@@ -54,14 +54,18 @@ export class CloudflareSaasClientError extends Error {
 
 @Injectable()
 export class CloudflareSaasClient {
+  private readonly baseDomain = sanitizeEnv(process.env.APP_BASE_DOMAIN);
   private readonly apiBaseUrl =
     sanitizeEnv(process.env.CLOUDFLARE_API_BASE_URL) ??
     'https://api.cloudflare.com/client/v4';
   private readonly apiToken = sanitizeEnv(process.env.CLOUDFLARE_API_TOKEN);
   private readonly zoneId = sanitizeEnv(process.env.CLOUDFLARE_ZONE_ID);
-  private readonly fallbackOrigin = sanitizeEnv(
-    process.env.CLOUDFLARE_SAAS_FALLBACK_ORIGIN,
-  );
+  private readonly fallbackOrigin =
+    sanitizeEnv(process.env.CLOUDFLARE_SAAS_FALLBACK_ORIGIN) ??
+    (this.baseDomain ? `proxy-fallback.${this.baseDomain}` : null);
+  private readonly customerCnameTarget =
+    sanitizeEnv(process.env.CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET) ??
+    (this.baseDomain ? `customers.${this.baseDomain}` : null);
   private readonly timeoutMs = parsePositiveInt(
     process.env.CLOUDFLARE_REQUEST_TIMEOUT_MS,
     10_000,
@@ -73,6 +77,10 @@ export class CloudflareSaasClient {
 
   getFallbackOrigin() {
     return this.fallbackOrigin;
+  }
+
+  getCustomerCnameTarget() {
+    return this.customerCnameTarget;
   }
 
   async createCustomHostname(input: {
@@ -109,8 +117,24 @@ export class CloudflareSaasClient {
 
   async refreshCustomHostname(
     customHostnameId: string,
+    input: {
+      hostname: string;
+      domainType: DomainType;
+      verificationMethod: DomainVerificationMethod;
+    },
   ): Promise<CloudflareCustomHostnameSnapshot> {
-    return await this.getCustomHostname(customHostnameId);
+    const response = await this.request(
+      `/custom_hostnames/${customHostnameId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(this.buildPayload(input)),
+      },
+    );
+
+    return this.toSnapshot(
+      response,
+      'No pudimos refrescar el custom hostname en Cloudflare.',
+    );
   }
 
   async updateCustomHostname(
