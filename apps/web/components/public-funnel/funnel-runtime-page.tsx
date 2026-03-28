@@ -58,8 +58,8 @@ export function FunnelRuntimePage({
           <div className="grid min-h-screen lg:grid-cols-2 lg:gap-0">
             <StickyMediaGallery runtime={runtime} blocks={blocks} />
 
-            <div className="flex min-w-0 flex-col bg-slate-950 px-4 py-6 text-slate-100 md:px-8 md:py-10 lg:px-8 lg:py-14 xl:px-12">
-              <div className="mx-auto flex w-full max-w-[44rem] flex-col gap-6 md:gap-8">
+            <div className="flex min-w-0 flex-col bg-slate-950 px-8 py-8 text-slate-100 md:px-8 md:py-10 lg:px-20 lg:py-14">
+              <div className="mx-auto w-full max-w-[44rem] space-y-12">
                 {blocks.map((block, index) => (
                   <PublicBlockAdapter
                     key={`${block.type}-${index}`}

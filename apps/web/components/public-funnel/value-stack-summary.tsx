@@ -1,13 +1,35 @@
+export type ValueStackItem = {
+  title: string;
+  description?: string;
+  valueText?: string;
+  priceText?: string;
+};
+
 type ValueStackSummaryProps = {
   title?: string;
-  items: string[];
+  items: Array<string | ValueStackItem>;
 };
 
 export function ValueStackSummary({
   title = "Lo que obtendras hoy",
   items,
 }: ValueStackSummaryProps) {
-  if (items.length === 0) {
+  const normalizedItems = items
+    .map((item) => {
+      if (typeof item === "string") {
+        return item.trim()
+          ? {
+              title: item.trim(),
+              priceText: "Precio $0",
+            }
+          : null;
+      }
+
+      return item.title.trim() ? item : null;
+    })
+    .filter((item): item is ValueStackItem => Boolean(item));
+
+  if (normalizedItems.length === 0) {
     return null;
   }
 
@@ -16,14 +38,37 @@ export function ValueStackSummary({
       <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-100">
         {title}
       </p>
-      <div className="grid gap-3">
-        {items.map((item) => (
-          <div key={item} className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-sm font-black text-emerald-400">
-              ✓
-            </span>
-            <p className="text-sm font-medium leading-6 text-slate-200">{item}</p>
-          </div>
+      <div className="grid gap-4">
+        {normalizedItems.map((item) => (
+          <article
+            key={`${item.title}-${item.valueText ?? item.priceText ?? ""}`}
+            className="rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-black/20"
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-sm font-black text-emerald-500">
+                ✓
+              </span>
+              <div className="min-w-0 space-y-3">
+                <p className="text-base font-black uppercase tracking-[0.1em] text-white">
+                  {item.title}
+                </p>
+                {item.description ? (
+                  <p className="text-sm leading-6 text-slate-300">
+                    {item.description}
+                  </p>
+                ) : null}
+                <div className="inline-flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-slate-950 px-3 py-2">
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-amber-300">
+                    {item.valueText || "Valor incluido"}
+                  </span>
+                  <span className="text-slate-600">/</span>
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-emerald-400">
+                    {item.priceText || "Precio $0"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </article>
         ))}
       </div>
     </div>

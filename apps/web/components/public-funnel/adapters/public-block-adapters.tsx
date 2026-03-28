@@ -1,6 +1,7 @@
 import { AssignedSponsorReveal } from "@/components/public-funnel/assigned-sponsor-reveal";
 import {
   buildCtaClassName,
+  flatBlockTitleClassName,
   PublicChecklistItem,
   PublicEyebrow,
   PublicQuoteCard,
@@ -54,6 +55,25 @@ type PublicBlockAdapterProps = {
   blocks: RuntimeBlock[];
   layoutVariant?: "single_column" | "sticky_media";
 };
+
+const authorityReferenceCatalog = {
+  PDR: {
+    label: "PDR",
+    meta: "Physicians' Desk Reference",
+  },
+  CPS: {
+    label: "CPS",
+    meta: "Compendium of Pharmaceuticals",
+  },
+} as const;
+
+function inferAuthorityItemsFromBlocks(blocks: RuntimeBlock[]) {
+  const serialized = JSON.stringify(blocks).toUpperCase();
+
+  return Object.entries(authorityReferenceCatalog)
+    .filter(([token]) => serialized.includes(token))
+    .map(([, item]) => item);
+}
 
 function HeroBlockAdapter({
   block,
@@ -229,12 +249,13 @@ function HookAndPromiseBlockAdapter({
         block.authority_logos ??
         block.authority_badges,
     ).map((item) => ({ label: item })),
-    ...trustBadges.map((item) => ({ label: item })),
   ].filter(
     (item, index, collection) =>
       item.label.trim() &&
       collection.findIndex((candidate) => candidate.label === item.label) === index,
   );
+  const inferredAuthorityItems =
+    authorityItems.length > 0 ? authorityItems : inferAuthorityItemsFromBlocks(blocks);
   const hasCaptureBlock = blocks.some(
     (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
   );
@@ -279,7 +300,7 @@ function HookAndPromiseBlockAdapter({
       subheadline={subheadline}
       bullets={bullets}
       trustBadges={trustBadges}
-      authorityItems={authorityItems}
+      authorityItems={inferredAuthorityItems}
       priceAnchorText={asString(block.price_anchor_text)}
       priceMainText={asString(block.price_main_text)}
       media={media}
@@ -813,8 +834,10 @@ function RiskReversalBlockAdapter({
           </PublicEyebrow>
           <h2
             className={cx(
-              "mt-3 text-left text-3xl font-black tracking-tight",
-              layoutVariant === "sticky_media" ? "text-slate-100" : "text-slate-950",
+              "mt-3",
+              layoutVariant === "sticky_media"
+                ? flatBlockTitleClassName
+                : "text-left text-3xl font-black tracking-tight text-slate-950",
             )}
           >
             {title}

@@ -1,6 +1,9 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { cx } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import {
+  cx,
+  flatBlockTitleClassName,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
 import { TrustAuthorityBar } from "@/components/public-funnel/trust-authority-bar";
 
@@ -94,7 +97,12 @@ export function JakawiHookAndPromiseSection({
               </span>
             ) : null}
 
-            <h2 className="mb-2 max-w-5xl text-4xl font-extrabold uppercase leading-[0.95] tracking-tight text-balance text-slate-100 lg:text-5xl">
+            <h2
+              className={cx(
+                "mb-2 max-w-5xl text-balance leading-[0.95]",
+                flatBlockTitleClassName,
+              )}
+            >
               {renderHighlightedText(headline)}
             </h2>
 
@@ -102,6 +110,10 @@ export function JakawiHookAndPromiseSection({
               <p className="mb-2 max-w-3xl text-base leading-7 text-slate-400">
                 {subheadline}
               </p>
+            ) : null}
+
+            {authorityItems.length > 0 ? (
+              <TrustAuthorityBar items={authorityItems} className="pt-4" />
             ) : null}
           </div>
 
@@ -135,9 +147,7 @@ export function JakawiHookAndPromiseSection({
             </div>
           ) : null}
 
-          {authorityItems.length > 0 ? (
-            <TrustAuthorityBar items={authorityItems} className="pt-1" />
-          ) : trustBadges.length > 0 ? (
+          {authorityItems.length === 0 && trustBadges.length > 0 ? (
             <div className="flex flex-wrap gap-x-3 gap-y-1.5">
               {trustBadges.map((badge, index) => (
                 <span

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import {
+  flatBlockTitleClassName,
   PublicChecklistItem,
   PublicEyebrow,
   PublicPill,
@@ -204,8 +205,10 @@ export function RecycledSocialProofSection({
         </PublicEyebrow>
         <h2
           className={cx(
-            "mt-3 text-left text-3xl font-black tracking-tight",
-            surfaceVariant === "flat" ? "text-slate-100" : "text-slate-950",
+            "mt-3",
+            surfaceVariant === "flat"
+              ? flatBlockTitleClassName
+              : "text-left text-3xl font-black tracking-tight text-slate-950",
           )}
         >
           {title}
@@ -497,8 +500,10 @@ export function RecycledFaqAccordionSection({
         </PublicEyebrow>
         <h2
           className={cx(
-            "mt-3 text-left text-3xl font-black tracking-tight",
-            variant === "flat" ? "text-slate-100" : "text-slate-950",
+            "mt-3",
+            variant === "flat"
+              ? flatBlockTitleClassName
+              : "text-left text-3xl font-black tracking-tight text-slate-950",
           )}
         >
           {title}

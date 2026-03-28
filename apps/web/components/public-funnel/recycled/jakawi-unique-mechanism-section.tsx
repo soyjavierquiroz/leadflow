@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import { cx, flatBlockTitleClassName } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
 
 type UniqueMechanismStepItem = {
@@ -78,7 +79,14 @@ export function JakawiUniqueMechanismSection({
     >
       <div className="space-y-7">
         {headline ? (
-          <h3 className="max-w-4xl text-3xl font-black leading-tight tracking-tight text-slate-100 md:text-4xl">
+          <h3
+            className={cx(
+              "max-w-4xl leading-tight",
+              variant === "flat"
+                ? flatBlockTitleClassName
+                : "text-3xl font-black tracking-tight text-slate-100 md:text-4xl",
+            )}
+          >
             {renderHighlightedText(headline)}
           </h3>
         ) : null}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  flatBlockTitleClassName,
   PublicEyebrow,
   PublicSectionSurface,
   PublicStatCard,
@@ -109,7 +110,7 @@ export function UrgencyTimerBlock({
           <h2
             className={
               variant === "flat"
-                ? "mt-3 text-left text-3xl font-black tracking-tight text-slate-100"
+                ? `mt-3 ${flatBlockTitleClassName}`
                 : "mt-3 text-left text-3xl font-black tracking-tight text-slate-950"
             }
           >

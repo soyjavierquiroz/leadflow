@@ -17,6 +17,9 @@ const surfaceToneClasses: Record<SurfaceTone, string> = {
 export const cx = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
 
+export const flatBlockTitleClassName =
+  "text-left font-extrabold text-4xl uppercase tracking-tighter text-white lg:text-5xl";
+
 export function PublicSectionSurface({
   children,
   className,

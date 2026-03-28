@@ -6,8 +6,12 @@ import { useMemo, useState } from "react";
 import {
   buildCtaClassName,
   cx,
+  flatBlockTitleClassName,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
-import { ValueStackSummary } from "@/components/public-funnel/value-stack-summary";
+import {
+  ValueStackSummary,
+  type ValueStackItem,
+} from "@/components/public-funnel/value-stack-summary";
 import { resolveLeadflowBlockMedia } from "@/components/public-funnel/leadflow-media-resolver";
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
 import {
@@ -94,11 +98,41 @@ const toValueStackItems = (
   includedItems: OfferLineItem[],
   bonusItems: OfferLineItem[],
 ) => {
-  const items = [...includedItems, ...bonusItems]
-    .map((item) => item.name || item.description || null)
-    .filter((item): item is string => Boolean(item?.trim()));
+  const items = [...includedItems, ...bonusItems].reduce<ValueStackItem[]>(
+    (collection, item) => {
+      const title = item.name || item.description;
+      if (!title?.trim()) {
+        return collection;
+      }
 
-  return Array.from(new Set(items));
+      const normalizedTitle = title.trim();
+      const nextItem = {
+        title: normalizedTitle,
+        description:
+          item.name && item.description && item.description !== item.name
+            ? item.description
+            : undefined,
+        valueText: item.valueText || undefined,
+        priceText: "Precio $0",
+      } satisfies ValueStackItem;
+
+      if (
+        collection.some(
+          (entry) =>
+            entry.title === nextItem.title &&
+            entry.valueText === nextItem.valueText,
+        )
+      ) {
+        return collection;
+      }
+
+      collection.push(nextItem);
+      return collection;
+    },
+    [],
+  );
+
+  return items;
 };
 
 function renderHighlightedText(text?: string) {
@@ -285,7 +319,14 @@ export function PublicGrandSlamOfferBlock({
       >
         <div className="space-y-7">
           {asString(block.headline) ? (
-            <h3 className="max-w-4xl text-3xl font-black leading-tight tracking-tight text-slate-100 md:text-4xl">
+            <h3
+              className={cx(
+                "max-w-4xl leading-tight",
+                variant === "flat"
+                  ? flatBlockTitleClassName
+                  : "text-3xl font-black tracking-tight text-slate-100 md:text-4xl",
+              )}
+            >
               {renderHighlightedText(asString(block.headline))}
             </h3>
           ) : null}

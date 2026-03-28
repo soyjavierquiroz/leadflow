@@ -1,4 +1,9 @@
-import { PublicEyebrow, PublicSectionSurface, cx } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import {
+  PublicEyebrow,
+  PublicSectionSurface,
+  cx,
+  flatBlockTitleClassName,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
 
 type FaqSocialProofItem = {
   question: string;
@@ -46,7 +51,7 @@ export function FaqSocialProof({
     >
       <div className="max-w-3xl">
         <PublicEyebrow tone="neutral" className="text-slate-400">{eyebrow}</PublicEyebrow>
-        <h2 className="mt-3 text-left text-3xl font-black tracking-tight text-slate-100">
+        <h2 className={`mt-3 ${flatBlockTitleClassName}`}>
           {title}
         </h2>
       </div>
