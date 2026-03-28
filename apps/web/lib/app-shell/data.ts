@@ -229,13 +229,33 @@ const buildPublicationViews = (input: {
       (item) => item.id === funnel?.templateId,
     );
     const team = input.teams.find((item) => item.id === publication.teamId);
+    const funnelSettings =
+      funnel?.settingsJson &&
+      typeof funnel.settingsJson === "object" &&
+      !Array.isArray(funnel.settingsJson)
+        ? (funnel.settingsJson as Record<string, unknown>)
+        : null;
+    const hybridEditor =
+      funnelSettings?.hybridEditor &&
+      typeof funnelSettings.hybridEditor === "object" &&
+      !Array.isArray(funnelSettings.hybridEditor)
+        ? (funnelSettings.hybridEditor as Record<string, unknown>)
+        : null;
+    const templateName = template?.name ?? "Template sin referencia";
+    const normalizedTemplateName = templateName.toLowerCase();
+    const isHybridVsl =
+      hybridEditor?.mode === "data-driven-assembly" ||
+      normalizedTemplateName.includes("vexercore") ||
+      normalizedTemplateName.includes("vsl") ||
+      normalizedTemplateName.includes("split 50/50");
 
     return {
       ...publication,
       domainHost: domain?.host ?? "Host no resuelto",
       funnelName: funnel?.name ?? "Funnel sin instancia",
       funnelCode: funnel?.code ?? "pending",
-      templateName: template?.name ?? "Template sin referencia",
+      templateName,
+      isHybridVsl,
       teamName: team?.name ?? "Team sin metadata",
       trackingLabel: publication.trackingProfileId
         ? "Tracking conectado"

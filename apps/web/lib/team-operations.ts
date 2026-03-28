@@ -11,16 +11,26 @@ export const teamOperationRequest = async <T>(
   path: string,
   init: RequestInit,
 ): Promise<T> => {
-  const response = await fetch(`${webPublicConfig.urls.api}/v1${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
+  let response: Response;
 
-  const payload = (await response.json()) as unknown;
+  try {
+    response = await fetch(`${webPublicConfig.urls.api}/v1${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? `No pudimos conectar con el API del team (${error.message}).`
+        : "No pudimos conectar con el API del team.",
+    );
+  }
+
+  const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
     const errorPayload = payload as ErrorPayload;

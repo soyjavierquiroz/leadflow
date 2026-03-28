@@ -169,6 +169,7 @@ export function RecycledHookSection({
 
 type RecycledSocialProofSectionProps = {
   variant?: string;
+  surfaceVariant?: "default" | "flat";
   eyebrow: string;
   title: string;
   description: string;
@@ -180,6 +181,7 @@ type RecycledSocialProofSectionProps = {
 
 export function RecycledSocialProofSection({
   variant = "metrics_trust",
+  surfaceVariant = "default",
   eyebrow,
   title,
   description,
@@ -189,20 +191,45 @@ export function RecycledSocialProofSection({
   logos = [],
 }: RecycledSocialProofSectionProps) {
   return (
-    <PublicSectionSurface>
+    <PublicSectionSurface
+      variant={surfaceVariant}
+      className={surfaceVariant === "flat" ? "py-6 text-left md:py-8" : ""}
+    >
       <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral">{eyebrow}</PublicEyebrow>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        <PublicEyebrow
+          tone="neutral"
+          className={surfaceVariant === "flat" ? "text-slate-400" : ""}
+        >
+          {eyebrow}
+        </PublicEyebrow>
+        <h2
+          className={cx(
+            "mt-3 text-left text-3xl font-black tracking-tight",
+            surfaceVariant === "flat" ? "text-slate-100" : "text-slate-950",
+          )}
+        >
           {title}
         </h2>
-        <p className="mt-4 text-base leading-7 text-slate-600">{description}</p>
+        <p
+          className={cx(
+            "mt-4 text-left text-base leading-7",
+            surfaceVariant === "flat" ? "text-slate-400" : "text-slate-600",
+          )}
+        >
+          {description}
+        </p>
       </div>
       {logos.length > 0 ? (
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {logos.map((logo) => (
             <div
               key={`${logo.alt}-${logo.src}`}
-              className="flex min-h-20 items-center justify-center rounded-[1.4rem] border border-slate-200 bg-white px-4 py-5"
+              className={cx(
+                "flex min-h-20 items-center justify-center rounded-[1.4rem] px-4 py-5",
+                surfaceVariant === "flat"
+                  ? "border border-slate-800 bg-slate-900"
+                  : "border border-slate-200 bg-white",
+              )}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -221,13 +248,16 @@ export function RecycledSocialProofSection({
             label={item.label}
             value={item.value}
             description={item.description}
+            variant={surfaceVariant}
           />
         ))}
       </div>
       {variant === "risk_reversal" && checklist.length > 0 ? (
         <div className="mt-8 grid gap-3">
           {checklist.map((item) => (
-            <PublicChecklistItem key={item.title}>{item.title}</PublicChecklistItem>
+            <PublicChecklistItem key={item.title} variant={surfaceVariant}>
+              {item.title}
+            </PublicChecklistItem>
           ))}
         </div>
       ) : null}
@@ -244,6 +274,7 @@ export function RecycledSocialProofSection({
               quote={item.quote}
               author={item.author}
               detail={[item.role, item.company].filter(Boolean).join(" · ")}
+              variant={surfaceVariant}
             />
           ))}
         </div>
@@ -440,21 +471,36 @@ export function RecycledFinalCtaSection({
 }
 
 type RecycledFaqAccordionSectionProps = {
+  variant?: "default" | "flat";
   eyebrow: string;
   title: string;
   items: RuntimeFaqItem[];
 };
 
 export function RecycledFaqAccordionSection({
+  variant = "default",
   eyebrow,
   title,
   items,
 }: RecycledFaqAccordionSectionProps) {
   return (
-    <PublicSectionSurface>
+    <PublicSectionSurface
+      variant={variant}
+      className={variant === "flat" ? "py-6 text-left md:py-8" : ""}
+    >
       <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral">{eyebrow}</PublicEyebrow>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        <PublicEyebrow
+          tone={variant === "flat" ? "neutral" : "neutral"}
+          className={variant === "flat" ? "text-slate-400" : ""}
+        >
+          {eyebrow}
+        </PublicEyebrow>
+        <h2
+          className={cx(
+            "mt-3 text-left text-3xl font-black tracking-tight",
+            variant === "flat" ? "text-slate-100" : "text-slate-950",
+          )}
+        >
           {title}
         </h2>
       </div>
@@ -462,12 +508,29 @@ export function RecycledFaqAccordionSection({
         {items.map((item) => (
           <details
             key={item.question}
-            className="group rounded-[1.6rem] border border-slate-200 bg-slate-50 p-5 open:bg-white"
+            className={cx(
+              "group",
+              variant === "flat"
+                ? "rounded-[1.4rem] border border-slate-800 bg-slate-900 px-5 py-5"
+                : "rounded-[1.6rem] border border-slate-200 bg-slate-50 p-5 open:bg-white",
+            )}
           >
-            <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
+            <summary
+              className={cx(
+                "cursor-pointer list-none text-base font-semibold",
+                variant === "flat" ? "text-slate-100" : "text-slate-900",
+              )}
+            >
               {item.question}
             </summary>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{item.answer}</p>
+            <p
+              className={cx(
+                "mt-3 text-sm leading-6",
+                variant === "flat" ? "text-slate-400" : "text-slate-600",
+              )}
+            >
+              {item.answer}
+            </p>
           </details>
         ))}
       </div>

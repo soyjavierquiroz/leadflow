@@ -285,6 +285,7 @@ export type PublicationView = FunnelPublicationRecord & {
   funnelName: string;
   funnelCode: string;
   templateName: string;
+  isHybridVsl: boolean;
   teamName: string;
   trackingLabel: string;
   handoffLabel: string;

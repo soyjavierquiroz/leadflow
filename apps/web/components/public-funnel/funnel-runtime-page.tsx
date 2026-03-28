@@ -7,6 +7,7 @@ import {
   PublicSectionSurface,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { PublicRuntimeTracker } from "@/components/public-funnel/public-runtime-tracker";
+import { StickyMediaGallery } from "@/components/public-funnel/sticky-media-gallery";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import {
   parseRuntimeBlocks,
@@ -25,6 +26,7 @@ export function FunnelRuntimePage({
 }: FunnelRuntimePageProps) {
   const parsedBlocks = parseRuntimeBlocks(runtime.currentStep.blocksJson);
   const blocks = parsedBlocks.blocks;
+  const hasRenderableBlocks = blocks.length > 0;
   const entryStepPath =
     runtime.steps.find((step) => step.isEntryStep)?.path ??
     runtime.currentStep.path;
@@ -32,6 +34,48 @@ export function FunnelRuntimePage({
     1,
     Math.round((runtime.currentStep.position / runtime.steps.length) * 100),
   );
+  const mediaAssetCount = [
+    runtime.currentStep.mediaMap,
+    runtime.funnel.mediaMap,
+    runtime.funnel.template.mediaMap,
+  ].reduce<number>((count, candidate) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      return count;
+    }
+
+    return Math.max(
+      count,
+      Object.keys(candidate as Record<string, unknown>).length,
+    );
+  }, 0);
+
+  if (hasRenderableBlocks) {
+    return (
+      <main className="min-h-screen overflow-x-hidden bg-black">
+        <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
+
+        <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen">
+          <div className="grid min-h-screen lg:grid-cols-2 lg:gap-0">
+            <StickyMediaGallery runtime={runtime} blocks={blocks} />
+
+            <div className="flex min-w-0 flex-col bg-slate-950 px-4 py-6 text-slate-100 md:px-8 md:py-10 lg:px-8 lg:py-14 xl:px-12">
+              <div className="mx-auto flex w-full max-w-[44rem] flex-col gap-6 md:gap-8">
+                {blocks.map((block, index) => (
+                  <PublicBlockAdapter
+                    key={`${block.type}-${index}`}
+                    block={block}
+                    runtime={runtime}
+                    blocks={blocks}
+                    layoutVariant="sticky_media"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.16),_transparent_26%),radial-gradient(circle_at_top_right,_rgba(251,191,36,0.14),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_45%,_#f8fafc_100%)] px-4 py-6 md:px-8 md:py-10">
@@ -162,9 +206,11 @@ export function FunnelRuntimePage({
                 `Dominio resuelto: ${runtime.domain.host}`,
                 `Tracking profile: ${runtime.trackingProfile?.name ?? "sin perfil activo"}`,
                 `Modo de handoff: ${runtime.handoff.mode ?? "sin modo definido"}`,
-                parsedBlocks.compatibility.mediaDictionaryKeys.length > 0
-                  ? `Media dictionary: ${parsedBlocks.compatibility.mediaDictionaryKeys.length} assets`
-                  : "Media dictionary: no definido",
+                mediaAssetCount > 0
+                  ? `Media assets disponibles: ${mediaAssetCount}`
+                  : parsedBlocks.compatibility.mediaDictionaryKeys.length > 0
+                    ? `Media dictionary: ${parsedBlocks.compatibility.mediaDictionaryKeys.length} assets`
+                    : "Media dictionary: no definido",
               ].map((item) => (
                 <div
                   key={item}

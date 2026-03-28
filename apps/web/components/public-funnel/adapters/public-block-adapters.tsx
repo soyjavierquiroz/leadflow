@@ -13,11 +13,13 @@ import {
   RecycledFaqAccordionSection,
   RecycledFinalCtaSection,
   RecycledHeroSection,
-  RecycledHookSection,
   RecycledOfferStackSection,
   RecycledSocialProofSection,
   RecycledVideoSection,
 } from "@/components/public-funnel/recycled/compatible-commercial-sections";
+import { FaqSocialProof } from "@/components/public-funnel/faq-social-proof";
+import { resolveLeadflowBlockMedia } from "@/components/public-funnel/leadflow-media-resolver";
+import { JakawiHookAndPromiseSection } from "@/components/public-funnel/recycled/jakawi-hook-and-promise-section";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import { UrgencyTimerBlock } from "@/components/public-funnel/urgency-timer-block";
 import { WhatsappHandoffCta } from "@/components/public-funnel/whatsapp-handoff-cta";
@@ -33,6 +35,7 @@ import {
   asMetricItems,
   asNumber,
   asOfferItems,
+  asRecord,
   asString,
   asStringArray,
   asTestimonialItems,
@@ -42,11 +45,14 @@ import {
   resolveCtaHref,
   toStepLabel,
 } from "@/components/public-funnel/runtime-block-utils";
+import { PublicGrandSlamOfferBlock } from "@/components/public-funnel/public-grand-slam-offer-block";
+import { JakawiUniqueMechanismSection } from "@/components/public-funnel/recycled/jakawi-unique-mechanism-section";
 
 type PublicBlockAdapterProps = {
   block: RuntimeBlock;
   runtime: PublicFunnelRuntimePayload;
   blocks: RuntimeBlock[];
+  layoutVariant?: "single_column" | "sticky_media";
 };
 
 function HeroBlockAdapter({
@@ -184,31 +190,100 @@ function HeroBlockAdapter({
 function HookAndPromiseBlockAdapter({
   block,
   runtime,
+  blocks,
+  layoutVariant = "single_column",
 }: PublicBlockAdapterProps) {
-  const eyebrow = asString(block.eyebrow, "Hook & Promise");
-  const hook = asString(
-    block.hook,
-    asString(block.title, "Atrae atención con una propuesta clara"),
+  const eyebrow = asString(
+    block.eyebrow_text,
+    asString(block.eyebrow, "Hook & Promise"),
   );
-  const promise = asString(
-    block.promise,
+  const headline = asString(
+    block.headline,
     asString(
-      block.description,
-      "Bloque comercial diseñado para abrir el funnel con claridad, tensión positiva y continuidad hacia la captura.",
+      block.hook,
+      asString(block.title, "Atrae atención con una propuesta clara"),
     ),
   );
-  const points = asStringArray(block.items);
+  const subheadline = asString(
+    block.subheadline,
+    asString(
+      block.promise,
+      asString(
+        block.description,
+        "Bloque comercial diseñado para abrir el funnel con claridad, tensión positiva y continuidad hacia la captura.",
+      ),
+    ),
+  );
+  const bullets = asStringArray(
+    block.primary_benefit_bullets ??
+      block.highlights ??
+      block.benefits ??
+      block.bullets ??
+      block.items,
+  ).filter(Boolean);
+  const trustBadges = asStringArray(block.trust_badges).filter(Boolean);
+  const authorityItems = [
+    ...asStringArray(
+      block.trust_authority_items ??
+        block.authority_items ??
+        block.authority_logos ??
+        block.authority_badges,
+    ).map((item) => ({ label: item })),
+    ...trustBadges.map((item) => ({ label: item })),
+  ].filter(
+    (item, index, collection) =>
+      item.label.trim() &&
+      collection.findIndex((candidate) => candidate.label === item.label) === index,
+  );
+  const hasCaptureBlock = blocks.some(
+    (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
+  );
   const ctaHref =
     asString(block.href) ||
-    runtime.steps.find((step) => step.isEntryStep)?.path ||
+    (hasCaptureBlock ? "#public-capture-form" : runtime.nextStep?.path) ||
     runtime.currentStep.path;
-  const ctaLabel = asString(block.label, "Quiero ver cómo funciona");
+  const ctaLabel = asString(
+    block.label,
+    asString(
+      block.primary_cta_text,
+      hasCaptureBlock ? "Quiero dejar mis datos" : "Quiero ver cómo funciona",
+    ),
+  );
+  const media = resolveLeadflowBlockMedia({
+    runtime,
+    block,
+    fallbackAlt: headline,
+    candidate: block.media,
+    preferBlockKeys: [
+      "hero_image_url",
+      "heroImageUrl",
+      "image_url",
+      "imageUrl",
+      "image_key",
+      "imageKey",
+      "media_key",
+      "mediaKey",
+      "asset_key",
+      "assetKey",
+    ],
+    fallbackMapKeys: ["hero", "product_box"],
+    leadflowMetadata:
+      block.leadflow_metadata ?? block.metadata ?? runtime.funnel.settingsJson,
+  });
 
   return (
-    <RecycledHookSection
+    <JakawiHookAndPromiseSection
+      variant={layoutVariant === "sticky_media" ? "flat" : "default"}
       eyebrow={eyebrow}
-      hook={hook}
-      promise={promise}
+      headline={headline}
+      subheadline={subheadline}
+      bullets={bullets}
+      trustBadges={trustBadges}
+      authorityItems={authorityItems}
+      priceAnchorText={asString(block.price_anchor_text)}
+      priceMainText={asString(block.price_main_text)}
+      media={media}
+      hideDesktopMedia={layoutVariant === "sticky_media"}
       cta={
         <TrackedCta
           publicationId={runtime.publication.id}
@@ -216,19 +291,163 @@ function HookAndPromiseBlockAdapter({
           currentPath={runtime.request.path}
           href={ctaHref}
           label={ctaLabel}
-          className={buildCtaClassName("primary")}
+          className={cx(
+            buildCtaClassName("primary"),
+            layoutVariant === "sticky_media"
+              ? "bg-amber-500 text-black hover:bg-amber-400 focus-visible:outline-amber-400"
+              : "",
+          )}
           action={asString(block.action) || "hook_primary"}
         />
       }
-      points={
-        points.length > 0
-          ? points
-          : [
-              "Copy directo para abrir interés sin rodeos.",
-              "Promesa alineada al siguiente paso del funnel.",
-              "Bloque pensado para intake de componentes reciclados.",
-            ]
+    />
+  );
+}
+
+function toUniqueMechanismSteps(value: RuntimeBlock["how_it_works_steps"]) {
+  if (!Array.isArray(value)) {
+    return [] as Array<{ title?: string; text?: string }>;
+  }
+
+  const items = value.map((item) => {
+    const record = asRecord(item);
+    if (!record) {
+      return null;
+    }
+
+    const title = asString(record.step_title, asString(record.title));
+    const text = asString(record.step_text, asString(record.text));
+
+    return title || text
+      ? { title: title || undefined, text: text || undefined }
+      : null;
+  });
+
+  return items.filter(
+    (item): item is NonNullable<(typeof items)[number]> => Boolean(item),
+  );
+}
+
+function toUniqueMechanismPairs(value: RuntimeBlock["feature_benefit_pairs"]) {
+  if (!Array.isArray(value)) {
+    return [] as Array<{ feature?: string; benefit?: string }>;
+  }
+
+  const items = value.map((item) => {
+      const record = asRecord(item);
+      if (!record) {
+        return null;
       }
+
+      const feature = asString(record.feature);
+      const benefit = asString(record.benefit);
+
+      return feature || benefit
+        ? { feature: feature || undefined, benefit: benefit || undefined }
+        : null;
+    });
+
+  return items.filter(
+    (item): item is NonNullable<(typeof items)[number]> => Boolean(item),
+  );
+}
+
+function toEmbedUrl(rawUrl: string) {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.includes("youtube.com/embed/")) {
+    return trimmed;
+  }
+
+  const youtubeMatch = trimmed.match(/[?&]v=([^&]+)/);
+  if (youtubeMatch?.[1]) {
+    return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
+  }
+
+  const shortYoutubeMatch = trimmed.match(/youtu\.be\/([^?&/]+)/);
+  if (shortYoutubeMatch?.[1]) {
+    return `https://www.youtube.com/embed/${shortYoutubeMatch[1]}`;
+  }
+
+  const vimeoMatch = trimmed.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch?.[1]) {
+    return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  }
+
+  return trimmed;
+}
+
+function isDirectVideoUrl(rawUrl: string) {
+  return /\.(mp4|webm|ogg)(\?.*)?$/i.test(rawUrl);
+}
+
+function UniqueMechanismBlockAdapter({
+  block,
+  runtime,
+  layoutVariant = "single_column",
+}: PublicBlockAdapterProps) {
+  const headline = asString(block.headline, asString(block.title));
+  const mechanismName = asString(block.mechanism_name);
+  const steps = toUniqueMechanismSteps(block.how_it_works_steps);
+  const pairs = toUniqueMechanismPairs(block.feature_benefit_pairs);
+  const fallbackAlt = headline || mechanismName || "Mecanismo único";
+  const media = resolveLeadflowBlockMedia({
+    runtime,
+    block,
+    fallbackAlt,
+    candidate: block.media_url ?? block.media,
+    preferBlockKeys: [
+      "media_url",
+      "mediaUrl",
+      "image_url",
+      "imageUrl",
+      "image_key",
+      "imageKey",
+      "media_key",
+      "mediaKey",
+      "asset_key",
+      "assetKey",
+    ],
+    fallbackMapKeys: ["product_box", "hero"],
+    leadflowMetadata:
+      block.leadflow_metadata ?? block.metadata ?? runtime.funnel.settingsJson,
+  });
+  const embedUrl = toEmbedUrl(asString(block.demo_video_url));
+  const mediaNode =
+    embedUrl && isDirectVideoUrl(embedUrl) ? (
+      <video
+        src={embedUrl}
+        controls
+        playsInline
+        className="h-full min-h-[280px] w-full object-cover"
+      />
+    ) : embedUrl ? (
+      <iframe
+        src={embedUrl}
+        title={fallbackAlt}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+        className="min-h-[280px] w-full"
+      />
+    ) : null;
+
+  if (!headline && !mechanismName && steps.length === 0 && pairs.length === 0) {
+    return null;
+  }
+
+  return (
+    <JakawiUniqueMechanismSection
+      variant={layoutVariant === "sticky_media" ? "flat" : "default"}
+      headline={headline || undefined}
+      mechanismName={mechanismName || undefined}
+      steps={steps}
+      pairs={pairs}
+      media={media}
+      mediaNode={mediaNode}
+      hideDesktopMedia={layoutVariant === "sticky_media"}
     />
   );
 }
@@ -295,13 +514,24 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
   );
 }
 
-function UrgencyTimerBlockAdapter({ block }: PublicBlockAdapterProps) {
+function UrgencyTimerBlockAdapter({
+  block,
+  layoutVariant = "single_column",
+}: PublicBlockAdapterProps) {
   return (
     <UrgencyTimerBlock
       eyebrow={asString(block.eyebrow) || undefined}
-      headline={asString(block.headline, asString(block.title, "Cierre próximo"))}
+      headline={
+        asString(
+          block.prefix_text,
+          asString(block.headline, asString(block.title, "Cierre próximo")),
+        ) || "Cierre próximo"
+      }
       subheadline={
-        asString(block.subheadline, asString(block.description)) || undefined
+        asString(
+          block.main_text,
+          asString(block.subheadline, asString(block.description)),
+        ) || undefined
       }
       expiresAt={
         asString(
@@ -312,6 +542,7 @@ function UrgencyTimerBlockAdapter({ block }: PublicBlockAdapterProps) {
       durationMinutes={
         asNumber(block.duration_minutes, asNumber(block.durationMinutes, 0)) || undefined
       }
+      variant={layoutVariant === "sticky_media" ? "flat" : "default"}
     />
   );
 }
@@ -456,29 +687,58 @@ function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
   );
 }
 
-function FaqBlockAdapter({ block }: PublicBlockAdapterProps) {
+function FaqBlockAdapter({
+  block,
+  layoutVariant = "single_column",
+}: PublicBlockAdapterProps) {
   const variant = asString(block.variant, "accordion");
-  const title = asString(block.title, "Preguntas frecuentes");
-  const items = asFaqItems(block.items);
+  const title = asString(
+    block.headline,
+    asString(block.title, "Preguntas frecuentes"),
+  );
+  const items = asFaqItems(block.items ?? block.faqs);
+
+  if (variant === "social_proof" || variant === "objection_stack") {
+    return (
+      <FaqSocialProof
+        eyebrow={asString(block.eyebrow, "Objeciones frecuentes")}
+        title={title}
+        items={items.length > 0 ? items : undefined}
+        variant={layoutVariant === "sticky_media" ? "flat" : "default"}
+      />
+    );
+  }
 
   return (
     <RecycledFaqAccordionSection
       eyebrow={variant === "accordion" ? "FAQ accordion" : "Confianza y objeciones"}
       title={title}
       items={items}
+      variant={layoutVariant === "sticky_media" ? "flat" : "default"}
     />
   );
 }
 
-function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
+function SocialProofBlockAdapter({
+  block,
+  layoutVariant = "single_column",
+}: PublicBlockAdapterProps) {
   const variant = asString(block.variant, "metrics_trust");
-  const title = asString(block.title, "Prueba social");
+  const title = asString(
+    block.headline,
+    asString(block.title, "Prueba social"),
+  );
   const description = asString(
-    block.description,
-    "Bloque preparado para absorber métricas, logos, resultados o señales de confianza sin tocar el renderer base.",
+    block.subheadline,
+    asString(
+      block.description,
+      "Bloque preparado para absorber métricas, logos, resultados o señales de confianza sin tocar el renderer base.",
+    ),
   );
   const metrics = asMetricItems(block.metrics ?? block.items);
-  const testimonials = asTestimonialItems(block.testimonials);
+  const testimonials = asTestimonialItems(
+    block.testimonials ?? block.reviews ?? block.items,
+  );
   const featureItems = asFeatureItems(block.items);
   const logos = asMediaItems(block.logos, title);
   const fallbackMetrics = [
@@ -502,6 +762,7 @@ function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
   return (
     <RecycledSocialProofSection
       variant={variant}
+      surfaceVariant={layoutVariant === "sticky_media" ? "flat" : "default"}
       eyebrow="Social proof adapter"
       title={title}
       description={description}
@@ -510,6 +771,99 @@ function SocialProofBlockAdapter({ block }: PublicBlockAdapterProps) {
       checklist={featureItems}
       logos={logos}
     />
+  );
+}
+
+function RiskReversalBlockAdapter({
+  block,
+  runtime,
+  layoutVariant = "single_column",
+}: PublicBlockAdapterProps) {
+  const title = asString(
+    block.headline,
+    asString(block.title, "Compra protegida"),
+  );
+  const description = asString(
+    block.guarantee_body,
+    asString(
+      block.description,
+      "Reduce el riesgo percibido y deja claro que la compra está respaldada.",
+    ),
+  );
+  const bullets = asStringArray(
+    block.guarantee_bullets ?? block.items,
+  ).filter(Boolean);
+  const ctaLabel = asString(
+    block.section_cta_text,
+    runtime.handoff.buttonLabel || "Continuar",
+  );
+
+  return (
+    <PublicSectionSurface
+      variant={layoutVariant === "sticky_media" ? "flat" : "default"}
+      className={layoutVariant === "sticky_media" ? "py-6 text-left md:py-8" : ""}
+    >
+      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+        <div>
+          <PublicEyebrow
+            tone="neutral"
+            className={layoutVariant === "sticky_media" ? "text-slate-400" : ""}
+          >
+            {asString(block.guarantee_duration_text, "Garantía activa")}
+          </PublicEyebrow>
+          <h2
+            className={cx(
+              "mt-3 text-left text-3xl font-black tracking-tight",
+              layoutVariant === "sticky_media" ? "text-slate-100" : "text-slate-950",
+            )}
+          >
+            {title}
+          </h2>
+          <p
+            className={cx(
+              "mt-4 max-w-2xl text-left text-base leading-7",
+              layoutVariant === "sticky_media" ? "text-slate-400" : "text-slate-600",
+            )}
+          >
+            {description}
+          </p>
+          <div className="mt-7">
+            <TrackedCta
+              publicationId={runtime.publication.id}
+              currentStepId={runtime.currentStep.id}
+              currentPath={runtime.request.path}
+              href={runtime.currentStep.path}
+              label={ctaLabel}
+              className={cx(
+                buildCtaClassName("primary"),
+                layoutVariant === "sticky_media"
+                  ? "bg-amber-500 text-black hover:bg-amber-400 focus-visible:outline-amber-400"
+                  : "",
+              )}
+              action="risk_reversal_cta"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3">
+          {(bullets.length > 0
+            ? bullets
+            : [
+                "Respaldo visible para reducir fricción de compra.",
+                "Lenguaje simple y claro sobre el proceso.",
+                "Continuidad comercial sin romper el runtime.",
+              ]
+          ).map((item) => (
+            <PublicChecklistItem
+              key={item}
+              variant={layoutVariant === "sticky_media" ? "flat" : "default"}
+            >
+              {item}
+            </PublicChecklistItem>
+          ))}
+        </div>
+      </div>
+    </PublicSectionSurface>
   );
 }
 
@@ -798,21 +1152,44 @@ export function PublicBlockAdapter({
   block,
   runtime,
   blocks,
+  layoutVariant = "single_column",
 }: PublicBlockAdapterProps) {
   switch (normalizeRuntimeBlockType(block.type)) {
     case "hero":
-      return <HeroBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+      return (
+        <HeroBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+          layoutVariant={layoutVariant}
+        />
+      );
     case "hook_and_promise":
       return (
         <HookAndPromiseBlockAdapter
           block={block}
           runtime={runtime}
           blocks={blocks}
+          layoutVariant={layoutVariant}
+        />
+      );
+    case "unique_mechanism":
+      return (
+        <UniqueMechanismBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+          layoutVariant={layoutVariant}
         />
       );
     case "urgency_timer":
       return (
-        <UrgencyTimerBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+        <UrgencyTimerBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+          layoutVariant={layoutVariant}
+        />
       );
     case "text":
       return <TextBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
@@ -821,7 +1198,15 @@ export function PublicBlockAdapter({
     case "cta":
       return <CtaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
     case "faq":
-      return <FaqBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+    case "faq_social_proof":
+      return (
+        <FaqBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+          layoutVariant={layoutVariant}
+        />
+      );
     case "lead_capture_form":
       return (
         <PublicCaptureForm
@@ -852,7 +1237,21 @@ export function PublicBlockAdapter({
       );
     case "social_proof":
       return (
-        <SocialProofBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+        <SocialProofBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+          layoutVariant={layoutVariant}
+        />
+      );
+    case "risk_reversal":
+      return (
+        <RiskReversalBlockAdapter
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+          layoutVariant={layoutVariant}
+        />
       );
     case "testimonial":
     case "testimonials":
@@ -876,6 +1275,16 @@ export function PublicBlockAdapter({
       return <MediaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
     case "offer_pricing":
       return <OfferBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+    case "grand_slam_offer":
+      return (
+        <PublicGrandSlamOfferBlock
+          block={block}
+          runtime={runtime}
+          blocks={blocks}
+          hideDesktopMedia={layoutVariant === "sticky_media"}
+          variant={layoutVariant === "sticky_media" ? "flat" : "default"}
+        />
+      );
     case "whatsapp_handoff_cta":
       return (
         <WhatsappHandoffCtaBlockAdapter

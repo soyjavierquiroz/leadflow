@@ -23,6 +23,7 @@ async function bootstrap() {
   app.enableCors({
     origin: runtimeConfig.corsAllowedOrigins,
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await app.listen(runtimeConfig.port, runtimeConfig.host);

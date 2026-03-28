@@ -13,6 +13,7 @@ type UrgencyTimerBlockProps = {
   subheadline?: string;
   expiresAt?: string | null;
   durationMinutes?: number | null;
+  variant?: "default" | "flat";
 };
 
 type CountdownState = {
@@ -56,6 +57,7 @@ export function UrgencyTimerBlock({
   subheadline,
   expiresAt,
   durationMinutes,
+  variant = "default",
 }: UrgencyTimerBlockProps) {
   const [countdown, setCountdown] = useState<CountdownState>(() =>
     toCountdownState(null),
@@ -91,37 +93,64 @@ export function UrgencyTimerBlock({
   }, [durationMinutes, expiresAt]);
 
   return (
-    <PublicSectionSurface tone="warm">
+    <PublicSectionSurface
+      tone="warm"
+      variant={variant}
+      className={variant === "flat" ? "py-6 text-left md:py-8" : ""}
+    >
       <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
         <div>
-          <PublicEyebrow tone="warm">
+          <PublicEyebrow
+            tone="warm"
+            className={variant === "flat" ? "text-amber-400" : ""}
+          >
             {eyebrow || "Ventana de decisión"}
           </PublicEyebrow>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+          <h2
+            className={
+              variant === "flat"
+                ? "mt-3 text-left text-3xl font-black tracking-tight text-slate-100"
+                : "mt-3 text-left text-3xl font-black tracking-tight text-slate-950"
+            }
+          >
             {headline}
           </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
+          <p
+            className={
+              variant === "flat"
+                ? "mt-4 max-w-2xl text-left text-base leading-7 text-slate-400"
+                : "mt-4 max-w-2xl text-left text-base leading-7 text-slate-700"
+            }
+          >
             {subheadline ||
               "Bloque de urgencia listo para templates comerciales sin depender de lógica custom por funnel."}
           </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-4">
-          <PublicStatCard label="Días" value={countdown.days} tone="warm" />
-          <PublicStatCard label="Horas" value={countdown.hours} tone="warm" />
+          <PublicStatCard label="Días" value={countdown.days} tone="warm" variant={variant} />
+          <PublicStatCard label="Horas" value={countdown.hours} tone="warm" variant={variant} />
           <PublicStatCard
             label="Minutos"
             value={countdown.minutes}
             tone="warm"
+            variant={variant}
           />
           <PublicStatCard
             label="Segundos"
             value={countdown.seconds}
             tone="warm"
+            variant={variant}
           />
         </div>
       </div>
-      <div className="mt-5 rounded-[1.5rem] border border-amber-200 bg-white px-4 py-4 text-sm leading-6 text-slate-700">
+      <div
+        className={
+          variant === "flat"
+            ? "mt-5 rounded-[1.4rem] border border-slate-800 bg-slate-900 px-4 py-4 text-sm leading-6 text-slate-400"
+            : "mt-5 rounded-[1.5rem] border border-amber-200 bg-white px-4 py-4 text-sm leading-6 text-slate-700"
+        }
+      >
         {countdown.expired
           ? "La cuenta regresiva llegó a cero. El bloque sigue visible para que el funnel conserve continuidad."
           : "La cuenta regresiva se actualiza en cliente y puede usarse para reforzar urgencia comercial declarativa."}

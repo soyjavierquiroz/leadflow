@@ -36,6 +36,7 @@ type PublicCaptureFormProps = {
   publicationId: string;
   currentStepId: string;
   block: RuntimeLeadCaptureFormBlock;
+  sectionId?: string;
 };
 
 type UrlAttribution = {
@@ -175,6 +176,7 @@ export function PublicCaptureForm({
   publicationId,
   currentStepId,
   block,
+  sectionId = "public-capture-form",
 }: PublicCaptureFormProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -323,7 +325,7 @@ export function PublicCaptureForm({
 
   return (
     <PublicSectionSurface
-      id="public-capture-form"
+      id={sectionId}
       tone="success"
       className={cx(
         "scroll-mt-8",

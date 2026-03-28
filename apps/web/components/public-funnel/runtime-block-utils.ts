@@ -282,8 +282,6 @@ export const normalizeRuntimeBlockType = (value: string) => {
       return "offer_pricing";
     case "final_cta":
       return "cta";
-    case "risk_reversal":
-      return "social_proof";
     case "testimonial":
     case "testimonials":
       return "testimonials";
@@ -482,6 +480,12 @@ const normalizeCompatibleExternalBlock = (
     key: asString(rawBlock.key, `${normalizedType}-${index}`),
   };
 
+  if (Object.keys(dictionary).length > 0) {
+    baseBlock.leadflow_metadata = {
+      mediaMap: dictionary,
+    } as unknown as JsonValue;
+  }
+
   switch (rawType) {
     case "hero_block":
       baseBlock.eyebrow = pickString(rawBlock, [
@@ -594,6 +598,9 @@ const normalizeCompatibleExternalBlock = (
       }
       if (hookCta?.action) {
         baseBlock.action = hookCta.action;
+      }
+      if (media) {
+        baseBlock.media = media;
       }
       break;
     case "social_proof":
@@ -820,6 +827,31 @@ const normalizeCompatibleExternalBlock = (
 };
 
 export const parseRuntimeBlocks = (value: JsonValue | undefined) => {
+  if (Array.isArray(value)) {
+    const normalizedBlocks = value.reduce<RuntimeBlock[]>((accumulator, block) => {
+      if (
+        block &&
+        typeof block === "object" &&
+        !Array.isArray(block) &&
+        typeof (block as { type?: unknown }).type === "string"
+      ) {
+        accumulator.push(block as RuntimeBlock);
+      }
+
+      return accumulator;
+    }, []);
+
+    return {
+      blocks: normalizedBlocks,
+      compatibility: {
+        mode: "leadflow_native",
+        templateId: null,
+        presetId: null,
+        mediaDictionaryKeys: [],
+      },
+    } satisfies RuntimeBlocksParseResult;
+  }
+
   if (!value || typeof value !== "object" || !("blocks" in value)) {
     const compatibleRecord = asRecord(value);
 
@@ -1048,6 +1080,7 @@ export const asTestimonialItems = (value: JsonValue | undefined) => {
   return mapObjectArray(value, (item) => {
     const quote = pickString(item, [
       "quote",
+      "comment",
       "body",
       "text",
       "review",
@@ -1062,7 +1095,7 @@ export const asTestimonialItems = (value: JsonValue | undefined) => {
       "client",
       "person",
     ]);
-    const role = pickString(item, ["role", "title", "position"]);
+    const role = pickString(item, ["role", "title", "position", "location"]);
     const company = pickString(item, ["company", "organization", "business"]);
 
     if (!quote || !author) {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
@@ -77,17 +78,47 @@ const buildView = (
 ): PublicationView => {
   const domain = input.domains.find((item) => item.id === record.domainId);
   const funnel = input.funnels.find((item) => item.id === record.funnelInstanceId);
+  const funnelSettings =
+    funnel?.settingsJson &&
+    typeof funnel.settingsJson === "object" &&
+    !Array.isArray(funnel.settingsJson)
+      ? (funnel.settingsJson as Record<string, unknown>)
+      : null;
+  const hybridEditor =
+    funnelSettings?.hybridEditor &&
+    typeof funnelSettings.hybridEditor === "object" &&
+    !Array.isArray(funnelSettings.hybridEditor)
+      ? (funnelSettings.hybridEditor as Record<string, unknown>)
+      : null;
+  const templateName = funnel?.templateName ?? "Template sin referencia";
+  const normalizedTemplateName = templateName.toLowerCase();
 
   return {
     ...record,
     domainHost: domain?.host ?? "Host no resuelto",
     funnelName: funnel?.name ?? "Funnel sin instancia",
     funnelCode: funnel?.code ?? "pending",
-    templateName: funnel?.templateName ?? "Template sin referencia",
+    templateName,
+    isHybridVsl:
+      hybridEditor?.mode === "data-driven-assembly" ||
+      normalizedTemplateName.includes("vexercore") ||
+      normalizedTemplateName.includes("vsl") ||
+      normalizedTemplateName.includes("split 50/50"),
     teamName: funnel?.teamName ?? "Team sin metadata",
     trackingLabel: record.trackingProfileId ? "Tracking conectado" : "Tracking pendiente",
     handoffLabel: record.handoffStrategyId ? "Handoff definido" : "Handoff pendiente",
   };
+};
+
+const isHybridPublication = (publication: PublicationView) => {
+  const templateName = publication.templateName.toLowerCase();
+
+  return (
+    publication.isHybridVsl ||
+    templateName.includes("vexercore") ||
+    templateName.includes("vsl") ||
+    templateName.includes("split 50/50")
+  );
 };
 
 export function TeamPublicationsClient({
@@ -299,16 +330,24 @@ export function TeamPublicationsClient({
         title="Rutas visibles del team"
         description="Aquí el team puede crear bindings reales por host + path, resolver conflictos de publicación y activar o pausar rutas operativas."
         actions={
-          <button
-            type="button"
-            onClick={() => {
-              resetMessages();
-              setIsCreateOpen(true);
-            }}
-            className={primaryButtonClassName}
-          >
-            Crear publicación
-          </button>
+          <>
+            <Link
+              href="/team/publications/new-vsl"
+              className={primaryButtonClassName}
+            >
+              Crear Embudo VSL (Híbrido)
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                resetMessages();
+                setIsCreateOpen(true);
+              }}
+              className={buttonClassName}
+            >
+              Crear publicación clásica
+            </button>
+          </>
         }
       />
 
@@ -347,13 +386,28 @@ export function TeamPublicationsClient({
             publication={publication}
             actions={
               <>
-                <button
-                  type="button"
-                  onClick={() => openEdit(publication)}
+                <Link
+                  href={`/team/publications/new-vsl?publicationId=${publication.id}`}
                   className={buttonClassName}
                 >
-                  Editar
-                </button>
+                  Editor híbrido
+                </Link>
+                {isHybridPublication(publication) ? (
+                  <Link
+                    href={`/team/publications/new-vsl?publicationId=${publication.id}`}
+                    className={buttonClassName}
+                  >
+                    Editar
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openEdit(publication)}
+                    className={buttonClassName}
+                  >
+                    Editar
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleStatusToggle(publication)}
@@ -400,13 +454,28 @@ export function TeamPublicationsClient({
             header: "Acciones",
             render: (row) => (
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => openEdit(row)}
+                <Link
+                  href={`/team/publications/new-vsl?publicationId=${row.id}`}
                   className={buttonClassName}
                 >
-                  Editar
-                </button>
+                  Editor híbrido
+                </Link>
+                {isHybridPublication(row) ? (
+                  <Link
+                    href={`/team/publications/new-vsl?publicationId=${row.id}`}
+                    className={buttonClassName}
+                  >
+                    Editar
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openEdit(row)}
+                    className={buttonClassName}
+                  >
+                    Editar
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleStatusToggle(row)}

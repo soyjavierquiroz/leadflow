@@ -1,6 +1,7 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 type SurfaceTone = "brand" | "neutral" | "warm" | "success";
+type SurfaceVariant = "default" | "flat";
 
 const surfaceToneClasses: Record<SurfaceTone, string> = {
   brand:
@@ -20,18 +21,22 @@ export function PublicSectionSurface({
   children,
   className,
   tone = "neutral",
+  variant = "default",
   ...props
 }: {
   children: ReactNode;
   className?: string;
   tone?: SurfaceTone;
+  variant?: SurfaceVariant;
 } & ComponentPropsWithoutRef<"section">) {
   return (
     <section
       {...props}
       className={cx(
-        "overflow-hidden rounded-[2rem] border p-6 md:p-8",
-        surfaceToneClasses[tone],
+        variant === "flat"
+          ? "overflow-visible p-0"
+          : "overflow-hidden rounded-[2rem] border p-6 md:p-8",
+        variant === "flat" ? "" : surfaceToneClasses[tone],
         className,
       )}
     >
@@ -105,9 +110,11 @@ export function PublicPill({
 export function PublicChecklistItem({
   children,
   accent = "brand",
+  variant = "default",
 }: {
   children: ReactNode;
   accent?: "brand" | "warm" | "success";
+  variant?: SurfaceVariant;
 }) {
   const accentClass =
     accent === "warm"
@@ -117,7 +124,14 @@ export function PublicChecklistItem({
         : "bg-slate-950 text-white";
 
   return (
-    <div className="flex items-start gap-3 rounded-[1.5rem] border border-white/70 bg-white/80 px-4 py-4">
+    <div
+      className={cx(
+        "flex items-start gap-3",
+        variant === "flat"
+          ? "px-0 py-1"
+          : "rounded-[1.5rem] border border-white/70 bg-white/80 px-4 py-4",
+      )}
+    >
       <div
         className={cx(
           "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
@@ -126,7 +140,14 @@ export function PublicChecklistItem({
       >
         ✓
       </div>
-      <p className="text-sm leading-6 text-slate-700">{children}</p>
+      <p
+        className={cx(
+          "text-sm leading-6",
+          variant === "flat" ? "text-slate-300" : "text-slate-700",
+        )}
+      >
+        {children}
+      </p>
     </div>
   );
 }
@@ -136,11 +157,13 @@ export function PublicStatCard({
   value,
   description,
   tone = "neutral",
+  variant = "default",
 }: {
   label: string;
   value: string;
   description?: string;
   tone?: "neutral" | "brand" | "warm" | "success";
+  variant?: SurfaceVariant;
 }) {
   const toneClass =
     tone === "brand"
@@ -152,14 +175,32 @@ export function PublicStatCard({
           : "border-slate-200 bg-white";
 
   const labelTone =
-    tone === "brand" ? "text-slate-300" : "text-slate-500";
-  const valueTone = tone === "brand" ? "text-white" : "text-slate-950";
+    variant === "flat"
+      ? "text-slate-500"
+      : tone === "brand"
+        ? "text-slate-300"
+        : "text-slate-500";
+  const valueTone =
+    variant === "flat"
+      ? "text-slate-100"
+      : tone === "brand"
+        ? "text-white"
+        : "text-slate-950";
   const descriptionTone =
-    tone === "brand" ? "text-slate-200" : "text-slate-600";
+    variant === "flat"
+      ? "text-slate-400"
+      : tone === "brand"
+        ? "text-slate-200"
+        : "text-slate-600";
 
   return (
     <article
-      className={cx("rounded-[1.5rem] border px-4 py-4", toneClass)}
+      className={cx(
+        variant === "flat"
+          ? "border-0 bg-transparent px-0 py-1"
+          : "rounded-[1.5rem] border px-4 py-4",
+        variant === "flat" ? "" : toneClass,
+      )}
     >
       <p
         className={cx(
@@ -185,20 +226,47 @@ export function PublicQuoteCard({
   quote,
   author,
   detail,
+  variant = "default",
 }: {
   quote: string;
   author: string;
   detail?: string;
+  variant?: SurfaceVariant;
 }) {
   return (
-    <article className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-      <p className="text-base leading-7 text-slate-700">
+    <article
+      className={cx(
+        variant === "flat"
+          ? "px-0 py-1"
+          : "rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]",
+      )}
+    >
+      <p
+        className={cx(
+          "text-base leading-7",
+          variant === "flat" ? "text-slate-300" : "text-slate-700",
+        )}
+      >
         &ldquo;{quote}&rdquo;
       </p>
       <div className="mt-5">
-        <p className="text-sm font-semibold text-slate-950">{author}</p>
+        <p
+          className={cx(
+            "text-sm font-semibold",
+            variant === "flat" ? "text-slate-100" : "text-slate-950",
+          )}
+        >
+          {author}
+        </p>
         {detail ? (
-          <p className="mt-1 text-sm text-slate-500">{detail}</p>
+          <p
+            className={cx(
+              "mt-1 text-sm",
+              variant === "flat" ? "text-slate-500" : "text-slate-500",
+            )}
+          >
+            {detail}
+          </p>
         ) : null}
       </div>
     </article>
