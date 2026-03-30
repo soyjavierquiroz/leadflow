@@ -18,7 +18,7 @@ export const cx = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
 
 export const flatBlockTitleClassName =
-  "text-left font-extrabold text-4xl uppercase tracking-tighter text-white lg:text-5xl";
+  "text-left font-extrabold text-4xl uppercase tracking-tighter text-slate-950 lg:text-5xl";
 
 export function PublicSectionSurface({
   children,
@@ -146,7 +146,7 @@ export function PublicChecklistItem({
       <p
         className={cx(
           "text-sm leading-6",
-          variant === "flat" ? "text-slate-300" : "text-slate-700",
+          variant === "flat" ? "text-slate-700" : "text-slate-700",
         )}
       >
         {children}
@@ -185,13 +185,13 @@ export function PublicStatCard({
         : "text-slate-500";
   const valueTone =
     variant === "flat"
-      ? "text-slate-100"
+      ? "text-slate-950"
       : tone === "brand"
         ? "text-white"
         : "text-slate-950";
   const descriptionTone =
     variant === "flat"
-      ? "text-slate-400"
+      ? "text-slate-600"
       : tone === "brand"
         ? "text-slate-200"
         : "text-slate-600";
@@ -247,7 +247,7 @@ export function PublicQuoteCard({
       <p
         className={cx(
           "text-base leading-7",
-          variant === "flat" ? "text-slate-300" : "text-slate-700",
+          variant === "flat" ? "text-slate-700" : "text-slate-700",
         )}
       >
         &ldquo;{quote}&rdquo;
@@ -256,7 +256,7 @@ export function PublicQuoteCard({
         <p
           className={cx(
             "text-sm font-semibold",
-            variant === "flat" ? "text-slate-100" : "text-slate-950",
+            variant === "flat" ? "text-slate-950" : "text-slate-950",
           )}
         >
           {author}

@@ -1,0 +1,44 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 4px solid rgba(15, 23, 42, 0.12);
+  border-top-color: #ff5722;
+  border-right-color: rgba(255, 87, 34, 0.35);
+  animation: spin 0.8s linear infinite, pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.72;
+    filter: brightness(0.95);
+  }
+
+  50% {
+    opacity: 1;
+    filter: brightness(1.08);
+  }
+
+  100% {
+    opacity: 0.72;
+    filter: brightness(0.95);
+  }
+}
+

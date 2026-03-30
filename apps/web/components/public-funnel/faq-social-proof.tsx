@@ -50,7 +50,7 @@ export function FaqSocialProof({
       className={variant === "flat" ? "py-6 text-left md:py-8" : ""}
     >
       <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral" className="text-slate-400">{eyebrow}</PublicEyebrow>
+        <PublicEyebrow tone="neutral" className="text-slate-500">{eyebrow}</PublicEyebrow>
         <h2 className={`mt-3 ${flatBlockTitleClassName}`}>
           {title}
         </h2>
@@ -62,14 +62,14 @@ export function FaqSocialProof({
             className={cx(
               "group",
               variant === "flat"
-                ? "rounded-[1.4rem] border border-slate-800 bg-slate-900 px-5 py-5"
+                ? "rounded-[1.4rem] border border-slate-200 bg-slate-50 px-5 py-5"
                 : "rounded-[1.6rem] border border-slate-800 bg-slate-900 p-5",
             )}
           >
-            <summary className="cursor-pointer list-none text-base font-semibold text-slate-100">
+            <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
               {item.question}
             </summary>
-            <p className="mt-3 text-sm leading-6 text-slate-400">{item.answer}</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{item.answer}</p>
           </details>
         ))}
       </div>

@@ -1,8 +1,6 @@
 import {
   matchesIncomingWebhookSecret,
-  parseConversationSignalLimit,
   readIncomingWebhookSecret,
-  resolveConversationSignalTransition,
 } from './incoming-webhooks.utils';
 
 describe('incoming-webhooks.utils', () => {
@@ -29,37 +27,5 @@ describe('incoming-webhooks.utils', () => {
     expect(matchesIncomingWebhookSecret('shared-secret', 'wrong-secret')).toBe(
       false,
     );
-  });
-
-  it('maps engagement signals to nurturing and accepted', () => {
-    expect(
-      resolveConversationSignalTransition({
-        signalType: 'message_inbound',
-        currentLeadStatus: 'assigned',
-        currentAssignmentStatus: 'assigned',
-      }),
-    ).toEqual({
-      leadStatusAfter: 'nurturing',
-      assignmentStatusAfter: 'accepted',
-    });
-  });
-
-  it('maps terminal signals to won/lost and closes the assignment', () => {
-    expect(
-      resolveConversationSignalTransition({
-        signalType: 'lead_won',
-        currentLeadStatus: 'qualified',
-        currentAssignmentStatus: 'accepted',
-      }),
-    ).toEqual({
-      leadStatusAfter: 'won',
-      assignmentStatusAfter: 'closed',
-    });
-  });
-
-  it('caps the lead signal limit to a reasonable number', () => {
-    expect(parseConversationSignalLimit('4')).toBe(4);
-    expect(parseConversationSignalLimit('200')).toBe(20);
-    expect(parseConversationSignalLimit(undefined)).toBe(8);
   });
 });

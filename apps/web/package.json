@@ -11,11 +11,14 @@
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",
+    "@radix-ui/react-dialog": "^1.1.15",
     "@uiw/react-codemirror": "^4.25.9",
+    "libphonenumber-js": "^1.12.41",
     "lucide-react": "^1.7.0",
     "next": "16.2.1",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-phone-number-input": "^3.4.16"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

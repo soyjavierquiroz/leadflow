@@ -103,7 +103,7 @@ export function UrgencyTimerBlock({
         <div>
           <PublicEyebrow
             tone="warm"
-            className={variant === "flat" ? "text-amber-400" : ""}
+            className={variant === "flat" ? "text-amber-700" : ""}
           >
             {eyebrow || "Ventana de decisión"}
           </PublicEyebrow>
@@ -119,7 +119,7 @@ export function UrgencyTimerBlock({
           <p
             className={
               variant === "flat"
-                ? "mt-4 max-w-2xl text-left text-base leading-7 text-slate-400"
+                ? "mt-4 max-w-2xl text-left text-base leading-7 text-slate-700"
                 : "mt-4 max-w-2xl text-left text-base leading-7 text-slate-700"
             }
           >
@@ -148,7 +148,7 @@ export function UrgencyTimerBlock({
       <div
         className={
           variant === "flat"
-            ? "mt-5 rounded-[1.4rem] border border-slate-800 bg-slate-900 px-4 py-4 text-sm leading-6 text-slate-400"
+            ? "mt-5 rounded-[1.4rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-slate-700"
             : "mt-5 rounded-[1.5rem] border border-amber-200 bg-white px-4 py-4 text-sm leading-6 text-slate-700"
         }
       >

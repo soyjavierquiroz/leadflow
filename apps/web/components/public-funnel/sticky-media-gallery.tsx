@@ -4,15 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import { cx } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { resolveLeadflowBlockMedia } from "@/components/public-funnel/leadflow-media-resolver";
-import { asString, type RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
+import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
 import type {
   PublicFunnelRuntimePayload,
-  RuntimeBlock,
 } from "@/lib/public-funnel-runtime.types";
 
 type StickyMediaGalleryProps = {
   runtime: PublicFunnelRuntimePayload;
-  blocks: RuntimeBlock[];
+  blocks: unknown[];
   className?: string;
 };
 
@@ -22,27 +21,6 @@ const GALLERY_MAP_KEYS = [
   "gallery_2",
   "gallery_3",
   "gallery_4",
-  "gallery_5",
-  "gallery_6",
-  "product_box",
-  "heroImage",
-  "image",
-  "seo_cover",
-] as const;
-
-const BLOCK_MEDIA_KEYS = [
-  "hero_image_url",
-  "heroImageUrl",
-  "image_url",
-  "imageUrl",
-  "media_url",
-  "mediaUrl",
-  "image_key",
-  "imageKey",
-  "media_key",
-  "mediaKey",
-  "asset_key",
-  "assetKey",
 ] as const;
 
 function pushUniqueMedia(
@@ -50,21 +28,62 @@ function pushUniqueMedia(
   seen: Set<string>,
   candidate: RuntimeMediaItem | null,
 ) {
-  if (!candidate?.src) {
+  const normalizedSrc = normalizeGalleryMediaSrc(candidate?.src);
+
+  if (!candidate?.src || !normalizedSrc) {
     return;
   }
 
-  if (seen.has(candidate.src)) {
+  if (seen.has(normalizedSrc)) {
     return;
   }
 
-  seen.add(candidate.src);
-  collection.push(candidate);
+  seen.add(normalizedSrc);
+  collection.push({
+    ...candidate,
+    src: normalizedSrc,
+  });
+}
+
+function isRenderableMediaSrc(src?: string | null) {
+  if (!src?.trim()) {
+    return false;
+  }
+
+  try {
+    const url = new URL(src);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function normalizeGalleryMediaSrc(src?: string | null) {
+  if (!src?.trim()) {
+    return null;
+  }
+
+  try {
+    const url = new URL(src);
+
+    if (url.pathname.endsWith("/_next/image")) {
+      const nestedUrl = url.searchParams.get("url");
+
+      if (!nestedUrl) {
+        return src;
+      }
+
+      return decodeURIComponent(nestedUrl);
+    }
+
+    return src;
+  } catch {
+    return src;
+  }
 }
 
 function resolveGalleryImages(
   runtime: PublicFunnelRuntimePayload,
-  blocks: RuntimeBlock[],
 ) {
   const items: RuntimeMediaItem[] = [];
   const seen = new Set<string>();
@@ -84,110 +103,132 @@ function resolveGalleryImages(
     );
   }
 
-  for (const block of blocks) {
-    const fallbackAlt =
-      asString(block.headline) ||
-      asString(block.title) ||
-      asString(block.offer_name) ||
-      runtime.funnel.name;
-
-    pushUniqueMedia(
-      items,
-      seen,
-      resolveLeadflowBlockMedia({
-        runtime,
-        block,
-        fallbackAlt,
-        candidate: block.media_url ?? block.media ?? block.image,
-        preferBlockKeys: [...BLOCK_MEDIA_KEYS],
-        fallbackMapKeys: [...GALLERY_MAP_KEYS],
-        leadflowMetadata:
-          block.leadflow_metadata ?? block.metadata ?? sharedMetadata,
-      }),
-    );
-  }
-
   return items;
 }
 
 export function StickyMediaGallery({
   runtime,
-  blocks,
+  blocks: _blocks,
   className,
 }: StickyMediaGalleryProps) {
   const images = useMemo(
-    () => resolveGalleryImages(runtime, blocks),
-    [blocks, runtime],
+    () => resolveGalleryImages(runtime),
+    [runtime],
   );
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [failedSources, setFailedSources] = useState<string[]>([]);
+
+  const visibleImages = useMemo(
+    () =>
+      images.filter(
+        (image) =>
+          isRenderableMediaSrc(image.src) && !failedSources.includes(image.src),
+      ),
+    [failedSources, images],
+  );
+
+  const handleMediaError = (src: string) => {
+    setFailedSources((current) =>
+      current.includes(src) ? current : [...current, src],
+    );
+  };
 
   useEffect(() => {
-    if (!images.length) {
+    if (!visibleImages.length) {
       setSelectedIndex(0);
       return;
     }
 
-    if (selectedIndex > images.length - 1) {
+    if (selectedIndex > visibleImages.length - 1) {
       setSelectedIndex(0);
     }
-  }, [images.length, selectedIndex]);
+  }, [selectedIndex, visibleImages.length]);
 
-  if (!images.length) {
+  useEffect(() => {
+    if (visibleImages.length <= 1) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setSelectedIndex((current) => (current + 1) % visibleImages.length);
+    }, 3000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [visibleImages.length]);
+
+  if (!visibleImages.length) {
     return null;
   }
 
-  const activeImage = images[Math.min(selectedIndex, images.length - 1)] ?? images[0];
+  const activeImage =
+    visibleImages[Math.min(selectedIndex, visibleImages.length - 1)] ??
+    visibleImages[0];
+
+  if (!activeImage) {
+    return (
+      <aside
+        className={cx(
+          "flex h-full w-full flex-col items-center justify-start bg-black",
+          className,
+        )}
+      />
+    );
+  }
 
   return (
     <aside
       className={cx(
-        "hidden bg-black lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-full lg:flex-col lg:justify-center",
+        "flex h-full w-full flex-col items-center justify-start bg-black",
         className,
       )}
     >
-      <div className="w-full px-8 py-8 xl:px-12">
-        <div className="mx-auto flex w-full max-w-[44rem] flex-col justify-center">
-          <div className="overflow-hidden rounded-[1.75rem] border border-amber-500/20 bg-slate-950/70 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+      <div className="flex h-full w-full flex-col items-center justify-start px-8 xl:px-12">
+        <div className="mx-auto flex w-full max-w-[44rem] flex-col items-center justify-start space-y-4 lg:space-y-6">
+          <div className="mx-auto flex aspect-square w-full max-w-[85%] items-center justify-center overflow-hidden rounded-[40px] border border-slate-800 bg-slate-900 shadow-2xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activeImage.src}
               alt={activeImage.alt}
-              loading="lazy"
-              className="aspect-square w-full object-cover object-center"
+              loading="eager"
+              onError={() => handleMediaError(activeImage.src)}
+              className="h-full w-full rounded-[2.5rem] object-contain p-4"
             />
           </div>
 
-          {images.length > 1 ? (
-              <div className="mt-4 flex justify-center gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                {images.map((image, index) => {
-                  const isActive = index === selectedIndex;
+          {visibleImages.length > 1 ? (
+            <div className="flex justify-center gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {visibleImages.map((image, index) => {
+                const isActive = index === selectedIndex;
 
-                  return (
-                    <button
-                      key={`${image.src}-${index}`}
-                      type="button"
-                      onClick={() => setSelectedIndex(index)}
-                      className={cx(
-                        "overflow-hidden rounded-xl border bg-slate-950/80 transition",
-                        isActive
-                          ? "border-amber-500 shadow-[0_0_0_1px_rgba(245,158,11,0.3)]"
-                          : "border-slate-800 hover:border-emerald-500/50",
-                      )}
-                      aria-label={`Ver imagen ${index + 1}`}
-                      aria-pressed={isActive}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={image.src}
-                        alt={image.alt}
-                        loading="lazy"
-                        className="h-20 w-20 object-cover object-center"
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
+                return (
+                  <button
+                    key={`${image.src}-${index}`}
+                    type="button"
+                    onClick={() => setSelectedIndex(index)}
+                    className={cx(
+                      "overflow-hidden rounded-xl border bg-slate-950/80 transition",
+                      isActive
+                        ? "border-amber-500 shadow-[0_0_0_1px_rgba(245,158,11,0.3)]"
+                        : "border-slate-800 hover:border-emerald-500/50",
+                    )}
+                    aria-label={`Ver imagen ${index + 1}`}
+                    aria-pressed={isActive}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.src}
+                      alt={image.alt}
+                      loading="lazy"
+                      onError={() => handleMediaError(image.src)}
+                      className="h-16 w-16 object-cover object-center"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </div>
     </aside>

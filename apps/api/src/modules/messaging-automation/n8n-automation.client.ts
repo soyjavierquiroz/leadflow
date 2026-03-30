@@ -34,7 +34,7 @@ export class N8nAutomationClientError extends Error {
 @Injectable()
 export class N8nAutomationClient {
   private readonly defaultWebhookBaseUrl =
-    process.env.MESSAGING_AUTOMATION_WEBHOOK_BASE_URL?.trim() || null;
+    process.env.N8N_AUTOMATION_WEBHOOK_BASE_URL?.trim() || null;
   private readonly webhookToken =
     process.env.MESSAGING_AUTOMATION_WEBHOOK_TOKEN?.trim() || null;
   private readonly timeoutMs = parsePositiveInt(

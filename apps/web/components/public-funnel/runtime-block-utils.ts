@@ -285,6 +285,8 @@ export const normalizeRuntimeBlockType = (value: string) => {
     case "testimonial":
     case "testimonials":
       return "testimonials";
+    case "marquee":
+      return "announcement";
     default:
       return value;
   }

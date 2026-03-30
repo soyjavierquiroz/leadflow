@@ -52,7 +52,7 @@ const buildDomainRecord = (
     verificationMethod: 'cname',
     cloudflareCustomHostnameId: 'cf-hostname-1',
     cloudflareStatusJson: null,
-    dnsTarget: 'proxy-fallback.exitosos.com',
+    dnsTarget: 'legacy-saas-target.example.net',
     lastCloudflareSyncAt: now,
     activatedAt: now,
     createdAt: now,
@@ -141,11 +141,11 @@ describe('DomainsService', () => {
     update.mockResolvedValue(updatedRecord);
 
     const deleteCustomHostnameSpy = jest
-      .spyOn(service as never, 'deleteCloudflareCustomHostname' as never)
-      .mockResolvedValue(undefined);
+      .spyOn(service as any, 'deleteCloudflareCustomHostname')
+      .mockImplementation(async () => undefined);
     const syncDomainToCloudflareSpy = jest
-      .spyOn(service as never, 'syncDomainToCloudflare' as never)
-      .mockResolvedValue(buildDomainEntity(updatedRecord));
+      .spyOn(service as any, 'syncDomainToCloudflare')
+      .mockImplementation(async () => buildDomainEntity(updatedRecord));
 
     const result = await service.recreateOnboardingForTeam(scope, 'domain-1');
     const updateCall = update.mock.calls[0]?.[0];
@@ -206,11 +206,11 @@ describe('DomainsService', () => {
     update.mockResolvedValue(updatedRecord);
 
     jest
-      .spyOn(service as never, 'deleteCloudflareCustomHostname' as never)
-      .mockResolvedValue(undefined);
+      .spyOn(service as any, 'deleteCloudflareCustomHostname')
+      .mockImplementation(async () => undefined);
     jest
-      .spyOn(service as never, 'syncDomainToCloudflare' as never)
-      .mockResolvedValue(buildDomainEntity(updatedRecord));
+      .spyOn(service as any, 'syncDomainToCloudflare')
+      .mockImplementation(async () => buildDomainEntity(updatedRecord));
 
     const result = await service.recreateOnboardingForTeam(scope, 'domain-1', {
       host: ' clientes.retodetransformacion.com ',

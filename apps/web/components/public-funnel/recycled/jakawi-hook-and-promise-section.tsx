@@ -10,8 +10,13 @@ import { TrustAuthorityBar } from "@/components/public-funnel/trust-authority-ba
 type JakawiHookAndPromiseSectionProps = {
   variant?: "default" | "flat";
   eyebrow?: string;
+  hookLeadIn?: string;
   headline: string;
+  authorityText?: string;
+  authorityFooter?: string;
   subheadline?: string;
+  bodyCopy?: string;
+  proofHeader?: string;
   bullets: string[];
   priceAnchorText?: string;
   priceMainText?: string;
@@ -20,12 +25,17 @@ type JakawiHookAndPromiseSectionProps = {
     label: string;
     meta?: string;
   }>;
+  urgencyText?: string;
+  urgencyMechanism?: string;
   media?: RuntimeMediaItem | null;
   cta?: ReactNode;
   hideDesktopMedia?: boolean;
 };
 
-function renderHighlightedText(text?: string) {
+function renderHighlightedText(
+  text: string | undefined,
+  variant: JakawiHookAndPromiseSectionProps["variant"],
+) {
   if (!text) {
     return null;
   }
@@ -42,7 +52,12 @@ function renderHighlightedText(text?: string) {
       return (
         <mark
           key={`${content}-${index}`}
-          className="rounded-sm bg-amber-200/85 px-1 py-0.5 text-slate-950"
+          className={cx(
+            "rounded-sm px-1 py-0.5",
+            variant === "flat"
+              ? "bg-transparent text-rose-700"
+              : "bg-amber-200/85 text-slate-950",
+          )}
         >
           {content}
         </mark>
@@ -53,16 +68,112 @@ function renderHighlightedText(text?: string) {
   });
 }
 
+function parseTechnicalBullet(bullet: string) {
+  const normalized = bullet.trim();
+  if (!normalized) {
+    return { title: "", description: "" };
+  }
+
+  const match = normalized.match(/^([^:.-]+?)\s*[:.-]\s*(.+)$/);
+  if (!match) {
+    return {
+      title: normalized,
+      description: "",
+    };
+  }
+
+  return {
+    title: match[1]?.trim() ?? normalized,
+    description: match[2]?.trim() ?? "",
+  };
+}
+
+function stripBulletPrefix(bullet: string) {
+  return bullet.replace(/^[✔✓]\s*/, "").trim();
+}
+
+function renderAuthorityRow(
+  authorityText: string | undefined,
+  authorityItems: Array<{ label: string; meta?: string }>,
+) {
+  const segments = authorityText
+    ? authorityText
+        .split("|")
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+    : authorityItems
+        .map((item) =>
+          item.meta ? `${item.label}: ${item.meta}` : item.label,
+        )
+        .filter(Boolean);
+
+  if (!segments.length) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-medium text-slate-500 md:text-xs">
+      {segments.map((segment, index) => (
+        <span key={`${segment}-${index}`} className="inline-flex items-center gap-2">
+          <span>{segment}</span>
+          {index < segments.length - 1 ? (
+            <span aria-hidden="true" className="text-slate-300">
+              |
+            </span>
+          ) : null}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function renderSubheadline(
+  subheadline: string | undefined,
+  variant: JakawiHookAndPromiseSectionProps["variant"],
+) {
+  if (!subheadline) {
+    return null;
+  }
+
+  if (variant !== "flat") {
+    return <>{subheadline}</>;
+  }
+
+  const emphasisNeedle = "Y lo peor…";
+  const emphasisIndex = subheadline.indexOf(emphasisNeedle);
+
+  if (emphasisIndex === -1) {
+    return <>{subheadline}</>;
+  }
+
+  const prefix = subheadline.slice(0, emphasisIndex).trimEnd();
+  const emphasis = subheadline.slice(emphasisIndex).trim();
+
+  return (
+    <>
+      {prefix ? <span>{prefix}</span> : null}
+      <span className="mt-2 block font-semibold text-slate-900">{emphasis}</span>
+    </>
+  );
+}
+
 export function JakawiHookAndPromiseSection({
   variant = "default",
   eyebrow,
+  hookLeadIn,
   headline,
+  authorityText,
+  authorityFooter,
   subheadline,
+  bodyCopy,
+  proofHeader,
   bullets,
   priceAnchorText,
   priceMainText,
   trustBadges,
   authorityItems = [],
+  urgencyText,
+  urgencyMechanism,
   media,
   cta,
   hideDesktopMedia = false,
@@ -71,13 +182,13 @@ export function JakawiHookAndPromiseSection({
     <section
       className={cx(
         "w-full text-[var(--lf-hook-text-main)]",
-        variant === "flat" ? "py-6 md:py-8" : "py-2 md:py-3",
+        variant === "flat" ? "pb-12 pt-6 md:pb-20 md:pt-10" : "py-2 md:py-3",
       )}
       style={
         {
           "--lf-hook-primary": "#10b981",
-          "--lf-hook-text-main": "#f8fafc",
-          "--lf-hook-card-bg": "#020617",
+          "--lf-hook-text-main": variant === "flat" ? "#0f172a" : "#f8fafc",
+          "--lf-hook-card-bg": variant === "flat" ? "#ffffff" : "#020617",
         } as CSSProperties
       }
     >
@@ -87,46 +198,152 @@ export function JakawiHookAndPromiseSection({
           hideDesktopMedia ? "" : "lg:grid-cols-[1.04fr_0.96fr] lg:items-center",
         )}
       >
-        <div className="flex flex-col space-y-3 lg:space-y-4">
-          <div className="space-y-1">
+        <div className="mx-auto flex w-full max-w-[640px] flex-col space-y-2.5 lg:space-y-4">
+          <div className="space-y-0.5">
             {eyebrow ? (
               <span
-                className="mb-0 inline-flex rounded-full bg-emerald-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-400 md:text-xs"
+                className={cx(
+                  variant === "flat"
+                    ? "mb-2 flex w-full items-center justify-center rounded-b-lg bg-emerald-50 px-3 py-1.5 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-800"
+                    : "inline-flex w-fit rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400",
+                )}
               >
                 {eyebrow}
               </span>
             ) : null}
 
+            {hookLeadIn ? (
+              <span
+                className={cx(
+                  "mb-1 block italic",
+                  variant === "flat" ? "text-xs leading-5 text-slate-500" : "text-sm text-slate-300",
+                )}
+              >
+                {hookLeadIn}
+              </span>
+            ) : null}
+
             <h2
               className={cx(
-                "mb-2 max-w-5xl text-balance leading-[0.95]",
-                flatBlockTitleClassName,
+                "max-w-5xl text-balance",
+                variant === "flat"
+                  ? "text-left text-[1.8rem] font-black leading-[1.02] tracking-[-0.04em] text-slate-950 lg:text-5xl"
+                  : flatBlockTitleClassName,
               )}
             >
-              {renderHighlightedText(headline)}
+              {renderHighlightedText(headline, variant)}
             </h2>
 
             {subheadline ? (
-              <p className="mb-2 max-w-3xl text-base leading-7 text-slate-400">
-                {subheadline}
+              <p
+                className={cx(
+                  "max-w-3xl",
+                  variant === "flat"
+                    ? "mt-6 text-[14px] leading-5 text-slate-600"
+                    : "mb-2 text-base leading-7 text-slate-400",
+                )}
+              >
+                {renderSubheadline(subheadline, variant)}
               </p>
             ) : null}
 
-            {authorityItems.length > 0 ? (
+            {variant !== "flat" && authorityItems.length > 0 ? (
               <TrustAuthorityBar items={authorityItems} className="pt-4" />
             ) : null}
           </div>
 
+          {urgencyText ? (
+            <div
+              className={cx(
+                "border-l-4 p-3 sm:my-4",
+                variant === "flat"
+                  ? "mb-10 mt-8 border-emerald-500 bg-emerald-50 text-emerald-900"
+                  : "border-emerald-400 bg-emerald-950/30 text-slate-100",
+              )}
+            >
+              <p className={variant === "flat" ? "text-[15px] leading-6" : ""}>{urgencyText}</p>
+              {urgencyMechanism ? (
+                <p
+                  className={cx(
+                    "mt-2",
+                    variant === "flat"
+                      ? "text-[15px] font-semibold leading-6 text-emerald-950"
+                      : "font-semibold text-slate-50",
+                  )}
+                >
+                  {urgencyMechanism}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {cta ? <div className={variant === "flat" ? "mt-6" : "pt-0"}>{cta}</div> : null}
+
+          {bodyCopy ? (
+            <p
+              className={cx(
+                "max-w-3xl text-sm leading-6",
+                variant === "flat" ? "text-slate-600" : "text-slate-300",
+              )}
+            >
+              {bodyCopy}
+            </p>
+          ) : null}
+
+          {media && variant === "flat" ? (
+            <div className="mb-8 overflow-hidden rounded-[2rem] border border-slate-200 shadow-[0_18px_40px_rgba(15,23,42,0.08)] lg:hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={media.src}
+                alt={media.alt}
+                loading="lazy"
+                className="h-full min-h-[220px] w-full object-cover"
+              />
+            </div>
+          ) : null}
+
+          {proofHeader && bullets.length > 0 ? (
+            <p className="mb-2 text-sm font-bold text-slate-800">{proofHeader}</p>
+          ) : null}
+
           {bullets.length > 0 ? (
-            <ul className="space-y-2">
+            <ul className={cx(variant === "flat" ? "space-y-2" : "space-y-1.5")}>
               {bullets.map((bullet, index) => (
-                <li key={`${bullet}-${index}`} className="flex items-start gap-3">
-                  <span className="mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-sm font-black text-emerald-500">
-                    ✓
-                  </span>
-                  <span className="text-base font-medium leading-relaxed text-slate-100">
-                    {bullet}
-                  </span>
+                <li
+                  key={`${bullet}-${index}`}
+                  className={cx(
+                    "flex items-start gap-3",
+                    variant === "flat"
+                      ? "text-slate-700"
+                      : "rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-2.5",
+                  )}
+                >
+                  {variant === "flat" ? (
+                    <>
+                      <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-xs font-black text-emerald-600">
+                        ✓
+                      </span>
+                      <span className="text-sm font-medium leading-6 text-slate-700">
+                        {stripBulletPrefix(bullet)}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-sm font-black text-emerald-500">
+                        {index + 1}
+                      </span>
+                      <span className="space-y-1">
+                        <span className="block text-sm font-black uppercase tracking-[0.18em] text-emerald-600">
+                          {parseTechnicalBullet(bullet).title}
+                        </span>
+                        {parseTechnicalBullet(bullet).description ? (
+                          <span className="block text-sm leading-relaxed text-slate-200">
+                            {parseTechnicalBullet(bullet).description}
+                          </span>
+                        ) : null}
+                      </span>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -152,7 +369,10 @@ export function JakawiHookAndPromiseSection({
               {trustBadges.map((badge, index) => (
                 <span
                   key={`${badge}-${index}`}
-                  className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 md:text-xs"
+                  className={cx(
+                    "text-[11px] font-semibold uppercase tracking-wide md:text-xs",
+                    variant === "flat" ? "text-slate-500" : "text-slate-400",
+                  )}
                 >
                   {badge}
                 </span>
@@ -160,9 +380,14 @@ export function JakawiHookAndPromiseSection({
             </div>
           ) : null}
 
-          {cta ? <div className="pt-1">{cta}</div> : null}
+          {variant === "flat"
+            ? renderAuthorityRow(
+                authorityFooter || authorityText,
+                authorityFooter ? [] : authorityItems,
+              )
+            : null}
 
-          {media ? (
+          {media && variant !== "flat" ? (
             <div className="overflow-hidden md:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -187,6 +412,17 @@ export function JakawiHookAndPromiseSection({
           </div>
         ) : null}
       </div>
+      <style>{`
+        @keyframes lf-cta-pulse-scale {
+          0%,
+          100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.03);
+          }
+        }
+      `}</style>
     </section>
   );
 }

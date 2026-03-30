@@ -1,0 +1,95 @@
+.block {
+  border: 1px solid #fecdd3;
+  border-radius: 16px;
+  padding: 20px;
+  background: linear-gradient(180deg, #fff1f2 0%, #ffffff 80%);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  font-family: 'Poppins', sans-serif;
+}
+
+.headline {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(1.2rem, 3.5vw, 1.6rem);
+  line-height: 1.25;
+}
+
+.subtitle {
+  margin: 10px 0 0;
+  color: #475569;
+}
+
+.ctaButton {
+  margin-top: 14px;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50px;
+  padding: 14px 16px;
+  cursor: pointer;
+  background: linear-gradient(0deg, rgb(253, 91, 130) 0%, rgb(255, 8, 38) 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(253, 91, 130, 0.4);
+}
+
+.ctaButton:hover {
+  filter: brightness(1.06);
+}
+
+.ctaTitle {
+  display: block;
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+.ctaSub {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.themeLight {
+  border-color: #fecdd3;
+  background: linear-gradient(180deg, #fff1f2 0%, #ffffff 80%);
+}
+
+.themeDark {
+  border-color: #334155;
+  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.45);
+}
+
+.themeDark .headline {
+  color: #f8fafc;
+}
+
+.themeDark .subtitle {
+  color: #94a3b8;
+}
+
+.themeOrange {
+  border-color: #fdba74;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 80%);
+}
+
+.themeOrange .headline {
+  color: #9a3412;
+}
+
+.themeOrange .subtitle {
+  color: #7c2d12;
+}
+
+.ctaButtonLight {
+  background: linear-gradient(0deg, rgb(253, 91, 130) 0%, rgb(255, 8, 38) 100%);
+  box-shadow: 0 8px 20px rgba(253, 91, 130, 0.4);
+}
+
+.ctaButtonDark {
+  background: linear-gradient(90deg, #0891b2 0%, #22d3ee 100%);
+  box-shadow: 0 10px 26px rgba(34, 211, 238, 0.35);
+}
+
+.ctaButtonOrange {
+  background: linear-gradient(90deg, #ea580c 0%, #fb923c 100%);
+  box-shadow: 0 10px 26px rgba(249, 115, 22, 0.35);
+}

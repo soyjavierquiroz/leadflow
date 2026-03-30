@@ -423,7 +423,7 @@ export function LeadQualificationTimelinePanel({
               Timeline del lead
             </p>
             <p className="text-xs text-slate-500">
-              Señales entrantes, notas y eventos manuales en una sola vista.
+              Notas internas y eventos operativos del gateway en una sola vista.
             </p>
           </div>
 

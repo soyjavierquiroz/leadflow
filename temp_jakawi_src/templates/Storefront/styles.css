@@ -1,0 +1,35 @@
+.storefront-wrapper {
+  --brand-primary: #ef4444; /* red-500 */
+  --brand-primary-hover: #dc2626; /* red-600 */
+  --brand-bg: #f8fafc; /* slate-50 */
+  --brand-text: #0f172a; /* slate-900 */
+}
+
+.storefront-hero-bg {
+  background-image: url('https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=1600&q=80');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.storefront-line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.28s ease-out both;
+}

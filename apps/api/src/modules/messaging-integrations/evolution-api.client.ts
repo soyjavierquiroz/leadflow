@@ -31,6 +31,15 @@ type EvolutionRequestCandidate = {
 };
 
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const DEFAULT_N8N_WEBHOOK_INTERNAL_BASE =
+  'http://n8n-v2_n8n_v2_webhook:5678/webhook';
+const DEFAULT_N8N_WEBHOOK_ID = '7feee028-e25e-43a3-abac-1a0bf7b0ccf4';
+const EVOLUTION_WEBHOOK_EVENTS = [
+  'MESSAGES_UPSERT',
+  'MESSAGES_UPDATE',
+  'SEND_MESSAGE',
+  'CONNECTION_UPDATE',
+] as const;
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -39,17 +48,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 const readString = (value: unknown): string | null =>
   typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-
-const normalizeWebhookEvent = (value: string | null) => {
-  if (!value) {
-    return 'MESSAGES_UPSERT';
-  }
-
-  return value
-    .trim()
-    .replace(/[\s.-]+/g, '_')
-    .toUpperCase();
-};
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -86,11 +84,14 @@ export class EvolutionApiClient {
   private readonly instancePrefix =
     sanitizeNullableText(process.env.EVOLUTION_INSTANCE_PREFIX) ?? 'leadflow';
   private readonly automationWebhookBaseUrl = sanitizeNullableText(
-    process.env.MESSAGING_AUTOMATION_WEBHOOK_BASE_URL,
+    process.env.N8N_AUTOMATION_WEBHOOK_BASE_URL,
   );
-  private readonly webhookEvent = normalizeWebhookEvent(
-    sanitizeNullableText(process.env.EVOLUTION_WEBHOOK_EVENT),
-  );
+  private readonly n8nWebhookInternalBase =
+    sanitizeNullableText(process.env.N8N_WEBHOOK_INTERNAL_BASE) ??
+    DEFAULT_N8N_WEBHOOK_INTERNAL_BASE;
+  private readonly n8nWebhookId =
+    sanitizeNullableText(process.env.N8N_WEBHOOK_ID) ??
+    DEFAULT_N8N_WEBHOOK_ID;
   private readonly requestTimeoutMs = parsePositiveInt(
     process.env.EVOLUTION_REQUEST_TIMEOUT_MS,
     15_000,
@@ -147,7 +148,18 @@ export class EvolutionApiClient {
   }
 
   getWebhookEvent() {
-    return this.webhookEvent;
+    return EVOLUTION_WEBHOOK_EVENTS.join(', ');
+  }
+
+  getWebhookEvents() {
+    return [...EVOLUTION_WEBHOOK_EVENTS];
+  }
+
+  buildInboundWebhookUrl(instanceId: string) {
+    const normalizedBaseUrl = this.n8nWebhookInternalBase.replace(/\/+$/, '');
+    const normalizedWebhookId = this.n8nWebhookId.replace(/^\/+|\/+$/g, '');
+
+    return `${normalizedBaseUrl}/${normalizedWebhookId}/channels/evolution/${instanceId}/inbound`;
   }
 
   async ensureInstanceExists(instanceId: string) {
@@ -168,6 +180,12 @@ export class EvolutionApiClient {
         instanceName: instanceId,
         integration: 'WHATSAPP-BAILEYS',
         qrcode: true,
+        rejectCall: true,
+        groupsIgnore: true,
+        alwaysOnline: true,
+        readMessages: true,
+        readStatus: true,
+        syncFullHistory: true,
       }),
     });
 
@@ -198,10 +216,9 @@ export class EvolutionApiClient {
           webhook: {
             enabled: true,
             url: webhookUrl,
-            webhookByEvents: false,
-            events: [this.webhookEvent],
+            webhookByEvents: true,
+            events: this.getWebhookEvents(),
             webhookBase64: true,
-            webhook_base64: true,
           },
         }),
       });

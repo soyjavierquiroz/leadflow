@@ -31,25 +31,6 @@ export type LeadTimelineItem =
     }
   | {
       id: string;
-      itemType: "signal";
-      occurredAt: string;
-      title: string;
-      description: string;
-      actorLabel: string;
-      statusLabel: "received" | "applied" | "ignored" | "failed";
-      source: "n8n" | "evolution";
-      signalType:
-        | "conversation_started"
-        | "message_inbound"
-        | "message_outbound"
-        | "lead_contacted"
-        | "lead_qualified"
-        | "lead_follow_up"
-        | "lead_won"
-        | "lead_lost";
-    }
-  | {
-      id: string;
       itemType: "event";
       occurredAt: string;
       title: string;

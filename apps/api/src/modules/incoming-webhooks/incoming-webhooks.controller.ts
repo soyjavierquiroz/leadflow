@@ -1,17 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  Post,
-  Query,
-} from '@nestjs/common';
-import { UserRole } from '@prisma/client';
-import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
-import type { AuthenticatedUser } from '../auth/auth.types';
-import { RequireRoles } from '../auth/roles.decorator';
-import type { ReceiveMessagingSignalDto } from './dto/receive-messaging-signal.dto';
+import { Body, Controller, Headers, HttpCode, Post, Query } from '@nestjs/common';
 import { IncomingWebhooksService } from './incoming-webhooks.service';
 
 @Controller('incoming-webhooks')
@@ -20,22 +7,21 @@ export class IncomingWebhooksController {
     private readonly incomingWebhooksService: IncomingWebhooksService,
   ) {}
 
-  @Post('messaging')
+  @Post('messaging/connection')
   @HttpCode(202)
-  receiveMessagingSignal(
+  receiveMessagingConnection(
     @Headers() headers: Record<string, string | string[] | undefined>,
-    @Body() dto: ReceiveMessagingSignalDto,
+    @Query('instanceId') instanceId?: string,
+    @Query('secret') secret?: string,
+    @Body() payload?: Record<string, unknown>,
   ) {
-    return this.incomingWebhooksService.ingestMessagingSignal(headers, dto);
-  }
-
-  @Get('messaging/signals')
-  @RequireRoles(UserRole.SUPER_ADMIN, UserRole.TEAM_ADMIN, UserRole.MEMBER)
-  listLeadSignals(
-    @CurrentAuthUser() user: AuthenticatedUser,
-    @Query('leadId') leadId: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.incomingWebhooksService.listLeadSignals(user, leadId, limit);
+    return this.incomingWebhooksService.ingestMessagingConnection(
+      headers,
+      {
+        instanceId,
+        secret,
+      },
+      payload,
+    );
   }
 }

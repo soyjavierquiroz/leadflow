@@ -184,7 +184,6 @@ async function main() {
 
   await prisma.authSession.deleteMany();
   await prisma.leadNote.deleteMany();
-  await prisma.conversationSignal.deleteMany();
   await prisma.automationDispatch.deleteMany();
   await prisma.domainEvent.deleteMany();
   await prisma.assignment.deleteMany();
@@ -1290,57 +1289,6 @@ async function main() {
       },
     });
   }
-
-  await prisma.conversationSignal.createMany({
-    data: [
-      {
-        id: 'signal-maria-follow-up',
-        workspaceId: workspace.id,
-        teamId: team.id,
-        sponsorId: sponsorA.id,
-        leadId: 'lead-maria-santos',
-        assignmentId: 'assignment-maria-ana',
-        messagingConnectionId: null,
-        automationDispatchId: null,
-        source: 'n8n',
-        signalType: 'lead_follow_up',
-        processingStatus: 'applied',
-        externalEventId: 'evt-maria-follow-up',
-        payloadSnapshot: {
-          note: 'Lead pidió retomar la conversación al día siguiente.',
-        },
-        errorCode: null,
-        errorMessage: null,
-        leadStatusAfter: 'nurturing',
-        assignmentStatusAfter: 'accepted',
-        occurredAt: new Date('2026-03-24T12:00:00.000Z'),
-        processedAt: new Date('2026-03-24T12:00:05.000Z'),
-      },
-      {
-        id: 'signal-carlos-qualified',
-        workspaceId: workspace.id,
-        teamId: team.id,
-        sponsorId: sponsorB.id,
-        leadId: 'lead-carlos-rivera',
-        assignmentId: 'assignment-carlos-bruno',
-        messagingConnectionId: null,
-        automationDispatchId: null,
-        source: 'evolution',
-        signalType: 'lead_qualified',
-        processingStatus: 'applied',
-        externalEventId: 'evt-carlos-qualified',
-        payloadSnapshot: {
-          note: 'Lead confirmó interés y pidió propuesta.',
-        },
-        errorCode: null,
-        errorMessage: null,
-        leadStatusAfter: 'qualified',
-        assignmentStatusAfter: 'accepted',
-        occurredAt: new Date('2026-03-25T09:50:00.000Z'),
-        processedAt: new Date('2026-03-25T09:50:03.000Z'),
-      },
-    ],
-  });
 
   await prisma.leadNote.createMany({
     data: [

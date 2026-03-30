@@ -6,10 +6,12 @@ import {
   PublicPill,
   PublicSectionSurface,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import { PublicAnnouncementBanner } from "@/components/public-funnel/public-announcement-banner";
 import { PublicRuntimeTracker } from "@/components/public-funnel/public-runtime-tracker";
 import { StickyMediaGallery } from "@/components/public-funnel/sticky-media-gallery";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import {
+  normalizeRuntimeBlockType,
   parseRuntimeBlocks,
   toStepLabel,
 } from "@/components/public-funnel/runtime-block-utils";
@@ -27,6 +29,9 @@ export function FunnelRuntimePage({
   const parsedBlocks = parseRuntimeBlocks(runtime.currentStep.blocksJson);
   const blocks = parsedBlocks.blocks;
   const hasRenderableBlocks = blocks.length > 0;
+  const isConversionPage = blocks.some(
+    (block) => normalizeRuntimeBlockType(block.type) === "conversion_page_config",
+  );
   const entryStepPath =
     runtime.steps.find((step) => step.isEntryStep)?.path ??
     runtime.currentStep.path;
@@ -50,15 +55,41 @@ export function FunnelRuntimePage({
   }, 0);
 
   if (hasRenderableBlocks) {
+    if (isConversionPage) {
+      return (
+        <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#ecfdf5_100%)]">
+          <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
+          <div className="min-h-screen px-4 py-6 md:px-6 md:py-10">
+            {blocks.map((block, index) => (
+              <PublicBlockAdapter
+                key={`${block.type}-${index}`}
+                block={block}
+                runtime={runtime}
+                blocks={blocks}
+                layoutVariant="single_column"
+              />
+            ))}
+          </div>
+        </main>
+      );
+    }
+
     return (
-      <main className="min-h-screen overflow-x-hidden bg-black">
+      <main className="min-h-screen">
         <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
+        <PublicAnnouncementBanner blocks={blocks} />
 
         <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen">
           <div className="grid min-h-screen lg:grid-cols-2 lg:gap-0">
-            <StickyMediaGallery runtime={runtime} blocks={blocks} />
+            <div className="hidden bg-black overflow-hidden lg:block lg:sticky lg:top-0 lg:h-screen">
+              <StickyMediaGallery
+                runtime={runtime}
+                blocks={blocks}
+                className="h-full pt-6 pb-48 lg:pt-8 lg:pb-56"
+              />
+            </div>
 
-            <div className="flex min-w-0 flex-col bg-slate-950 px-8 py-8 text-slate-100 md:px-8 md:py-10 lg:px-20 lg:py-14">
+            <div className="min-h-screen bg-white px-6 pb-8 pt-0 text-slate-900 lg:px-20 lg:pb-12 lg:pt-4">
               <div className="mx-auto w-full max-w-[44rem] space-y-12">
                 {blocks.map((block, index) => (
                   <PublicBlockAdapter

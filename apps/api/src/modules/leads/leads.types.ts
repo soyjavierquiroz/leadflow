@@ -1,8 +1,5 @@
 import type {
   AssignmentStatus,
-  ConversationSignalProcessingStatus,
-  ConversationSignalSource,
-  ConversationSignalType,
   EventActorType,
   LeadQualificationGrade,
   LeadStatus,
@@ -36,17 +33,6 @@ export type LeadTimelineItem =
       description: string;
       actorLabel: string;
       statusLabel: string | null;
-    }
-  | {
-      id: string;
-      itemType: 'signal';
-      occurredAt: ISODateString;
-      title: string;
-      description: string;
-      actorLabel: string;
-      statusLabel: ConversationSignalProcessingStatus;
-      source: ConversationSignalSource;
-      signalType: ConversationSignalType;
     }
   | {
       id: string;

@@ -8,6 +8,10 @@ type WebPublicConfig = {
     admin: string;
     api: string;
   };
+  saas: {
+    customerCnameTarget: string | null;
+    fallbackOrigin: string | null;
+  };
 };
 
 const withFallback = (value: string | undefined, fallback: string) => {
@@ -36,6 +40,10 @@ const siteUrlFallback = baseDomain
 const siteUrl = normalizeUrl(
   withFallback(process.env.NEXT_PUBLIC_SITE_URL, siteUrlFallback),
 );
+const customerCnameTarget =
+  sanitizeEnv(process.env.NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET) ?? null;
+const fallbackOrigin =
+  sanitizeEnv(process.env.NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN) ?? null;
 
 export const webPublicConfig: WebPublicConfig = {
   appName: withFallback(process.env.NEXT_PUBLIC_APP_NAME, "Leadflow"),
@@ -58,5 +66,9 @@ export const webPublicConfig: WebPublicConfig = {
         baseDomain ? toHttpsUrl(`api.${baseDomain}`) : "http://localhost:3001",
       ),
     ),
+  },
+  saas: {
+    customerCnameTarget,
+    fallbackOrigin,
   },
 };

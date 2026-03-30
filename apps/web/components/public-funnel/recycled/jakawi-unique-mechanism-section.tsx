@@ -72,8 +72,8 @@ export function JakawiUniqueMechanismSection({
       style={
         {
           "--lf-unique-primary": "#10b981",
-          "--lf-unique-text-main": "#f8fafc",
-          "--lf-unique-card-bg": "#020617",
+          "--lf-unique-text-main": variant === "flat" ? "#0f172a" : "#f8fafc",
+          "--lf-unique-card-bg": variant === "flat" ? "#ffffff" : "#020617",
         } as CSSProperties
       }
     >
@@ -99,7 +99,7 @@ export function JakawiUniqueMechanismSection({
             >
               Mecanismo único
             </p>
-            <p className="mt-3 text-lg font-bold leading-snug text-slate-100 md:text-xl">
+            <p className="mt-3 text-lg font-bold leading-snug text-slate-950 md:text-xl">
               {mechanismName}
             </p>
           </div>
@@ -123,12 +123,12 @@ export function JakawiUniqueMechanismSection({
                 </span>
                 <div>
                   {step.title ? (
-                    <h4 className="text-base font-bold leading-snug text-slate-100">
+                    <h4 className="text-base font-bold leading-snug text-slate-950">
                       {step.title}
                     </h4>
                   ) : null}
                   {step.text ? (
-                    <p className="mt-2 text-[15px] leading-relaxed text-slate-400">
+                    <p className="mt-2 text-[15px] leading-relaxed text-slate-700">
                       {step.text}
                     </p>
                   ) : null}
@@ -150,7 +150,7 @@ export function JakawiUniqueMechanismSection({
               className="h-full min-h-[280px] w-full object-cover"
             />
           ) : (
-            <div className="flex min-h-[280px] items-center justify-center rounded-[1.6rem] border border-slate-800 bg-slate-900 text-sm font-medium text-slate-500">
+            <div className="flex min-h-[280px] items-center justify-center rounded-[1.6rem] border border-slate-200 bg-slate-50 text-sm font-medium text-slate-500">
               Demo del mecanismo
             </div>
           )}
@@ -172,7 +172,7 @@ export function JakawiUniqueMechanismSection({
                   </p>
                 ) : null}
                 {pair.benefit ? (
-                  <p className="mt-3 text-[15px] leading-relaxed text-slate-400">
+                  <p className="mt-3 text-[15px] leading-relaxed text-slate-700">
                     {pair.benefit}
                   </p>
                 ) : null}

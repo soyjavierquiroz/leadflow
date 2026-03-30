@@ -3,6 +3,7 @@
 import { webPublicConfig } from "@/lib/public-env";
 
 export type LeadCaptureSubmissionResponse = {
+  success?: boolean;
   visitor: {
     id: string;
     anonymousId: string;
@@ -49,6 +50,19 @@ export type LeadCaptureSubmissionResponse = {
     whatsappMessage: string | null;
     whatsappUrl: string | null;
   };
+  advisor?: {
+    name: string;
+    phone: string | null;
+    photoUrl: string | null;
+    bio: string | null;
+    whatsappUrl: string | null;
+  } | null;
+  assigned_advisor?: {
+    name: string;
+    phone: string | null;
+    photo_url: string | null;
+    bio: string | null;
+  } | null;
 };
 
 type StoredSubmissionContext = {
@@ -59,6 +73,7 @@ type StoredSubmissionContext = {
   assignment: LeadCaptureSubmissionResponse["assignment"];
   nextStep: LeadCaptureSubmissionResponse["nextStep"];
   handoff: LeadCaptureSubmissionResponse["handoff"];
+  advisor: LeadCaptureSubmissionResponse["advisor"];
   capturedAt: string;
 };
 
@@ -106,6 +121,17 @@ export const persistSubmissionContext = (
     assignment: payload.assignment,
     nextStep: payload.nextStep,
     handoff: payload.handoff,
+    advisor:
+      payload.advisor ??
+      (payload.assigned_advisor
+        ? {
+            name: payload.assigned_advisor.name,
+            phone: payload.assigned_advisor.phone,
+            photoUrl: payload.assigned_advisor.photo_url,
+            bio: payload.assigned_advisor.bio,
+            whatsappUrl: payload.handoff.whatsappUrl,
+          }
+        : null),
     capturedAt: new Date().toISOString(),
   };
 

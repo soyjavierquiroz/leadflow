@@ -10,6 +10,7 @@ import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type { DomainRecord } from "@/lib/app-shell/types";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
+import { webPublicConfig } from "@/lib/public-env";
 import { teamOperationRequest } from "@/lib/team-operations";
 
 type TeamDomainsClientProps = {
@@ -30,6 +31,22 @@ type DeleteDomainResponse = {
   deleted: true;
 };
 
+type CloudflareValidationEntry = {
+  id: string;
+  type: "txt" | "cname" | "http";
+  host: string;
+  value: string;
+  status: string | null;
+  label: string;
+  detail: string;
+};
+
+const saasCustomerCnameTarget =
+  webPublicConfig.saas.customerCnameTarget ?? "customers.leadflow.local";
+const saasFallbackOrigin =
+  webPublicConfig.saas.fallbackOrigin ?? "proxy-fallback.leadflow.local";
+const legacyDnsTarget = `legacy-${saasCustomerCnameTarget}`;
+
 const buttonClassName =
   "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
@@ -38,6 +55,9 @@ const primaryButtonClassName =
 
 const dangerButtonClassName =
   "rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60";
+
+const copyButtonClassName =
+  "rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100";
 
 const buildCreateState = (): DomainFormState => ({
   host: "",
@@ -101,6 +121,155 @@ const describeDomainType = (domainType: DomainRecord["domainType"]) => {
   }
 };
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const asString = (value: unknown) =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const toValidationEntries = (cloudflareStatusJson: unknown) => {
+  const root = asRecord(cloudflareStatusJson);
+
+  if (!root) {
+    return [] as CloudflareValidationEntry[];
+  }
+
+  const entries: CloudflareValidationEntry[] = [];
+  const ownershipVerification = asRecord(root.ownershipVerification);
+  const ssl = asRecord(root.ssl);
+  const raw = asRecord(root.raw);
+  const rawSsl = asRecord(raw?.ssl);
+
+  if (ownershipVerification) {
+    const host = asString(ownershipVerification.name);
+    const value = asString(ownershipVerification.value);
+    const type =
+      asString(ownershipVerification.type) ??
+      asString(ownershipVerification.record_type);
+
+    if (host && value) {
+      entries.push({
+        id: `ownership-${type ?? "txt"}-${host}-${value}`,
+        type: type?.toLowerCase() === "cname" ? "cname" : "txt",
+        host,
+        value,
+        status: null,
+        label: "Ownership verification",
+        detail:
+          "Cloudflare pide esta verificación para demostrar control del hostname.",
+      });
+    }
+  }
+
+  const validationRecords = [
+    ...(Array.isArray(ssl?.validationRecords) ? ssl.validationRecords : []),
+    ...(Array.isArray(ssl?.validation_records) ? ssl.validation_records : []),
+    ...(Array.isArray(rawSsl?.validation_records)
+      ? rawSsl.validation_records
+      : []),
+  ];
+
+  for (const item of validationRecords) {
+    const record = asRecord(item);
+
+    if (!record) {
+      continue;
+    }
+
+    const txtName = asString(record.txtName) ?? asString(record.txt_name);
+    const txtValue = asString(record.txtValue) ?? asString(record.txt_value);
+    const httpUrl = asString(record.httpUrl) ?? asString(record.http_url);
+    const httpBody = asString(record.httpBody) ?? asString(record.http_body);
+    const status = asString(record.status);
+
+    if (txtName && txtValue) {
+      entries.push({
+        id: `ssl-txt-${txtName}-${txtValue}`,
+        type: "txt",
+        host: txtName,
+        value: txtValue,
+        status,
+        label: "SSL validation TXT",
+        detail:
+          "Registro TXT requerido por Cloudflare para emitir o revalidar el certificado.",
+      });
+    }
+
+    if (httpUrl && httpBody) {
+      entries.push({
+        id: `ssl-http-${httpUrl}-${httpBody}`,
+        type: "http",
+        host: httpUrl,
+        value: httpBody,
+        status,
+        label: "HTTP validation",
+        detail:
+          "Cloudflare devolvió una validación HTTP alternativa para este hostname.",
+      });
+    }
+  }
+
+  const dcvDelegationRecords = Array.isArray(rawSsl?.dcv_delegation_records)
+    ? rawSsl.dcv_delegation_records
+    : [];
+
+  for (const item of dcvDelegationRecords) {
+    const record = asRecord(item);
+
+    if (!record) {
+      continue;
+    }
+
+    const host = asString(record.cname);
+    const value = asString(record.cname_target);
+
+    if (host && value) {
+      entries.push({
+        id: `ssl-cname-${host}-${value}`,
+        type: "cname",
+        host,
+        value,
+        status: null,
+        label: "DCV delegation CNAME",
+        detail:
+          "Delegación CNAME que Cloudflare puede aceptar como alternativa al TXT.",
+      });
+    }
+  }
+
+  const fallbackTxtName = asString(ssl?.txt_name);
+  const fallbackTxtValue = asString(ssl?.txt_value);
+
+  if (
+    fallbackTxtName &&
+    fallbackTxtValue &&
+    !entries.some(
+      (entry) =>
+        entry.type === "txt" &&
+        entry.host === fallbackTxtName &&
+        entry.value === fallbackTxtValue,
+    )
+  ) {
+    entries.push({
+      id: `ssl-txt-fallback-${fallbackTxtName}-${fallbackTxtValue}`,
+      type: "txt",
+      host: fallbackTxtName,
+      value: fallbackTxtValue,
+      status: asString(ssl?.status),
+      label: "SSL validation TXT",
+      detail:
+        "Registro TXT expuesto por Cloudflare para completar la validación del certificado.",
+    });
+  }
+
+  return entries.filter(
+    (entry, index, current) =>
+      current.findIndex((candidate) => candidate.id === entry.id) === index,
+  );
+};
+
 const canEditHostInPatch = (domain: DomainRecord) =>
   domain.cloudflareCustomHostnameId === null &&
   domain.onboardingStatus === "draft";
@@ -124,6 +293,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
   const [recreateState, setRecreateState] =
     useState<DomainFormState>(buildCreateState);
   const [deleteDomain, setDeleteDomain] = useState<DomainRecord | null>(null);
+  const [copiedFieldKey, setCopiedFieldKey] = useState<string | null>(null);
 
   const resetMessages = () => {
     setErrorMessage(null);
@@ -331,12 +501,37 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
     });
   };
 
+  const handleCopyValue = async (copyKey: string, value: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+
+      setCopiedFieldKey(copyKey);
+      window.setTimeout(() => {
+        setCopiedFieldKey((current) => (current === copyKey ? null : current));
+      }, 1800);
+    } catch {
+      setErrorMessage("No pudimos copiar el valor al portapapeles.");
+    }
+  };
+
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Team Admin / Domains"
         title="Domain management"
-        description="Aquí el team limpia dominios heredados, recrea onboarding en Cloudflare y mantiene el flujo SaaS simple sobre customers.leadflow.kurukin.com."
+        description={`Aquí el team limpia dominios heredados, recrea onboarding en Cloudflare y mantiene el flujo SaaS simple sobre ${saasCustomerCnameTarget}.`}
         actions={
           <button
             type="button"
@@ -441,7 +636,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                 </p>
                 <p className="text-xs text-slate-500">
                   {row.recreateRequired
-                    ? "Target sano esperado: customers.leadflow.kurukin.com"
+                    ? `Target sano esperado: ${saasCustomerCnameTarget}`
                     : `Fallback interno: ${row.fallbackOrigin ?? "no aplica"}`}
                 </p>
               </div>
@@ -555,11 +750,19 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
       />
 
       <section className="grid gap-4 xl:grid-cols-2">
-        {rows.map((domain) => (
-          <article
-            key={domain.id}
-            className="rounded-[1.85rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]"
-          >
+        {rows.map((domain) => {
+          const validationEntries = toValidationEntries(
+            domain.cloudflareStatusJson,
+          );
+          const showCloudflareValidationTable =
+            (domain.cloudflareSslStatus ?? domain.sslStatus) ===
+              "pending_validation" && validationEntries.length > 0;
+
+          return (
+            <article
+              key={domain.id}
+              className="rounded-[1.85rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]"
+            >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
@@ -620,7 +823,112 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
               ) : null}
             </div>
 
-            <div className="mt-5 space-y-3">
+              <div className="mt-5 space-y-3">
+                {showCloudflareValidationTable ? (
+                  <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge value="pending_validation" />
+                      <p className="text-sm font-semibold text-slate-950">
+                        Cloudflare validation records
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      El dominio sigue en validación. Copia estos registros
+                      exactamente como los pide Cloudflare para evitar errores
+                      manuales.
+                    </p>
+
+                    <div className="mt-4 overflow-x-auto">
+                      <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
+                        <thead>
+                          <tr className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                            <th className="border-b border-amber-200 px-3 py-2 font-semibold">
+                              Type
+                            </th>
+                            <th className="border-b border-amber-200 px-3 py-2 font-semibold">
+                              Host
+                            </th>
+                            <th className="border-b border-amber-200 px-3 py-2 font-semibold">
+                              Value
+                            </th>
+                            <th className="border-b border-amber-200 px-3 py-2 font-semibold">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {validationEntries.map((entry) => (
+                            <tr key={entry.id} className="align-top">
+                              <td className="border-b border-amber-100 px-3 py-3">
+                                <div className="space-y-2">
+                                  <StatusBadge value={entry.type} />
+                                  <p className="text-xs text-slate-500">
+                                    {entry.label}
+                                  </p>
+                                </div>
+                              </td>
+                              <td className="border-b border-amber-100 px-3 py-3">
+                                <div className="space-y-2">
+                                  <code className="block break-all rounded-2xl bg-white px-3 py-2 text-xs text-slate-800">
+                                    {entry.host}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleCopyValue(
+                                        `${domain.id}-${entry.id}-host`,
+                                        entry.host,
+                                      )
+                                    }
+                                    className={copyButtonClassName}
+                                  >
+                                    {copiedFieldKey ===
+                                    `${domain.id}-${entry.id}-host`
+                                      ? "Copiado"
+                                      : "Copy host"}
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="border-b border-amber-100 px-3 py-3">
+                                <div className="space-y-2">
+                                  <code className="block break-all rounded-2xl bg-white px-3 py-2 text-xs text-slate-800">
+                                    {entry.value}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleCopyValue(
+                                        `${domain.id}-${entry.id}-value`,
+                                        entry.value,
+                                      )
+                                    }
+                                    className={copyButtonClassName}
+                                  >
+                                    {copiedFieldKey ===
+                                    `${domain.id}-${entry.id}-value`
+                                      ? "Copiado"
+                                      : "Copy value"}
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="border-b border-amber-100 px-3 py-3">
+                                <div className="space-y-2">
+                                  <StatusBadge
+                                    value={entry.status ?? "required"}
+                                  />
+                                  <p className="text-xs leading-5 text-slate-500">
+                                    {entry.detail}
+                                  </p>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
+
               {(domain.dnsInstructions ?? []).length > 0 ? (
                 domain.dnsInstructions?.map((instruction) => (
                   <div
@@ -650,9 +958,10 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
                   dominio.
                 </div>
               )}
-            </div>
-          </article>
-        ))}
+              </div>
+            </article>
+          );
+        })}
       </section>
 
       {isCreateOpen ? (
@@ -665,7 +974,7 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
             state={createState}
             onChange={setCreateState}
             submitLabel="Crear dominio"
-            helperText="Recomendado: custom_subdomain vía CNAME a customers.leadflow.kurukin.com."
+            helperText={`Recomendado: custom_subdomain vía CNAME a ${saasCustomerCnameTarget}.`}
             isBusy={isCreating}
             onCancel={() => setIsCreateOpen(false)}
             onSubmit={handleCreateDomain}
@@ -699,14 +1008,14 @@ export function TeamDomainsClient({ initialRows }: TeamDomainsClientProps) {
       {recreateDomain ? (
         <ModalShell
           title={`Recrear onboarding de ${recreateDomain.host}`}
-          description="Leadflow elimina el custom hostname viejo en Cloudflare, limpia targets heredados y crea un onboarding nuevo sobre customers.leadflow.kurukin.com."
+          description={`Leadflow elimina el custom hostname viejo en Cloudflare, limpia targets heredados y crea un onboarding nuevo sobre ${saasCustomerCnameTarget}.`}
           onClose={() => setRecreateDomain(null)}
         >
           <DomainForm
             state={recreateState}
             onChange={setRecreateState}
             submitLabel="Recrear onboarding"
-            helperText="Úsalo para limpiar registros heredados como proxy-fallback.exitosos.com y regenerar el target sano del SaaS."
+            helperText={`Úsalo para limpiar registros heredados como ${legacyDnsTarget} y regenerar el target sano del SaaS sobre ${saasFallbackOrigin}.`}
             isBusy={isPending}
             onCancel={() => setRecreateDomain(null)}
             onSubmit={handleRecreate}

@@ -91,14 +91,13 @@ describe('domain onboarding utils', () => {
   it('marks legacy dns targets as requiring recreation', () => {
     const legacy = deriveLegacyDomainState(
       {
-        host: 'www.retodetransformacion.com',
         domainType: 'custom_subdomain',
-        dnsTarget: 'proxy-fallback.exitosos.com',
+        dnsTarget: 'legacy-saas-target.example.net',
         cloudflareStatusJson: {
           id: 'cf-hostname-legacy',
           hostname: 'www.retodetransformacion.com',
           status: 'active',
-          customOriginServer: 'proxy-fallback.exitosos.com',
+          customOriginServer: 'legacy-origin.example.net',
           verificationErrors: [],
           ownershipVerification: null,
           ssl: {

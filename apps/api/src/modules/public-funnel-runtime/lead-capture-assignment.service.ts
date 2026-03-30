@@ -10,6 +10,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { TrackingEventsService } from '../events/tracking-events.service';
+import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
 import { MessagingAutomationService } from '../messaging-automation/messaging-automation.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto';
@@ -126,12 +127,20 @@ type RuntimeAttributionPayload = {
   ttclid?: string | null;
 };
 
+const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
+  'ROTATION_POOL_NOT_CONFIGURED',
+  'ROTATION_POOL_NOT_FOUND',
+  'NO_ELIGIBLE_SPONSORS',
+  'ROTATION_MEMBER_NOT_FOUND',
+]);
+
 @Injectable()
 export class LeadCaptureAssignmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly trackingEventsService: TrackingEventsService,
     private readonly messagingAutomationService: MessagingAutomationService,
+    private readonly leadDispatcherService: LeadDispatcherService,
   ) {}
 
   async registerVisitor(dto: RegisterPublicVisitorDto) {
@@ -232,6 +241,11 @@ export class LeadCaptureAssignmentService {
       });
 
       if (result.assignmentWasCreated) {
+        void this.leadDispatcherService
+          .dispatchLeadContextUpsert({
+            assignmentId: result.assignment.id,
+          })
+          .catch(() => undefined);
         void this.messagingAutomationService
           .dispatchAssignmentAutomation({
             assignmentId: result.assignment.id,
@@ -366,6 +380,15 @@ export class LeadCaptureAssignmentService {
           whatsappPhone,
           whatsappMessage,
         );
+        const advisor = sponsor
+          ? {
+              name: sponsor.displayName,
+              phone: sponsor.phone ?? whatsappPhone,
+              photoUrl: null,
+              bio: 'Especialista en Protocolos de Recuperacion',
+              whatsappUrl,
+            }
+          : null;
 
         failureContext = null;
 
@@ -386,10 +409,16 @@ export class LeadCaptureAssignmentService {
             whatsappMessage,
             whatsappUrl,
           },
+          advisor,
         };
       });
 
       if (result.assignmentWasCreated) {
+        void this.leadDispatcherService
+          .dispatchLeadContextUpsert({
+            assignmentId: result.assignment.id,
+          })
+          .catch(() => undefined);
         void this.messagingAutomationService
           .dispatchAssignmentAutomation({
             assignmentId: result.assignment.id,
@@ -408,6 +437,15 @@ export class LeadCaptureAssignmentService {
         assignment: result.assignment,
         nextStep: result.nextStep,
         handoff: result.handoff,
+        advisor: result.advisor,
+        assigned_advisor: result.advisor
+          ? {
+              name: result.advisor.name,
+              phone: result.advisor.phone,
+              photo_url: result.advisor.photoUrl,
+              bio: result.advisor.bio,
+            }
+          : null,
       };
     } catch (error) {
       await this.recordAssignmentFailure(failureContext, error);
@@ -810,11 +848,37 @@ export class LeadCaptureAssignmentService {
       };
     }
 
-    const rotationPool = await this.resolveRotationPoolOrThrow(tx, publication);
-    const nextMember = await this.resolveNextRotationMemberOrThrow(
-      tx,
-      rotationPool,
-    );
+    let assignmentReason: 'rotation' | 'fallback' = 'rotation';
+    let selectedSponsor: RotationPoolWithMembers['members'][number]['sponsor'];
+    let assignmentRotationPoolId: string | null = null;
+
+    try {
+      const rotationPool = await this.resolveRotationPoolOrThrow(
+        tx,
+        publication,
+      );
+      const nextMember = await this.resolveNextRotationMemberOrThrow(
+        tx,
+        rotationPool,
+      );
+
+      selectedSponsor = nextMember.sponsor;
+      assignmentRotationPoolId = rotationPool.id;
+    } catch (error) {
+      if (!this.shouldFallbackAssignment(error)) {
+        throw error;
+      }
+
+      const fallbackResolution = await this.resolveFallbackSponsorOrThrow(
+        tx,
+        publication,
+      );
+
+      assignmentReason = 'fallback';
+      selectedSponsor = fallbackResolution.sponsor;
+      assignmentRotationPoolId = fallbackResolution.rotationPoolId;
+    }
+
     const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
 
     if (!legacyFunnelId) {
@@ -832,14 +896,14 @@ export class LeadCaptureAssignmentService {
       data: {
         workspaceId: publication.workspaceId,
         leadId: lead.id,
-        sponsorId: nextMember.sponsor.id,
+        sponsorId: selectedSponsor.id,
         teamId: publication.teamId,
         funnelId: legacyFunnelId,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
-        rotationPoolId: rotationPool.id,
+        rotationPoolId: assignmentRotationPoolId,
         status: 'assigned',
-        reason: 'rotation',
+        reason: assignmentReason,
         assignedAt,
         resolvedAt: null,
       },
@@ -867,7 +931,7 @@ export class LeadCaptureAssignmentService {
         payload: {
           assignmentId: assignment.id,
           sponsorId: assignment.sponsor.id,
-          rotationPoolId: rotationPool.id,
+          rotationPoolId: assignmentRotationPoolId,
           funnelPublicationId: publication.id,
         },
         occurredAt: assignedAt,
@@ -895,7 +959,8 @@ export class LeadCaptureAssignmentService {
         source: 'server',
         triggerEventId: input?.triggerEventId ?? null,
         sponsorId: assignment.sponsor.id,
-        rotationPoolId: rotationPool.id,
+        rotationPoolId: assignmentRotationPoolId,
+        assignmentReason,
       },
     });
 
@@ -1064,6 +1129,85 @@ export class LeadCaptureAssignmentService {
     }
 
     return matchedMember;
+  }
+
+  private shouldFallbackAssignment(error: unknown) {
+    if (!(error instanceof ConflictException)) {
+      return false;
+    }
+
+    const response = error.getResponse();
+    if (!response || typeof response !== 'object' || Array.isArray(response)) {
+      return false;
+    }
+
+    const code =
+      'code' in response && typeof response.code === 'string'
+        ? response.code
+        : null;
+
+    return code ? ASSIGNMENT_FALLBACK_ERROR_CODES.has(code) : false;
+  }
+
+  private async resolveFallbackSponsorOrThrow(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+  ) {
+    const fallbackPool = await tx.rotationPool.findFirst({
+      where: {
+        workspaceId: publication.workspaceId,
+        teamId: publication.teamId,
+        status: 'active',
+        isFallbackPool: true,
+      },
+      include: {
+        members: {
+          where: {
+            isActive: true,
+            sponsor: {
+              status: 'active',
+              availabilityStatus: 'available',
+            },
+          },
+          orderBy: {
+            position: 'asc',
+          },
+          include: eligibleMemberInclude,
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    if (fallbackPool?.members.length) {
+      return {
+        sponsor: fallbackPool.members[0].sponsor,
+        rotationPoolId: fallbackPool.id,
+      };
+    }
+
+    const directSponsor = await tx.sponsor.findFirst({
+      where: {
+        workspaceId: publication.workspaceId,
+        teamId: publication.teamId,
+        status: 'active',
+        availabilityStatus: 'available',
+      },
+      orderBy: [{ routingWeight: 'desc' }, { createdAt: 'asc' }],
+    });
+
+    if (directSponsor) {
+      return {
+        sponsor: directSponsor,
+        rotationPoolId: null,
+      };
+    }
+
+    throw new ConflictException({
+      code: 'NO_FALLBACK_SPONSOR_AVAILABLE',
+      message: `Publication ${publication.id} does not have a fallback sponsor available.`,
+    });
   }
 
   private resolveNextStepAfterCaptureFromPublication(

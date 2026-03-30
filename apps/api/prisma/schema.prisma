@@ -236,29 +236,6 @@ enum AutomationDispatchStatus {
   failed
 }
 
-enum ConversationSignalSource {
-  n8n
-  evolution
-}
-
-enum ConversationSignalType {
-  conversation_started
-  message_inbound
-  message_outbound
-  lead_contacted
-  lead_qualified
-  lead_follow_up
-  lead_won
-  lead_lost
-}
-
-enum ConversationSignalProcessingStatus {
-  received
-  applied
-  ignored
-  failed
-}
-
 enum EventActorType {
   system
   user
@@ -316,7 +293,6 @@ model Workspace {
   users              User[]
   messagingConnections MessagingConnection[]
   automationDispatches AutomationDispatch[]
-  conversationSignals ConversationSignal[]
   leadNotes          LeadNote[]
 }
 
@@ -344,7 +320,6 @@ model Team {
   users              User[]
   messagingConnections MessagingConnection[]
   automationDispatches AutomationDispatch[]
-  conversationSignals ConversationSignal[]
   leadNotes          LeadNote[]
 
   @@unique([workspaceId, code])
@@ -370,7 +345,6 @@ model Sponsor {
   user                User?
   messagingConnection MessagingConnection?
   automationDispatches AutomationDispatch[]
-  conversationSignals ConversationSignal[]
   leadNotes          LeadNote[]
 }
 
@@ -440,7 +414,6 @@ model MessagingConnection {
   team                 Team                      @relation(fields: [teamId], references: [id], onDelete: Cascade)
   sponsor              Sponsor                   @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
   automationDispatches AutomationDispatch[]
-  conversationSignals  ConversationSignal[]
 
   @@index([workspaceId, provider, status])
   @@index([teamId, provider, status])
@@ -742,7 +715,6 @@ model Lead {
   currentAssignment   Assignment?         @relation("CurrentLeadAssignment", fields: [currentAssignmentId], references: [id], onDelete: SetNull)
   events              DomainEvent[]
   automationDispatches AutomationDispatch[]
-  conversationSignals ConversationSignal[]
   notes               LeadNote[]
 }
 
@@ -773,7 +745,6 @@ model Assignment {
   currentForLead      Lead?               @relation("CurrentLeadAssignment")
   events              DomainEvent[]
   automationDispatches AutomationDispatch[]
-  conversationSignals ConversationSignal[]
 }
 
 model AutomationDispatch {
@@ -807,50 +778,11 @@ model AutomationDispatch {
   funnelInstance      FunnelInstance?          @relation(fields: [funnelInstanceId], references: [id], onDelete: SetNull)
   funnelPublication   FunnelPublication?       @relation(fields: [funnelPublicationId], references: [id], onDelete: SetNull)
   messagingConnection MessagingConnection?     @relation(fields: [messagingConnectionId], references: [id], onDelete: SetNull)
-  conversationSignals ConversationSignal[]
 
   @@index([workspaceId, status, createdAt])
   @@index([sponsorId, createdAt])
   @@index([assignmentId, createdAt])
   @@index([messagingConnectionId, createdAt])
-}
-
-model ConversationSignal {
-  id                    String                              @id @default(uuid())
-  workspaceId           String
-  teamId                String
-  sponsorId             String?
-  leadId                String?
-  assignmentId          String?
-  messagingConnectionId String?
-  automationDispatchId  String?
-  source                ConversationSignalSource
-  signalType            ConversationSignalType
-  processingStatus      ConversationSignalProcessingStatus
-  externalEventId       String?
-  payloadSnapshot       Json
-  errorCode             String?
-  errorMessage          String?
-  leadStatusAfter       LeadStatus?
-  assignmentStatusAfter AssignmentStatus?
-  occurredAt            DateTime
-  processedAt           DateTime?
-  createdAt             DateTime                            @default(now())
-  updatedAt             DateTime                            @updatedAt
-  workspace             Workspace                           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  team                  Team                                @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  sponsor               Sponsor?                            @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
-  lead                  Lead?                               @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  assignment            Assignment?                         @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
-  messagingConnection   MessagingConnection?                @relation(fields: [messagingConnectionId], references: [id], onDelete: SetNull)
-  automationDispatch    AutomationDispatch?                 @relation(fields: [automationDispatchId], references: [id], onDelete: SetNull)
-
-  @@index([workspaceId, source, occurredAt])
-  @@index([leadId, occurredAt])
-  @@index([assignmentId, occurredAt])
-  @@index([sponsorId, occurredAt])
-  @@index([messagingConnectionId, occurredAt])
-  @@index([automationDispatchId, occurredAt])
 }
 
 model LeadNote {

@@ -399,9 +399,10 @@ export function MemberChannelClient({ sponsor }: MemberChannelClientProps) {
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Webhook event</dt>
+              <dt className="text-slate-500">Webhook events</dt>
               <dd className="mt-1 font-medium text-slate-900">
-                {provider?.webhookEvent ?? "messages.upsert"}
+                {provider?.webhookEvent ??
+                  "MESSAGES_UPSERT, MESSAGES_UPDATE, SEND_MESSAGE, CONNECTION_UPDATE"}
               </dd>
             </div>
             <div>

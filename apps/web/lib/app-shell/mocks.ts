@@ -12,8 +12,14 @@ import type {
   TeamMetadata,
   WorkspaceRecord,
 } from "@/lib/app-shell/types";
+import { webPublicConfig } from "@/lib/public-env";
 
 const now = "2026-03-21T15:10:00.000Z";
+const saasCustomerCnameTarget =
+  webPublicConfig.saas.customerCnameTarget ?? "customers.leadflow.local";
+const saasFallbackOrigin =
+  webPublicConfig.saas.fallbackOrigin ?? "proxy-fallback.leadflow.local";
+const legacyDnsTarget = `legacy-${saasCustomerCnameTarget}`;
 
 export const mockWorkspace: WorkspaceRecord = {
   id: "workspace-leadflow-dev",
@@ -163,7 +169,7 @@ export const mockDomains: DomainRecord[] = [
       id: "cf-custom-hostname-promo-acme-test",
       hostname: "promo.acme.test",
       status: "active",
-      customOriginServer: "proxy-fallback.leadflow.kurukin.com",
+      customOriginServer: saasFallbackOrigin,
       verificationErrors: [],
       ownershipVerification: null,
       ssl: {
@@ -176,8 +182,8 @@ export const mockDomains: DomainRecord[] = [
       error: null,
       raw: null,
     },
-    cnameTarget: "customers.leadflow.kurukin.com",
-    fallbackOrigin: "proxy-fallback.leadflow.kurukin.com",
+    cnameTarget: saasCustomerCnameTarget,
+    fallbackOrigin: saasFallbackOrigin,
     cloudflareHostnameStatus: "active",
     cloudflareSslStatus: "active",
     cloudflareErrorMessage: null,
@@ -185,7 +191,7 @@ export const mockDomains: DomainRecord[] = [
     isLegacyConfiguration: false,
     recreateRequired: false,
     legacyReason: null,
-    dnsTarget: "customers.leadflow.kurukin.com",
+    dnsTarget: saasCustomerCnameTarget,
     lastCloudflareSyncAt: now,
     activatedAt: now,
     dnsInstructions: [
@@ -193,11 +199,11 @@ export const mockDomains: DomainRecord[] = [
         id: "cname-promo-acme-test",
         type: "cname",
         host: "promo.acme.test",
-        value: "customers.leadflow.kurukin.com",
+        value: saasCustomerCnameTarget,
         status: "required",
         label: "CNAME required",
         detail:
-          "Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo proxy-fallback.leadflow.kurukin.com.",
+          `Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo ${saasFallbackOrigin}.`,
       },
     ],
     createdAt: now,
@@ -221,8 +227,8 @@ export const mockDomains: DomainRecord[] = [
     verificationMethod: "cname",
     cloudflareCustomHostnameId: null,
     cloudflareStatusJson: null,
-    cnameTarget: "customers.leadflow.kurukin.com",
-    fallbackOrigin: "proxy-fallback.leadflow.kurukin.com",
+    cnameTarget: saasCustomerCnameTarget,
+    fallbackOrigin: saasFallbackOrigin,
     cloudflareHostnameStatus: null,
     cloudflareSslStatus: null,
     cloudflareErrorMessage: null,
@@ -230,8 +236,8 @@ export const mockDomains: DomainRecord[] = [
     isLegacyConfiguration: true,
     recreateRequired: true,
     legacyReason:
-      "DNS target legado detectado: proxy-fallback.exitosos.com. El target sano es customers.leadflow.kurukin.com.",
-    dnsTarget: "proxy-fallback.exitosos.com",
+      `DNS target legado detectado: ${legacyDnsTarget}. El target sano es ${saasCustomerCnameTarget}.`,
+    dnsTarget: legacyDnsTarget,
     lastCloudflareSyncAt: null,
     activatedAt: null,
     dnsInstructions: [
@@ -239,11 +245,11 @@ export const mockDomains: DomainRecord[] = [
         id: "cname-cliente-demo-acme-test",
         type: "cname",
         host: "cliente-demo.acme.test",
-        value: "customers.leadflow.kurukin.com",
+        value: saasCustomerCnameTarget,
         status: "required",
         label: "CNAME required",
         detail:
-          "Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo proxy-fallback.leadflow.kurukin.com.",
+          `Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo ${saasFallbackOrigin}.`,
       },
     ],
     createdAt: now,

@@ -312,8 +312,8 @@ export function PublicGrandSlamOfferBlock({
         style={
           {
             "--lf-grand-primary": "#f59e0b",
-            "--lf-grand-text-main": "#f8fafc",
-            "--lf-grand-card-bg": "#020617",
+            "--lf-grand-text-main": variant === "flat" ? "#0f172a" : "#f8fafc",
+            "--lf-grand-card-bg": variant === "flat" ? "#ffffff" : "#020617",
           } as CSSProperties
         }
       >
@@ -332,13 +332,13 @@ export function PublicGrandSlamOfferBlock({
           ) : null}
 
           {offerName ? (
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
               {offerName}
             </p>
           ) : null}
 
           {asString(block.offer_intro) ? (
-            <p className="max-w-3xl text-[15px] leading-relaxed text-slate-400">
+            <p className="max-w-3xl text-[15px] leading-relaxed text-slate-700">
               {asString(block.offer_intro)}
             </p>
           ) : null}
@@ -366,12 +366,12 @@ export function PublicGrandSlamOfferBlock({
                 >
                   <div>
                     {item.name ? (
-                      <h4 className="text-base font-bold leading-snug text-slate-100">
+                      <h4 className="text-base font-bold leading-snug text-slate-950">
                         {item.name}
                       </h4>
                     ) : null}
                     {item.description ? (
-                      <p className="mt-2 text-[15px] leading-relaxed text-slate-400">
+                      <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
                         {item.description}
                       </p>
                     ) : null}
@@ -402,7 +402,7 @@ export function PublicGrandSlamOfferBlock({
                     </p>
                   ) : null}
                   {item.description ? (
-                    <p className="text-[15px] leading-relaxed text-slate-400">
+                    <p className="text-[15px] leading-relaxed text-slate-600">
                       {item.description}
                     </p>
                   ) : null}
@@ -419,22 +419,22 @@ export function PublicGrandSlamOfferBlock({
               Resumen de la oferta
             </p>
             {anchorPriceText ? (
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400 line-through">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 line-through">
                 {anchorPriceText}
               </p>
             ) : null}
             {finalPriceText ? (
-              <p className="text-3xl font-black tracking-tight text-slate-100 md:text-4xl">
+              <p className="text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
                 {finalPriceText}
               </p>
             ) : null}
             {savingsText ? (
-              <p className="text-[15px] font-semibold text-slate-300">
+              <p className="text-[15px] font-semibold text-slate-700">
                 {savingsText}
               </p>
             ) : null}
             {asString(block.payment_terms_text) ? (
-              <p className="text-[15px] leading-relaxed text-slate-400">
+              <p className="text-[15px] leading-relaxed text-slate-700">
                 {asString(block.payment_terms_text)}
               </p>
             ) : null}

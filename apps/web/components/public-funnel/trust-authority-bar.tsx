@@ -19,25 +19,25 @@ export function TrustAuthorityBar({
   }
 
   return (
-    <div
-      className={cx(
-        "border-y border-slate-800/90 py-5",
-        className,
-      )}
-    >
-      <div className="flex flex-wrap items-center justify-center gap-3 text-center lg:justify-start">
-        {items.map((item) => (
+    <div className={cx("border-y border-slate-200 py-2", className)}>
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center lg:justify-start">
+        {items.map((item, index) => (
           <div
             key={`${item.label}-${item.meta ?? ""}`}
-            className="min-w-[9rem] rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 shadow-xl shadow-black/20"
+            className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-slate-600 md:text-xs"
           >
-            <p className="text-lg font-black uppercase tracking-[0.28em] text-white">
-              {item.label}
-            </p>
-            {item.meta ? (
-              <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                {item.meta}
-              </p>
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500/12 text-[10px] font-black text-emerald-600">
+              +
+            </span>
+            <span className="font-black uppercase tracking-[0.16em] text-slate-900">
+              {item.label}:
+            </span>
+            {item.meta ? <span>{item.meta}</span> : null}
+            {index < items.length - 1 ? (
+              <span
+                aria-hidden="true"
+                className="ml-1 inline-block h-3 w-px bg-slate-300"
+              />
             ) : null}
           </div>
         ))}

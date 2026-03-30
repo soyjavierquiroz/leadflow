@@ -45,12 +45,6 @@ const leadTimelineInclude = {
     },
     take: 20,
   },
-  conversationSignals: {
-    orderBy: {
-      occurredAt: 'desc',
-    },
-    take: 20,
-  },
   events: {
     orderBy: {
       occurredAt: 'desc',
@@ -63,7 +57,7 @@ type LeadTimelineRecord = Prisma.LeadGetPayload<{
   include: typeof leadTimelineInclude;
 }>;
 
-const SIGNAL_EVENT_NAMES = new Set([
+const LEGACY_SIGNAL_EVENT_NAMES = new Set([
   'conversation_started',
   'message_inbound',
   'message_outbound',
@@ -75,7 +69,7 @@ const SIGNAL_EVENT_NAMES = new Set([
 ]);
 
 const INTERNAL_TIMELINE_EVENT_NAMES = new Set([
-  ...SIGNAL_EVENT_NAMES,
+  ...LEGACY_SIGNAL_EVENT_NAMES,
   'lead_note_added',
 ]);
 
@@ -87,27 +81,6 @@ const prettifyEventName = (value: string) =>
   value
     .replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-
-const buildSignalDescription = (
-  signal: LeadTimelineRecord['conversationSignals'][number],
-) => {
-  const parts = [
-    signal.leadStatusAfter ? `Lead -> ${signal.leadStatusAfter}` : null,
-    signal.assignmentStatusAfter
-      ? `Assignment -> ${signal.assignmentStatusAfter}`
-      : null,
-  ].filter(Boolean);
-
-  if (parts.length > 0) {
-    return parts.join(' · ');
-  }
-
-  if (signal.errorMessage) {
-    return signal.errorMessage;
-  }
-
-  return 'Señal registrada para trazabilidad operativa.';
-};
 
 const buildEventDescription = (
   event: LeadTimelineRecord['events'][number],
@@ -842,20 +815,6 @@ export class LeadsService {
       statusLabel: null,
     }));
 
-    const signalItems = lead.conversationSignals.map<LeadTimelineItem>(
-      (signal) => ({
-        id: signal.id,
-        itemType: 'signal',
-        occurredAt: signal.occurredAt.toISOString(),
-        title: prettifyEventName(signal.signalType),
-        description: buildSignalDescription(signal),
-        actorLabel: signal.source,
-        statusLabel: signal.processingStatus,
-        source: signal.source,
-        signalType: signal.signalType,
-      }),
-    );
-
     const eventItems = lead.events
       .filter((event) => !INTERNAL_TIMELINE_EVENT_NAMES.has(event.eventName))
       .map<LeadTimelineItem>((event) => ({
@@ -869,7 +828,7 @@ export class LeadsService {
         eventName: event.eventName,
       }));
 
-    return [...noteItems, ...signalItems, ...eventItems].sort((a, b) =>
+    return [...noteItems, ...eventItems].sort((a, b) =>
       a.occurredAt < b.occurredAt ? 1 : -1,
     );
   }

@@ -1,0 +1,49 @@
+.wrapper {
+  width: 100%;
+  overflow: hidden;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.orange {
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+}
+
+.dark {
+  background: #0f172a;
+  color: #22d3ee;
+  border-bottom-color: #1e293b;
+}
+
+.clean {
+  background: #03a697;
+  color: #ffffff;
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.marqueeTrack {
+  display: inline-flex;
+  min-width: 200%;
+  align-items: center;
+  white-space: nowrap;
+  animation: marquee-slide 16s linear infinite;
+}
+
+.item {
+  width: 50%;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0 1rem;
+}
+
+@keyframes marquee-slide {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}

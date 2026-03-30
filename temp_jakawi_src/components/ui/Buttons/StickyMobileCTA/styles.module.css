@@ -1,0 +1,75 @@
+.stickyBar {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .stickyBar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid #e5e7eb;
+    background: #ffffff;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    visibility: hidden;
+  }
+
+  .visible {
+    transform: translateY(0);
+    visibility: visible;
+  }
+
+  .hidden {
+    transform: translateY(100%);
+    visibility: hidden;
+  }
+}
+
+.inner {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.button {
+  width: 100%;
+  max-width: 400px;
+  border: 0;
+  border-radius: 50px;
+  padding: 12px 18px;
+  cursor: pointer;
+  color: #ffffff;
+  background: linear-gradient(0deg, rgb(253, 91, 130) 0%, rgb(255, 8, 38) 100%);
+  box-shadow: 0 8px 20px rgba(253, 91, 130, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0.96;
+}
+
+.button:active {
+  filter: brightness(0.96);
+}

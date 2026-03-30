@@ -225,7 +225,7 @@ Modulos disponibles:
 - Runtime SaaS v2 para dominios externos:
   - `customers.leadflow.kurukin.com` es el `CNAME target` único para clientes
   - `proxy-fallback.leadflow.kurukin.com` es el `fallback origin` fijo usado por Cloudflare
-  - `proxy-fallback.leadflow.kurukin.com` no se expone como target del cliente; si aparece un target legado como `proxy-fallback.exitosos.com`, Leadflow lo marca `legacy` y exige recreate
+  - `proxy-fallback.leadflow.kurukin.com` no se expone como target del cliente; si aparece un target legado distinto al configurado, Leadflow lo marca `legacy` y exige recreate
   - Traefik usa router público catch-all y deja routers explícitos solo para `leadflow.kurukin.com` y `api.leadflow.kurukin.com`
   - no se enumeran dominios cliente en YAML/labels del stack
 - Modelo de publicacion preparado para dominios externos reales:

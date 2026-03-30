@@ -13,6 +13,8 @@ export type ApiRuntimeConfig = {
   authCookieDomain?: string;
   authCookieSecure: boolean;
   authSessionTtlDays: number;
+  n8nDispatcherWebhookUrl: string | null;
+  n8nDispatcherApiKey: string | null;
 };
 
 const parseCsv = (value: string | undefined) => {
@@ -66,6 +68,8 @@ export const getApiRuntimeConfig = (
   const authSessionTtlDays = parseNumber(env.AUTH_SESSION_TTL_DAYS, 7);
   const authCookieSecure =
     (env.NODE_ENV ?? 'development') === 'production' || Boolean(baseDomain);
+  const n8nDispatcherWebhookUrl = sanitizeEnv(env.N8N_DISPATCHER_WEBHOOK_URL);
+  const n8nDispatcherApiKey = sanitizeEnv(env.N8N_DISPATCHER_API_KEY);
 
   return {
     appName: env.API_NAME ?? 'leadflow-api',
@@ -85,5 +89,7 @@ export const getApiRuntimeConfig = (
     authCookieDomain: baseDomain ?? undefined,
     authCookieSecure,
     authSessionTtlDays,
+    n8nDispatcherWebhookUrl: n8nDispatcherWebhookUrl ?? null,
+    n8nDispatcherApiKey: n8nDispatcherApiKey ?? null,
   };
 };

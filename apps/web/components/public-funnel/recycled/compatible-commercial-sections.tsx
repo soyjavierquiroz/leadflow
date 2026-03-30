@@ -199,7 +199,7 @@ export function RecycledSocialProofSection({
       <div className="max-w-3xl">
         <PublicEyebrow
           tone="neutral"
-          className={surfaceVariant === "flat" ? "text-slate-400" : ""}
+          className={surfaceVariant === "flat" ? "text-slate-500" : ""}
         >
           {eyebrow}
         </PublicEyebrow>
@@ -216,7 +216,7 @@ export function RecycledSocialProofSection({
         <p
           className={cx(
             "mt-4 text-left text-base leading-7",
-            surfaceVariant === "flat" ? "text-slate-400" : "text-slate-600",
+            surfaceVariant === "flat" ? "text-slate-600" : "text-slate-600",
           )}
         >
           {description}
@@ -230,7 +230,7 @@ export function RecycledSocialProofSection({
               className={cx(
                 "flex min-h-20 items-center justify-center rounded-[1.4rem] px-4 py-5",
                 surfaceVariant === "flat"
-                  ? "border border-slate-800 bg-slate-900"
+                  ? "border border-slate-200 bg-white"
                   : "border border-slate-200 bg-white",
               )}
             >
@@ -494,7 +494,7 @@ export function RecycledFaqAccordionSection({
       <div className="max-w-3xl">
         <PublicEyebrow
           tone={variant === "flat" ? "neutral" : "neutral"}
-          className={variant === "flat" ? "text-slate-400" : ""}
+          className={variant === "flat" ? "text-slate-500" : ""}
         >
           {eyebrow}
         </PublicEyebrow>
@@ -516,14 +516,14 @@ export function RecycledFaqAccordionSection({
             className={cx(
               "group",
               variant === "flat"
-                ? "rounded-[1.4rem] border border-slate-800 bg-slate-900 px-5 py-5"
+                ? "rounded-[1.4rem] border border-slate-200 bg-slate-50 px-5 py-5"
                 : "rounded-[1.6rem] border border-slate-200 bg-slate-50 p-5 open:bg-white",
             )}
           >
             <summary
               className={cx(
                 "cursor-pointer list-none text-base font-semibold",
-                variant === "flat" ? "text-slate-100" : "text-slate-900",
+                variant === "flat" ? "text-slate-900" : "text-slate-900",
               )}
             >
               {item.question}
@@ -531,7 +531,7 @@ export function RecycledFaqAccordionSection({
             <p
               className={cx(
                 "mt-3 text-sm leading-6",
-                variant === "flat" ? "text-slate-400" : "text-slate-600",
+                variant === "flat" ? "text-slate-600" : "text-slate-600",
               )}
             >
               {item.answer}

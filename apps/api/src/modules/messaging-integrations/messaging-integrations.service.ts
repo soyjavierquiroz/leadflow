@@ -395,9 +395,12 @@ export class MessagingIntegrationsService {
     }
 
     await this.evolutionClient.ensureInstanceExists(preparedInput.instanceId);
+    const connectionWebhookUrl = this.evolutionClient.buildInboundWebhookUrl(
+      preparedInput.instanceId,
+    );
     await this.evolutionClient.setWebhook(
       preparedInput.instanceId,
-      preparedInput.automationWebhookUrl,
+      connectionWebhookUrl,
     );
 
     const qrPayload = options.fetchQr
@@ -665,11 +668,11 @@ export class MessagingIntegrationsService {
 
     if (this.evolutionClient.getRoutingMode() === 'internal') {
       return this.evolutionClient.hasPublicFallbackBaseUrl()
-        ? 'Evolution está configurado por red interna y mantiene fallback público solo como respaldo.'
-        : 'Evolution está configurado por red interna para operaciones de control.';
+        ? 'Evolution está configurado por red interna y envía eventos directo al webhook interno de n8n; la URL pública queda solo como respaldo.'
+        : 'Evolution está configurado por red interna y envía eventos directo al webhook interno de n8n.';
     }
 
-    return 'Evolution solo tiene URL pública configurada en este entorno.';
+    return 'Evolution solo tiene URL pública configurada en este entorno, pero el webhook sigue apuntando directo a n8n.';
   }
 
   private buildMetadata(
