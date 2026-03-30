@@ -11,6 +11,8 @@ services:
       NEXT_PUBLIC_MEMBERS_URL: ${MEMBERS_URL:-https://leadflow.kurukin.com}
       NEXT_PUBLIC_ADMIN_URL: ${ADMIN_URL:-https://leadflow.kurukin.com}
       NEXT_PUBLIC_API_URL: ${API_URL:-https://api.leadflow.kurukin.com}
+      NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET: ${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.leadflow.kurukin.com}
+      NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN: ${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kurukin.com}
     networks:
       - traefik_public
       - leadflow_core
@@ -67,6 +69,7 @@ services:
       MEMBERS_URL: ${MEMBERS_URL:-https://leadflow.kurukin.com}
       ADMIN_URL: ${ADMIN_URL:-https://leadflow.kurukin.com}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://leadflow.kurukin.com}
+      DATABASE_URL: ${DATABASE_URL:-}
       EVOLUTION_API_INTERNAL_BASE_URL: ${EVOLUTION_API_INTERNAL_BASE_URL:-http://evolution_api_v2:8080}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
       N8N_WEBHOOK_INTERNAL_BASE: ${N8N_WEBHOOK_INTERNAL_BASE:-http://n8n-v2_n8n_v2_webhook:5678/webhook}

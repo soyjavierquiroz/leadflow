@@ -107,8 +107,6 @@ describe('LeadDispatcherService', () => {
         notes: '',
       },
     });
-
-    console.log(JSON.stringify(payload, null, 2));
   });
 
   it('sends the dispatcher request with the expected url, headers and body', async () => {

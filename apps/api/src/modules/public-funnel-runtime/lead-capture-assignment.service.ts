@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -136,6 +137,8 @@ const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
 
 @Injectable()
 export class LeadCaptureAssignmentService {
+  private readonly logger = new Logger(LeadCaptureAssignmentService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly trackingEventsService: TrackingEventsService,
@@ -245,7 +248,10 @@ export class LeadCaptureAssignmentService {
           .dispatchLeadContextUpsert({
             assignmentId: result.assignment.id,
           })
-          .catch(() => undefined);
+          .catch((err: unknown) => {
+            this.logger.error('Lead dispatcher failed', err);
+            return undefined;
+          });
         void this.messagingAutomationService
           .dispatchAssignmentAutomation({
             assignmentId: result.assignment.id,
@@ -418,7 +424,10 @@ export class LeadCaptureAssignmentService {
           .dispatchLeadContextUpsert({
             assignmentId: result.assignment.id,
           })
-          .catch(() => undefined);
+          .catch((err: unknown) => {
+            this.logger.error('Lead dispatcher failed', err);
+            return undefined;
+          });
         void this.messagingAutomationService
           .dispatchAssignmentAutomation({
             assignmentId: result.assignment.id,

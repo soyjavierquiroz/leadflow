@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeMessagingPhone } from '../messaging-integrations/messaging-integrations.utils';
@@ -65,6 +65,7 @@ type DispatchResponse = {
 
 @Injectable()
 export class LeadDispatcherService {
+  private readonly logger = new Logger(LeadDispatcherService.name);
   private readonly dispatcherWebhookUrl = normalizeDispatcherUrl(
     process.env.N8N_DISPATCHER_WEBHOOK_URL,
   );
@@ -72,7 +73,9 @@ export class LeadDispatcherService {
     process.env.N8N_DISPATCHER_API_KEY,
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {
+    this.logger.log(`Dispatcher URL: ${this.dispatcherWebhookUrl}`);
+  }
 
   hasConfiguredDispatcher() {
     return Boolean(this.dispatcherWebhookUrl);
@@ -207,6 +210,7 @@ export class LeadDispatcherService {
     const timeoutId = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
 
     try {
+      this.logger.log('Sending payload to n8n...');
       const response = await fetch(this.dispatcherWebhookUrl!, {
         method: 'POST',
         signal: controller.signal,

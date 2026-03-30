@@ -2,7 +2,6 @@
 
 Fecha: 2026-03-21 (UTC)
 Fuentes principales:
-- `/opt/projects/leadflow/README_INIT.md`
 - `/opt/projects/leadflow/docs/server-inventory.md`
 
 ## Resumen ejecutivo

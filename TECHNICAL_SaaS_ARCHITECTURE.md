@@ -1,304 +1,230 @@
-# Technical SaaS Architecture
+# Leadflow Technical SaaS Architecture
 
-## Objetivo
+## Scope
 
-Este documento explica el flujo de punta a punta del onboarding de dominios en Leadflow usando Cloudflare for SaaS, el bridge DNS del proyecto y la lógica del frontend que expone los desafíos de validación al usuario final.
+Este documento describe la arquitectura operativa vigente del runtime SaaS de Leadflow en Swarm.
 
-La meta operativa es simple:
+Flujo canónico:
 
-- el cliente apunta su dominio al bridge del SaaS
-- Cloudflare termina TLS del hostname del cliente
-- Cloudflare reenvía el tráfico a un origin fijo de Leadflow
-- Leadflow resuelve el contenido por `host + path` sin crear routers dedicados por dominio cliente
+`Internet -> Traefik -> Docker Swarm -> web -> api -> Prisma/Postgres -> n8n dispatcher`
 
-## 1. Arquitectura del Bridge
+## Topología real
 
-### Hostnames fijos del SaaS
+### 1. Edge y routing
 
-- `customers.leadflow.kurukin.com`
-  - es el `CNAME target` público que Leadflow entrega a los clientes
-  - funciona como bridge estable entre el DNS del cliente y el edge de Cloudflare
-  - evita exponer directamente la IP del origin real a terceros
-- `proxy-fallback.leadflow.kurukin.com`
-  - es el `fallback origin` fijo configurado en Cloudflare como `custom_origin_server`
-  - es el único hostname que el origin necesita servir de forma consistente
-  - desacopla el origin de los dominios cliente individuales
+- Traefik publica los hosts externos y termina TLS.
+- El stack productivo canónico es `infra/swarm/docker-stack.yml`.
+- El servicio `web` expone:
+  - un router explícito para `LEADFLOW_SITE_HOST`
+  - un router catch-all `HostRegexp(\`{host:.+}\`)` para tráfico SaaS y publicaciones públicas
+- El servicio `api` expone un router explícito para `LEADFLOW_API_HOST`.
 
-### Por qué el bridge protege la IP del origen
+Resultado:
 
-El cliente nunca recibe la IP del runtime como instrucción principal. En el flujo sano:
+- el tráfico público y dominios SaaS entra por `web`
+- el backend HTTP entra por `api`
+- Traefik no necesita una label por cada dominio cliente
 
-1. El cliente crea un `CNAME` o un `ALIAS/flattening` hacia `customers.leadflow.kurukin.com`.
-2. Cloudflare resuelve ese bridge y presenta el certificado del dominio del cliente.
-3. Cloudflare reenvía el tráfico al `fallback origin` fijo `proxy-fallback.leadflow.kurukin.com`.
-4. Traefik recibe el tráfico por el router catch-all y Leadflow resuelve la publicación por `host + path`.
+### 2. Servicio web
 
-Eso permite:
+El frontend vive en `apps/web` y corre como runtime Next.js.
 
-- ocultar la IP del origin detrás de Cloudflare
-- evitar que el cliente configure la IP del VPS manualmente
-- cambiar el runtime interno sin pedir un recableado DNS a cada cliente
+Responsabilidades principales:
 
-### Apex y CNAME Flattening
+- resolver publicaciones públicas por `host + path`
+- renderizar el funnel público
+- consumir el backend por `NEXT_PUBLIC_API_URL`
+- exponer configuración SaaS pública desde `apps/web/lib/public-env.ts`
 
-Un `custom_apex` no puede usar un CNAME clásico en la mayoría de proveedores DNS. Por eso el bridge para apex depende de:
+Variables públicas relevantes:
 
-- `CNAME Flattening`
-- `ALIAS`
-- o una capacidad equivalente del DNS del cliente
+- `NEXT_PUBLIC_APP_BASE_DOMAIN`
+- `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_MEMBERS_URL`
+- `NEXT_PUBLIC_ADMIN_URL`
+- `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET`
+- `NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN`
 
-La idea es que el apex del cliente siga apuntando lógicamente a `customers.leadflow.kurukin.com`, pero sin exponer la IP real del origin. El flattening deja que el proveedor DNS resuelva el target públicamente sin obligar al cliente a operar con registros A duros hacia el VPS.
+### 3. Servicio API
 
-## 2. Configuración de Cloudflare
+El backend vive en `apps/api` y corre con NestJS + Fastify.
 
-### Zona base
+Responsabilidades principales:
 
-Leadflow opera sobre la zona:
+- auth y sesiones
+- runtime público del funnel
+- captura y asignación de leads
+- acceso a dominio y publicaciones
+- integración con Evolution
+- dispatch hacia n8n
 
-- `kurukin.com`
+El servicio `api` necesita `DATABASE_URL` en runtime. Prisma lo toma desde `apps/api/prisma/schema.prisma` mediante `env("DATABASE_URL")`.
 
-Los hosts relevantes del SaaS viven bajo:
+Variables operativas críticas:
 
-- `leadflow.kurukin.com`
-- `api.leadflow.kurukin.com`
-- `customers.leadflow.kurukin.com`
-- `proxy-fallback.leadflow.kurukin.com`
+- `DATABASE_URL`
+- `APP_BASE_DOMAIN`
+- `API_URL`
+- `SITE_URL`
+- `MEMBERS_URL`
+- `ADMIN_URL`
+- `CORS_ALLOWED_ORIGINS`
+- `EVOLUTION_API_INTERNAL_BASE_URL`
+- `EVOLUTION_API_KEY`
+- `N8N_WEBHOOK_INTERNAL_BASE`
+- `N8N_WEBHOOK_ID`
+- `N8N_DISPATCHER_WEBHOOK_URL`
+- `N8N_DISPATCHER_API_KEY`
+- `N8N_AUTOMATION_WEBHOOK_BASE_URL`
+- `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
 
-### Modo SSL
+### 4. Datos y Prisma
 
-Modo esperado en este contexto:
+Leadflow usa PostgreSQL vía Prisma.
 
-- `Full`
+Estado actual del repo:
 
-Razón práctica:
+- el stack local `infra/swarm/docker-stack.local.yml` sí inyecta `DATABASE_URL`
+- el stack productivo `infra/swarm/docker-stack.yml` ahora también expone `DATABASE_URL` como variable requerida del entorno
+- el host de Postgres no está fijado en el repo productivo; se debe proveer desde el entorno del manager o Portainer
 
-- Cloudflare debe poder terminar TLS del hostname del cliente en el edge
-- el origin de Leadflow responde siempre por el hostname fijo del fallback
-- el flujo SaaS no debe depender de que el origin tenga certificados emitidos para cada dominio cliente
+Conclusión:
 
-Nota operativa:
+- la conexión API -> DB es obligatoria y explícita
+- si `DATABASE_URL` no está presente en producción, el runtime puede arrancar pero fallará al tocar datos
 
-- si la cuenta o la zona se endurecen con `Full (strict)`, el origin debe mantener certificados válidos para los hostnames fijos del SaaS, especialmente `proxy-fallback.leadflow.kurukin.com`
-- un desalineamiento aquí suele reaparecer como `526`
+### 5. Dispatcher a n8n
 
-### Fallback Origin
+El flujo actual del dispatcher sale desde:
 
-El `fallback origin` correcto es:
+- `apps/api/src/modules/public-funnel-runtime/lead-capture-assignment.service.ts`
+- `apps/api/src/modules/messaging-automation/lead-dispatcher.service.ts`
 
-- `proxy-fallback.leadflow.kurukin.com`
+Secuencia:
 
-Es importante porque:
+1. se crea o reutiliza un lead
+2. se genera una asignación
+3. si la asignación es nueva, el backend dispara `dispatchLeadContextUpsert`
+4. `LeadDispatcherService` arma el payload
+5. `postWithRetry` envía un `POST` a `N8N_DISPATCHER_WEBHOOK_URL`
 
-- Cloudflare lo usa como `custom_origin_server` en el custom hostname
-- el origin TLS solo necesita cubrir ese hostname fijo
-- evita configuraciones heredadas donde un dominio cliente o un host antiguo terminan apuntando al origin equivocado
+Instrumentación productiva preservada:
 
-Si este valor queda mal:
+- `Dispatcher URL: ...`
+- `Sending payload to n8n...`
+- `Lead dispatcher failed`
 
-- el custom hostname puede existir pero seguir en estado incoherente
-- el tráfico puede terminar en un origin que no sirve el runtime correcto
-- aparecen estados `legacy`, `recreate required` o errores de SSL
+Eso permite distinguir tres fallos distintos:
 
-### Permisos mínimos del token
+- variable vacía o URL inválida
+- intento de envío sí ejecutado pero fallido
+- error silencioso ahora capturado en `LeadCaptureAssignmentService`
 
-Para operar de forma completa sin bloqueos de scope, el token debe tener al menos:
+### 6. n8n inbound y automatización adicional
 
-- `DNS:Edit`
-- `Zone:Edit`
-- `SSL:Edit`
+Además del dispatcher principal, existen dos contratos separados:
 
-En la práctica también son útiles los permisos de lectura equivalentes porque el runtime:
+- `N8N_WEBHOOK_INTERNAL_BASE` + `N8N_WEBHOOK_ID`
+  - usados por `EvolutionApiClient` para construir webhooks inbound
+- `N8N_AUTOMATION_WEBHOOK_BASE_URL`
+  - usado por `N8nAutomationClient` para automatizaciones downstream
 
-- consulta `custom_hostnames`
-- consulta `dns_records`
-- inspecciona el estado de SSL y sus desafíos
+No deben confundirse:
 
-Sin esos permisos aparecen fallos como:
+- `N8N_DISPATCHER_WEBHOOK_URL` es el webhook específico de lead context upsert
+- `N8N_AUTOMATION_WEBHOOK_BASE_URL` es un base URL para otras automatizaciones
+- `N8N_WEBHOOK_INTERNAL_BASE` es la base interna para callbacks de Evolution hacia n8n
 
-- `403` al leer o escribir `dns_records`
-- imposibilidad de refrescar o corregir el estado del onboarding
-- incapacidad de validar si el bridge `customers.leadflow.kurukin.com` está sano
+## Redes y límites de responsabilidad
 
-## 3. Ciclo de Vida del Dominio
+Redes del stack productivo:
 
-## Estados principales
+- `traefik_public`
+- `general_network`
+- `leadflow_core`
+- `leadflow_automation`
 
-Leadflow trabaja con cuatro estados operativos relevantes:
+Asignación:
 
-- `pending_dns`
-- `pending_validation`
-- `active`
-- `error`
+- `web` se conecta a `traefik_public` y `leadflow_core`
+- `api` se conecta a `traefik_public`, `general_network`, `leadflow_core` y `leadflow_automation`
 
-Además, el registro puede marcarse como:
+Interpretación:
 
-- `legacy`
-- `recreate required`
+- `web` sirve la superficie HTTP pública
+- `api` mantiene conectividad adicional hacia dependencias internas y automatización
 
-cuando el target DNS o el `custom_origin_server` no coinciden con el patrón SaaS actual.
+## Fuente de verdad operativa
 
-### `custom_subdomain`
+Archivos canónicos:
 
-Caso recomendado.
+- stack productivo: `infra/swarm/docker-stack.yml`
+- stack local: `infra/swarm/docker-stack.local.yml`
+- ejemplo de variables Swarm: `infra/swarm/.env.example`
+- ejemplo API: `apps/api/.env.example`
+- ejemplo web: `apps/web/.env.example`
 
-Flujo:
+Archivos retirados por obsolescencia:
 
-1. El team registra, por ejemplo, `promo.cliente.com`.
-2. Leadflow crea o actualiza el custom hostname en Cloudflare.
-3. Leadflow entrega un único target:
-   - `customers.leadflow.kurukin.com`
-4. El cliente crea un `CNAME` desde `promo.cliente.com` hacia ese target.
-5. El team pulsa `Refresh`.
-6. Cuando hostname y SSL quedan `active`, el dominio queda operativo.
+- `docker-swarm.yml`
+- `README_INIT.md`
+- `temp_jakawi_src/`
 
-Ventajas:
+## Riesgos operativos actuales
 
-- más simple para el cliente
-- menos fricción DNS
-- menor probabilidad de conflicto con el apex
+### Riesgo 1: inconsistencias entre entorno y stack
 
-### `custom_apex`
+El código usa correctamente:
 
-Caso avanzado.
+- `DATABASE_URL` para Prisma
+- `N8N_DISPATCHER_WEBHOOK_URL` para el dispatcher
 
-Flujo:
+El riesgo está en el despliegue si Portainer o el manager no proveen esas variables.
 
-1. El team registra, por ejemplo, `retodetransformacion.com`.
-2. Leadflow crea el custom hostname con método de validación `txt`.
-3. Cloudflare devuelve el desafío en `ssl.validation_records`.
-4. El frontend muestra al usuario los registros TXT o CNAME que debe crear.
-5. Cloudflare detecta el desafío, emite el certificado y cambia el hostname a `active`.
+### Riesgo 2: múltiples superficies de configuración
 
-Diferencia clave frente a `custom_subdomain`:
+El repo tenía duplicación entre:
 
-- `custom_subdomain` depende de un `CNAME` del cliente al bridge
-- `custom_apex` suele requerir TXT para validación y flattening/ALIAS para el apuntado final
+- stack productivo real en `infra/swarm/`
+- stack alternativo en raíz
+- ejemplos de entorno con URLs antiguas del dispatcher
 
-### Por qué aumentamos el timeout a `30000ms`
+Ese ruido ya fue reducido dejando una sola narrativa canónica.
 
-La integración original usaba un timeout corto para Cloudflare. En la práctica eso era insuficiente cuando:
+### Riesgo 3: salud del dispatcher depende de un evento real
 
-- la API de Cloudflare tardaba más en devolver el snapshot del custom hostname
-- el edge seguía procesando `ssl.validation_records`
-- el runtime necesitaba consultar o refrescar estados justo durante la propagación
+Con la instrumentación actual ya vimos en producción que:
 
-Subir `CLOUDFLARE_REQUEST_TIMEOUT_MS` a `30000ms` reduce falsos negativos operativos:
+- la API arranca
+- `N8N_DISPATCHER_WEBHOOK_URL` se carga correctamente
 
-- evita tratar como error una operación que en realidad seguía en curso
-- reduce reintentos innecesarios del usuario
-- hace más estable el botón `Refresh` durante el onboarding del apex
+Todavía hace falta observar un envío real de formulario para cerrar el circuito de:
 
-## 4. Frontend UI Logic
+- `Sending payload to n8n...`
+- o `Lead dispatcher failed`
 
-### Fuente de verdad en el frontend
+## Verificación operativa recomendada
 
-La UI de dominios consume `cloudflareStatusJson` y no depende solo de instrucciones prearmadas.
+### Arranque de API
 
-El componente relevante es:
+```bash
+docker service logs --since 5m --tail 200 leadflow_api
+```
 
-- `apps/web/components/team-operations/team-domains-client.tsx`
+Señales esperadas:
 
-### Cómo extrae los registros de validación
+- `Nest application successfully started`
+- `Dispatcher URL: ...`
 
-El parser del frontend es resiliente y contempla varias formas del payload:
+### Captura de un submit real
 
-- `ssl.validationRecords`
-- `ssl.validation_records`
-- `raw.ssl.validation_records`
-- `raw.ssl.dcv_delegation_records`
-- `ownershipVerification`
+```bash
+docker service logs -f --tail 200 leadflow_api 2>&1 | grep --line-buffered -E 'Dispatcher URL:|Sending payload to n8n|Lead dispatcher failed'
+```
 
-Eso permite tolerar diferencias entre:
+Interpretación:
 
-- snapshot normalizado del backend
-- payload `raw` devuelto por Cloudflare
-- combinaciones parciales durante una transición de estado
-
-### Qué renderiza la UI
-
-Si el dominio está en `pending_validation`, la pantalla:
-
-- construye una tabla de validación a partir de `cloudflareStatusJson`
-- muestra tipo, host, value y status
-- expone botones `Copy host` y `Copy value`
-
-Eso reduce errores humanos porque el usuario no necesita reescribir manualmente:
-
-- `_acme-challenge...`
-- valores TXT largos
-- targets CNAME de delegación
-
-## 5. Runtime y resolución final
-
-En Swarm, el patrón de routing es:
-
-- router explícito para `leadflow.kurukin.com`
-- router explícito para `api.leadflow.kurukin.com`
-- router catch-all para tráfico público y dominios proxied
-
-El runtime web no enumera dominios cliente en labels ni en YAML. El contenido se resuelve por:
-
-- `host + path`
-
-Esto permite:
-
-- publicar muchos dominios sin crecer la configuración de Traefik
-- recrear onboarding sin tocar el stack
-- mantener una sola superficie pública del runtime
-
-## 6. Troubleshooting
-
-### Error `526`
-
-En este contexto, `526` significa:
-
-- Cloudflare sí llegó al origin
-- pero no pudo validar correctamente el certificado TLS del origin
-
-Causas típicas aquí:
-
-- `proxy-fallback.leadflow.kurukin.com` no tiene un certificado sano en origen
-- Cloudflare está operando con una exigencia más estricta que la cobertura real del origin
-- el custom hostname quedó activo, pero el origin fijo del SaaS no está correctamente servido por Traefik
-
-Qué revisar:
-
-- certificado del origin para `proxy-fallback.leadflow.kurukin.com`
-- conectividad TLS del host fijo del SaaS
-- que el tráfico realmente esté entrando por el router público correcto
-
-### Error `403`
-
-En este contexto, `403` casi siempre significa:
-
-- el token de Cloudflare existe
-- pero no tiene scope suficiente para el endpoint consultado
-
-Se observó de forma directa cuando:
-
-- `GET /zones/{zone_id}/dns_records` respondía, pero el token no permitía editar
-- o directamente la lectura devolvía autorización insuficiente
-
-Qué revisar:
-
-- que el token cargado en el entorno sea el nuevo y no uno persistido en el spec viejo del servicio
-- que el servicio haya sido redeployado después de cambiar `.env`
-- que el token tenga `DNS:Edit`, `Zone:Edit` y `SSL:Edit`
-
-## 7. Resumen operativo
-
-Patrón sano final:
-
-- cliente apunta su dominio a `customers.leadflow.kurukin.com`
-- Cloudflare termina TLS del dominio cliente
-- Cloudflare reenvía a `proxy-fallback.leadflow.kurukin.com`
-- Leadflow resuelve por `host + path`
-- el frontend expone los desafíos desde `cloudflareStatusJson`
-- el team usa `Refresh` hasta ver `active`
-
-Ese patrón mantiene:
-
-- IP del origin protegida
-- configuración Swarm estable
-- UI informativa para onboarding real
-- troubleshooting reproducible cuando algo falla
+- si ves `Dispatcher URL: null`, el problema es configuración
+- si ves `Sending payload to n8n...` y luego error, el problema está en red, URL o respuesta del webhook
+- si no ves ninguna línea al enviar un formulario, el problema está antes del dispatcher en el flujo de assignment
