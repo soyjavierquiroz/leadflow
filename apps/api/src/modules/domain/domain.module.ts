@@ -17,6 +17,7 @@ import { MessagingIntegrationsModule } from '../messaging-integrations/messaging
 import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
 import { RotationPoolsModule } from '../rotation-pools/rotation-pools.module';
 import { SponsorsModule } from '../sponsors/sponsors.module';
+import { StorageModule } from '../storage/storage.module';
 import { TeamsModule } from '../teams/teams.module';
 import { TrackingProfilesModule } from '../tracking-profiles/tracking-profiles.module';
 import { VisitorsModule } from '../visitors/visitors.module';
@@ -27,6 +28,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     WorkspacesModule,
     TeamsModule,
     SponsorsModule,
+    StorageModule,
     FunnelsModule,
     DomainsModule,
     FunnelTemplatesModule,
@@ -51,6 +53,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     WorkspacesModule,
     TeamsModule,
     SponsorsModule,
+    StorageModule,
     FunnelsModule,
     DomainsModule,
     FunnelTemplatesModule,
