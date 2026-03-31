@@ -337,6 +337,7 @@ model Sponsor {
   teamId              String
   displayName         String
   status              SponsorStatus
+  avatarUrl           String?
   email               String?
   phone               String?
   availabilityStatus  AvailabilityStatus

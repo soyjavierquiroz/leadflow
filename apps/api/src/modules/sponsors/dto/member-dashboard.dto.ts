@@ -23,6 +23,7 @@ export type MemberDashboardReminderBucket =
 export class MemberDashboardSponsorDto {
   readonly id: string;
   readonly displayName: string;
+  readonly avatarUrl: string | null;
   readonly email: string | null;
   readonly phone: string | null;
   readonly availabilityStatus: MemberDashboardAvailabilityStatus;
@@ -30,12 +31,14 @@ export class MemberDashboardSponsorDto {
   constructor(input: {
     id: string;
     displayName: string;
+    avatarUrl: string | null;
     email: string | null;
     phone: string | null;
     availabilityStatus: MemberDashboardAvailabilityStatus;
   }) {
     this.id = input.id;
     this.displayName = input.displayName;
+    this.avatarUrl = input.avatarUrl;
     this.email = input.email;
     this.phone = input.phone;
     this.availabilityStatus = input.availabilityStatus;

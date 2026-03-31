@@ -1,27 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { SponsorCard } from "@/components/app-shell/sponsor-card";
 import { StatusBadge } from "@/components/app-shell/status-badge";
+import { buildInitials } from "@/lib/app-shell/utils";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
-import type { MemberProfile, SponsorRecord } from "@/lib/app-shell/types";
+import type { MemberDashboardKpis } from "@/lib/member-dashboard";
+import type { MemberProfileSponsor } from "@/lib/member-profile";
 import { memberOperationRequest } from "@/lib/member-operations";
+import { uploadFileWithPresignedUrl } from "@/lib/storage";
 
 type MemberProfileClientProps = {
-  sponsor: SponsorRecord;
-  memberProfile: MemberProfile;
-  leadCount: number;
-  assignmentCount: number;
+  sponsor: MemberProfileSponsor;
+  kpis: MemberDashboardKpis;
 };
 
 export function MemberProfileClient({
   sponsor,
-  memberProfile,
-  leadCount,
-  assignmentCount,
+  kpis,
 }: MemberProfileClientProps) {
   const [currentSponsor, setCurrentSponsor] = useState(sponsor);
   const [formState, setFormState] = useState({
@@ -31,10 +30,12 @@ export function MemberProfileClient({
     availabilityStatus: sponsor.availabilityStatus,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     message: string;
   } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -42,7 +43,7 @@ export function MemberProfileClient({
     setFeedback(null);
 
     try {
-      const updatedSponsor = await memberOperationRequest<SponsorRecord>(
+      const updatedSponsor = await memberOperationRequest<MemberProfileSponsor>(
         "/sponsors/me",
         {
           method: "PATCH",
@@ -79,12 +80,77 @@ export function MemberProfileClient({
     }
   };
 
+  const handleAvatarChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setFeedback({
+        tone: "error",
+        message: "Selecciona una imagen valida para tu avatar.",
+      });
+      event.target.value = "";
+      return;
+    }
+
+    const previousAvatarUrl = currentSponsor.avatarUrl;
+    const previewUrl = URL.createObjectURL(file);
+
+    setIsUploadingAvatar(true);
+    setFeedback(null);
+    setCurrentSponsor((current) => ({
+      ...current,
+      avatarUrl: previewUrl,
+    }));
+
+    try {
+      const publicUrl = await uploadFileWithPresignedUrl(file, "avatars");
+      const updatedSponsor = await memberOperationRequest<MemberProfileSponsor>(
+        "/sponsors/me",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ avatarUrl: publicUrl }),
+        },
+      );
+
+      setCurrentSponsor(updatedSponsor);
+      setFeedback({
+        tone: "success",
+        message: "Tu foto de perfil ya quedo actualizada.",
+      });
+    } catch (error) {
+      setCurrentSponsor((current) => ({
+        ...current,
+        avatarUrl: previousAvatarUrl,
+      }));
+      setFeedback({
+        tone: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No pudimos actualizar tu avatar.",
+      });
+    } finally {
+      URL.revokeObjectURL(previewUrl);
+      event.target.value = "";
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const avatarLabel =
+    currentSponsor.displayName.trim() || "Sponsor sin nombre visible";
+
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Sponsor / Member / Perfil"
-        title="Perfil operativo del member"
-        description="Aquí el sponsor mantiene sus datos visibles para handoff y controla si quiere seguir recibiendo leads nuevos."
+        title="Tu perfil operativo"
+        description="Actualiza tus datos visibles y tu foto para que el handoff salga con una identidad clara, profesional y lista para trabajar."
       />
 
       {feedback ? (
@@ -95,49 +161,102 @@ export function MemberProfileClient({
         <KpiCard
           label="Disponibilidad"
           value={currentSponsor.availabilityStatus}
-          hint="Estado operativo que impacta el routing del round robin."
+          hint="Estado actual que define si sigues recibiendo nuevos leads."
         />
         <KpiCard
-          label="Routing weight"
-          value={String(currentSponsor.routingWeight)}
-          hint="Peso actual visible para la distribución del pool."
+          label="Handoffs nuevos"
+          value={String(kpis.handoffsNew)}
+          hint="Leads que todavia esperan tu aceptacion."
         />
         <KpiCard
-          label="Leads activos"
-          value={String(leadCount)}
-          hint="Oportunidades hoy asociadas a este sponsor."
+          label="Acciones hoy"
+          value={String(kpis.actionsToday)}
+          hint="Seguimientos urgentes o pendientes para hoy."
         />
         <KpiCard
-          label="Assignments"
-          value={String(assignmentCount)}
-          hint="Carga operativa total ligada al member."
+          label="Cartera activa"
+          value={String(kpis.activePortfolio)}
+          hint="Leads abiertos que hoy estan en tu gestion."
         />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-        <SponsorCard
-          sponsor={currentSponsor}
-          leadCount={leadCount}
-          assignmentCount={assignmentCount}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge value={currentSponsor.status} />
-              <StatusBadge value={currentSponsor.availabilityStatus} />
+        <div className="space-y-6">
+          <SponsorCard
+            sponsor={currentSponsor}
+            leadCount={kpis.activePortfolio}
+            assignmentCount={kpis.handoffsNew}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge value={currentSponsor.status} />
+                <StatusBadge value={currentSponsor.availabilityStatus} />
+              </div>
+            }
+          />
+
+          <section className="rounded-[2rem] border border-slate-200 bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.12),_transparent_38%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                {currentSponsor.avatarUrl ? (
+                  <img
+                    src={currentSponsor.avatarUrl}
+                    alt={`Avatar de ${avatarLabel}`}
+                    className="h-20 w-20 rounded-[1.75rem] border border-white object-cover shadow-[0_18px_30px_rgba(15,23,42,0.12)]"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-slate-950 text-xl font-semibold text-white shadow-[0_18px_30px_rgba(15,23,42,0.12)]">
+                    {buildInitials(avatarLabel)}
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    Foto de perfil
+                  </p>
+                  <h2 className="mt-2 text-xl font-semibold text-slate-950">
+                    Tu avatar visible en handoff
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                    Sube una imagen clara y profesional. La carga va directo a
+                    nuestro storage y el perfil se actualiza al terminar.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isUploadingAvatar ? "Subiendo avatar..." : "Cambiar foto"}
+                </button>
+                <span className="text-xs text-slate-500">
+                  PNG, JPG, WEBP o GIF
+                </span>
+              </div>
             </div>
-          }
-        />
+          </section>
+        </div>
 
         <div className="space-y-6">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-slate-950">
-                  Canal de mensajería
+                  Canal de mensajeria
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  La conexión real de WhatsApp vive ahora en una superficie
-                  separada para que puedas gestionarla sin mezclarla con el
-                  resto del perfil operativo.
+                  La conexion real de WhatsApp vive en una vista separada para
+                  que puedas gestionarla sin mezclarla con el resto del perfil.
                 </p>
               </div>
 
@@ -159,9 +278,9 @@ export function MemberProfileClient({
                 Datos visibles del sponsor
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Esta información quedará disponible para reveal y handoff en
-                fases siguientes, así que aquí cuidamos el perfil operativo
-                básico.
+                Esta informacion queda disponible para las experiencias de
+                handoff y seguimiento, asi que aqui cuidamos la identidad
+                operativa base.
               </p>
             </div>
 
@@ -191,7 +310,10 @@ export function MemberProfileClient({
                   onChange={(event) =>
                     setFormState((current) => ({
                       ...current,
-                      availabilityStatus: event.target.value,
+                      availabilityStatus: event.target.value as
+                        | "available"
+                        | "paused"
+                        | "offline",
                     }))
                   }
                   className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
@@ -220,7 +342,7 @@ export function MemberProfileClient({
 
               <label className="space-y-2 text-sm">
                 <span className="font-medium text-slate-700">
-                  Teléfono visible
+                  Telefono visible
                 </span>
                 <input
                   value={formState.phone}
@@ -241,67 +363,11 @@ export function MemberProfileClient({
                 disabled={isSaving}
                 className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Guardar perfil operativo
+                {isSaving ? "Guardando..." : "Guardar perfil operativo"}
               </button>
             </div>
           </form>
         </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-        <h2 className="text-xl font-semibold text-slate-950">
-          Preferencias aún temporales
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Estas preferencias siguen separadas del dominio productivo y quedarán
-          para una fase posterior de configuración personal más profunda.
-        </p>
-
-        <dl className="mt-6 grid gap-5 text-sm md:grid-cols-2">
-          <div>
-            <dt className="text-slate-500">Título</dt>
-            <dd className="mt-1 font-medium text-slate-900">
-              {memberProfile.title}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">Foco comercial</dt>
-            <dd className="mt-1 font-medium text-slate-900">
-              {memberProfile.focus}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">Timezone</dt>
-            <dd className="mt-1 font-medium text-slate-900">
-              {memberProfile.timezone}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-500">Ventana de respuesta</dt>
-            <dd className="mt-1 font-medium text-slate-900">
-              {memberProfile.responseWindow}
-            </dd>
-          </div>
-          <div className="md:col-span-2">
-            <dt className="text-slate-500">Canales preferidos</dt>
-            <dd className="mt-2 flex flex-wrap gap-2">
-              {memberProfile.channels.map((channel) => (
-                <span
-                  key={channel}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700"
-                >
-                  {channel}
-                </span>
-              ))}
-            </dd>
-          </div>
-          <div className="md:col-span-2">
-            <dt className="text-slate-500">Notas</dt>
-            <dd className="mt-1 leading-6 text-slate-800">
-              {memberProfile.notes}
-            </dd>
-          </div>
-        </dl>
       </section>
     </div>
   );

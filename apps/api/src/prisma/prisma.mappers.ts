@@ -131,6 +131,7 @@ export const mapSponsorRecord = (record: SponsorRecord): Sponsor => ({
   teamId: record.teamId,
   displayName: record.displayName,
   status: record.status,
+  avatarUrl: record.avatarUrl,
   email: record.email,
   phone: record.phone,
   availabilityStatus: record.availabilityStatus,

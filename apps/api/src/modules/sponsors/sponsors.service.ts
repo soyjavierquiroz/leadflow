@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { type Prisma } from '@prisma/client';
 import { buildEntity } from '../shared/domain.factory';
 import { SPONSOR_REPOSITORY } from '../shared/domain.tokens';
@@ -55,6 +56,7 @@ type MemberDashboardAssignmentRecord = Prisma.AssignmentGetPayload<{
 export class SponsorsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     @Optional()
     @Inject(SPONSOR_REPOSITORY)
     private readonly repository?: SponsorRepository,
@@ -66,6 +68,7 @@ export class SponsorsService {
       teamId: dto.teamId,
       displayName: dto.displayName,
       status: 'draft',
+      avatarUrl: null,
       email: dto.email ?? null,
       phone: dto.phone ?? null,
       availabilityStatus: dto.availabilityStatus ?? 'available',
@@ -107,6 +110,7 @@ export class SponsorsService {
       select: {
         id: true,
         displayName: true,
+        avatarUrl: true,
         email: true,
         phone: true,
         availabilityStatus: true,
@@ -152,6 +156,7 @@ export class SponsorsService {
       sponsor: new MemberDashboardSponsorDto({
         id: sponsor.id,
         displayName: sponsor.displayName,
+        avatarUrl: sponsor.avatarUrl,
         email: sponsor.email,
         phone: sponsor.phone,
         availabilityStatus: sponsor.availabilityStatus,
@@ -246,6 +251,7 @@ export class SponsorsService {
   ): Promise<Sponsor> {
     if (
       dto.displayName === undefined &&
+      dto.avatarUrl === undefined &&
       dto.email === undefined &&
       dto.phone === undefined &&
       dto.availabilityStatus === undefined
@@ -300,11 +306,14 @@ export class SponsorsService {
 
     const nextEmail = normalizeNullable(dto.email);
     const nextPhone = normalizeNullable(dto.phone);
+    const nextAvatarUrl = this.normalizeSponsorAvatarUrl(dto.avatarUrl);
 
     const record = await this.prisma.sponsor.update({
       where: { id: sponsor.id },
       data: {
         displayName,
+        avatarUrl:
+          nextAvatarUrl !== undefined ? nextAvatarUrl : sponsor.avatarUrl,
         email: nextEmail !== undefined ? nextEmail : sponsor.email,
         phone: nextPhone !== undefined ? nextPhone : sponsor.phone,
         availabilityStatus:
@@ -313,6 +322,59 @@ export class SponsorsService {
     });
 
     return mapSponsorRecord(record);
+  }
+
+  private normalizeSponsorAvatarUrl(
+    value: string | null | undefined,
+  ): string | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    let parsedUrl: URL;
+
+    try {
+      parsedUrl = new URL(trimmed);
+    } catch {
+      throw new BadRequestException({
+        code: 'SPONSOR_AVATAR_URL_INVALID',
+        message: 'Avatar URL must be a valid absolute URL.',
+      });
+    }
+
+    const configuredBaseUrl = this.configService
+      .get<string>('MINIO_PUBLIC_URL')
+      ?.trim();
+
+    if (configuredBaseUrl) {
+      try {
+        const publicBaseUrl = new URL(configuredBaseUrl);
+
+        if (parsedUrl.origin !== publicBaseUrl.origin) {
+          throw new BadRequestException({
+            code: 'SPONSOR_AVATAR_URL_INVALID_ORIGIN',
+            message:
+              'Avatar URL must point to the configured Leadflow CDN origin.',
+          });
+        }
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+      }
+    }
+
+    return parsedUrl.toString();
   }
 
   private toMemberDashboardLead(

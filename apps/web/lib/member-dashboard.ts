@@ -25,6 +25,7 @@ export type MemberDashboardReminderBucket =
 export type MemberDashboardSponsor = {
   id: string;
   displayName: string;
+  avatarUrl: string | null;
   email: string | null;
   phone: string | null;
   availabilityStatus: MemberDashboardAvailabilityStatus;
