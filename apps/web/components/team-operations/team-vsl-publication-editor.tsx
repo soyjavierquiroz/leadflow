@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import CodeMirror from "@uiw/react-codemirror";
@@ -8,7 +8,6 @@ import { json } from "@codemirror/lang-json";
 import {
   Check,
   ChevronDown,
-  ClipboardPaste,
   FileJson,
   Globe,
   ImagePlus,
@@ -25,6 +24,7 @@ import type {
   DomainRecord,
   FunnelTemplateRecord,
 } from "@/lib/app-shell/types";
+import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import { teamOperationRequest } from "@/lib/team-operations";
 
 const primaryButtonClassName =
@@ -219,6 +219,7 @@ export function TeamVslPublicationEditor({
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [uploadingRowIndex, setUploadingRowIndex] = useState<number | null>(null);
   const [currentPublicationId, setCurrentPublicationId] = useState<string | null>(
     publicationId,
   );
@@ -232,6 +233,8 @@ export function TeamVslPublicationEditor({
   const [metaDescription, setMetaDescription] = useState("");
   const [blocksText, setBlocksText] = useState(defaultBlocksSeed);
   const [mediaRows, setMediaRows] = useState<MediaRow[]>([...defaultMediaRows]);
+  const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingMediaUploadIndexRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!publicationId) {
@@ -323,6 +326,7 @@ export function TeamVslPublicationEditor({
   const isSaveDisabled =
     isPending ||
     isLoadingExisting ||
+    uploadingRowIndex !== null ||
     !funnelName.trim() ||
     !selectedDomainId ||
     !selectedTemplateId ||
@@ -355,12 +359,46 @@ export function TeamVslPublicationEditor({
     setMediaRows((current) => [...current, { key, value: "" }]);
   };
 
-  const handlePasteFromClipboard = async (index: number) => {
+  const handleUploadMediaClick = (index: number) => {
+    pendingMediaUploadIndexRef.current = index;
+    mediaUploadInputRef.current?.click();
+  };
+
+  const handleMediaUploadChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const targetIndex = pendingMediaUploadIndexRef.current;
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (targetIndex === null || !file) {
+      pendingMediaUploadIndexRef.current = null;
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      pendingMediaUploadIndexRef.current = null;
+      setErrorMessage("Solo puedes subir imágenes al media dictionary.");
+      return;
+    }
+
+    const rowKey = mediaRows[targetIndex]?.key.trim() || `media_${targetIndex + 1}`;
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setUploadingRowIndex(targetIndex);
+
     try {
-      const text = await navigator.clipboard.readText();
-      handleMediaRowChange(index, { value: text });
-    } catch {
-      setErrorMessage("No pudimos leer el portapapeles en este navegador.");
+      const publicUrl = await uploadFileWithPresignedUrl(file, "funnels");
+      handleMediaRowChange(targetIndex, { value: publicUrl });
+      setSuccessMessage(`Imagen subida al CDN para ${rowKey}.`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos subir la imagen al CDN.",
+      );
+    } finally {
+      pendingMediaUploadIndexRef.current = null;
+      setUploadingRowIndex(null);
     }
   };
 
@@ -422,6 +460,14 @@ export function TeamVslPublicationEditor({
 
   return (
     <div className="space-y-6">
+      <input
+        ref={mediaUploadInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => void handleMediaUploadChange(event)}
+      />
+
       <SectionHeader
         eyebrow="Team Admin / Publicaciones híbridas"
         title="Crear o editar funnel VSL/Landing"
@@ -530,9 +576,9 @@ export function TeamVslPublicationEditor({
             </h2>
             <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
               <p>
-                El runtime resuelve primero desde el bloque y luego cae a{" "}
-                <code>mediaMap</code>, así que usa URLs absolutas como{" "}
-                <code>https://cdn.leadflow.io/media/...</code>.
+                Sube los assets directo al CDN desde cada fila y deja{" "}
+                <code>mediaMap</code> solo como diccionario final de URLs
+                públicas.
               </p>
               <p>
                 Para VSL híbrido recomendamos arrancar con{" "}
@@ -725,6 +771,7 @@ export function TeamVslPublicationEditor({
                   }
                   handleAddMediaRow(key);
                 }}
+                disabled={uploadingRowIndex !== null}
                 className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700 transition hover:bg-slate-50"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -753,6 +800,7 @@ export function TeamVslPublicationEditor({
                           handleMediaRowChange(index, { key: event.target.value })
                         }
                         placeholder="hero"
+                        disabled={uploadingRowIndex !== null}
                         className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
                       />
                     </td>
@@ -762,7 +810,8 @@ export function TeamVslPublicationEditor({
                         onChange={(event) =>
                           handleMediaRowChange(index, { value: event.target.value })
                         }
-                        placeholder="https://cdn.leadflow.io/media/..."
+                        placeholder="https://cdn.kurukin.com/funnels/..."
+                        disabled={uploadingRowIndex !== null}
                         className="w-full min-w-72 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
                       />
                     </td>
@@ -784,11 +833,12 @@ export function TeamVslPublicationEditor({
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => void handlePasteFromClipboard(index)}
+                          onClick={() => handleUploadMediaClick(index)}
+                          disabled={uploadingRowIndex !== null}
                           className={secondaryButtonClassName}
                         >
-                          <ClipboardPaste className="h-4 w-4" />
-                          Pegar URL
+                          <ImagePlus className="h-4 w-4" />
+                          {uploadingRowIndex === index ? "Subiendo..." : "Subir a CDN"}
                         </button>
                         <button
                           type="button"
@@ -797,6 +847,7 @@ export function TeamVslPublicationEditor({
                               current.filter((_, rowIndex) => rowIndex !== index),
                             )
                           }
+                          disabled={uploadingRowIndex !== null}
                           className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -818,6 +869,7 @@ export function TeamVslPublicationEditor({
             <button
               type="button"
               onClick={() => handleAddMediaRow()}
+              disabled={uploadingRowIndex !== null}
               className={secondaryButtonClassName}
             >
               <ImagePlus className="h-4 w-4" />
