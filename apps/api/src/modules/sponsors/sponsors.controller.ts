@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -66,6 +74,22 @@ export class SponsorsController {
         sponsorId: user.sponsorId!,
       },
       dto,
+    );
+  }
+
+  @Post('me/leads/:id/accept')
+  @RequireRoles(UserRole.MEMBER)
+  acceptLead(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') leadId: string,
+  ) {
+    return this.sponsorsService.acceptLeadForMember(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+        sponsorId: user.sponsorId!,
+      },
+      leadId,
     );
   }
 

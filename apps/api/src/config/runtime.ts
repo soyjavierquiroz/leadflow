@@ -15,6 +15,7 @@ export type ApiRuntimeConfig = {
   authSessionTtlDays: number;
   n8nDispatcherWebhookUrl: string | null;
   n8nDispatcherApiKey: string | null;
+  n8nOutboundWebhookUrl: string | null;
 };
 
 const parseCsv = (value: string | undefined) => {
@@ -70,6 +71,7 @@ export const getApiRuntimeConfig = (
     (env.NODE_ENV ?? 'development') === 'production' || Boolean(baseDomain);
   const n8nDispatcherWebhookUrl = sanitizeEnv(env.N8N_DISPATCHER_WEBHOOK_URL);
   const n8nDispatcherApiKey = sanitizeEnv(env.N8N_DISPATCHER_API_KEY);
+  const n8nOutboundWebhookUrl = sanitizeEnv(env.N8N_OUTBOUND_WEBHOOK_URL);
 
   return {
     appName: env.API_NAME ?? 'leadflow-api',
@@ -91,5 +93,6 @@ export const getApiRuntimeConfig = (
     authSessionTtlDays,
     n8nDispatcherWebhookUrl: n8nDispatcherWebhookUrl ?? null,
     n8nDispatcherApiKey: n8nDispatcherApiKey ?? null,
+    n8nOutboundWebhookUrl: n8nOutboundWebhookUrl ?? null,
   };
 };

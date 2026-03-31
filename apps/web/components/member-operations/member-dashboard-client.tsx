@@ -53,15 +53,12 @@ const availabilityCopy = {
   },
   offline: {
     title: "Recepción temporalmente detenida",
-    description:
-      "No estás disponible para nuevos handoffs en este momento.",
+    description: "No estás disponible para nuevos handoffs en este momento.",
   },
 } as const;
 
 const toSentenceCase = (value: string) =>
-  value
-    .replace(/[_-]+/g, " ")
-    .replace(/^./, (letter) => letter.toUpperCase());
+  value.replace(/[_-]+/g, " ").replace(/^./, (letter) => letter.toUpperCase());
 
 const buildKpis = (inbox: MemberDashboardLead[]) => ({
   handoffsNew: inbox.filter((item) => item.assignmentStatus === "assigned")
@@ -70,7 +67,8 @@ const buildKpis = (inbox: MemberDashboardLead[]) => ({
     (item) =>
       item.reminderBucket === "overdue" || item.reminderBucket === "due_today",
   ).length,
-  activePortfolio: inbox.length,
+  activePortfolio: inbox.filter((item) => item.assignmentStatus === "accepted")
+    .length,
 });
 
 const buildOriginLabel = (lead: MemberDashboardLead) => {
@@ -137,13 +135,7 @@ function MetricCard({
   );
 }
 
-function SoftBadge({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: string;
-}) {
+function SoftBadge({ label, tone }: { label: string; tone: string }) {
   return (
     <span
       className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}
@@ -176,13 +168,11 @@ export function MemberDashboardClient({
     setFeedback(null);
 
     try {
-      const updatedSponsor = await memberOperationRequest<MemberDashboardSponsor>(
-        "/sponsors/me",
-        {
+      const updatedSponsor =
+        await memberOperationRequest<MemberDashboardSponsor>("/sponsors/me", {
           method: "PATCH",
           body: JSON.stringify({ availabilityStatus }),
-        },
-      );
+        });
 
       setSponsor((current) => ({
         ...current,
@@ -208,16 +198,35 @@ export function MemberDashboardClient({
   };
 
   const handleAcceptLead = async (lead: MemberDashboardLead) => {
+    const previousInbox = inbox;
+
     setLoadingAction(`accept:${lead.id}`);
     setFeedback(null);
+    setInbox((current) =>
+      current.map((item) =>
+        item.id === lead.id
+          ? {
+              ...item,
+              assignmentStatus: "accepted",
+              leadStatus:
+                item.leadStatus === "assigned" ? "nurturing" : item.leadStatus,
+            }
+          : item,
+      ),
+    );
 
     try {
-      const matchingAssignment = await memberOperationRequest<{
-        id: string;
-        status: "accepted";
-      }>(`/assignments/${lead.assignmentId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "accepted" }),
+      const acceptedLead = await memberOperationRequest<{
+        ok: true;
+        leadId: string;
+        sponsorId: string;
+        assignmentId: string;
+        assignmentStatus: "accepted";
+        leadStatus: MemberDashboardLeadStatus;
+        acceptedAt: string;
+        alreadyAccepted: boolean;
+      }>(`/sponsors/me/leads/${lead.id}/accept`, {
+        method: "POST",
       });
 
       setInbox((current) =>
@@ -225,18 +234,20 @@ export function MemberDashboardClient({
           item.id === lead.id
             ? {
                 ...item,
-                assignmentStatus: matchingAssignment.status,
-                leadStatus:
-                  item.leadStatus === "assigned" ? "nurturing" : item.leadStatus,
+                assignmentStatus: acceptedLead.assignmentStatus,
+                leadStatus: acceptedLead.leadStatus,
               }
             : item,
         ),
       );
       setFeedback({
         tone: "success",
-        message: "Lead aceptado. Ya quedó dentro de tu cartera activa.",
+        message: acceptedLead.alreadyAccepted
+          ? "Este lead ya estaba aceptado y sigue dentro de tu cartera activa."
+          : "Lead aceptado. Ya quedó dentro de tu cartera activa.",
       });
     } catch (error) {
+      setInbox(previousInbox);
       setFeedback({
         tone: "error",
         message:

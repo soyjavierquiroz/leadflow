@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -12,6 +13,11 @@ import { SPONSOR_REPOSITORY } from '../shared/domain.tokens';
 import { mapSponsorRecord } from '../../prisma/prisma.mappers';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildLeadWorkflow } from '../leads/leads-workflows';
+import { N8nAutomationClient } from '../messaging-automation/n8n-automation.client';
+import {
+  normalizeMessagingPhone,
+  sanitizeNullableText,
+} from '../messaging-integrations/messaging-integrations.utils';
 import type { CreateSponsorDto } from './dto/create-sponsor.dto';
 import {
   MemberDashboardDto,
@@ -52,11 +58,66 @@ type MemberDashboardAssignmentRecord = Prisma.AssignmentGetPayload<{
   include: typeof memberDashboardAssignmentInclude;
 }>;
 
+const memberLeadAcceptInclude = {
+  currentAssignment: {
+    include: {
+      sponsor: {
+        include: {
+          messagingConnection: true,
+        },
+      },
+      team: true,
+    },
+  },
+  funnelInstance: {
+    select: {
+      id: true,
+      name: true,
+      code: true,
+    },
+  },
+  funnelPublication: {
+    select: {
+      id: true,
+      pathPrefix: true,
+      domain: {
+        select: {
+          host: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.LeadInclude;
+
+type MemberLeadAcceptRecord = Prisma.LeadGetPayload<{
+  include: typeof memberLeadAcceptInclude;
+}>;
+
+type MemberLeadAcceptResult = {
+  ok: true;
+  leadId: string;
+  sponsorId: string;
+  assignmentId: string;
+  assignmentStatus: 'accepted';
+  leadStatus:
+    | 'captured'
+    | 'qualified'
+    | 'assigned'
+    | 'nurturing'
+    | 'won'
+    | 'lost';
+  acceptedAt: string;
+  alreadyAccepted: boolean;
+};
+
 @Injectable()
 export class SponsorsService {
+  private readonly logger = new Logger(SponsorsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly n8nAutomationClient: N8nAutomationClient,
     @Optional()
     @Inject(SPONSOR_REPOSITORY)
     private readonly repository?: SponsorRepository,
@@ -162,17 +223,147 @@ export class SponsorsService {
         availabilityStatus: sponsor.availabilityStatus,
       }),
       kpis: new MemberDashboardKpisDto({
-        handoffsNew: inbox.filter((item) => item.assignmentStatus === 'assigned')
-          .length,
+        handoffsNew: inbox.filter(
+          (item) => item.assignmentStatus === 'assigned',
+        ).length,
         actionsToday: inbox.filter(
           (item) =>
             item.reminderBucket === 'overdue' ||
             item.reminderBucket === 'due_today',
         ).length,
-        activePortfolio: inbox.length,
+        activePortfolio: inbox.filter(
+          (item) => item.assignmentStatus === 'accepted',
+        ).length,
       }),
       inbox,
     });
+  }
+
+  async acceptLeadForMember(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+      sponsorId: string;
+    },
+    leadId: string,
+  ): Promise<MemberLeadAcceptResult> {
+    const lead = await this.prisma.lead.findFirst({
+      where: {
+        id: leadId,
+        workspaceId: scope.workspaceId,
+        currentAssignment: {
+          is: {
+            sponsorId: scope.sponsorId,
+            teamId: scope.teamId,
+          },
+        },
+      },
+      include: memberLeadAcceptInclude,
+    });
+
+    if (!lead) {
+      throw new NotFoundException({
+        code: 'LEAD_NOT_FOUND',
+        message: 'The requested lead was not found for this sponsor.',
+      });
+    }
+
+    const assignment = lead.currentAssignment;
+
+    if (!assignment) {
+      throw new BadRequestException({
+        code: 'LEAD_ASSIGNMENT_REQUIRED',
+        message: 'The lead does not have an active assignment to accept.',
+      });
+    }
+
+    if (lead.status === 'won' || lead.status === 'lost') {
+      throw new BadRequestException({
+        code: 'LEAD_NOT_ACCEPTABLE',
+        message: 'Terminal leads cannot be accepted manually.',
+      });
+    }
+
+    if (assignment.status === 'accepted') {
+      return {
+        ok: true,
+        leadId: lead.id,
+        sponsorId: assignment.sponsorId,
+        assignmentId: assignment.id,
+        assignmentStatus: 'accepted',
+        leadStatus: lead.status,
+        acceptedAt:
+          assignment.acceptedAt?.toISOString() ??
+          assignment.updatedAt.toISOString(),
+        alreadyAccepted: true,
+      };
+    }
+
+    if (assignment.status !== 'pending' && assignment.status !== 'assigned') {
+      throw new BadRequestException({
+        code: 'ASSIGNMENT_NOT_ACCEPTABLE',
+        message: 'Only pending or assigned leads can be accepted manually.',
+      });
+    }
+
+    const acceptedAt = new Date();
+    const nextLeadStatus =
+      lead.status === 'captured' || lead.status === 'assigned'
+        ? 'nurturing'
+        : lead.status;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.assignment.update({
+        where: {
+          id: assignment.id,
+        },
+        data: {
+          status: 'accepted',
+          acceptedAt,
+        },
+      });
+
+      if (nextLeadStatus !== lead.status) {
+        await tx.lead.update({
+          where: {
+            id: lead.id,
+          },
+          data: {
+            status: nextLeadStatus,
+          },
+        });
+      }
+    });
+
+    const result: MemberLeadAcceptResult = {
+      ok: true,
+      leadId: lead.id,
+      sponsorId: assignment.sponsorId,
+      assignmentId: assignment.id,
+      assignmentStatus: 'accepted',
+      leadStatus: nextLeadStatus,
+      acceptedAt: acceptedAt.toISOString(),
+      alreadyAccepted: false,
+    };
+
+    const outboundWebhookUrl = this.getOutboundWebhookUrl();
+
+    if (outboundWebhookUrl) {
+      void this.dispatchOutboundRescueWebhook(
+        outboundWebhookUrl,
+        this.buildOutboundRescuePayload(lead, {
+          acceptedAt: result.acceptedAt,
+          assignmentStatus: result.assignmentStatus,
+          leadStatus: result.leadStatus,
+        }),
+      );
+    } else {
+      this.logger.warn(
+        `Skipping outbound rescue webhook for lead ${lead.id}: N8N_OUTBOUND_WEBHOOK_URL is not configured.`,
+      );
+    }
+
+    return result;
   }
 
   async findForMember(scope: {
@@ -377,6 +568,140 @@ export class SponsorsService {
     return parsedUrl.toString();
   }
 
+  private getOutboundWebhookUrl() {
+    const configuredValue = sanitizeNullableText(
+      this.configService.get<string>('N8N_OUTBOUND_WEBHOOK_URL'),
+    );
+
+    if (!configuredValue) {
+      return null;
+    }
+
+    try {
+      return new URL(configuredValue).toString();
+    } catch {
+      this.logger.warn(
+        `Skipping outbound rescue webhook because N8N_OUTBOUND_WEBHOOK_URL is invalid: ${configuredValue}`,
+      );
+      return null;
+    }
+  }
+
+  private buildOutboundRescuePayload(
+    lead: MemberLeadAcceptRecord,
+    input: {
+      acceptedAt: string;
+      assignmentStatus: 'accepted';
+      leadStatus: MemberLeadAcceptResult['leadStatus'];
+    },
+  ) {
+    const assignment = lead.currentAssignment;
+
+    if (!assignment) {
+      throw new Error(
+        'Lead assignment is required to build the outbound payload.',
+      );
+    }
+
+    const messagingConnection = assignment.sponsor.messagingConnection;
+
+    return {
+      version: 'leadflow.outbound-rescue.v1',
+      event: 'LEAD_OUTBOUND_RESCUE_ACCEPTED',
+      occurredAt: input.acceptedAt,
+      leadId: lead.id,
+      sponsorId: assignment.sponsorId,
+      assignmentId: assignment.id,
+      lead: {
+        id: lead.id,
+        status: input.leadStatus,
+        sourceChannel: lead.sourceChannel,
+        fullName: sanitizeNullableText(lead.fullName),
+        email: sanitizeNullableText(lead.email),
+        phone: sanitizeNullableText(lead.phone),
+        normalizedPhone: normalizeMessagingPhone(lead.phone),
+        companyName: sanitizeNullableText(lead.companyName),
+        qualificationGrade: lead.qualificationGrade,
+        summaryText: sanitizeNullableText(lead.summaryText),
+        nextActionLabel: sanitizeNullableText(lead.nextActionLabel),
+        followUpAt: lead.followUpAt?.toISOString() ?? null,
+        tags: lead.tags,
+      },
+      sponsor: {
+        id: assignment.sponsor.id,
+        displayName: assignment.sponsor.displayName,
+        email: sanitizeNullableText(assignment.sponsor.email),
+        phone: sanitizeNullableText(assignment.sponsor.phone),
+      },
+      team: {
+        id: assignment.team.id,
+        name: assignment.team.name,
+        code: assignment.team.code,
+      },
+      assignment: {
+        id: assignment.id,
+        status: input.assignmentStatus,
+        reason: assignment.reason,
+        assignedAt: assignment.assignedAt.toISOString(),
+        acceptedAt: input.acceptedAt,
+      },
+      messagingConnection: messagingConnection
+        ? {
+            id: messagingConnection.id,
+            provider: messagingConnection.provider,
+            status: messagingConnection.status,
+            runtimeContextStatus: messagingConnection.runtimeContextStatus,
+            externalInstanceId: messagingConnection.externalInstanceId,
+            phone: sanitizeNullableText(messagingConnection.phone),
+            normalizedPhone:
+              sanitizeNullableText(messagingConnection.normalizedPhone) ??
+              normalizeMessagingPhone(messagingConnection.phone),
+            automationWebhookUrl: sanitizeNullableText(
+              messagingConnection.automationWebhookUrl,
+            ),
+            automationEnabled: messagingConnection.automationEnabled,
+          }
+        : null,
+      funnelInstance: lead.funnelInstance
+        ? {
+            id: lead.funnelInstance.id,
+            name: lead.funnelInstance.name,
+            code: lead.funnelInstance.code,
+          }
+        : null,
+      publication: lead.funnelPublication
+        ? {
+            id: lead.funnelPublication.id,
+            pathPrefix: lead.funnelPublication.pathPrefix,
+            domainHost: lead.funnelPublication.domain.host,
+          }
+        : null,
+    };
+  }
+
+  private async dispatchOutboundRescueWebhook(url: string, payload: unknown) {
+    try {
+      const response = await this.n8nAutomationClient.dispatch(url, payload);
+
+      if (response.status < 200 || response.status >= 300) {
+        this.logger.warn(
+          `Outbound rescue webhook responded with HTTP ${response.status}.`,
+        );
+        return;
+      }
+
+      this.logger.log(
+        `Outbound rescue webhook accepted with HTTP ${response.status}.`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Outbound rescue webhook failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+  }
+
   private toMemberDashboardLead(
     assignment: MemberDashboardAssignmentRecord,
   ): MemberDashboardLeadDto {
@@ -417,9 +742,7 @@ export class SponsorsService {
     });
   }
 
-  private resolveDashboardLeadPriority(
-    lead: MemberDashboardLeadDto,
-  ): number {
+  private resolveDashboardLeadPriority(lead: MemberDashboardLeadDto): number {
     if (lead.assignmentStatus === 'assigned') {
       return 0;
     }

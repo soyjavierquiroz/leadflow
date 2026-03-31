@@ -13,6 +13,10 @@ import { RuntimeContextModule } from '../runtime-context/runtime-context.module'
     N8nAutomationClient,
     LeadDispatcherService,
   ],
-  exports: [MessagingAutomationService, LeadDispatcherService],
+  exports: [
+    MessagingAutomationService,
+    N8nAutomationClient,
+    LeadDispatcherService,
+  ],
 })
 export class MessagingAutomationModule {}
