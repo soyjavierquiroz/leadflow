@@ -38,6 +38,7 @@ export class AssignmentsService {
       status: 'pending',
       reason: dto.reason ?? 'rotation',
       assignedAt: new Date().toISOString(),
+      acceptedAt: null,
       resolvedAt: null,
     });
   }
@@ -131,6 +132,10 @@ export class AssignmentsService {
         where: { id: assignment.id },
         data: {
           status: dto.status,
+          acceptedAt:
+            dto.status === 'accepted'
+              ? (assignment.acceptedAt ?? new Date())
+              : assignment.acceptedAt,
           resolvedAt: dto.status === 'closed' ? new Date() : null,
         },
       });

@@ -388,6 +388,7 @@ export const mapAssignmentRecord = (record: AssignmentRecord): Assignment => ({
   status: record.status,
   reason: record.reason,
   assignedAt: toIso(record.assignedAt),
+  acceptedAt: record.acceptedAt ? toIso(record.acceptedAt) : null,
   resolvedAt: record.resolvedAt ? toIso(record.resolvedAt) : null,
   createdAt: toIso(record.createdAt),
   updatedAt: toIso(record.updatedAt),

@@ -27,6 +27,7 @@ export interface Assignment extends BaseDomainEntity, WorkspaceScoped {
   status: AssignmentStatus;
   reason: AssignmentReason;
   assignedAt: ISODateString;
+  acceptedAt: ISODateString | null;
   resolvedAt: ISODateString | null;
 }
 

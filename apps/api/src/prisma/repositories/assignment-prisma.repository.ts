@@ -90,6 +90,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
         status: 'pending',
         reason: data.reason ?? 'rotation',
         assignedAt: new Date(),
+        acceptedAt: null,
         resolvedAt: null,
       },
     });
@@ -113,6 +114,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
         status: entity.status,
         reason: entity.reason,
         assignedAt: new Date(entity.assignedAt),
+        acceptedAt: entity.acceptedAt ? new Date(entity.acceptedAt) : null,
         resolvedAt: entity.resolvedAt ? new Date(entity.resolvedAt) : null,
         createdAt: new Date(entity.createdAt),
         updatedAt: new Date(entity.updatedAt),
@@ -127,6 +129,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
         status: entity.status,
         reason: entity.reason,
         assignedAt: new Date(entity.assignedAt),
+        acceptedAt: entity.acceptedAt ? new Date(entity.acceptedAt) : null,
         resolvedAt: entity.resolvedAt ? new Date(entity.resolvedAt) : null,
       },
     });

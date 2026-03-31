@@ -403,6 +403,142 @@ export class LeadsService {
     return this.enrichLead(mapLeadRecord(updated));
   }
 
+  async autoAcceptLeadFromWebhook(leadId: string) {
+    const lead = await this.prisma.lead.findUnique({
+      where: {
+        id: leadId,
+      },
+      include: {
+        currentAssignment: true,
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException({
+        code: 'LEAD_NOT_FOUND',
+        message: 'The requested lead was not found.',
+      });
+    }
+
+    const assignment = lead.currentAssignment;
+
+    if (!assignment) {
+      throw new BadRequestException({
+        code: 'LEAD_ASSIGNMENT_REQUIRED',
+        message: 'The lead does not have an active assignment to accept.',
+      });
+    }
+
+    if (lead.status === 'won' || lead.status === 'lost') {
+      throw new BadRequestException({
+        code: 'LEAD_NOT_ACCEPTABLE',
+        message: 'Terminal leads cannot be auto-accepted.',
+      });
+    }
+
+    if (assignment.status === 'accepted') {
+      return {
+        ok: true,
+        leadId: lead.id,
+        assignmentId: assignment.id,
+        assignmentStatus: assignment.status,
+        leadStatus: lead.status,
+        acceptedAt:
+          assignment.acceptedAt?.toISOString() ??
+          assignment.updatedAt.toISOString(),
+        alreadyAccepted: true,
+      };
+    }
+
+    if (assignment.status !== 'pending' && assignment.status !== 'assigned') {
+      throw new BadRequestException({
+        code: 'ASSIGNMENT_NOT_ACCEPTABLE',
+        message: 'Only pending or assigned leads can be auto-accepted.',
+      });
+    }
+
+    const now = new Date();
+    const nextLeadStatus =
+      lead.status === 'captured' || lead.status === 'assigned'
+        ? 'nurturing'
+        : lead.status;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updatedAssignment = await tx.assignment.update({
+        where: {
+          id: assignment.id,
+        },
+        data: {
+          status: 'accepted',
+          acceptedAt: assignment.acceptedAt ?? now,
+        },
+      });
+
+      if (nextLeadStatus !== lead.status) {
+        await tx.lead.update({
+          where: {
+            id: lead.id,
+          },
+          data: {
+            status: nextLeadStatus,
+          },
+        });
+
+        await this.recordLeadDomainEvent(tx, {
+          leadId: lead.id,
+          workspaceId: lead.workspaceId,
+          assignmentId: assignment.id,
+          eventName: 'lead_status_updated',
+          actorType: 'integration',
+          occurredAt: now,
+          payload: {
+            nextStatus: nextLeadStatus,
+            previousStatus: lead.status,
+            source: 'n8n_auto_accept_webhook',
+          },
+        });
+      }
+
+      await tx.domainEvent.create({
+        data: {
+          id: randomUUID(),
+          workspaceId: lead.workspaceId,
+          eventId: randomUUID(),
+          aggregateType: 'assignment',
+          aggregateId: assignment.id,
+          eventName: 'assignment_auto_accepted',
+          actorType: 'integration',
+          payload: toInputJsonValue({
+            leadId: lead.id,
+            sponsorId: assignment.sponsorId,
+            previousStatus: assignment.status,
+            nextStatus: 'accepted',
+            source: 'n8n_auto_accept_webhook',
+          }),
+          occurredAt: now,
+          visitorId: lead.visitorId,
+          leadId: lead.id,
+          assignmentId: assignment.id,
+        },
+      });
+
+      return {
+        leadId: lead.id,
+        assignmentId: assignment.id,
+        assignmentStatus: updatedAssignment.status,
+        leadStatus: nextLeadStatus,
+        acceptedAt:
+          updatedAssignment.acceptedAt?.toISOString() ?? now.toISOString(),
+      };
+    });
+
+    return {
+      ok: true,
+      ...result,
+      alreadyAccepted: false,
+    };
+  }
+
   async getTimelineDetail(
     scope: LeadTimelineScope,
     leadId: string,
@@ -841,6 +977,7 @@ export class LeadsService {
       assignmentId: string | null;
       eventName: string;
       actorType: 'user' | 'system' | 'integration';
+      occurredAt?: Date;
       payload: Record<string, unknown>;
     },
   ) {
@@ -854,7 +991,7 @@ export class LeadsService {
         eventName: input.eventName,
         actorType: input.actorType,
         payload: toInputJsonValue(input.payload),
-        occurredAt: new Date(),
+        occurredAt: input.occurredAt ?? new Date(),
         visitorId: null,
         leadId: input.leadId,
         assignmentId: input.assignmentId,

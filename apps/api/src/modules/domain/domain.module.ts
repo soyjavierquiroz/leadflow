@@ -21,6 +21,7 @@ import { StorageModule } from '../storage/storage.module';
 import { TeamsModule } from '../teams/teams.module';
 import { TrackingProfilesModule } from '../tracking-profiles/tracking-profiles.module';
 import { VisitorsModule } from '../visitors/visitors.module';
+import { WebhooksModule } from '../webhooks/webhooks.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
 
 @Module({
@@ -43,6 +44,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,
+    WebhooksModule,
     LeadsModule,
     MessagingAutomationModule,
     MessagingIntegrationsModule,
@@ -68,6 +70,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,
+    WebhooksModule,
     LeadsModule,
     MessagingAutomationModule,
     MessagingIntegrationsModule,
