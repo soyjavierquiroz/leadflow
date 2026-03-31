@@ -1,5 +1,6 @@
 import type {
   MessagingConnectionStatus,
+  MessagingRuntimeContextStatus,
   MessagingProvider,
 } from '@prisma/client';
 import type { ISODateString } from '../shared/domain.types';
@@ -11,6 +12,8 @@ export type MessagingConnectionView = {
   sponsorId: string;
   provider: MessagingProvider;
   status: MessagingConnectionStatus;
+  runtimeContextStatus: MessagingRuntimeContextStatus | null;
+  runtimeContextTenantId: string | null;
   instanceId: string | null;
   externalInstanceId: string | null;
   phone: string | null;
@@ -22,6 +25,11 @@ export type MessagingConnectionView = {
   automationEnabled: boolean;
   metadata: unknown;
   lastSyncedAt: ISODateString | null;
+  runtimeContextRegisteredAt: ISODateString | null;
+  runtimeContextReadyAt: ISODateString | null;
+  runtimeContextLastCheckedAt: ISODateString | null;
+  runtimeContextLastErrorAt: ISODateString | null;
+  runtimeContextLastErrorMessage: string | null;
   lastConnectedAt: ISODateString | null;
   lastDisconnectedAt: ISODateString | null;
   lastErrorAt: ISODateString | null;

@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MessagingRuntimeContextStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeMessagingPhone } from '../messaging-integrations/messaging-integrations.utils';
 import type { LeadContextUpsertPayload } from './lead-dispatcher.types';
+import { RuntimeContextCentralService } from '../runtime-context/runtime-context-central.service';
 
 const DISPATCH_RETRY_DELAYS_MS = [0, 2_000, 5_000] as const;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -73,7 +74,10 @@ export class LeadDispatcherService {
     process.env.N8N_DISPATCHER_API_KEY,
   );
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly runtimeContextCentralService: RuntimeContextCentralService,
+  ) {
     this.logger.log(`Dispatcher URL: ${this.dispatcherWebhookUrl}`);
   }
 
@@ -94,6 +98,29 @@ export class LeadDispatcherService {
     });
 
     if (!assignment) {
+      return null;
+    }
+
+    const connection = assignment.sponsor.messagingConnection;
+
+    if (!connection?.externalInstanceId) {
+      return null;
+    }
+
+    const readiness =
+      connection.runtimeContextStatus === MessagingRuntimeContextStatus.READY
+        ? {
+            ready: true,
+          }
+        : await this.runtimeContextCentralService.ensureConnectionReady({
+            id: connection.id,
+            workspaceId: connection.workspaceId,
+            externalInstanceId: connection.externalInstanceId,
+            runtimeContextStatus: connection.runtimeContextStatus,
+            runtimeContextTenantId: connection.runtimeContextTenantId,
+          });
+
+    if (!readiness.ready) {
       return null;
     }
 

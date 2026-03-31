@@ -244,14 +244,9 @@ export class LeadCaptureAssignmentService {
       });
 
       if (result.assignmentWasCreated) {
-        void this.leadDispatcherService
-          .dispatchLeadContextUpsert({
-            assignmentId: result.assignment.id,
-          })
-          .catch((err: unknown) => {
-            this.logger.error('Lead dispatcher failed', err);
-            return undefined;
-          });
+        void this.sendLeadContextUpsert({
+          assignmentId: result.assignment.id,
+        });
         void this.messagingAutomationService
           .dispatchAssignmentAutomation({
             assignmentId: result.assignment.id,
@@ -420,14 +415,9 @@ export class LeadCaptureAssignmentService {
       });
 
       if (result.assignmentWasCreated) {
-        void this.leadDispatcherService
-          .dispatchLeadContextUpsert({
-            assignmentId: result.assignment.id,
-          })
-          .catch((err: unknown) => {
-            this.logger.error('Lead dispatcher failed', err);
-            return undefined;
-          });
+        void this.sendLeadContextUpsert({
+          assignmentId: result.assignment.id,
+        });
         void this.messagingAutomationService
           .dispatchAssignmentAutomation({
             assignmentId: result.assignment.id,
@@ -517,6 +507,14 @@ export class LeadCaptureAssignmentService {
       publication,
       currentStepId,
     );
+  }
+
+  private async sendLeadContextUpsert(input: { assignmentId: string }) {
+    try {
+      await this.leadDispatcherService.dispatchLeadContextUpsert(input);
+    } catch (err) {
+      this.logger.error('Lead dispatcher failed', err);
+    }
   }
 
   private async getPublicationContextOrThrow(

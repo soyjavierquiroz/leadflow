@@ -6,7 +6,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "nest start --watch",
-    "build": "prisma generate && nest build",
+    "build": "rm -rf dist && prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main",
     "domains:cleanup-legacy": "ts-node src/scripts/domains-cleanup-legacy.ts",

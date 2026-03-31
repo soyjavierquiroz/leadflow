@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   MessagingConnectionStatus,
+  MessagingRuntimeContextStatus,
   MessagingProvider,
   type MessagingConnection,
   type Prisma,
@@ -29,6 +30,7 @@ import {
   resolveMessagingConnectionStatus,
   sanitizeNullableText,
 } from './messaging-integrations.utils';
+import { RuntimeContextCentralService } from '../runtime-context/runtime-context-central.service';
 
 type MemberMessagingScope = {
   workspaceId: string;
@@ -62,6 +64,7 @@ export class MessagingIntegrationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly evolutionClient: EvolutionApiClient,
+    private readonly runtimeContextCentralService: RuntimeContextCentralService,
   ) {}
 
   async getCurrentForMember(
@@ -350,6 +353,13 @@ export class MessagingIntegrationsService {
       },
       data: {
         status: MessagingConnectionStatus.disconnected,
+        runtimeContextStatus: null,
+        runtimeContextTenantId: existingConnection.workspaceId,
+        runtimeContextRegisteredAt: null,
+        runtimeContextReadyAt: null,
+        runtimeContextLastCheckedAt: null,
+        runtimeContextLastErrorAt: null,
+        runtimeContextLastErrorMessage: null,
         qrCodeData: null,
         pairingCode: null,
         pairingExpiresAt: null,
@@ -402,6 +412,17 @@ export class MessagingIntegrationsService {
       preparedInput.instanceId,
       connectionWebhookUrl,
     );
+    await this.runtimeContextCentralService.markConnectionProvisioned({
+      connectionId: baseConnection.id,
+      tenantId: scope.workspaceId,
+    });
+    await this.runtimeContextCentralService.ensureConnectionReady({
+      id: baseConnection.id,
+      workspaceId: scope.workspaceId,
+      externalInstanceId: preparedInput.instanceId,
+      runtimeContextStatus: MessagingRuntimeContextStatus.PROVISIONED,
+      runtimeContextTenantId: scope.workspaceId,
+    });
 
     const qrPayload = options.fetchQr
       ? await this.evolutionClient.fetchQr(preparedInput.instanceId)
@@ -514,6 +535,13 @@ export class MessagingIntegrationsService {
       update: {
         provider: MessagingProvider.EVOLUTION,
         status,
+        runtimeContextStatus: null,
+        runtimeContextTenantId: scope.workspaceId,
+        runtimeContextRegisteredAt: null,
+        runtimeContextReadyAt: null,
+        runtimeContextLastCheckedAt: null,
+        runtimeContextLastErrorAt: null,
+        runtimeContextLastErrorMessage: null,
         externalInstanceId: preparedInput.instanceId,
         phone: preparedInput.phone,
         normalizedPhone: preparedInput.normalizedPhone,
@@ -538,6 +566,8 @@ export class MessagingIntegrationsService {
         sponsorId: sponsor.id,
         provider: MessagingProvider.EVOLUTION,
         status,
+        runtimeContextStatus: null,
+        runtimeContextTenantId: scope.workspaceId,
         externalInstanceId: preparedInput.instanceId,
         phone: preparedInput.phone,
         normalizedPhone: preparedInput.normalizedPhone,
@@ -620,6 +650,8 @@ export class MessagingIntegrationsService {
       sponsorId: connection.sponsorId,
       provider: connection.provider,
       status: connection.status,
+      runtimeContextStatus: connection.runtimeContextStatus,
+      runtimeContextTenantId: connection.runtimeContextTenantId,
       instanceId: connection.externalInstanceId,
       externalInstanceId: connection.externalInstanceId,
       phone: connection.phone,
@@ -631,6 +663,13 @@ export class MessagingIntegrationsService {
       automationEnabled: connection.automationEnabled,
       metadata: connection.metadataJson ?? null,
       lastSyncedAt: toIso(connection.lastSyncedAt),
+      runtimeContextRegisteredAt: toIso(connection.runtimeContextRegisteredAt),
+      runtimeContextReadyAt: toIso(connection.runtimeContextReadyAt),
+      runtimeContextLastCheckedAt: toIso(
+        connection.runtimeContextLastCheckedAt,
+      ),
+      runtimeContextLastErrorAt: toIso(connection.runtimeContextLastErrorAt),
+      runtimeContextLastErrorMessage: connection.runtimeContextLastErrorMessage,
       lastConnectedAt: toIso(connection.lastConnectedAt),
       lastDisconnectedAt: toIso(connection.lastDisconnectedAt),
       lastErrorAt: toIso(connection.lastErrorAt),
@@ -700,7 +739,7 @@ export class MessagingIntegrationsService {
     preparedInput: PreparedConnectionInput;
     message: string;
   }) {
-    const data = {
+    const updateData = {
       workspaceId: input.scope.workspaceId,
       teamId: input.scope.teamId,
       sponsorId: input.scope.sponsorId,
@@ -716,19 +755,16 @@ export class MessagingIntegrationsService {
       lastErrorMessage: input.message,
     };
 
-    if (input.existingConnection) {
-      await this.prisma.messagingConnection.update({
-        where: {
-          id: input.existingConnection.id,
-        },
-        data,
-      });
-
-      return;
-    }
-
-    await this.prisma.messagingConnection.create({
-      data,
+    await this.prisma.messagingConnection.upsert({
+      where: {
+        sponsorId: input.sponsor.id,
+      },
+      update: updateData,
+      create: {
+        ...updateData,
+        runtimeContextStatus: null,
+        runtimeContextTenantId: input.scope.workspaceId,
+      },
     });
   }
 

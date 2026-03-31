@@ -229,6 +229,12 @@ enum MessagingConnectionStatus {
   error
 }
 
+enum MessagingRuntimeContextStatus {
+  PROVISIONED
+  REGISTERED
+  READY
+}
+
 enum AutomationDispatchStatus {
   pending
   skipped
@@ -394,6 +400,13 @@ model MessagingConnection {
   sponsorId            String                    @unique
   provider             MessagingProvider
   status               MessagingConnectionStatus
+  runtimeContextStatus MessagingRuntimeContextStatus?
+  runtimeContextTenantId String?
+  runtimeContextRegisteredAt DateTime?
+  runtimeContextReadyAt DateTime?
+  runtimeContextLastCheckedAt DateTime?
+  runtimeContextLastErrorAt DateTime?
+  runtimeContextLastErrorMessage String?
   externalInstanceId   String?                   @unique
   phone                String?
   normalizedPhone      String?
@@ -417,6 +430,7 @@ model MessagingConnection {
 
   @@index([workspaceId, provider, status])
   @@index([teamId, provider, status])
+  @@index([workspaceId, runtimeContextStatus])
 }
 
 model Funnel {

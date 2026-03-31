@@ -111,6 +111,18 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-leadflow}:${POSTGRES_PASSWORD:-leadflow}@db:5432/${POSTGRES_DB:-leadflow}?schema=public
       CLOUDFLARE_SAAS_FALLBACK_ORIGIN: ${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kurukin.com}
       CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET: ${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.leadflow.kurukin.com}
+      
+      # CABLES DE n8n
+      N8N_DISPATCHER_WEBHOOK_URL: ${N8N_DISPATCHER_WEBHOOK_URL}
+      N8N_DISPATCHER_API_KEY: ${N8N_DISPATCHER_API_KEY}
+      RUNTIME_CONTEXT_CENTRAL_BASE_URL: ${RUNTIME_CONTEXT_CENTRAL_BASE_URL:-}
+      RUNTIME_CONTEXT_REGISTER_PATH: ${RUNTIME_CONTEXT_REGISTER_PATH:-/register}
+      RUNTIME_CONTEXT_RESOLVE_FULL_PATH: ${RUNTIME_CONTEXT_RESOLVE_FULL_PATH:-/resolve-full}
+      RUNTIME_CONTEXT_CENTRAL_API_KEY: ${RUNTIME_CONTEXT_CENTRAL_API_KEY:-}
+      RUNTIME_CONTEXT_REQUEST_TIMEOUT_MS: ${RUNTIME_CONTEXT_REQUEST_TIMEOUT_MS:-5000}
+      RUNTIME_CONTEXT_RESOLVE_RETRIES: ${RUNTIME_CONTEXT_RESOLVE_RETRIES:-5}
+      RUNTIME_CONTEXT_RESOLVE_DELAY_MS: ${RUNTIME_CONTEXT_RESOLVE_DELAY_MS:-1000}
+
     networks:
       - traefik_public
       - leadflow_core
@@ -156,7 +168,6 @@ networks:
   leadflow_core:
     driver: overlay
     attachable: true
-  # Placeholder para integraciones internas futuras (n8n/Evolution/workers)
   leadflow_automation:
     driver: overlay
     attachable: true

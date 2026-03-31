@@ -57,7 +57,7 @@ describe('LeadDispatcherService', () => {
   });
 
   it('builds the exact lead context payload expected by the generic dispatcher', () => {
-    const service = new LeadDispatcherService({} as never);
+    const service = new LeadDispatcherService({} as never, {} as never);
     const payload = buildPayload(service, 'evt_test_lead_context_seed');
 
     expect(payload).toEqual({
@@ -114,7 +114,7 @@ describe('LeadDispatcherService', () => {
       'https://n8n.example.com/webhook/dispatcher/lead-context-upsert';
     process.env.N8N_DISPATCHER_API_KEY = 'dispatcher-secret';
 
-    const service = new LeadDispatcherService({} as never);
+    const service = new LeadDispatcherService({} as never, {} as never);
     const payload = buildPayload(service, 'evt_test_network_request');
     const fetchSpy = jest
       .spyOn(global, 'fetch')
@@ -152,7 +152,7 @@ describe('LeadDispatcherService', () => {
       'https://n8n.example.com/webhook/dispatcher/lead-context-upsert';
     process.env.N8N_DISPATCHER_API_KEY = 'dispatcher-secret';
 
-    const service = new LeadDispatcherService({} as never);
+    const service = new LeadDispatcherService({} as never, {} as never);
     const payload = buildPayload(service, 'evt_test_retry_path');
     const fetchSpy = jest
       .spyOn(global, 'fetch')

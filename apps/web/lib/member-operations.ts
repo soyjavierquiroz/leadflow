@@ -20,6 +20,8 @@ export type MemberMessagingConnection = {
     | "connecting"
     | "connected"
     | "error";
+  runtimeContextStatus: "PROVISIONED" | "REGISTERED" | "READY" | null;
+  runtimeContextTenantId: string | null;
   instanceId: string | null;
   externalInstanceId: string | null;
   phone: string | null;
@@ -31,6 +33,11 @@ export type MemberMessagingConnection = {
   automationEnabled: boolean;
   metadata: unknown;
   lastSyncedAt: string | null;
+  runtimeContextRegisteredAt: string | null;
+  runtimeContextReadyAt: string | null;
+  runtimeContextLastCheckedAt: string | null;
+  runtimeContextLastErrorAt: string | null;
+  runtimeContextLastErrorMessage: string | null;
   lastConnectedAt: string | null;
   lastDisconnectedAt: string | null;
   lastErrorAt: string | null;
