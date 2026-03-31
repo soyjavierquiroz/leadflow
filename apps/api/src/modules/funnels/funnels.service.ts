@@ -17,6 +17,7 @@ export class FunnelsService {
       workspaceId: dto.workspaceId,
       name: dto.name,
       code: dto.code,
+      thumbnailUrl: null,
       status: 'draft',
       stages: dto.stages ?? ['captured', 'qualified', 'won'],
       entrySources: dto.entrySources ?? [

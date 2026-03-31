@@ -55,6 +55,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
         workspaceId: data.workspaceId,
         name: data.name,
         code: data.code,
+        thumbnailUrl: null,
         status: 'draft',
         stages: data.stages ?? ['captured', 'qualified', 'won'],
         entrySources: (
@@ -76,6 +77,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
         workspaceId: entity.workspaceId,
         name: entity.name,
         code: entity.code,
+        thumbnailUrl: entity.thumbnailUrl,
         status: entity.status,
         stages: entity.stages,
         entrySources: entity.entrySources.map((item) => toDbSource(item)),
@@ -87,6 +89,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
       update: {
         name: entity.name,
         code: entity.code,
+        thumbnailUrl: entity.thumbnailUrl,
         status: entity.status,
         stages: entity.stages,
         entrySources: entity.entrySources.map((item) => toDbSource(item)),

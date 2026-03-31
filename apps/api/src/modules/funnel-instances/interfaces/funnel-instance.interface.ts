@@ -16,6 +16,7 @@ export interface FunnelInstance
   legacyFunnelId: DomainId | null;
   name: string;
   code: string;
+  thumbnailUrl: string | null;
   status: FunnelInstanceStatus;
   rotationPoolId: DomainId | null;
   trackingProfileId: DomainId | null;

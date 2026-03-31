@@ -12,6 +12,7 @@ export type FunnelStatus = 'draft' | 'active' | 'archived';
 export interface Funnel extends BaseDomainEntity, WorkspaceScoped {
   name: string;
   code: string;
+  thumbnailUrl: string | null;
   status: FunnelStatus;
   stages: string[];
   entrySources: LeadSourceChannel[];

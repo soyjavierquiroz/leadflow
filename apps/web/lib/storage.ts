@@ -1,6 +1,6 @@
 "use client";
 
-import { memberOperationRequest } from "@/lib/member-operations";
+import { webPublicConfig } from "@/lib/public-env";
 
 export type StorageUploadContext = "avatars" | "funnels";
 
@@ -9,22 +9,56 @@ type PresignedUploadPayload = {
   publicUrl: string;
 };
 
+type ErrorPayload = {
+  message?: string;
+  error?: string;
+};
+
+const requestPresignedUploadUrl = async (
+  file: File,
+  context: StorageUploadContext,
+) => {
+  const response = await fetch(
+    `${webPublicConfig.urls.api}/v1/storage/presigned-url`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type,
+        context,
+      }),
+    },
+  );
+
+  const payload = (await response.json().catch(() => null)) as unknown;
+
+  if (!response.ok) {
+    const errorPayload = payload as ErrorPayload;
+    const message =
+      (typeof errorPayload.message === "string"
+        ? errorPayload.message
+        : null) ??
+      (typeof errorPayload.error === "string" ? errorPayload.error : null) ??
+      "No pudimos obtener una URL de upload para este archivo.";
+
+    throw new Error(message);
+  }
+
+  return payload as PresignedUploadPayload;
+};
+
 export const uploadFileWithPresignedUrl = async (
   file: File,
   context: StorageUploadContext,
 ) => {
-  const { uploadUrl, publicUrl } =
-    await memberOperationRequest<PresignedUploadPayload>(
-      "/storage/presigned-url",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          fileName: file.name,
-          mimeType: file.type,
-          context,
-        }),
-      },
-    );
+  const { uploadUrl, publicUrl } = await requestPresignedUploadUrl(
+    file,
+    context,
+  );
 
   const uploadResponse = await fetch(uploadUrl, {
     method: "PUT",

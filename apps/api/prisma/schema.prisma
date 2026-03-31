@@ -439,6 +439,7 @@ model Funnel {
   workspaceId           String
   name                  String
   code                  String
+  thumbnailUrl          String?
   status                FunnelStatus
   stages                String[]
   entrySources          LeadSourceChannel[]
@@ -514,6 +515,7 @@ model FunnelInstance {
   legacyFunnelId     String?              @unique
   name               String
   code               String
+  thumbnailUrl       String?
   status             FunnelInstanceStatus
   rotationPoolId     String?
   trackingProfileId  String?

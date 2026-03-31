@@ -7,6 +7,7 @@ export class CreateFunnelInstanceDto {
   readonly legacyFunnelId?: string | null;
   readonly name!: string;
   readonly code!: string;
+  readonly thumbnailUrl?: string | null;
   readonly rotationPoolId?: string | null;
   readonly trackingProfileId?: string | null;
   readonly handoffStrategyId?: string | null;

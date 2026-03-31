@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { buildEntity } from '../shared/domain.factory';
 import { FUNNEL_INSTANCE_REPOSITORY } from '../shared/domain.tokens';
@@ -29,6 +30,7 @@ const toInputJson = (value: unknown): Prisma.InputJsonValue =>
 export class FunnelInstancesService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     @Optional()
     @Inject(FUNNEL_INSTANCE_REPOSITORY)
     private readonly repository?: FunnelInstanceRepository,
@@ -42,6 +44,7 @@ export class FunnelInstancesService {
       legacyFunnelId: dto.legacyFunnelId ?? null,
       name: dto.name,
       code: dto.code,
+      thumbnailUrl: null,
       status: 'draft',
       rotationPoolId: dto.rotationPoolId ?? null,
       trackingProfileId: dto.trackingProfileId ?? null,
@@ -133,6 +136,7 @@ export class FunnelInstancesService {
           workspaceId: scope.workspaceId,
           name,
           code,
+          thumbnailUrl: null,
           status: 'draft',
           stages: ['captured', 'qualified', 'assigned'],
           entrySources: ['manual', 'form', 'landing_page', 'api'],
@@ -149,6 +153,7 @@ export class FunnelInstancesService {
           legacyFunnelId: legacyFunnel.id,
           name,
           code,
+          thumbnailUrl: null,
           status: 'draft',
           rotationPoolId: dto.rotationPoolId ?? null,
           trackingProfileId: dto.trackingProfileId ?? null,
@@ -190,6 +195,10 @@ export class FunnelInstancesService {
     const name = dto.name !== undefined ? dto.name.trim() : existing.name;
     const code =
       dto.code !== undefined ? this.normalizeCode(dto.code) : existing.code;
+    const thumbnailUrl =
+      dto.thumbnailUrl !== undefined
+        ? this.normalizeAssetUrl(dto.thumbnailUrl)
+        : existing.thumbnailUrl;
     const status = dto.status ?? existing.status;
 
     if (!name) {
@@ -229,6 +238,7 @@ export class FunnelInstancesService {
           data: {
             name,
             code,
+            thumbnailUrl,
             status,
             defaultTeamId: scope.teamId,
             defaultRotationPoolId:
@@ -244,6 +254,7 @@ export class FunnelInstancesService {
         data: {
           name,
           code,
+          thumbnailUrl,
           status,
           rotationPoolId:
             dto.rotationPoolId !== undefined
@@ -263,6 +274,59 @@ export class FunnelInstancesService {
     });
 
     return mapFunnelInstanceRecord(record);
+  }
+
+  private normalizeAssetUrl(
+    value: string | null | undefined,
+  ): string | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    let parsedUrl: URL;
+
+    try {
+      parsedUrl = new URL(trimmed);
+    } catch {
+      throw new BadRequestException({
+        code: 'FUNNEL_INSTANCE_THUMBNAIL_URL_INVALID',
+        message: 'Thumbnail URL must be a valid absolute URL.',
+      });
+    }
+
+    const configuredBaseUrl = this.configService
+      .get<string>('MINIO_PUBLIC_URL')
+      ?.trim();
+
+    if (configuredBaseUrl) {
+      try {
+        const publicBaseUrl = new URL(configuredBaseUrl);
+
+        if (parsedUrl.origin !== publicBaseUrl.origin) {
+          throw new BadRequestException({
+            code: 'FUNNEL_INSTANCE_THUMBNAIL_URL_INVALID_ORIGIN',
+            message:
+              'Thumbnail URL must point to the configured Leadflow CDN origin.',
+          });
+        }
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+      }
+    }
+
+    return parsedUrl.toString();
   }
 
   private async assertTeamScopedDependencies(

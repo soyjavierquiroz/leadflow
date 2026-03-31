@@ -1,6 +1,7 @@
 export class UpdateTeamFunnelInstanceDto {
   readonly name?: string;
   readonly code?: string;
+  readonly thumbnailUrl?: string | null;
   readonly rotationPoolId?: string | null;
   readonly trackingProfileId?: string | null;
   readonly handoffStrategyId?: string | null;

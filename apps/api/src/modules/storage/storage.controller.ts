@@ -25,7 +25,7 @@ const isStorageUploadContext = (
   storageUploadContexts.includes(value as StorageUploadContext);
 
 @Controller('storage')
-@RequireRoles(UserRole.MEMBER)
+@RequireRoles(UserRole.MEMBER, UserRole.TEAM_ADMIN, UserRole.SUPER_ADMIN)
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
@@ -77,16 +77,32 @@ export class StorageController {
     const teamId = user.teamId?.trim();
     const sponsorId = user.sponsorId?.trim();
 
-    if (!workspaceId || !teamId || !sponsorId) {
+    if (!workspaceId) {
       throw new BadRequestException({
         code: 'STORAGE_SCOPE_INVALID',
         message:
-          'The authenticated member is missing workspace, team, or sponsor scope.',
+          'The authenticated user is missing workspace scope.',
       });
     }
 
     if (context === 'avatars') {
+      if (!sponsorId) {
+        throw new BadRequestException({
+          code: 'STORAGE_SCOPE_INVALID',
+          message:
+            'The authenticated user is missing sponsor scope for avatar uploads.',
+        });
+      }
+
       return `${STORAGE_PUBLIC_BUCKET}/avatars/${workspaceId}/${sponsorId}`;
+    }
+
+    if (!teamId) {
+      throw new BadRequestException({
+        code: 'STORAGE_SCOPE_INVALID',
+        message:
+          'The authenticated user is missing team scope for funnel asset uploads.',
+      });
     }
 
     return `${STORAGE_PUBLIC_BUCKET}/funnels/${workspaceId}/${teamId}`;

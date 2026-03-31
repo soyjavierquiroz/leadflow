@@ -146,6 +146,7 @@ export const mapFunnelRecord = (record: FunnelRecord): Funnel => ({
   workspaceId: record.workspaceId,
   name: record.name,
   code: record.code,
+  thumbnailUrl: record.thumbnailUrl,
   status: record.status,
   stages: record.stages,
   entrySources: record.entrySources.map((item) =>
@@ -214,6 +215,7 @@ export const mapFunnelInstanceRecord = (
   legacyFunnelId: record.legacyFunnelId,
   name: record.name,
   code: record.code,
+  thumbnailUrl: record.thumbnailUrl,
   status: record.status,
   rotationPoolId: record.rotationPoolId,
   trackingProfileId: record.trackingProfileId,

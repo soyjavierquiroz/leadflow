@@ -52,6 +52,7 @@ export type FunnelInstanceRecord = {
   legacyFunnelId: string | null;
   name: string;
   code: string;
+  thumbnailUrl: string | null;
   status: string;
   rotationPoolId: string | null;
   trackingProfileId: string | null;

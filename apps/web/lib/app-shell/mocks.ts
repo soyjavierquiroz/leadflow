@@ -89,6 +89,7 @@ export const mockFunnelInstances: FunnelInstanceRecord[] = [
     legacyFunnelId: "legacy-core-acquisition",
     name: "Core Acquisition",
     code: "core-acquisition",
+    thumbnailUrl: null,
     status: "active",
     rotationPoolId: "pool-primary-sales",
     trackingProfileId: "tracking-meta-core",
