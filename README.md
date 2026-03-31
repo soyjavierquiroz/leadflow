@@ -6,14 +6,47 @@ Leadflow es un SaaS de captación, asignación y automatización de leads constr
 
 Flujo operativo real:
 
-`Traefik -> Docker Swarm -> web -> api -> Prisma/Postgres -> n8n dispatcher`
+`Traefik -> Docker Swarm -> web -> api -> Prisma/Postgres -> Runtime Context Central -> n8n dispatcher`
 
 Piezas principales:
 
 - `apps/web`: Next.js. Atiende el sitio principal y el runtime público por `HostRegexp`.
 - `apps/api`: NestJS + Fastify. Expone auth, runtime público, asignación de leads e integraciones.
 - `Prisma/Postgres`: persistencia transaccional del backend.
+- `Runtime Context Central`: registro y resolución del contexto operativo antes de habilitar dispatch downstream.
 - `n8n`: recibe eventos del dispatcher y automatizaciones complementarias.
+
+## Onboarding central y dispatcher
+
+`RuntimeContextCentralService` centraliza el onboarding de cada `MessagingConnection` contra el servicio Runtime Context Central.
+
+- `markConnectionProvisioned()` persiste `runtimeContextStatus=PROVISIONED`, guarda el `tenantId` operativo y limpia timestamps/errores previos.
+- `ensureConnectionReady()` solo continúa si existe `externalInstanceId`; si la conexión ya está en `READY`, hace short-circuit.
+- Si la conexión todavía no está onboarded, el servicio marca `PROVISIONED`, ejecuta `register` contra Runtime Context Central y luego persiste `REGISTERED`.
+- Después entra en polling con `waitUntilResolvable()` contra `resolve-full` usando `RUNTIME_CONTEXT_RESOLVE_RETRIES` y `RUNTIME_CONTEXT_RESOLVE_DELAY_MS`.
+- Cuando `resolve-full` devuelve `200`, la conexión pasa a `READY` y se guardan `runtimeContextReadyAt` y `runtimeContextLastCheckedAt`.
+- Si el registro o la resolución fallan, la conexión queda en `PROVISIONED` o `REGISTERED` según el último punto alcanzado y se persisten `runtimeContextLastErrorAt` y `runtimeContextLastErrorMessage`.
+
+El guardrail del dispatcher vive en `LeadDispatcherService`:
+
+- antes de construir el payload hacia n8n, `dispatchLeadContextUpsert()` exige `externalInstanceId`
+- si `runtimeContextStatus !== READY`, delega en `RuntimeContextCentralService.ensureConnectionReady()`
+- si la conexión no queda lista, retorna `null` y no dispara el `POST` al dispatcher
+- solo cuando la conexión está en `READY` construye `LEAD_CONTEXT_UPSERT` y hace el envío a `N8N_DISPATCHER_WEBHOOK_URL`
+
+Este bloqueo evita enviar payloads cuando Runtime Context Central todavía no resuelve la instancia, que era la causa de los `404` en `resolve-full`.
+
+## Flujo lógico de onboarding
+
+Secuencia operativa actual:
+
+1. Leadflow crea o reutiliza la instancia en Evolution y configura el webhook inbound.
+2. La conexión se marca en base como `PROVISIONED`.
+3. Leadflow registra la instancia en Runtime Context Central con `provider=evolution`, `channel=whatsapp`, `instance_name`, `tenant_id` y `service_owner_key=lead-handler`.
+4. La conexión pasa a `REGISTERED`.
+5. Leadflow hace polling de verificación contra `resolve-full` hasta que Runtime Context Central devuelve `200`.
+6. La conexión pasa a `READY`.
+7. `LeadDispatcherService` queda habilitado para despachar el contexto estructurado hacia n8n.
 
 ## Fuente de verdad de despliegue
 
@@ -79,6 +112,20 @@ Variables de integración frecuentes:
 - `N8N_DISPATCHER_API_KEY`
 - `N8N_AUTOMATION_WEBHOOK_BASE_URL`
 - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
+
+Variables críticas del onboarding central y del dispatcher:
+
+- `N8N_WEBHOOK_INTERNAL_BASE`
+- `N8N_WEBHOOK_ID`
+- `N8N_DISPATCHER_WEBHOOK_URL`
+- `N8N_DISPATCHER_API_KEY`
+- `RUNTIME_CONTEXT_CENTRAL_BASE_URL`
+- `RUNTIME_CONTEXT_REGISTER_PATH`
+- `RUNTIME_CONTEXT_RESOLVE_FULL_PATH`
+- `RUNTIME_CONTEXT_CENTRAL_API_KEY`
+- `RUNTIME_CONTEXT_REQUEST_TIMEOUT_MS`
+- `RUNTIME_CONTEXT_RESOLVE_RETRIES`
+- `RUNTIME_CONTEXT_RESOLVE_DELAY_MS`
 
 ### Web
 
@@ -175,6 +222,27 @@ Ver logs del servicio:
 
 ```bash
 docker service logs -f --tail 200 leadflow_api 2>&1 | grep --line-buffered -E 'Dispatcher URL:|Sending payload to n8n|Lead dispatcher failed'
+```
+
+## Troubleshooting `REGISTERED -> READY`
+
+Si una conexión se queda en `REGISTERED` y no pasa a `READY`, revisa en este orden:
+
+1. Confirma que `leadflow_api` expone `RUNTIME_CONTEXT_CENTRAL_BASE_URL`, `RUNTIME_CONTEXT_CENTRAL_API_KEY`, `RUNTIME_CONTEXT_REGISTER_PATH` y `RUNTIME_CONTEXT_RESOLVE_FULL_PATH`.
+2. Confirma conectividad desde la API al servicio central. En Swarm local, el target operativo es `http://runtime_context_service:8080/health`.
+3. Revisa que Runtime Context Central responda `200` en `/health` y que esté accesible por la red compartida entre servicios.
+4. Busca en los logs de API errores del polling, especialmente mensajes equivalentes a `Runtime context resolve-full still missing instance ...`.
+5. Verifica que la instancia exista realmente en Evolution y que el `externalInstanceId` persistido en `MessagingConnection` coincida con el registrado en central.
+6. Consulta `MessagingConnection.runtimeContextLastErrorMessage`, `runtimeContextLastErrorAt` y `runtimeContextLastCheckedAt` para distinguir si el bloqueo fue de registro, de resolución o de conectividad.
+7. Si faltan columnas o estados nuevos en base, ejecuta `prisma migrate deploy` antes de seguir probando el flujo.
+
+Comandos útiles:
+
+```bash
+docker exec <leadflow_api_container> printenv | grep RUNTIME_CONTEXT
+docker exec <leadflow_api_container> wget -qO- http://runtime_context_service:8080/health
+docker service logs --tail 200 leadflow_api
+docker exec <leadflow_db_container> psql -U leadflow -d leadflow -c "SELECT runtimeContextStatus, runtimeContextLastErrorMessage, runtimeContextReadyAt FROM \"MessagingConnection\";"
 ```
 
 ## Estado operativo conocido
