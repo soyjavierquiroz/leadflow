@@ -6,21 +6,14 @@ type TopBarProps = {
   title: string;
   workspaceName: string;
   personaLabel: string;
-  sourceMode: DataSourceMode;
+  sourceMode?: DataSourceMode;
   currentUser: AuthenticatedAppUser | null;
 };
-
-const sourceLabel = {
-  live: "Datos reales",
-  hybrid: "Datos mixtos",
-  mock: "Modo mock",
-} satisfies Record<DataSourceMode, string>;
 
 export function TopBar({
   title,
   workspaceName,
   personaLabel,
-  sourceMode,
   currentUser,
 }: TopBarProps) {
   return (
@@ -49,13 +42,6 @@ export function TopBar({
             <p className="text-xs text-slate-500">
               {currentUser?.email ?? "No autenticado"}
             </p>
-          </div>
-
-          <div className="rounded-full border border-slate-200 bg-slate-950 px-4 py-2 text-right text-white shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Fuente
-            </p>
-            <p className="text-sm font-semibold">{sourceLabel[sourceMode]}</p>
           </div>
 
           <LogoutButton />

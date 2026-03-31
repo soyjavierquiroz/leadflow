@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   normalizeMessagingPhone,
   normalizeQrCodeData,
@@ -34,6 +35,8 @@ const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const DEFAULT_N8N_WEBHOOK_INTERNAL_BASE =
   'http://n8n-v2_n8n_v2_webhook:5678/webhook';
 const DEFAULT_N8N_WEBHOOK_ID = '7feee028-e25e-43a3-abac-1a0bf7b0ccf4';
+const DEFAULT_N8N_WEBHOOK_SCHEME = 'https';
+const DEFAULT_N8N_WEBHOOK_BASE_PATH = '/webhook';
 const EVOLUTION_WEBHOOK_EVENTS = [
   'MESSAGES_UPSERT',
   'MESSAGES_UPDATE',
@@ -62,6 +65,41 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
 const delay = async (ms: number) =>
   await new Promise((resolve) => setTimeout(resolve, ms));
 
+const buildPublicN8nWebhookBase = (input: {
+  domain: string | null | undefined;
+  scheme: string | null | undefined;
+  basePath: string | null | undefined;
+}) => {
+  const sanitizedDomain = sanitizeNullableText(input.domain);
+
+  if (!sanitizedDomain) {
+    return null;
+  }
+
+  const normalizedBasePath = `/${
+    (sanitizeNullableText(input.basePath) ?? DEFAULT_N8N_WEBHOOK_BASE_PATH)
+      .replace(/^\/+|\/+$/g, '')
+  }`;
+
+  try {
+    const url = sanitizedDomain.includes('://')
+      ? new URL(sanitizedDomain)
+      : new URL(
+          `${
+            sanitizeNullableText(input.scheme) ?? DEFAULT_N8N_WEBHOOK_SCHEME
+          }://${sanitizedDomain}`,
+        );
+
+    url.pathname = normalizedBasePath;
+    url.search = '';
+    url.hash = '';
+
+    return url.toString().replace(/\/+$/, '');
+  } catch {
+    return null;
+  }
+};
+
 export class EvolutionApiClientError extends Error {
   constructor(
     message: string,
@@ -74,40 +112,69 @@ export class EvolutionApiClientError extends Error {
 
 @Injectable()
 export class EvolutionApiClient {
-  private readonly internalBaseUrl =
-    sanitizeNullableText(process.env.EVOLUTION_API_INTERNAL_BASE_URL) ??
-    sanitizeNullableText(process.env.EVOLUTION_API_BASE_URL);
-  private readonly publicBaseUrl = sanitizeNullableText(
-    process.env.EVOLUTION_API_PUBLIC_BASE_URL,
-  );
-  private readonly apiKey = sanitizeNullableText(process.env.EVOLUTION_API_KEY);
-  private readonly instancePrefix =
-    sanitizeNullableText(process.env.EVOLUTION_INSTANCE_PREFIX) ?? 'leadflow';
-  private readonly automationWebhookBaseUrl = sanitizeNullableText(
-    process.env.N8N_AUTOMATION_WEBHOOK_BASE_URL,
-  );
-  private readonly n8nWebhookInternalBase =
-    sanitizeNullableText(process.env.N8N_WEBHOOK_INTERNAL_BASE) ??
-    DEFAULT_N8N_WEBHOOK_INTERNAL_BASE;
-  private readonly n8nWebhookId =
-    sanitizeNullableText(process.env.N8N_WEBHOOK_ID) ??
-    DEFAULT_N8N_WEBHOOK_ID;
-  private readonly requestTimeoutMs = parsePositiveInt(
-    process.env.EVOLUTION_REQUEST_TIMEOUT_MS,
-    15_000,
-  );
-  private readonly requestRetries = parsePositiveInt(
-    process.env.EVOLUTION_REQUEST_RETRIES,
-    2,
-  );
-  private readonly qrPollAttempts = parsePositiveInt(
-    process.env.EVOLUTION_QR_POLL_ATTEMPTS,
-    5,
-  );
-  private readonly qrPollDelayMs = parsePositiveInt(
-    process.env.EVOLUTION_QR_POLL_DELAY_MS,
-    1_000,
-  );
+  private readonly internalBaseUrl: string | null;
+  private readonly publicBaseUrl: string | null;
+  private readonly apiKey: string | null;
+  private readonly instancePrefix: string;
+  private readonly automationWebhookBaseUrl: string | null;
+  private readonly n8nWebhookInternalBase: string;
+  private readonly n8nWebhookPublicBase: string | null;
+  private readonly n8nWebhookId: string;
+  private readonly requestTimeoutMs: number;
+  private readonly requestRetries: number;
+  private readonly qrPollAttempts: number;
+  private readonly qrPollDelayMs: number;
+
+  constructor(private readonly configService: ConfigService) {
+    this.internalBaseUrl =
+      sanitizeNullableText(
+        this.configService.get<string>('EVOLUTION_API_INTERNAL_BASE_URL'),
+      ) ??
+      sanitizeNullableText(
+        this.configService.get<string>('EVOLUTION_API_BASE_URL'),
+      );
+    this.publicBaseUrl = sanitizeNullableText(
+      this.configService.get<string>('EVOLUTION_API_PUBLIC_BASE_URL'),
+    );
+    this.apiKey = sanitizeNullableText(
+      this.configService.get<string>('EVOLUTION_API_KEY'),
+    );
+    this.instancePrefix =
+      sanitizeNullableText(
+        this.configService.get<string>('EVOLUTION_INSTANCE_PREFIX'),
+      ) ?? 'leadflow';
+    this.automationWebhookBaseUrl = sanitizeNullableText(
+      this.configService.get<string>('N8N_AUTOMATION_WEBHOOK_BASE_URL'),
+    );
+    this.n8nWebhookInternalBase =
+      sanitizeNullableText(
+        this.configService.get<string>('N8N_WEBHOOK_INTERNAL_BASE'),
+      ) ?? DEFAULT_N8N_WEBHOOK_INTERNAL_BASE;
+    this.n8nWebhookPublicBase = buildPublicN8nWebhookBase({
+      domain: this.configService.get<string>('N8N_BASE_DOMAIN'),
+      scheme: this.configService.get<string>('N8N_WEBHOOK_SCHEME'),
+      basePath: this.configService.get<string>('N8N_WEBHOOK_BASE_PATH'),
+    });
+    this.n8nWebhookId =
+      sanitizeNullableText(this.configService.get<string>('N8N_WEBHOOK_ID')) ??
+      DEFAULT_N8N_WEBHOOK_ID;
+    this.requestTimeoutMs = parsePositiveInt(
+      this.configService.get<string>('EVOLUTION_REQUEST_TIMEOUT_MS'),
+      15_000,
+    );
+    this.requestRetries = parsePositiveInt(
+      this.configService.get<string>('EVOLUTION_REQUEST_RETRIES'),
+      2,
+    );
+    this.qrPollAttempts = parsePositiveInt(
+      this.configService.get<string>('EVOLUTION_QR_POLL_ATTEMPTS'),
+      5,
+    );
+    this.qrPollDelayMs = parsePositiveInt(
+      this.configService.get<string>('EVOLUTION_QR_POLL_DELAY_MS'),
+      1_000,
+    );
+  }
 
   isConfigured() {
     return Boolean(this.apiKey && (this.internalBaseUrl || this.publicBaseUrl));
@@ -156,7 +223,9 @@ export class EvolutionApiClient {
   }
 
   buildInboundWebhookUrl(instanceId: string) {
-    const normalizedBaseUrl = this.n8nWebhookInternalBase.replace(/\/+$/, '');
+    const normalizedBaseUrl = (
+      this.n8nWebhookPublicBase ?? this.n8nWebhookInternalBase
+    ).replace(/\/+$/, '');
     const normalizedWebhookId = this.n8nWebhookId.replace(/^\/+|\/+$/g, '');
 
     return `${normalizedBaseUrl}/${normalizedWebhookId}/channels/evolution/${instanceId}/inbound`;

@@ -1,20 +1,8 @@
 import { MemberDashboardClient } from "@/components/member-operations/member-dashboard-client";
-import { getAppShellSnapshot } from "@/lib/app-shell/data";
+import { getMemberDashboardSnapshot } from "@/lib/member-dashboard";
 
 export default async function MemberPage() {
-  const data = await getAppShellSnapshot();
-  const memberLeads = data.leadViews.filter(
-    (item) => item.sponsorId === data.currentSponsor.id,
-  );
-  const memberAssignments = data.assignments.filter(
-    (item) => item.sponsorId === data.currentSponsor.id,
-  );
+  const dashboard = await getMemberDashboardSnapshot();
 
-  return (
-    <MemberDashboardClient
-      sponsor={data.currentSponsor}
-      leads={memberLeads}
-      assignments={memberAssignments}
-    />
-  );
+  return <MemberDashboardClient initialDashboard={dashboard} />;
 }

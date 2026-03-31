@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
+import { MemberDashboardDto } from './dto/member-dashboard.dto';
 import type { UpdateMemberSponsorDto } from './dto/update-member-sponsor.dto';
 import type { UpdateTeamSponsorDto } from './dto/update-team-sponsor.dto';
 import { SponsorsService } from './sponsors.service';
@@ -27,6 +28,18 @@ export class SponsorsController {
         user.role === UserRole.SUPER_ADMIN
           ? teamId
           : (user.teamId ?? undefined),
+    });
+  }
+
+  @Get('me/dashboard')
+  @RequireRoles(UserRole.MEMBER)
+  getMemberDashboard(
+    @CurrentAuthUser() user: AuthenticatedUser,
+  ): Promise<MemberDashboardDto> {
+    return this.sponsorsService.getDashboardForMember({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+      sponsorId: user.sponsorId!,
     });
   }
 

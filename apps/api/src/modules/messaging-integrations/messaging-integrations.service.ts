@@ -16,13 +16,13 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import type { ConnectMemberMessagingDto } from './dto/connect-member-messaging.dto';
 import {
+  SponsorDashboardDto,
+  type SponsorDashboardStatus,
+} from './dto/sponsor-dashboard.dto';
+import {
   EvolutionApiClient,
   EvolutionApiClientError,
 } from './evolution-api.client';
-import type {
-  MessagingConnectionView,
-  MessagingIntegrationSnapshot,
-} from './messaging-integrations.types';
 import {
   buildAutomationWebhookUrl,
   buildEvolutionInstanceId,
@@ -57,8 +57,6 @@ type ProvisionFlowOptions = {
   resetRemoteFirst?: boolean;
 };
 
-const toIso = (value: Date | null) => (value ? value.toISOString() : null);
-
 @Injectable()
 export class MessagingIntegrationsService {
   constructor(
@@ -69,20 +67,17 @@ export class MessagingIntegrationsService {
 
   async getCurrentForMember(
     scope: MemberMessagingScope,
-  ): Promise<MessagingIntegrationSnapshot> {
+  ): Promise<SponsorDashboardDto> {
     const sponsor = await this.requireMemberSponsor(scope);
     const connection = await this.findConnection(scope);
 
-    return this.buildSnapshot(connection, {
-      note: this.buildProviderNote(connection),
-      sponsor,
-    });
+    return this.buildDashboardDto(sponsor, connection);
   }
 
   async connectForMember(
     scope: MemberMessagingScope,
     dto?: ConnectMemberMessagingDto,
-  ): Promise<MessagingIntegrationSnapshot> {
+  ): Promise<SponsorDashboardDto> {
     this.ensureProviderConfigured();
 
     const sponsor = await this.requireMemberSponsor(scope);
@@ -99,10 +94,7 @@ export class MessagingIntegrationsService {
         },
       );
 
-      return this.buildSnapshot(connection, {
-        note: 'Instancia lista para conectar por QR o pairing code.',
-        sponsor,
-      });
+      return this.buildDashboardDto(sponsor, connection);
     } catch (error) {
       await this.persistProviderError({
         scope,
@@ -123,7 +115,7 @@ export class MessagingIntegrationsService {
   async getQrForMember(
     scope: MemberMessagingScope,
     dto?: ConnectMemberMessagingDto,
-  ): Promise<MessagingIntegrationSnapshot> {
+  ): Promise<SponsorDashboardDto> {
     this.ensureProviderConfigured();
 
     const sponsor = await this.requireMemberSponsor(scope);
@@ -140,13 +132,7 @@ export class MessagingIntegrationsService {
         },
       );
 
-      return this.buildSnapshot(connection, {
-        note:
-          connection.status === MessagingConnectionStatus.qr_ready
-            ? 'QR actualizado correctamente.'
-            : 'El canal ya no requiere un QR nuevo.',
-        sponsor,
-      });
+      return this.buildDashboardDto(sponsor, connection);
     } catch (error) {
       await this.persistProviderError({
         scope,
@@ -166,25 +152,19 @@ export class MessagingIntegrationsService {
 
   async refreshForMember(
     scope: MemberMessagingScope,
-  ): Promise<MessagingIntegrationSnapshot> {
+  ): Promise<SponsorDashboardDto> {
     const sponsor = await this.requireMemberSponsor(scope);
     const existingConnection = await this.findConnection(scope);
 
     if (!existingConnection) {
-      return this.buildSnapshot(null, {
-        note: this.buildProviderNote(null),
-        sponsor,
-      });
+      return this.buildDashboardDto(sponsor, null);
     }
 
     if (
       !this.evolutionClient.isConfigured() ||
       !existingConnection.externalInstanceId
     ) {
-      return this.buildSnapshot(existingConnection, {
-        note: this.buildProviderNote(existingConnection),
-        sponsor,
-      });
+      return this.buildDashboardDto(sponsor, existingConnection);
     }
 
     try {
@@ -242,10 +222,7 @@ export class MessagingIntegrationsService {
         },
       });
 
-      return this.buildSnapshot(connection, {
-        note: 'Estado del canal actualizado contra Evolution.',
-        sponsor,
-      });
+      return this.buildDashboardDto(sponsor, connection);
     } catch (error) {
       await this.prisma.messagingConnection.update({
         where: {
@@ -266,7 +243,7 @@ export class MessagingIntegrationsService {
   async resetForMember(
     scope: MemberMessagingScope,
     dto?: ConnectMemberMessagingDto,
-  ): Promise<MessagingIntegrationSnapshot> {
+  ): Promise<SponsorDashboardDto> {
     this.ensureProviderConfigured();
 
     const sponsor = await this.requireMemberSponsor(scope);
@@ -284,10 +261,7 @@ export class MessagingIntegrationsService {
         },
       );
 
-      return this.buildSnapshot(connection, {
-        note: 'Instancia reseteada y reprovisionada correctamente.',
-        sponsor,
-      });
+      return this.buildDashboardDto(sponsor, connection);
     } catch (error) {
       await this.persistProviderError({
         scope,
@@ -307,18 +281,13 @@ export class MessagingIntegrationsService {
 
   async disconnectForMember(
     scope: MemberMessagingScope,
-  ): Promise<MessagingIntegrationSnapshot> {
+  ): Promise<SponsorDashboardDto> {
     const sponsor = await this.requireMemberSponsor(scope);
     const existingConnection = await this.findConnection(scope);
 
     if (!existingConnection) {
-      return this.buildSnapshot(null, {
-        note: this.buildProviderNote(null),
-        sponsor,
-      });
+      return this.buildDashboardDto(sponsor, null);
     }
-
-    let note: string | null = null;
 
     if (
       this.evolutionClient.isConfigured() &&
@@ -329,9 +298,6 @@ export class MessagingIntegrationsService {
           existingConnection.externalInstanceId,
         );
       } catch (error) {
-        note =
-          'La conexión local quedó desactivada, pero Evolution devolvió un error al limpiar la instancia remota.';
-
         await this.prisma.messagingConnection.update({
           where: {
             id: existingConnection.id,
@@ -342,9 +308,6 @@ export class MessagingIntegrationsService {
           },
         });
       }
-    } else if (!this.evolutionClient.isConfigured()) {
-      note =
-        'La conexión quedó desactivada localmente. Evolution no está configurado en este entorno.';
     }
 
     const connection = await this.prisma.messagingConnection.update({
@@ -371,10 +334,7 @@ export class MessagingIntegrationsService {
       },
     });
 
-    return this.buildSnapshot(connection, {
-      note,
-      sponsor,
-    });
+    return this.buildDashboardDto(sponsor, connection);
   }
 
   private async runProvisionFlow(
@@ -614,69 +574,37 @@ export class MessagingIntegrationsService {
     });
   }
 
-  private buildSnapshot(
+  private buildDashboardDto(
+    sponsor: MemberScopedSponsor,
     connection: MessagingConnection | null,
-    input: {
-      note: string | null;
-      sponsor: MemberScopedSponsor;
-    },
-  ): MessagingIntegrationSnapshot {
-    return {
-      connection: connection ? this.mapConnection(connection) : null,
-      provider: {
-        provider: MessagingProvider.EVOLUTION,
-        configured: this.evolutionClient.isConfigured(),
-        internalConfigured: this.evolutionClient.hasInternalBaseUrl(),
-        publicFallbackConfigured:
-          this.evolutionClient.hasPublicFallbackBaseUrl(),
-        routingMode: this.evolutionClient.getRoutingMode(),
-        instancePrefix: this.evolutionClient.getInstancePrefix(),
-        automationBaseConfigured:
-          this.evolutionClient.hasAutomationWebhookBaseUrl(),
-        fallbackWaMeEnabled: true,
-        webhookEvent: this.evolutionClient.getWebhookEvent(),
-        note: input.note,
-      },
-    };
+  ): SponsorDashboardDto {
+    const status = this.resolveDashboardStatus(connection);
+    const isConnected = status === 'READY';
+
+    return new SponsorDashboardDto({
+      status,
+      qrCode: isConnected ? null : connection?.qrCodeData ?? null,
+      sponsorName: sponsor.displayName,
+      isConnected,
+    });
   }
 
-  private mapConnection(
-    connection: MessagingConnection,
-  ): MessagingConnectionView {
-    return {
-      id: connection.id,
-      workspaceId: connection.workspaceId,
-      teamId: connection.teamId,
-      sponsorId: connection.sponsorId,
-      provider: connection.provider,
-      status: connection.status,
-      runtimeContextStatus: connection.runtimeContextStatus,
-      runtimeContextTenantId: connection.runtimeContextTenantId,
-      instanceId: connection.externalInstanceId,
-      externalInstanceId: connection.externalInstanceId,
-      phone: connection.phone,
-      normalizedPhone: connection.normalizedPhone,
-      qrCodeData: connection.qrCodeData,
-      pairingCode: connection.pairingCode,
-      pairingExpiresAt: toIso(connection.pairingExpiresAt),
-      automationWebhookUrl: connection.automationWebhookUrl,
-      automationEnabled: connection.automationEnabled,
-      metadata: connection.metadataJson ?? null,
-      lastSyncedAt: toIso(connection.lastSyncedAt),
-      runtimeContextRegisteredAt: toIso(connection.runtimeContextRegisteredAt),
-      runtimeContextReadyAt: toIso(connection.runtimeContextReadyAt),
-      runtimeContextLastCheckedAt: toIso(
-        connection.runtimeContextLastCheckedAt,
-      ),
-      runtimeContextLastErrorAt: toIso(connection.runtimeContextLastErrorAt),
-      runtimeContextLastErrorMessage: connection.runtimeContextLastErrorMessage,
-      lastConnectedAt: toIso(connection.lastConnectedAt),
-      lastDisconnectedAt: toIso(connection.lastDisconnectedAt),
-      lastErrorAt: toIso(connection.lastErrorAt),
-      lastErrorMessage: connection.lastErrorMessage,
-      createdAt: connection.createdAt.toISOString(),
-      updatedAt: connection.updatedAt.toISOString(),
-    };
+  private resolveDashboardStatus(
+    connection: MessagingConnection | null,
+  ): SponsorDashboardStatus {
+    if (connection?.status === MessagingConnectionStatus.connected) {
+      return 'READY';
+    }
+
+    if (
+      connection?.runtimeContextStatus ===
+        MessagingRuntimeContextStatus.REGISTERED ||
+      connection?.runtimeContextStatus === MessagingRuntimeContextStatus.READY
+    ) {
+      return 'REGISTERED';
+    }
+
+    return 'PROVISIONED';
   }
 
   private resolveAutomationWebhookUrl(
@@ -696,22 +624,6 @@ export class MessagingIntegrationsService {
       this.evolutionClient.getAutomationWebhookBaseUrl(),
       instanceId,
     );
-  }
-
-  private buildProviderNote(connection: MessagingConnection | null) {
-    if (!this.evolutionClient.isConfigured()) {
-      return connection
-        ? 'Evolution no está configurado en este entorno. Se muestra el último estado persistido y el fallback comercial sigue usando wa.me.'
-        : 'Evolution no está configurado en este entorno. El handoff sigue funcionando vía wa.me.';
-    }
-
-    if (this.evolutionClient.getRoutingMode() === 'internal') {
-      return this.evolutionClient.hasPublicFallbackBaseUrl()
-        ? 'Evolution está configurado por red interna y envía eventos directo al webhook interno de n8n; la URL pública queda solo como respaldo.'
-        : 'Evolution está configurado por red interna y envía eventos directo al webhook interno de n8n.';
-    }
-
-    return 'Evolution solo tiene URL pública configurada en este entorno, pero el webhook sigue apuntando directo a n8n.';
   }
 
   private buildMetadata(

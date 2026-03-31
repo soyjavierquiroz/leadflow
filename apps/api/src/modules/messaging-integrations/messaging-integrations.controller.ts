@@ -4,6 +4,7 @@ import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
 import type { ConnectMemberMessagingDto } from './dto/connect-member-messaging.dto';
+import { SponsorDashboardDto } from './dto/sponsor-dashboard.dto';
 import { MessagingIntegrationsService } from './messaging-integrations.service';
 
 @Controller('messaging-integrations')
@@ -14,7 +15,9 @@ export class MessagingIntegrationsController {
   ) {}
 
   @Get('me')
-  getCurrent(@CurrentAuthUser() user: AuthenticatedUser) {
+  getCurrent(
+    @CurrentAuthUser() user: AuthenticatedUser,
+  ): Promise<SponsorDashboardDto> {
     return this.messagingIntegrationsService.getCurrentForMember({
       workspaceId: user.workspaceId!,
       teamId: user.teamId!,
@@ -26,7 +29,7 @@ export class MessagingIntegrationsController {
   connect(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Body() dto: ConnectMemberMessagingDto,
-  ) {
+  ): Promise<SponsorDashboardDto> {
     return this.messagingIntegrationsService.connectForMember(
       {
         workspaceId: user.workspaceId!,
@@ -38,7 +41,9 @@ export class MessagingIntegrationsController {
   }
 
   @Post('me/refresh')
-  refresh(@CurrentAuthUser() user: AuthenticatedUser) {
+  refresh(
+    @CurrentAuthUser() user: AuthenticatedUser,
+  ): Promise<SponsorDashboardDto> {
     return this.messagingIntegrationsService.refreshForMember({
       workspaceId: user.workspaceId!,
       teamId: user.teamId!,
@@ -50,7 +55,7 @@ export class MessagingIntegrationsController {
   getQr(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Body() dto: ConnectMemberMessagingDto,
-  ) {
+  ): Promise<SponsorDashboardDto> {
     return this.messagingIntegrationsService.getQrForMember(
       {
         workspaceId: user.workspaceId!,
@@ -65,7 +70,7 @@ export class MessagingIntegrationsController {
   reset(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Body() dto: ConnectMemberMessagingDto,
-  ) {
+  ): Promise<SponsorDashboardDto> {
     return this.messagingIntegrationsService.resetForMember(
       {
         workspaceId: user.workspaceId!,
@@ -77,7 +82,9 @@ export class MessagingIntegrationsController {
   }
 
   @Post('me/disconnect')
-  disconnect(@CurrentAuthUser() user: AuthenticatedUser) {
+  disconnect(
+    @CurrentAuthUser() user: AuthenticatedUser,
+  ): Promise<SponsorDashboardDto> {
     return this.messagingIntegrationsService.disconnectForMember({
       workspaceId: user.workspaceId!,
       teamId: user.teamId!,

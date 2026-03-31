@@ -1,6 +1,5 @@
 import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
 import { requireRole } from "@/lib/auth";
-import { getAppShellSnapshot } from "@/lib/app-shell/data";
 
 const memberNav = [
   {
@@ -30,18 +29,16 @@ export default async function MemberLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  await requireRole("MEMBER");
-  const snapshot = await getAppShellSnapshot();
+  const user = await requireRole("MEMBER");
 
   return (
-      <AppShellLayout
-        areaLabel="Sponsor / Member"
-        areaDescription="Workspace personal del sponsor para aceptar handoffs, hacer seguimiento y sostener su canal de atencion."
-        topBarTitle={snapshot.currentSponsor.displayName}
-        personaLabel="Sponsor / Member"
-      workspaceName={snapshot.workspace.name}
-      sourceMode={snapshot.sourceMode}
-      currentUser={snapshot.currentUser}
+    <AppShellLayout
+      areaLabel="Sponsor / Member"
+      areaDescription="Workspace personal del sponsor para aceptar handoffs, hacer seguimiento y sostener su canal de atencion."
+      topBarTitle={user.sponsor?.displayName ?? user.fullName}
+      personaLabel="Sponsor / Member"
+      workspaceName={user.workspace?.name ?? "Leadflow"}
+      currentUser={user}
       nav={memberNav}
     >
       {children}

@@ -10,7 +10,7 @@ type AppShellLayoutProps = {
   topBarTitle: string;
   personaLabel: string;
   workspaceName: string;
-  sourceMode: DataSourceMode;
+  sourceMode?: DataSourceMode;
   currentUser: AuthenticatedAppUser | null;
   nav: ShellNavItem[];
   children: ReactNode;

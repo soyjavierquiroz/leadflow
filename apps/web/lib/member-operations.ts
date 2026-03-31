@@ -7,104 +7,16 @@ type ErrorPayload = {
   error?: string;
 };
 
-export type MemberMessagingConnection = {
-  id: string;
-  workspaceId: string;
-  teamId: string;
-  sponsorId: string;
-  provider: "EVOLUTION";
-  status:
-    | "disconnected"
-    | "provisioning"
-    | "qr_ready"
-    | "connecting"
-    | "connected"
-    | "error";
-  runtimeContextStatus: "PROVISIONED" | "REGISTERED" | "READY" | null;
-  runtimeContextTenantId: string | null;
-  instanceId: string | null;
-  externalInstanceId: string | null;
-  phone: string | null;
-  normalizedPhone: string | null;
-  qrCodeData: string | null;
-  pairingCode: string | null;
-  pairingExpiresAt: string | null;
-  automationWebhookUrl: string | null;
-  automationEnabled: boolean;
-  metadata: unknown;
-  lastSyncedAt: string | null;
-  runtimeContextRegisteredAt: string | null;
-  runtimeContextReadyAt: string | null;
-  runtimeContextLastCheckedAt: string | null;
-  runtimeContextLastErrorAt: string | null;
-  runtimeContextLastErrorMessage: string | null;
-  lastConnectedAt: string | null;
-  lastDisconnectedAt: string | null;
-  lastErrorAt: string | null;
-  lastErrorMessage: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+export type MemberSponsorDashboardStatus =
+  | "PROVISIONED"
+  | "REGISTERED"
+  | "READY";
 
-export type MemberMessagingSnapshot = {
-  connection: MemberMessagingConnection | null;
-  provider: {
-    provider: "EVOLUTION";
-    configured: boolean;
-    internalConfigured: boolean;
-    publicFallbackConfigured: boolean;
-    routingMode: "internal" | "public" | "unconfigured";
-    instancePrefix: string;
-    automationBaseConfigured: boolean;
-    fallbackWaMeEnabled: boolean;
-    webhookEvent: string;
-    note: string | null;
-  };
-};
-
-export type MemberAutomationDispatch = {
-  id: string;
-  assignmentId: string;
-  leadId: string;
-  sponsorId: string;
-  triggerType: string;
-  status: "pending" | "skipped" | "dispatched" | "failed";
-  targetWebhookUrl: string | null;
-  responseStatusCode: number | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  queuedAt: string;
-  dispatchedAt: string | null;
-  completedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  lead: {
-    id: string;
-    fullName: string | null;
-    email: string | null;
-    phone: string | null;
-    status: string;
-  };
-};
-
-export type MemberMessagingAutomationSnapshot = {
-  readiness: {
-    canDispatch: boolean;
-    status: "ready" | "blocked";
-    blockingReason: string | null;
-    targetWebhookUrl: string | null;
-    defaultWebhookBaseUrlConfigured: boolean;
-    connectionStatus:
-      | "disconnected"
-      | "provisioning"
-      | "qr_ready"
-      | "connecting"
-      | "connected"
-      | "error"
-      | null;
-    note: string | null;
-  };
-  latestDispatches: MemberAutomationDispatch[];
+export type MemberSponsorDashboard = {
+  status: MemberSponsorDashboardStatus;
+  qrCode: string | null;
+  sponsorName: string;
+  isConnected: boolean;
 };
 
 export const memberOperationRequest = async <T>(
