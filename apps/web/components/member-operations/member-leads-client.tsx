@@ -25,6 +25,15 @@ type MemberLeadsClientProps = {
   remindersSummary: LeadRemindersSummary;
 };
 
+const mutableLeadStatuses = [
+  "qualified",
+  "nurturing",
+  "won",
+  "lost",
+] as const;
+
+type MutableLeadStatus = (typeof mutableLeadStatuses)[number];
+
 const leadStatusOptions = [
   "all",
   "qualified",
@@ -66,6 +75,104 @@ const assignmentStatusLabel: Record<
   assigned: "Asignado",
   accepted: "Aceptado",
   closed: "Cerrado",
+};
+
+type MemberLeadStatusMutationResponse = Pick<
+  LeadView,
+  | "id"
+  | "status"
+  | "qualificationGrade"
+  | "summaryText"
+  | "nextActionLabel"
+  | "followUpAt"
+  | "lastContactedAt"
+  | "lastQualifiedAt"
+  | "reminderBucket"
+  | "reminderLabel"
+  | "suggestedNextAction"
+  | "effectiveNextAction"
+  | "playbookKey"
+  | "playbookTitle"
+  | "playbookDescription"
+  | "needsAttention"
+  | "updatedAt"
+>;
+
+const buildOptimisticLeadStatusUpdate = (
+  lead: LeadView,
+  nextStatus: MutableLeadStatus,
+): Partial<LeadView> => {
+  const now = new Date().toISOString();
+  const baseUpdate: Partial<LeadView> = {
+    status: nextStatus,
+    updatedAt: now,
+  };
+
+  if (nextStatus === "won") {
+    return {
+      ...baseUpdate,
+      assignmentStatus: lead.assignmentStatus ? "closed" : lead.assignmentStatus,
+      reminderBucket: "none",
+      reminderLabel: "Sin seguimiento activo",
+      needsAttention: false,
+      lastQualifiedAt: now,
+      playbookKey: "won_handoff",
+      playbookTitle: "Cierre ganado",
+      playbookDescription:
+        "Consolidar el cierre, confirmar el siguiente paso y evitar que el lead quede sin handoff operativo.",
+      suggestedNextAction: "Confirmar onboarding y dejar cierre documentado.",
+      effectiveNextAction:
+        lead.nextActionLabel ?? "Confirmar onboarding y dejar cierre documentado.",
+    };
+  }
+
+  if (nextStatus === "lost") {
+    return {
+      ...baseUpdate,
+      assignmentStatus: lead.assignmentStatus ? "closed" : lead.assignmentStatus,
+      reminderBucket: "none",
+      reminderLabel: "Sin seguimiento activo",
+      needsAttention: false,
+      playbookKey: "lost_recycle",
+      playbookTitle: "Reciclaje de perdida",
+      playbookDescription:
+        "Registrar por que se perdio la oportunidad y dejarla lista para reactivacion futura si aplica.",
+      suggestedNextAction:
+        "Registrar motivo de perdida y definir si entra a reciclaje.",
+      effectiveNextAction:
+        lead.nextActionLabel ??
+        "Registrar motivo de perdida y definir si entra a reciclaje.",
+    };
+  }
+
+  if (nextStatus === "qualified") {
+    return {
+      ...baseUpdate,
+      lastQualifiedAt: now,
+      playbookKey: "high_intent_close",
+      playbookTitle: "Alta intencion",
+      playbookDescription:
+        "Lead con senales de cierre. La operacion debe avanzar hacia llamada, propuesta o siguiente decision comercial.",
+      suggestedNextAction:
+        "Llevar el lead a llamada o propuesta con seguimiento corto.",
+      effectiveNextAction:
+        lead.nextActionLabel ??
+        "Llevar el lead a llamada o propuesta con seguimiento corto.",
+    };
+  }
+
+  return {
+    ...baseUpdate,
+    playbookKey: "active_nurture",
+    playbookTitle: "Nurturing activo",
+    playbookDescription:
+      "El lead ya entro en conversacion y necesita seguimiento constante sin sobreoperarlo.",
+    suggestedNextAction:
+      "Enviar seguimiento con contexto y confirmar el siguiente paso.",
+    effectiveNextAction:
+      lead.nextActionLabel ??
+      "Enviar seguimiento con contexto y confirmar el siguiente paso.",
+  };
 };
 
 export function MemberLeadsClient({
@@ -118,6 +225,49 @@ export function MemberLeadsClient({
   const hotLeadCount = filteredRows.filter(
     (row) => row.qualificationGrade === "hot",
   ).length;
+  const reminderMetrics =
+    rows.length === 0
+      ? remindersSummary.totals
+      : rows.reduce(
+          (summary, row) => {
+            if (row.reminderBucket === "none") {
+              return summary;
+            }
+
+            summary.active += 1;
+
+            if (row.needsAttention) {
+              summary.needsAttention += 1;
+            }
+
+            switch (row.reminderBucket) {
+              case "overdue":
+                summary.overdue += 1;
+                break;
+              case "due_today":
+                summary.dueToday += 1;
+                break;
+              case "upcoming":
+                summary.upcoming += 1;
+                break;
+              case "unscheduled":
+                summary.unscheduled += 1;
+                break;
+              default:
+                break;
+            }
+
+            return summary;
+          },
+          {
+            active: 0,
+            overdue: 0,
+            dueToday: 0,
+            upcoming: 0,
+            unscheduled: 0,
+            needsAttention: 0,
+          },
+        );
   const pendingAcceptanceCount = filteredRows.filter(
     (row) => row.assignmentStatus === "assigned",
   ).length;
@@ -176,29 +326,41 @@ export function MemberLeadsClient({
 
   const handleLeadStatusChange = async (
     lead: LeadView,
-    nextStatus: "qualified" | "nurturing" | "won" | "lost",
+    nextStatus: MutableLeadStatus,
   ) => {
+    const previousLead = rows.find((row) => row.id === lead.id);
+
+    if (!previousLead) {
+      return;
+    }
+
     setLoadingAction(`lead:${lead.id}:${nextStatus}`);
     setFeedback(null);
+    updateLeadRow(lead.id, buildOptimisticLeadStatusUpdate(previousLead, nextStatus));
 
     try {
-      await memberOperationRequest(`/leads/${lead.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: nextStatus }),
-      });
+      const updatedLead =
+        await memberOperationRequest<MemberLeadStatusMutationResponse>(
+          `/sponsors/me/leads/${lead.id}/status`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ status: nextStatus }),
+          },
+        );
 
       updateLeadRow(lead.id, {
-        status: nextStatus,
+        ...updatedLead,
         assignmentStatus:
           nextStatus === "won" || nextStatus === "lost"
             ? "closed"
-            : lead.assignmentStatus,
+            : previousLead.assignmentStatus,
       });
       setFeedback({
         tone: "success",
-        message: `Lead movido a ${nextStatus}.`,
+        message: `Lead movido a ${leadStatusLabel[nextStatus].toLowerCase()}.`,
       });
     } catch (error) {
+      updateLeadRow(lead.id, previousLead);
       setFeedback({
         tone: "error",
         message:
@@ -263,22 +425,22 @@ export function MemberLeadsClient({
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Vencidos"
-          value={formatCompactNumber(remindersSummary.totals.overdue)}
+          value={formatCompactNumber(reminderMetrics.overdue)}
           hint="Seguimientos que ya debieron resolverse."
         />
         <KpiCard
           label="Hoy"
-          value={formatCompactNumber(remindersSummary.totals.dueToday)}
+          value={formatCompactNumber(reminderMetrics.dueToday)}
           hint="Leads que requieren follow-up hoy."
         />
         <KpiCard
           label="Próximos"
-          value={formatCompactNumber(remindersSummary.totals.upcoming)}
+          value={formatCompactNumber(reminderMetrics.upcoming)}
           hint="Seguimientos ya agendados para los próximos días."
         />
         <KpiCard
           label="Sin follow-up"
-          value={formatCompactNumber(remindersSummary.totals.unscheduled)}
+          value={formatCompactNumber(reminderMetrics.unscheduled)}
           hint="Leads activos que todavía no tienen una próxima fecha."
         />
       </section>
@@ -590,23 +752,20 @@ export function MemberLeadsClient({
                   </button>
                 ) : null}
 
-                {(["qualified", "nurturing", "won", "lost"] as const).map(
-                  (status) => (
-                    <button
-                      key={status}
-                      type="button"
-                      className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={
-                        loadingAction === `lead:${selectedLead.id}:${status}`
-                      }
-                      onClick={() =>
-                        handleLeadStatusChange(selectedLead, status)
-                      }
-                    >
-                      Mover a {status}
-                    </button>
-                  ),
-                )}
+                {mutableLeadStatuses.map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={
+                      loadingAction === `lead:${selectedLead.id}:${status}` ||
+                      selectedLead.status === status
+                    }
+                    onClick={() => handleLeadStatusChange(selectedLead, status)}
+                  >
+                    Mover a {leadStatusLabel[status].toLowerCase()}
+                  </button>
+                ))}
 
                 {selectedLead.currentAssignmentId ? (
                   <button
@@ -625,6 +784,7 @@ export function MemberLeadsClient({
             </div>
 
             <LeadQualificationTimelinePanel
+              key={`${selectedLead.id}:${selectedLead.updatedAt}`}
               leadId={selectedLead.id}
               onLeadChange={(leadId, updates) => updateLeadRow(leadId, updates)}
             />

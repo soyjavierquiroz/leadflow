@@ -15,10 +15,15 @@ import { MemberDashboardDto } from './dto/member-dashboard.dto';
 import type { UpdateMemberSponsorDto } from './dto/update-member-sponsor.dto';
 import type { UpdateTeamSponsorDto } from './dto/update-team-sponsor.dto';
 import { SponsorsService } from './sponsors.service';
+import { LeadsService } from '../leads/leads.service';
+import type { UpdateMemberLeadDto } from '../leads/dto/update-member-lead.dto';
 
 @Controller('sponsors')
 export class SponsorsController {
-  constructor(private readonly sponsorsService: SponsorsService) {}
+  constructor(
+    private readonly sponsorsService: SponsorsService,
+    private readonly leadsService: LeadsService,
+  ) {}
 
   @Get()
   @RequireRoles(UserRole.SUPER_ADMIN, UserRole.TEAM_ADMIN)
@@ -90,6 +95,24 @@ export class SponsorsController {
         sponsorId: user.sponsorId!,
       },
       leadId,
+    );
+  }
+
+  @Patch('me/leads/:id/status')
+  @RequireRoles(UserRole.MEMBER)
+  updateLeadStatus(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') leadId: string,
+    @Body() dto: UpdateMemberLeadDto,
+  ) {
+    return this.leadsService.updateForMember(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+        sponsorId: user.sponsorId!,
+      },
+      leadId,
+      dto,
     );
   }
 

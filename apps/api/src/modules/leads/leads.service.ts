@@ -15,7 +15,10 @@ import type { CreateLeadNoteDto } from './dto/create-lead-note.dto';
 import type { CreateLeadDto } from './dto/create-lead.dto';
 import type { UpdateLeadFollowUpDto } from './dto/update-lead-follow-up.dto';
 import type { UpdateLeadQualificationDto } from './dto/update-lead-qualification.dto';
-import type { UpdateMemberLeadDto } from './dto/update-member-lead.dto';
+import {
+  memberLeadStatusValues,
+  type UpdateMemberLeadDto,
+} from './dto/update-member-lead.dto';
 import type { Lead, LeadRepository } from './interfaces/lead.interface';
 import { buildLeadWorkflow, type LeadWorkflowView } from './leads-workflows';
 import type {
@@ -338,6 +341,15 @@ export class LeadsService {
       throw new BadRequestException({
         code: 'LEAD_UPDATE_EMPTY',
         message: 'A lead status is required.',
+      });
+    }
+
+    if (!memberLeadStatusValues.includes(dto.status)) {
+      throw new BadRequestException({
+        code: 'LEAD_STATUS_INVALID',
+        message: `Lead status must be one of: ${memberLeadStatusValues.join(
+          ', ',
+        )}.`,
       });
     }
 
