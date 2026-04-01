@@ -8,8 +8,10 @@ import { RuntimeContextCentralService } from '../runtime-context/runtime-context
 
 const DISPATCH_RETRY_DELAYS_MS = [0, 2_000, 5_000] as const;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
-const DISPATCH_TIMEOUT_MS = 5_000;
+const DISPATCH_TIMEOUT_MS = 2_500;
 const LEAD_DISPATCHER_SOURCE_VERSION = '1.0.0' as const;
+const DEFAULT_N8N_DISPATCHER_INTERNAL_BASE =
+  'http://n8n-v2_n8n_v2_webhook:5678/webhook';
 
 const assignmentLeadContextInclude = {
   lead: true,
@@ -38,7 +40,7 @@ const sanitizeNullableText = (value: string | null | undefined) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-const normalizeDispatcherUrl = (value: string | null | undefined) => {
+const normalizeUrl = (value: string | null | undefined) => {
   const sanitized = sanitizeNullableText(value);
 
   if (!sanitized) {
@@ -49,6 +51,50 @@ const normalizeDispatcherUrl = (value: string | null | undefined) => {
     return new URL(sanitized).toString();
   } catch {
     return null;
+  }
+};
+
+const joinUrl = (baseUrl: string, pathname: string) => {
+  const base = new URL(baseUrl);
+  const normalizedBasePath = base.pathname.replace(/\/+$/, '');
+  const normalizedPath = pathname.replace(/^\/+/, '');
+  base.pathname = `${normalizedBasePath}/${normalizedPath}`.replace(
+    /\/{2,}/g,
+    '/',
+  );
+  base.search = '';
+  base.hash = '';
+  return base.toString();
+};
+
+const resolveDispatcherWebhookUrl = (input: {
+  explicitUrl: string | null | undefined;
+  internalBaseUrl: string | null | undefined;
+}) => {
+  const explicitUrl = normalizeUrl(input.explicitUrl);
+
+  if (!explicitUrl) {
+    return null;
+  }
+
+  const internalBaseUrl =
+    normalizeUrl(input.internalBaseUrl) ?? DEFAULT_N8N_DISPATCHER_INTERNAL_BASE;
+
+  try {
+    const explicit = new URL(explicitUrl);
+    const internalBase = new URL(internalBaseUrl);
+    const normalizedInternalBasePath = internalBase.pathname.replace(
+      /\/+$/,
+      '',
+    );
+    const explicitPath = explicit.pathname.replace(/\/+$/, '');
+    const relativePath = explicitPath.startsWith(normalizedInternalBasePath)
+      ? explicitPath.slice(normalizedInternalBasePath.length)
+      : explicitPath;
+
+    return joinUrl(internalBase.toString(), relativePath);
+  } catch {
+    return explicitUrl;
   }
 };
 
@@ -67,9 +113,13 @@ type DispatchResponse = {
 @Injectable()
 export class LeadDispatcherService {
   private readonly logger = new Logger(LeadDispatcherService.name);
-  private readonly dispatcherWebhookUrl = normalizeDispatcherUrl(
+  private readonly configuredDispatcherWebhookUrl = sanitizeNullableText(
     process.env.N8N_DISPATCHER_WEBHOOK_URL,
   );
+  private readonly dispatcherWebhookUrl = resolveDispatcherWebhookUrl({
+    explicitUrl: this.configuredDispatcherWebhookUrl,
+    internalBaseUrl: process.env.N8N_WEBHOOK_INTERNAL_BASE,
+  });
   private readonly dispatcherApiKey = sanitizeNullableText(
     process.env.N8N_DISPATCHER_API_KEY,
   );
@@ -78,7 +128,9 @@ export class LeadDispatcherService {
     private readonly prisma: PrismaService,
     private readonly runtimeContextCentralService: RuntimeContextCentralService,
   ) {
-    this.logger.log(`Dispatcher URL: ${this.dispatcherWebhookUrl}`);
+    this.logger.log(
+      `Dispatcher URL resolved to internal route: configured=${this.configuredDispatcherWebhookUrl} effective=${this.dispatcherWebhookUrl}`,
+    );
   }
 
   hasConfiguredDispatcher() {
@@ -211,7 +263,9 @@ export class LeadDispatcherService {
         }
 
         if (response.status < 200 || response.status >= 300) {
-          throw new Error(`Dispatcher rejected payload with HTTP ${response.status}`);
+          throw new Error(
+            `Dispatcher rejected payload with HTTP ${response.status}`,
+          );
         }
 
         return response;

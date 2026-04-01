@@ -246,16 +246,15 @@ export class LeadCaptureAssignmentService {
       });
 
       if (result.assignmentWasCreated) {
-        void this.sendLeadContextUpsert({
+        this.dispatchAssignmentCreatedSideEffects({
           assignmentId: result.assignment.id,
-        });
-        void this.messagingAutomationService
-          .dispatchAssignmentAutomation({
+          sponsorId: result.assignment.sponsor.id,
+          automation: {
             assignmentId: result.assignment.id,
             triggerType: 'public_auto_assignment_created',
             triggerEventId: dto.triggerEventId ?? null,
-          })
-          .catch(() => undefined);
+          },
+        });
       }
 
       return {
@@ -417,19 +416,18 @@ export class LeadCaptureAssignmentService {
       });
 
       if (result.assignmentWasCreated) {
-        void this.sendLeadContextUpsert({
+        this.dispatchAssignmentCreatedSideEffects({
           assignmentId: result.assignment.id,
-        });
-        void this.messagingAutomationService
-          .dispatchAssignmentAutomation({
+          sponsorId: result.assignment.sponsor.id,
+          automation: {
             assignmentId: result.assignment.id,
             triggerType: 'public_submission_assignment_created',
             triggerEventId: dto.submissionEventId ?? null,
             anonymousId: dto.anonymousId,
             currentStepId: dto.currentStepId,
             nextStepPath: result.nextStep?.path ?? null,
-          })
-          .catch(() => undefined);
+          },
+        });
       }
 
       return {
@@ -517,6 +515,26 @@ export class LeadCaptureAssignmentService {
     } catch (err) {
       this.logger.error('Lead dispatcher failed', err);
     }
+  }
+
+  private dispatchAssignmentCreatedSideEffects(input: {
+    assignmentId: string;
+    sponsorId: string;
+    automation: Parameters<
+      MessagingAutomationService['dispatchAssignmentAutomation']
+    >[0];
+  }) {
+    this.logger.log(
+      `Queueing LEAD_CONTEXT_UPSERT immediately after assignment creation. assignmentId=${input.assignmentId} sponsorId=${input.sponsorId}`,
+    );
+
+    void this.sendLeadContextUpsert({
+      assignmentId: input.assignmentId,
+    });
+
+    void this.messagingAutomationService
+      .dispatchAssignmentAutomation(input.automation)
+      .catch(() => undefined);
   }
 
   private async getPublicationContextOrThrow(

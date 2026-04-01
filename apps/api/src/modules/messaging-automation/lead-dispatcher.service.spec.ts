@@ -111,7 +111,7 @@ describe('LeadDispatcherService', () => {
 
   it('sends the dispatcher request with the expected url, headers and body', async () => {
     process.env.N8N_DISPATCHER_WEBHOOK_URL =
-      'https://n8n.example.com/webhook/dispatcher/lead-context-upsert';
+      'https://n8n.example.com/webhook/channels/dispatcher/lead-context-upsert';
     process.env.N8N_DISPATCHER_API_KEY = 'dispatcher-secret';
 
     const service = new LeadDispatcherService({} as never, {} as never);
@@ -122,7 +122,9 @@ describe('LeadDispatcherService', () => {
 
     const result = await (
       service as unknown as {
-        postWithRetry: (input: unknown) => Promise<{ status: number; data: unknown }>;
+        postWithRetry: (
+          input: unknown,
+        ) => Promise<{ status: number; data: unknown }>;
       }
     ).postWithRetry(payload);
 
@@ -135,7 +137,7 @@ describe('LeadDispatcherService', () => {
     const [requestUrl, requestInit] = fetchSpy.mock.calls[0] ?? [];
 
     expect(requestUrl).toBe(
-      'https://n8n.example.com/webhook/dispatcher/lead-context-upsert',
+      'http://n8n-v2_n8n_v2_webhook:5678/webhook/channels/dispatcher/lead-context-upsert',
     );
     expect(requestInit).toBeDefined();
     expect(requestInit?.method).toBe('POST');
@@ -149,7 +151,7 @@ describe('LeadDispatcherService', () => {
 
   it('retries once after a retryable 500 response and then succeeds', async () => {
     process.env.N8N_DISPATCHER_WEBHOOK_URL =
-      'https://n8n.example.com/webhook/dispatcher/lead-context-upsert';
+      'https://n8n.example.com/webhook/channels/dispatcher/lead-context-upsert';
     process.env.N8N_DISPATCHER_API_KEY = 'dispatcher-secret';
 
     const service = new LeadDispatcherService({} as never, {} as never);
@@ -161,7 +163,9 @@ describe('LeadDispatcherService', () => {
 
     const promise = (
       service as unknown as {
-        postWithRetry: (input: unknown) => Promise<{ status: number; data: unknown }>;
+        postWithRetry: (
+          input: unknown,
+        ) => Promise<{ status: number; data: unknown }>;
       }
     ).postWithRetry(payload);
 
