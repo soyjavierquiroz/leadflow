@@ -1,8 +1,18 @@
-import { Body, Controller, Headers, HttpCode, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  Logger,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { IncomingWebhooksService } from './incoming-webhooks.service';
 
 @Controller('incoming-webhooks')
 export class IncomingWebhooksController {
+  private readonly logger = new Logger(IncomingWebhooksController.name);
+
   constructor(
     private readonly incomingWebhooksService: IncomingWebhooksService,
   ) {}
@@ -13,8 +23,17 @@ export class IncomingWebhooksController {
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Query('instanceId') instanceId?: string,
     @Query('secret') secret?: string,
-    @Body() payload?: Record<string, unknown>,
+    @Body() payload?: unknown,
   ) {
+    this.logger.log(
+      `Evolution inbound webhook attempt: headers=${this.stringifyForLogs(
+        headers,
+      )} query=${this.stringifyForLogs({
+        instanceId: instanceId ?? null,
+        secret: secret ?? null,
+      })} body=${this.stringifyForLogs(payload)}`,
+    );
+
     return this.incomingWebhooksService.ingestMessagingConnection(
       headers,
       {
@@ -23,5 +42,13 @@ export class IncomingWebhooksController {
       },
       payload,
     );
+  }
+
+  private stringifyForLogs(value: unknown) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[unserializable payload]';
+    }
   }
 }

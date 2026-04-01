@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -27,6 +28,14 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 
+const stringifyForLogs = (value: unknown) => {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '[unserializable payload]';
+  }
+};
+
 const toDateOrNull = (value: string | null | undefined) => {
   if (!value) {
     return null;
@@ -38,9 +47,9 @@ const toDateOrNull = (value: string | null | undefined) => {
 
 const extractConnectionWebhookPayload = (input: {
   queryInstanceId?: string;
-  payload?: Record<string, unknown> | null;
+  payload?: unknown;
 }) => {
-  const payload = input.payload ?? null;
+  const payload = asRecord(input.payload);
   const data = asRecord(payload?.data);
   const instance = asRecord(payload?.instance) ?? asRecord(data?.instance);
   const instanceId =
@@ -86,6 +95,7 @@ const extractConnectionWebhookPayload = (input: {
 
 @Injectable()
 export class IncomingWebhooksService {
+  private readonly logger = new Logger(IncomingWebhooksService.name);
   private readonly incomingWebhookSecret =
     process.env.INCOMING_MESSAGING_WEBHOOK_SECRET?.trim() || null;
 
@@ -97,8 +107,17 @@ export class IncomingWebhooksService {
       instanceId?: string;
       secret?: string;
     },
-    payload?: Record<string, unknown> | null,
+    payload?: unknown,
   ) {
+    this.logger.log(
+      `Inbound messaging webhook received before validation: headers=${stringifyForLogs(
+        headers,
+      )} query=${stringifyForLogs({
+        instanceId: query.instanceId ?? null,
+        secret: query.secret ?? null,
+      })} body=${stringifyForLogs(payload)}`,
+    );
+
     this.assertWebhookSecret(headers, query.secret ?? null);
 
     const parsed = extractConnectionWebhookPayload({
@@ -106,7 +125,16 @@ export class IncomingWebhooksService {
       payload,
     });
 
+    this.logger.log(
+      `Inbound messaging webhook parsed payload: ${stringifyForLogs(parsed)}`,
+    );
+
     if (!parsed.instanceId || !parsed.status) {
+      this.logger.warn(
+        `Rejecting inbound messaging webhook because instanceId or status is missing. Parsed=${stringifyForLogs(
+          parsed,
+        )}`,
+      );
       throw new BadRequestException({
         code: 'CONNECTION_WEBHOOK_INVALID',
         message: 'The connection webhook must include instanceId and status.',
@@ -123,6 +151,9 @@ export class IncomingWebhooksService {
     });
 
     if (!connection) {
+      this.logger.warn(
+        `Rejecting inbound messaging webhook because instance ${parsed.instanceId} was not found.`,
+      );
       throw new BadRequestException({
         code: 'MESSAGING_INSTANCE_NOT_FOUND',
         message: `The instance ${parsed.instanceId} could not be resolved.`,
@@ -132,6 +163,9 @@ export class IncomingWebhooksService {
     const nextStatus = resolveMessagingConnectionStatus({
       state: parsed.status,
     });
+    this.logger.log(
+      `Resolved inbound messaging webhook instance=${parsed.instanceId} rawStatus=${parsed.status} nextStatus=${nextStatus}`,
+    );
     const occurredAt = toDateOrNull(parsed.occurredAt) ?? new Date();
     const normalizedPhone =
       normalizeMessagingPhone(parsed.phone) ?? connection.normalizedPhone;
@@ -276,6 +310,9 @@ export class IncomingWebhooksService {
     querySecret?: string | null,
   ) {
     if (!this.incomingWebhookSecret) {
+      this.logger.warn(
+        'Rejecting inbound messaging webhook because INCOMING_MESSAGING_WEBHOOK_SECRET is not configured.',
+      );
       throw new ServiceUnavailableException({
         code: 'WEBHOOK_SECRET_UNCONFIGURED',
         message: 'Incoming messaging webhooks are not configured yet.',
@@ -288,6 +325,11 @@ export class IncomingWebhooksService {
     if (
       !matchesIncomingWebhookSecret(this.incomingWebhookSecret, providedSecret)
     ) {
+      this.logger.warn(
+        `Rejecting inbound messaging webhook because the provided secret is invalid. headersSecret=${stringifyForLogs(
+          readIncomingWebhookSecret(headers),
+        )} querySecret=${querySecret ?? null}`,
+      );
       throw new UnauthorizedException({
         code: 'WEBHOOK_SECRET_INVALID',
         message: 'The provided incoming webhook secret is invalid.',
