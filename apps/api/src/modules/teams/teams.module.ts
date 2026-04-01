@@ -1,19 +1,24 @@
 import { Module } from '@nestjs/common';
+import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { TeamPrismaRepository } from '../../prisma/repositories/team-prisma.repository';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import { TeamsController } from './teams.controller';
+import { TeamLeadsController } from './team-leads.controller';
+import { TeamLeadsService } from './team-leads.service';
 import { TeamsService } from './teams.service';
 
 @Module({
-  controllers: [TeamsController],
+  imports: [MessagingAutomationModule],
+  controllers: [TeamsController, TeamLeadsController],
   providers: [
     TeamsService,
+    TeamLeadsService,
     TeamPrismaRepository,
     {
       provide: TEAM_REPOSITORY,
       useExisting: TeamPrismaRepository,
     },
   ],
-  exports: [TeamsService, TEAM_REPOSITORY],
+  exports: [TeamsService, TeamLeadsService, TEAM_REPOSITORY],
 })
 export class TeamsModule {}

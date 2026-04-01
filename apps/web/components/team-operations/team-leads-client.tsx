@@ -1,135 +1,284 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {
+  useDeferredValue,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
-import { LeadQualificationTimelinePanel } from "@/components/lead-signals/lead-qualification-timeline-panel";
 import { ModalShell } from "@/components/team-operations/modal-shell";
-import type { LeadRemindersSummary, LeadView } from "@/lib/app-shell/types";
+import { OperationBanner } from "@/components/team-operations/operation-banner";
+import {
+  type TeamLeadAvailableSponsor,
+  type TeamLeadInboxItem,
+  type TeamLeadReassignResponse,
+} from "@/lib/team-leads";
+import { teamOperationRequest } from "@/lib/team-operations";
 import {
   formatCompactNumber,
   formatDateTime,
-  toSentenceCase,
+  formatRelativeTime,
 } from "@/lib/app-shell/utils";
 
 type TeamLeadsClientProps = {
-  initialRows: LeadView[];
-  remindersSummary: LeadRemindersSummary;
+  initialRows: TeamLeadInboxItem[];
+  availableSponsors: TeamLeadAvailableSponsor[];
 };
 
-const reminderBucketOptions = [
+const supervisionFilterOptions = [
   "all",
-  "overdue",
-  "due_today",
-  "upcoming",
-  "unscheduled",
+  "orphaned",
+  "stagnant",
+  "active",
 ] as const;
 
-const leadStatusLabel: Record<string, string> = {
+const leadStatusFilterOptions = [
+  "all",
+  "captured",
+  "qualified",
+  "assigned",
+  "nurturing",
+  "won",
+  "lost",
+] as const;
+
+const filterLabelByValue = {
   all: "Todos",
-  captured: "Capturado",
-  assigned: "Asignado",
-  qualified: "Calificado",
+  orphaned: "Huerfanos",
+  stagnant: "Estancados",
+  active: "Activos",
+  captured: "Capturados",
+  qualified: "Calificados",
+  assigned: "Asignados",
   nurturing: "En seguimiento",
-  won: "Ganado",
-  lost: "Perdido",
-};
+  won: "Ganados",
+  lost: "Perdidos",
+} satisfies Record<string, string>;
+
+const buttonClassName =
+  "rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+
+const getLeadLabel = (lead: TeamLeadInboxItem) =>
+  lead.fullName ?? lead.phone ?? lead.email ?? "Lead sin nombre";
 
 export function TeamLeadsClient({
   initialRows,
-  remindersSummary,
+  availableSponsors,
 }: TeamLeadsClientProps) {
-  const [allRows, setAllRows] = useState(initialRows);
+  const [rows, setRows] = useState(initialRows);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
-  const [reminderBucket, setReminderBucket] =
-    useState<(typeof reminderBucketOptions)[number]>("all");
+  const [supervisionFilter, setSupervisionFilter] =
+    useState<(typeof supervisionFilterOptions)[number]>("all");
+  const [leadStatusFilter, setLeadStatusFilter] =
+    useState<(typeof leadStatusFilterOptions)[number]>("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [selectedSponsorId, setSelectedSponsorId] = useState<string>("");
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const rows = useMemo(() => {
-    return allRows.filter((row) => {
-      const matchesStatus = status === "all" ? true : row.status === status;
-      const matchesReminderBucket =
-        reminderBucket === "all" ? true : row.reminderBucket === reminderBucket;
-      const haystack = [
-        row.fullName,
-        row.email,
-        row.phone,
-        row.companyName,
-        row.funnelName,
-        row.sponsorName,
-        row.domainHost,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+  const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
       const matchesSearch =
-        search.trim().length === 0
-          ? true
-          : haystack.includes(search.trim().toLowerCase());
+        deferredSearch.length === 0 ||
+        [
+          row.fullName,
+          row.phone,
+          row.email,
+          row.companyName,
+          row.funnelName,
+          row.domainHost,
+          row.sponsor?.displayName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(deferredSearch);
 
-      return matchesStatus && matchesSearch && matchesReminderBucket;
+      const matchesSupervision =
+        supervisionFilter === "all" ||
+        row.supervisionStatus === supervisionFilter;
+      const matchesLeadStatus =
+        leadStatusFilter === "all" || row.leadStatus === leadStatusFilter;
+
+      return matchesSearch && matchesSupervision && matchesLeadStatus;
     });
-  }, [allRows, reminderBucket, search, status]);
+  }, [deferredSearch, leadStatusFilter, rows, supervisionFilter]);
 
   const selectedLead =
-    rows.find((row) => row.id === selectedLeadId) ??
-    allRows.find((row) => row.id === selectedLeadId) ??
-    null;
-  const pendingAssignmentCount = rows.filter(
-    (row) => !row.sponsorId || row.assignmentStatus === "assigned",
-  ).length;
-  const hotLeadCount = rows.filter((row) => row.qualificationGrade === "hot").length;
-  const attentionCount = rows.filter((row) => row.needsAttention).length;
+    rows.find((row) => row.id === selectedLeadId) ?? null;
+  const candidateSponsors = useMemo(() => {
+    if (!selectedLead) {
+      return [];
+    }
 
-  const updateLeadRow = (leadId: string, updates: Partial<LeadView>) => {
-    setAllRows((current) =>
+    return availableSponsors.filter(
+      (sponsor) => sponsor.id !== selectedLead.sponsor?.id,
+    );
+  }, [availableSponsors, selectedLead]);
+
+  const orphanedCount = rows.filter(
+    (row) => row.supervisionStatus === "orphaned",
+  ).length;
+  const stagnantCount = rows.filter(
+    (row) => row.supervisionStatus === "stagnant",
+  ).length;
+  const activeCount = rows.filter(
+    (row) => row.supervisionStatus === "active",
+  ).length;
+
+  const openReassignModal = (leadId: string) => {
+    const lead = rows.find((row) => row.id === leadId);
+
+    if (!lead) {
+      return;
+    }
+
+    const nextCandidates = availableSponsors.filter(
+      (sponsor) => sponsor.id !== lead.sponsor?.id,
+    );
+
+    setSelectedLeadId(leadId);
+    setSelectedSponsorId(nextCandidates[0]?.id ?? "");
+    setFeedback(null);
+  };
+
+  const closeReassignModal = () => {
+    setSelectedLeadId(null);
+    setSelectedSponsorId("");
+  };
+
+  const updateLead = (leadId: string, updates: Partial<TeamLeadInboxItem>) => {
+    setRows((current) =>
       current.map((row) => (row.id === leadId ? { ...row, ...updates } : row)),
     );
+  };
+
+  const replaceLead = (leadId: string, nextLead: TeamLeadInboxItem) => {
+    setRows((current) =>
+      current.map((row) => (row.id === leadId ? nextLead : row)),
+    );
+  };
+
+  const handleReassign = () => {
+    if (!selectedLead || !selectedSponsorId) {
+      return;
+    }
+
+    const targetSponsor = availableSponsors.find(
+      (sponsor) => sponsor.id === selectedSponsorId,
+    );
+
+    if (!targetSponsor) {
+      return;
+    }
+
+    const previousLead = rows.find((row) => row.id === selectedLead.id);
+
+    if (!previousLead) {
+      return;
+    }
+
+    const optimisticTimestamp = new Date().toISOString();
+
+    setFeedback(null);
+    updateLead(selectedLead.id, {
+      leadStatus: "assigned",
+      assignmentStatus: "assigned",
+      supervisionStatus: "stagnant",
+      assignedAt: optimisticTimestamp,
+      lastActivity: optimisticTimestamp,
+      updatedAt: optimisticTimestamp,
+      sponsor: {
+        id: targetSponsor.id,
+        displayName: targetSponsor.displayName,
+        availabilityStatus: targetSponsor.availabilityStatus,
+        status: targetSponsor.status,
+      },
+    });
+
+    startTransition(async () => {
+      try {
+        const response = await teamOperationRequest<TeamLeadReassignResponse>(
+          `/team/leads/${selectedLead.id}/reassign`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              targetSponsorId: selectedSponsorId,
+            }),
+          },
+        );
+
+        replaceLead(selectedLead.id, response.lead);
+        setFeedback({
+          tone: "success",
+          message: response.automationTriggered
+            ? "Lead reasignado y contexto enviado a n8n para el nuevo sponsor."
+            : "Lead reasignado correctamente. La tabla ya refleja el nuevo owner.",
+        });
+        closeReassignModal();
+      } catch (error) {
+        replaceLead(selectedLead.id, previousLead);
+        setFeedback({
+          tone: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "No pudimos reasignar el lead.",
+        });
+      }
+    });
   };
 
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Team Admin / Leads"
-        title="Bandeja operativa del equipo"
-        description="Prioriza qué leads están vencidos, cuáles requieren dueño claro y qué siguiente acción recomienda Leadflow para no perder ritmo comercial."
+        title="Bandeja global del equipo"
+        description="Vista total para detectar leads huerfanos, handoffs estancados y mover oportunidades entre sponsors activos sin perder el contexto comercial."
         actions={
           <>
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar lead, funnel, sponsor o dominio"
+              placeholder="Buscar por lead, telefono, sponsor o funnel"
               className="min-w-72 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
             />
             <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
-            >
-              {Object.entries(leadStatusLabel).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={reminderBucket}
+              value={supervisionFilter}
               onChange={(event) =>
-                setReminderBucket(
-                  event.target.value as (typeof reminderBucketOptions)[number],
+                setSupervisionFilter(
+                  event.target.value as (typeof supervisionFilterOptions)[number],
                 )
               }
               className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
             >
-              {reminderBucketOptions.map((option) => (
+              {supervisionFilterOptions.map((option) => (
                 <option key={option} value={option}>
-                  {option === "all"
-                    ? "Todos los reminders"
-                    : toSentenceCase(option)}
+                  {filterLabelByValue[option]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={leadStatusFilter}
+              onChange={(event) =>
+                setLeadStatusFilter(
+                  event.target.value as (typeof leadStatusFilterOptions)[number],
+                )
+              }
+              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
+            >
+              {leadStatusFilterOptions.map((option) => (
+                <option key={option} value={option}>
+                  {filterLabelByValue[option]}
                 </option>
               ))}
             </select>
@@ -137,65 +286,31 @@ export function TeamLeadsClient({
         }
       />
 
+      {feedback ? (
+        <OperationBanner tone={feedback.tone} message={feedback.message} />
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          label="Vencidos"
-          value={formatCompactNumber(remindersSummary.totals.overdue)}
-          hint="Leads del team con seguimiento ya vencido."
+          label="Panorama total"
+          value={formatCompactNumber(rows.length)}
+          hint="Todos los leads visibles para supervision del team."
         />
         <KpiCard
-          label="Hoy"
-          value={formatCompactNumber(remindersSummary.totals.dueToday)}
-          hint="Seguimientos que deberían resolverse durante hoy."
+          label="Huerfanos"
+          value={formatCompactNumber(orphanedCount)}
+          hint="Leads sin asignacion activa y listos para rescate."
         />
         <KpiCard
-          label="Próximos"
-          value={formatCompactNumber(remindersSummary.totals.upcoming)}
-          hint="Leads con próximos follow-ups ya visibles."
+          label="Estancados"
+          value={formatCompactNumber(stagnantCount)}
+          hint="Asignados pero todavia no aceptados por un sponsor."
         />
         <KpiCard
-          label="Sin follow-up"
-          value={formatCompactNumber(remindersSummary.totals.unscheduled)}
-          hint="Leads activos donde todavía falta programar seguimiento."
+          label="Sponsors listos"
+          value={formatCompactNumber(availableSponsors.length)}
+          hint={`${formatCompactNumber(activeCount)} leads hoy ya viven en ownership activo.`}
         />
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Carga visible
-          </p>
-          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-            {formatCompactNumber(rows.length)} leads en foco
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            La bandeja se ajusta a tus filtros y deja visible solo lo que el
-            equipo necesita revisar ahora.
-          </p>
-        </div>
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Por destrabar
-          </p>
-          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-            {formatCompactNumber(pendingAssignmentCount)} por tomar o mover
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Leads sin sponsor claro o todavía en etapa temprana de assignment.
-          </p>
-        </div>
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Prioridad comercial
-          </p>
-          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-            {formatCompactNumber(hotLeadCount + attentionCount)} leads calientes o en riesgo
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Combina intención alta y necesidad de atención para ordenar el día
-            del equipo.
-          </p>
-        </div>
       </section>
 
       <DataTable
@@ -209,14 +324,14 @@ export function TeamLeadsClient({
                   {row.fullName ?? "Lead sin nombre"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {row.companyName ?? row.email ?? row.phone ?? "Sin contacto"}
+                  {row.phone ?? row.email ?? "Sin telefono"}
                 </p>
               </div>
             ),
           },
           {
-            key: "funnel",
-            header: "Origen comercial",
+            key: "origin",
+            header: "Origen",
             render: (row) => (
               <div>
                 <p>{row.funnelName ?? "Sin funnel"}</p>
@@ -228,104 +343,108 @@ export function TeamLeadsClient({
             ),
           },
           {
-            key: "assignment",
-            header: "Owner actual",
+            key: "owner",
+            header: "Sponsor actual",
             render: (row) => (
               <div>
-                <p>{row.sponsorName ?? "Pendiente"}</p>
+                <p>{row.sponsor?.displayName ?? "Sin owner"}</p>
                 <p className="text-xs text-slate-500">
-                  {formatDateTime(row.assignedAt)}
+                  {row.sponsor
+                    ? formatDateTime(row.assignedAt)
+                    : "Sin asignacion activa"}
                 </p>
               </div>
             ),
           },
           {
             key: "status",
-            header: "Estado y prioridad",
+            header: "Estado",
             render: (row) => (
               <div className="flex flex-wrap gap-2">
-                <StatusBadge value={row.status} />
-                {row.qualificationGrade ? (
-                  <StatusBadge value={row.qualificationGrade} />
-                ) : null}
-                {row.reminderBucket !== "none" ? (
-                  <StatusBadge value={row.reminderBucket} />
+                <StatusBadge value={row.supervisionStatus} />
+                <StatusBadge value={row.leadStatus} />
+                {row.assignmentStatus ? (
+                  <StatusBadge value={row.assignmentStatus} />
                 ) : null}
               </div>
             ),
           },
           {
-            key: "assignmentStatus",
-            header: "Estado del handoff",
-            render: (row) => <StatusBadge value={row.assignmentStatus} />,
-          },
-          {
-            key: "nextAction",
-            header: "Siguiente acción",
-            render: (row) =>
-              row.effectiveNextAction ??
-              row.summaryText ??
-              "Pendiente de definir",
-          },
-          {
-            key: "playbook",
-            header: "Playbook",
-            render: (row) => row.playbookTitle ?? "Sin recomendación",
-          },
-          {
-            key: "followUp",
-            header: "Seguimiento",
+            key: "activity",
+            header: "Ultima actividad",
             render: (row) => (
               <div>
-                <p>{row.reminderLabel ?? "Sin seguimiento"}</p>
+                <p>{formatRelativeTime(row.lastActivity)}</p>
                 <p className="text-xs text-slate-500">
-                  {row.followUpAt
-                    ? formatDateTime(row.followUpAt)
-                    : "Sin fecha"}
+                  {formatDateTime(row.lastActivity)}
                 </p>
               </div>
             ),
           },
           {
-            key: "detail",
-            header: "Detalle",
+            key: "assignedAt",
+            header: "Tiempo desde asignacion",
+            render: (row) => (
+              <div>
+                <p>
+                  {row.assignedAt
+                    ? formatRelativeTime(row.assignedAt)
+                    : "Sin asignar"}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {row.assignedAt ? formatDateTime(row.assignedAt) : "Pendiente"}
+                </p>
+              </div>
+            ),
+          },
+          {
+            key: "action",
+            header: "Accion",
             render: (row) => (
               <button
                 type="button"
-                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
-                onClick={() => setSelectedLeadId(row.id)}
+                onClick={() => openReassignModal(row.id)}
+                disabled={
+                  isPending ||
+                  availableSponsors.filter(
+                    (sponsor) => sponsor.id !== row.sponsor?.id,
+                  ).length === 0
+                }
+                className={buttonClassName}
               >
-                Ver detalle
+                Reasignar
               </button>
             ),
           },
         ]}
-        rows={rows}
-        emptyTitle="Sin leads para el team"
-        emptyDescription="Cuando entren nuevas oportunidades desde el funnel público, esta bandeja las mostrará con owner, próxima acción y seguimiento."
+        rows={filteredRows}
+        emptyTitle="Sin leads para mostrar"
+        emptyDescription="Cuando el team capture oportunidades o necesite rescates manuales, esta bandeja global mostrara el ownership y el pulso operativo completo."
       />
 
       {selectedLead ? (
         <ModalShell
-          title={selectedLead.fullName ?? "Lead sin nombre"}
-          description="Detalle operativo del lead con owner, reminder, playbook sugerido e historial resumido para decidir el siguiente movimiento."
-          onClose={() => setSelectedLeadId(null)}
+          title={`Reasignar ${getLeadLabel(selectedLead)}`}
+          description="Selecciona un sponsor disponible. Al confirmar, cerramos el handoff actual, asignamos el nuevo owner y disparamos el upsert de contexto para WhatsApp."
+          onClose={closeReassignModal}
         >
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                <p className="text-slate-500">Contacto</p>
+                <p className="text-slate-500">Owner actual</p>
                 <p className="mt-2 font-medium text-slate-950">
-                  {selectedLead.email ?? "Sin email"}
+                  {selectedLead.sponsor?.displayName ?? "Sin owner"}
                 </p>
                 <p className="mt-1 text-slate-700">
-                  {selectedLead.phone ?? "Sin teléfono"}
+                  {selectedLead.assignedAt
+                    ? `Asignado ${formatRelativeTime(selectedLead.assignedAt)}`
+                    : "Lead huerfano"}
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                <p className="text-slate-500">Sponsor actual</p>
+                <p className="text-slate-500">Contexto</p>
                 <p className="mt-2 font-medium text-slate-950">
-                  {selectedLead.sponsorName ?? "Pendiente"}
+                  {selectedLead.funnelName ?? "Sin funnel"}
                 </p>
                 <p className="mt-1 text-slate-700">
                   {selectedLead.domainHost ?? "Host pendiente"}
@@ -336,64 +455,47 @@ export function TeamLeadsClient({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge value={selectedLead.status} />
-              {selectedLead.assignmentStatus ? (
-                <StatusBadge value={selectedLead.assignmentStatus} />
-              ) : null}
-              {selectedLead.qualificationGrade ? (
-                <StatusBadge value={selectedLead.qualificationGrade} />
-              ) : null}
-              {selectedLead.reminderBucket !== "none" ? (
-                <StatusBadge value={selectedLead.reminderBucket} />
-              ) : null}
+            {candidateSponsors.length > 0 ? (
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-900">
+                  Nuevo sponsor
+                </span>
+                <select
+                  value={selectedSponsorId}
+                  onChange={(event) => setSelectedSponsorId(event.target.value)}
+                  className="mt-3 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-950"
+                >
+                  {candidateSponsors.map((sponsor) => (
+                    <option key={sponsor.id} value={sponsor.id}>
+                      {sponsor.displayName}
+                      {sponsor.phone ? ` · ${sponsor.phone}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                No hay sponsors activos y disponibles distintos al owner actual.
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeReassignModal}
+                className={buttonClassName}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleReassign}
+                disabled={isPending || !selectedSponsorId}
+                className="rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPending ? "Reasignando..." : "Confirmar reasignacion"}
+              </button>
             </div>
-
-            <dl className="grid gap-3 text-sm md:grid-cols-2">
-              <div>
-                <dt className="text-slate-500">Empresa</dt>
-                <dd className="mt-1 font-medium text-slate-900">
-                  {selectedLead.companyName ?? "Sin empresa"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Funnel</dt>
-                <dd className="mt-1 font-medium text-slate-900">
-                  {selectedLead.funnelName ?? "Sin funnel"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Creado</dt>
-                <dd className="mt-1 font-medium text-slate-900">
-                  {formatDateTime(selectedLead.createdAt)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Asignado</dt>
-                <dd className="mt-1 font-medium text-slate-900">
-                  {selectedLead.assignedAt
-                    ? formatDateTime(selectedLead.assignedAt)
-                    : "Pendiente"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Playbook recomendado</dt>
-                <dd className="mt-1 font-medium text-slate-900">
-                  {selectedLead.playbookTitle ?? "Sin recomendación"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Próxima acción efectiva</dt>
-                <dd className="mt-1 font-medium text-slate-900">
-                  {selectedLead.effectiveNextAction ?? "Pendiente de definir"}
-                </dd>
-              </div>
-            </dl>
-
-            <LeadQualificationTimelinePanel
-              leadId={selectedLead.id}
-              onLeadChange={(leadId, updates) => updateLeadRow(leadId, updates)}
-            />
           </div>
         </ModalShell>
       ) : null}

@@ -30,6 +30,10 @@ const toneByValue = (value: string) => {
     case "reassigned":
     case "active_nurture":
       return "border-sky-200 bg-sky-50 text-sky-700";
+    case "stagnant":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "orphaned":
+      return "border-rose-200 bg-rose-50 text-rose-700";
     case "cold":
     case "cold_reengage":
     case "overdue":
