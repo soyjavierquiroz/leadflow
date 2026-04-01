@@ -44,6 +44,12 @@ enum RotationPoolStatus {
   archived
 }
 
+enum AdWheelStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+}
+
 enum FunnelStatus {
   draft
   active
@@ -323,6 +329,7 @@ model Team {
   trackingProfiles     TrackingProfile[]
   handoffStrategies    HandoffStrategy[]
   rotationPools        RotationPool[]
+  adWheels             AdWheel[]
   assignments          Assignment[]
   users                User[]
   messagingConnections MessagingConnection[]
@@ -350,11 +357,40 @@ model Sponsor {
   workspace            Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team                 Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
   rotationMembers      RotationMember[]
+  adWheelParticipants  AdWheelParticipant[]
   assignments          Assignment[]
   user                 User?
   messagingConnection  MessagingConnection?
   automationDispatches AutomationDispatch[]
   leadNotes            LeadNote[]
+}
+
+model AdWheel {
+  id           String               @id @default(uuid())
+  teamId       String
+  status       AdWheelStatus
+  name         String
+  seatPrice    Int
+  startDate    DateTime
+  endDate      DateTime
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  team         Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  participants AdWheelParticipant[]
+
+  @@index([teamId, status])
+  @@index([teamId, startDate, endDate])
+}
+
+model AdWheelParticipant {
+  adWheelId String
+  sponsorId String
+  joinedAt  DateTime @default(now())
+  adWheel   AdWheel  @relation(fields: [adWheelId], references: [id], onDelete: Cascade)
+  sponsor   Sponsor  @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  @@id([adWheelId, sponsorId])
+  @@index([sponsorId, joinedAt])
 }
 
 model User {

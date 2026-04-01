@@ -3,9 +3,13 @@ import type {
   InternalAxiosRequestConfig,
   RawAxiosRequestHeaders,
 } from 'axios';
+import { BadGatewayException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { of } from 'rxjs';
-import { WalletEngineService } from './wallet-engine.service';
+import {
+  readWalletEngineException,
+  WalletEngineService,
+} from './wallet-engine.service';
 
 const buildAxiosResponse = <T>(data: T): AxiosResponse<T> => ({
   data,
@@ -152,5 +156,73 @@ describe('WalletEngineService', () => {
     expect(secondHeaders['Idempotency-Key']).toBe(
       firstHeaders['Idempotency-Key'],
     );
+  });
+
+  it('accepts a custom Idempotency-Key for seat debits', async () => {
+    const { service, httpService } = createService();
+
+    httpService.post.mockReturnValue(
+      of(
+        buildAxiosResponse({
+          ledger_entry: {
+            id: 'ledger-1',
+            account_id: 'account-1',
+            movement_type: 'debit',
+            amount: '25.000000',
+            balance_after: '75.000000',
+            unit_code: 'KREDIT',
+            unit_scale: 6,
+            feature_key: 'ads_wheel.seat',
+            reference_type: 'seat_billing',
+            reference_id: 'join_wheel-1_sponsor-1',
+            idempotency_key: 'join_wheel-1_sponsor-1',
+            meta_json: {},
+            created_at: '2026-04-01T00:00:00.000Z',
+          },
+          balance: {
+            account_id: 'account-1',
+            unit_code: 'KREDIT',
+            unit_scale: 6,
+            balance: '75.000000',
+            held_amount: '0.000000',
+            available_balance: '75.000000',
+            updated_at: '2026-04-01T00:00:00.000Z',
+          },
+        }),
+      ),
+    );
+
+    await service.debitSeat(
+      'account-1',
+      '25.000000',
+      'join_wheel-1_sponsor-1',
+      {
+        idempotencyKey: 'join_wheel-1_sponsor-1',
+      },
+    );
+
+    expect(
+      httpService.post.mock.calls[0]?.[2]?.headers?.['Idempotency-Key'],
+    ).toBe('join_wheel-1_sponsor-1');
+  });
+
+  it('formats integer minor units using the wallet scale', () => {
+    const { service } = createService();
+
+    expect(service.formatMinorUnits(25_000_000)).toBe('25.000000');
+    expect(service.formatMinorUnits(1)).toBe('0.000001');
+  });
+
+  it('exposes the upstream wallet status from wrapped exceptions', () => {
+    const error = new BadGatewayException({
+      code: 'WALLET_ENGINE_REQUEST_FAILED',
+      message: 'Wallet engine request failed with HTTP 402: insufficient funds',
+      upstreamStatus: 402,
+    });
+
+    expect(readWalletEngineException(error)).toEqual({
+      upstreamStatus: 402,
+      message: 'Wallet engine request failed with HTTP 402: insufficient funds',
+    });
   });
 });

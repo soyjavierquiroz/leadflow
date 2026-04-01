@@ -1,8 +1,8 @@
 import { HttpService } from '@nestjs/axios';
 import {
   BadGatewayException,
-  Injectable,
   ServiceUnavailableException,
+  Injectable,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AxiosError, AxiosRequestConfig } from 'axios';
@@ -49,6 +49,16 @@ export type WalletEngineDebitResult = {
     created_at: string;
   };
   balance: WalletEngineBalance;
+};
+
+export type WalletEngineDebitOptions = {
+  idempotencyKey?: string;
+};
+
+type WalletEngineExceptionResponse = {
+  code: string;
+  message: string;
+  upstreamStatus: number | null;
 };
 
 const PLATFORM_KEY = 'leadflow';
@@ -142,10 +152,18 @@ export class WalletEngineService {
     accountId: string,
     amount: string,
     referenceId: string,
+    options?: WalletEngineDebitOptions,
   ): Promise<WalletEngineDebitResult> {
     const normalizedAccountId = this.requireText(accountId, 'accountId');
     const normalizedAmount = this.requireText(amount, 'amount');
     const normalizedReferenceId = this.requireText(referenceId, 'referenceId');
+    const normalizedIdempotencyKey = options?.idempotencyKey
+      ? this.requireText(options.idempotencyKey, 'idempotencyKey')
+      : this.buildIdempotencyKey('seat-debit', [
+          normalizedAccountId,
+          normalizedAmount,
+          normalizedReferenceId,
+        ]);
 
     return await this.post<WalletEngineDebitResult>(
       '/wallets/debit',
@@ -162,12 +180,24 @@ export class WalletEngineService {
           product_key: PRODUCT_KEY,
         },
       },
-      this.buildIdempotencyKey('seat-debit', [
-        normalizedAccountId,
-        normalizedAmount,
-        normalizedReferenceId,
-      ]),
+      normalizedIdempotencyKey,
     );
+  }
+
+  formatMinorUnits(amountInMinorUnits: number) {
+    if (!Number.isInteger(amountInMinorUnits)) {
+      throw new ServiceUnavailableException(
+        'Wallet engine amount must be expressed as integer minor units.',
+      );
+    }
+
+    const sign = amountInMinorUnits < 0 ? '-' : '';
+    const absolute = Math.abs(amountInMinorUnits);
+    const base = 10 ** UNIT_SCALE;
+    const whole = Math.trunc(absolute / base);
+    const fraction = String(absolute % base).padStart(UNIT_SCALE, '0');
+
+    return `${sign}${whole}.${fraction}`;
   }
 
   private async get<T>(path: string): Promise<T> {
@@ -269,13 +299,52 @@ export class WalletEngineService {
       'Wallet engine request failed.';
 
     if (status) {
-      return new BadGatewayException(
-        `Wallet engine request failed with HTTP ${status}: ${message}`,
-      );
+      return new BadGatewayException({
+        code: 'WALLET_ENGINE_REQUEST_FAILED',
+        message: `Wallet engine request failed with HTTP ${status}: ${message}`,
+        upstreamStatus: status,
+      } satisfies WalletEngineExceptionResponse);
     }
 
-    return new ServiceUnavailableException(
-      `Wallet engine is unavailable: ${message}`,
-    );
+    return new ServiceUnavailableException({
+      code: 'WALLET_ENGINE_UNAVAILABLE',
+      message: `Wallet engine is unavailable: ${message}`,
+      upstreamStatus: null,
+    } satisfies WalletEngineExceptionResponse);
   }
 }
+
+export const readWalletEngineException = (error: unknown) => {
+  if (
+    !(
+      error instanceof BadGatewayException ||
+      error instanceof ServiceUnavailableException
+    )
+  ) {
+    return {
+      upstreamStatus: null,
+      message: error instanceof Error ? error.message : 'Unknown wallet error.',
+    };
+  }
+
+  const response = error.getResponse();
+
+  if (!response || typeof response !== 'object' || Array.isArray(response)) {
+    return {
+      upstreamStatus: null,
+      message: error.message,
+    };
+  }
+
+  return {
+    upstreamStatus:
+      'upstreamStatus' in response &&
+      typeof response.upstreamStatus === 'number'
+        ? response.upstreamStatus
+        : null,
+    message:
+      'message' in response && typeof response.message === 'string'
+        ? response.message
+        : error.message,
+  };
+};

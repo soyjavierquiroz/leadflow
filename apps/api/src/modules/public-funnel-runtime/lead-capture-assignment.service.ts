@@ -140,6 +140,8 @@ const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
 const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
   ...ASSIGNMENT_FALLBACK_ERROR_CODES,
   'NO_FALLBACK_SPONSOR_AVAILABLE',
+  'NO_ACTIVE_AD_WHEEL',
+  'NO_ACTIVE_AD_WHEEL_PARTICIPANTS',
 ]);
 
 type DirectEligibleSponsor = Prisma.SponsorGetPayload<Record<string, never>>;
@@ -886,6 +888,8 @@ export class LeadCaptureAssignmentService {
     let assignmentReason: 'rotation' | 'fallback' = 'rotation';
     let selectedSponsor: RotationPoolWithMembers['members'][number]['sponsor'];
     let assignmentRotationPoolId: string | null = null;
+    const eligibleSponsorIds =
+      await this.resolveEligibleAdWheelSponsorIdsOrThrow(tx, publication);
 
     try {
       const rotationPool = await this.resolveRotationPoolOrThrow(
@@ -895,6 +899,7 @@ export class LeadCaptureAssignmentService {
       const nextMember = await this.resolveNextRotationMemberOrThrow(
         tx,
         rotationPool,
+        eligibleSponsorIds,
       );
 
       selectedSponsor = nextMember.sponsor;
@@ -907,6 +912,7 @@ export class LeadCaptureAssignmentService {
       const fallbackResolution = await this.resolveFallbackSponsorOrThrow(
         tx,
         publication,
+        eligibleSponsorIds,
       );
 
       assignmentReason = 'fallback';
@@ -1160,8 +1166,13 @@ export class LeadCaptureAssignmentService {
   private async resolveNextRotationMemberOrThrow(
     tx: TransactionClient,
     rotationPool: RotationPoolWithMembers,
+    eligibleSponsorIds: string[],
   ) {
-    if (rotationPool.members.length === 0) {
+    const eligibleMembers = rotationPool.members.filter((member) =>
+      eligibleSponsorIds.includes(member.sponsorId),
+    );
+
+    if (eligibleMembers.length === 0) {
       throw new ConflictException({
         code: 'NO_ELIGIBLE_SPONSORS',
         message: `Rotation pool ${rotationPool.id} does not have active sponsors available for assignment.`,
@@ -1170,11 +1181,11 @@ export class LeadCaptureAssignmentService {
 
     const lastAssignmentMap = await this.getLastAssignmentBySponsorId(
       tx,
-      rotationPool.members.map((member) => member.sponsorId),
+      eligibleMembers.map((member) => member.sponsorId),
     );
 
     const nextMember = pickNextRotationMember(
-      rotationPool.members.map((member) => ({
+      eligibleMembers.map((member) => ({
         sponsorId: member.sponsorId,
         position: member.position,
         lastAssignedAt:
@@ -1250,6 +1261,7 @@ export class LeadCaptureAssignmentService {
   private async resolveFallbackSponsorOrThrow(
     tx: TransactionClient,
     publication: FlowPublicationRecord,
+    eligibleSponsorIds: string[],
   ) {
     const fallbackPool = await tx.rotationPool.findFirst({
       where: {
@@ -1262,6 +1274,9 @@ export class LeadCaptureAssignmentService {
         members: {
           where: {
             isActive: true,
+            sponsorId: {
+              in: eligibleSponsorIds,
+            },
             sponsor: {
               isActive: true,
               status: 'active',
@@ -1302,6 +1317,9 @@ export class LeadCaptureAssignmentService {
       where: {
         workspaceId: publication.workspaceId,
         teamId: publication.teamId,
+        id: {
+          in: eligibleSponsorIds,
+        },
         isActive: true,
         status: 'active',
         availabilityStatus: 'available',
@@ -1325,6 +1343,47 @@ export class LeadCaptureAssignmentService {
       code: 'NO_FALLBACK_SPONSOR_AVAILABLE',
       message: `Publication ${publication.id} does not have a fallback sponsor available.`,
     });
+  }
+
+  private async resolveEligibleAdWheelSponsorIdsOrThrow(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+  ) {
+    const activeWheel = await tx.adWheel.findFirst({
+      where: {
+        teamId: publication.teamId,
+        status: 'ACTIVE',
+      },
+      select: {
+        id: true,
+        participants: {
+          select: {
+            sponsorId: true,
+          },
+        },
+      },
+      orderBy: [{ startDate: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    if (!activeWheel) {
+      throw new ConflictException({
+        code: 'NO_ACTIVE_AD_WHEEL',
+        message: `Team ${publication.teamId} does not have an active ad wheel.`,
+      });
+    }
+
+    const sponsorIds = [
+      ...new Set(activeWheel.participants.map((item) => item.sponsorId)),
+    ];
+
+    if (sponsorIds.length === 0) {
+      throw new ConflictException({
+        code: 'NO_ACTIVE_AD_WHEEL_PARTICIPANTS',
+        message: `Active ad wheel ${activeWheel.id} does not have paid participants.`,
+      });
+    }
+
+    return sponsorIds;
   }
 
   private async getLastAssignmentBySponsorId(
