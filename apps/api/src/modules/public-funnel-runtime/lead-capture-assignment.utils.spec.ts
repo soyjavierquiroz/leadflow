@@ -2,26 +2,56 @@ import { pickNextRotationMember } from './lead-capture-assignment.utils';
 
 describe('pickNextRotationMember', () => {
   const members = [
-    { sponsorId: 'sponsor-a', position: 1 },
-    { sponsorId: 'sponsor-b', position: 2 },
-    { sponsorId: 'sponsor-c', position: 3 },
+    { sponsorId: 'sponsor-a', position: 1, lastAssignedAt: null },
+    {
+      sponsorId: 'sponsor-b',
+      position: 2,
+      lastAssignedAt: '2026-03-31T19:00:00.000Z',
+    },
+    {
+      sponsorId: 'sponsor-c',
+      position: 3,
+      lastAssignedAt: '2026-03-31T20:00:00.000Z',
+    },
   ];
 
-  it('returns the first member when there is no previous assignment', () => {
-    expect(pickNextRotationMember(members, null)).toEqual(members[0]);
+  it('returns the sponsor that has never received an assignment first', () => {
+    expect(pickNextRotationMember(members)).toEqual(members[0]);
   });
 
-  it('returns the next member when a previous sponsor exists', () => {
-    expect(pickNextRotationMember(members, 'sponsor-a')).toEqual(members[1]);
+  it('returns the sponsor with the oldest last assignment', () => {
+    expect(
+      pickNextRotationMember(
+        members.map((member) =>
+          member.sponsorId === 'sponsor-a'
+            ? {
+                ...member,
+                lastAssignedAt: '2026-03-31T21:00:00.000Z',
+              }
+            : member,
+        ),
+      ),
+    ).toEqual(members[1]);
   });
 
-  it('wraps around to the first member', () => {
-    expect(pickNextRotationMember(members, 'sponsor-c')).toEqual(members[0]);
-  });
-
-  it('falls back to the first member when the previous sponsor is no longer eligible', () => {
-    expect(pickNextRotationMember(members, 'missing-sponsor')).toEqual(
-      members[0],
-    );
+  it('uses position as a stable tiebreaker', () => {
+    expect(
+      pickNextRotationMember([
+        {
+          sponsorId: 'sponsor-b',
+          position: 2,
+          lastAssignedAt: '2026-03-31T20:00:00.000Z',
+        },
+        {
+          sponsorId: 'sponsor-a',
+          position: 1,
+          lastAssignedAt: '2026-03-31T20:00:00.000Z',
+        },
+      ]),
+    ).toEqual({
+      sponsorId: 'sponsor-a',
+      position: 1,
+      lastAssignedAt: '2026-03-31T20:00:00.000Z',
+    });
   });
 });

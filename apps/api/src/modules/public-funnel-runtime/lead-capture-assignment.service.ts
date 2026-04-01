@@ -135,6 +135,8 @@ const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
   'ROTATION_MEMBER_NOT_FOUND',
 ]);
 
+type DirectEligibleSponsor = Prisma.SponsorGetPayload<Record<string, never>>;
+
 @Injectable()
 export class LeadCaptureAssignmentService {
   private readonly logger = new Logger(LeadCaptureAssignmentService.name);
@@ -826,7 +828,7 @@ export class LeadCaptureAssignmentService {
       where: {
         leadId: lead.id,
         status: {
-          in: ['pending', 'assigned', 'accepted'],
+          in: ['pending', 'assigned'],
         },
       },
       include: {
@@ -912,6 +914,7 @@ export class LeadCaptureAssignmentService {
         status: 'assigned',
         reason: assignmentReason,
         assignedAt,
+        acceptedAt: null,
         resolvedAt: null,
       },
       include: {
@@ -1100,21 +1103,19 @@ export class LeadCaptureAssignmentService {
       });
     }
 
-    const lastAssignment = await tx.assignment.findFirst({
-      where: {
-        rotationPoolId: rotationPool.id,
-      },
-      orderBy: {
-        assignedAt: 'desc',
-      },
-    });
+    const lastAssignmentMap = await this.getLastAssignmentBySponsorId(
+      tx,
+      rotationPool.members.map((member) => member.sponsorId),
+    );
 
     const nextMember = pickNextRotationMember(
       rotationPool.members.map((member) => ({
         sponsorId: member.sponsorId,
         position: member.position,
+        lastAssignedAt:
+          lastAssignmentMap.get(member.sponsorId)?.assignedAt.toISOString() ??
+          null,
       })),
-      lastAssignment?.sponsorId,
     );
 
     if (!nextMember) {
@@ -1188,21 +1189,38 @@ export class LeadCaptureAssignmentService {
     });
 
     if (fallbackPool?.members.length) {
+      const sponsor = await this.pickLeastRecentlyAssignedDirectSponsor(
+        tx,
+        fallbackPool.members.map((member) => member.sponsor),
+      );
+
+      if (!sponsor) {
+        throw new ConflictException({
+          code: 'NO_FALLBACK_SPONSOR_AVAILABLE',
+          message: `Publication ${publication.id} does not have a fallback sponsor available.`,
+        });
+      }
+
       return {
-        sponsor: fallbackPool.members[0].sponsor,
+        sponsor,
         rotationPoolId: fallbackPool.id,
       };
     }
 
-    const directSponsor = await tx.sponsor.findFirst({
+    const directSponsors = await tx.sponsor.findMany({
       where: {
         workspaceId: publication.workspaceId,
         teamId: publication.teamId,
         status: 'active',
         availabilityStatus: 'available',
       },
-      orderBy: [{ routingWeight: 'desc' }, { createdAt: 'asc' }],
+      orderBy: [{ createdAt: 'asc' }],
     });
+
+    const directSponsor = await this.pickLeastRecentlyAssignedDirectSponsor(
+      tx,
+      directSponsors,
+    );
 
     if (directSponsor) {
       return {
@@ -1215,6 +1233,77 @@ export class LeadCaptureAssignmentService {
       code: 'NO_FALLBACK_SPONSOR_AVAILABLE',
       message: `Publication ${publication.id} does not have a fallback sponsor available.`,
     });
+  }
+
+  private async getLastAssignmentBySponsorId(
+    tx: TransactionClient,
+    sponsorIds: string[],
+  ) {
+    if (sponsorIds.length === 0) {
+      return new Map<string, { sponsorId: string; assignedAt: Date }>();
+    }
+
+    const assignments = await tx.assignment.findMany({
+      where: {
+        sponsorId: {
+          in: sponsorIds,
+        },
+      },
+      select: {
+        sponsorId: true,
+        assignedAt: true,
+      },
+      orderBy: {
+        assignedAt: 'desc',
+      },
+    });
+
+    const lastAssignmentMap = new Map<
+      string,
+      {
+        sponsorId: string;
+        assignedAt: Date;
+      }
+    >();
+
+    for (const assignment of assignments) {
+      if (!lastAssignmentMap.has(assignment.sponsorId)) {
+        lastAssignmentMap.set(assignment.sponsorId, assignment);
+      }
+    }
+
+    return lastAssignmentMap;
+  }
+
+  private async pickLeastRecentlyAssignedDirectSponsor(
+    tx: TransactionClient,
+    sponsors: DirectEligibleSponsor[],
+  ) {
+    if (sponsors.length === 0) {
+      return null;
+    }
+
+    const lastAssignmentMap = await this.getLastAssignmentBySponsorId(
+      tx,
+      sponsors.map((sponsor) => sponsor.id),
+    );
+
+    return (
+      [...sponsors].sort((left, right) => {
+        const leftAssignedAt =
+          lastAssignmentMap.get(left.id)?.assignedAt.getTime() ??
+          Number.NEGATIVE_INFINITY;
+        const rightAssignedAt =
+          lastAssignmentMap.get(right.id)?.assignedAt.getTime() ??
+          Number.NEGATIVE_INFINITY;
+
+        if (leftAssignedAt !== rightAssignedAt) {
+          return leftAssignedAt - rightAssignedAt;
+        }
+
+        return left.createdAt.getTime() - right.createdAt.getTime();
+      })[0] ?? null
+    );
   }
 
   private resolveNextStepAfterCaptureFromPublication(

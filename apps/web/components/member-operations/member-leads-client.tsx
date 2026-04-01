@@ -121,7 +121,9 @@ export function MemberLeadsClient({
   const pendingAcceptanceCount = filteredRows.filter(
     (row) => row.assignmentStatus === "assigned",
   ).length;
-  const attentionCount = filteredRows.filter((row) => row.needsAttention).length;
+  const attentionCount = filteredRows.filter(
+    (row) => row.needsAttention,
+  ).length;
 
   const updateLeadRow = (leadId: string, updates: Partial<LeadView>) => {
     setRows((current) =>
@@ -138,17 +140,22 @@ export function MemberLeadsClient({
     setFeedback(null);
 
     try {
-      const updatedAssignment = await memberOperationRequest<AssignmentRecord>(
-        `/assignments/${lead.currentAssignmentId}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ status: "accepted" }),
-        },
-      );
+      const acceptedLead = await memberOperationRequest<{
+        ok: true;
+        leadId: string;
+        sponsorId: string;
+        assignmentId: string;
+        assignmentStatus: AssignmentRecord["status"];
+        leadStatus: LeadView["status"];
+        acceptedAt: string;
+        alreadyAccepted: boolean;
+      }>(`/sponsors/me/leads/${lead.id}/accept`, {
+        method: "POST",
+      });
 
       updateLeadRow(lead.id, {
-        assignmentStatus: updatedAssignment.status,
-        status: lead.status === "assigned" ? "nurturing" : lead.status,
+        assignmentStatus: acceptedLead.assignmentStatus,
+        status: acceptedLead.leadStatus,
       });
       setFeedback({
         tone: "success",
@@ -296,7 +303,8 @@ export function MemberLeadsClient({
             {formatCompactNumber(pendingAcceptanceCount)} esperando respuesta
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Tómalos primero si quieres bajar fricción entre assignment y seguimiento.
+            Tómalos primero si quieres bajar fricción entre assignment y
+            seguimiento.
           </p>
         </div>
         <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
@@ -304,7 +312,8 @@ export function MemberLeadsClient({
             Prioridad comercial
           </p>
           <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-            {formatCompactNumber(hotLeadCount + attentionCount)} leads calientes o en riesgo
+            {formatCompactNumber(hotLeadCount + attentionCount)} leads calientes
+            o en riesgo
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Mezcla intención alta y necesidad de atención para ordenar tu foco.
@@ -458,7 +467,7 @@ export function MemberLeadsClient({
             header: "Entró a mi bandeja",
             render: (row: LeadView) =>
               row.assignedAt ? formatDateTime(row.assignedAt) : "Pendiente",
-            },
+          },
           {
             key: "actions",
             header: "Detalle",

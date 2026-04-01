@@ -67,7 +67,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
       where: {
         leadId,
         status: {
-          in: ['pending', 'assigned', 'accepted'],
+          in: ['pending', 'assigned'],
         },
       },
       orderBy: { assignedAt: 'desc' },
