@@ -20,6 +20,7 @@ export type PublicVisibleSponsor = {
   displayName: string;
   email: string | null;
   phone: string | null;
+  avatarUrl: string | null;
 };
 
 const asRecord = (value: JsonValue | null | undefined) => {
@@ -165,4 +166,5 @@ export const toPublicVisibleSponsor = (input: PublicVisibleSponsor) => ({
   displayName: input.displayName,
   email: input.email,
   phone: input.phone,
+  avatarUrl: input.avatarUrl,
 });

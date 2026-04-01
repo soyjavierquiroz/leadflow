@@ -87,6 +87,7 @@ type AssignmentSummary = {
     displayName: string;
     email: string | null;
     phone: string | null;
+    avatarUrl: string | null;
   };
 };
 
@@ -386,7 +387,7 @@ export class LeadCaptureAssignmentService {
           ? {
               name: sponsor.displayName,
               phone: sponsor.phone ?? whatsappPhone,
-              photoUrl: null,
+              photoUrl: sponsor.avatarUrl,
               bio: 'Especialista en Protocolos de Recuperacion',
               whatsappUrl,
             }
@@ -869,6 +870,7 @@ export class LeadCaptureAssignmentService {
             displayName: existingOpenAssignment.sponsor.displayName,
             email: existingOpenAssignment.sponsor.email,
             phone: existingOpenAssignment.sponsor.phone,
+            avatarUrl: existingOpenAssignment.sponsor.avatarUrl,
           },
         },
         wasCreated: false,
@@ -1023,6 +1025,7 @@ export class LeadCaptureAssignmentService {
           displayName: assignment.sponsor.displayName,
           email: assignment.sponsor.email,
           phone: assignment.sponsor.phone,
+          avatarUrl: assignment.sponsor.avatarUrl,
         },
       },
       wasCreated: true,

@@ -79,7 +79,7 @@ const resolveAssignedAdvisor = (response: LeadCaptureSubmissionResponse) => {
     return {
       name: response.assignment.sponsor.displayName,
       phone: response.assignment.sponsor.phone,
-      photoUrl: null,
+      photoUrl: response.assignment.sponsor.avatarUrl,
       bio: "Especialista en Protocolos de Recuperación",
       whatsappUrl: response.handoff.whatsappUrl,
     };
@@ -109,6 +109,19 @@ const appendAdvisorQueryParams = (
 
   if (advisor.whatsappUrl) {
     nextUrl.searchParams.set("advisor_whatsapp", advisor.whatsappUrl);
+  }
+};
+
+const appendAssignmentQueryParams = (
+  nextUrl: URL,
+  response: LeadCaptureSubmissionResponse,
+) => {
+  if (response.assignment?.id) {
+    nextUrl.searchParams.set("assignment_id", response.assignment.id);
+  }
+
+  if (response.assignment?.sponsor.id) {
+    nextUrl.searchParams.set("sponsor_id", response.assignment.sponsor.id);
   }
 };
 
@@ -251,6 +264,8 @@ export function LeadCaptureModal({
         if (assignedAdvisor?.name) {
           appendAdvisorQueryParams(nextUrl, assignedAdvisor);
         }
+
+        appendAssignmentQueryParams(nextUrl, response);
 
         router.push(`${nextUrl.pathname}${nextUrl.search}`);
         return;

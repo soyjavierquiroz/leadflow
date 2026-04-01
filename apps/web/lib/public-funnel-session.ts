@@ -26,6 +26,7 @@ export type LeadCaptureSubmissionResponse = {
       displayName: string;
       email: string | null;
       phone: string | null;
+      avatarUrl: string | null;
     };
   } | null;
   nextStep: {
@@ -45,6 +46,7 @@ export type LeadCaptureSubmissionResponse = {
       displayName: string;
       email: string | null;
       phone: string | null;
+      avatarUrl: string | null;
     } | null;
     whatsappPhone: string | null;
     whatsappMessage: string | null;

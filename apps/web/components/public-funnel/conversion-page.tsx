@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import { buildWhatsappUrl, normalizeWhatsappPhone } from "@/lib/public-handoff";
@@ -24,19 +25,6 @@ type ConversionPageProps = {
 };
 
 const DEFAULT_ADVISOR_PHOTO = "/assets/default-advisor.svg";
-
-const getInitials = (value: string | null | undefined) => {
-  if (!value) {
-    return "LF";
-  }
-
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((item) => item[0]?.toUpperCase() ?? "")
-    .join("");
-};
 
 const getFirstName = (value: string | null | undefined) =>
   value?.trim().split(/\s+/)[0] ?? "tu asesor";
@@ -83,6 +71,44 @@ const readAdvisorFromSearchParams = (
   };
 };
 
+function AdvisorAvatar({
+  name,
+  photoUrl,
+}: Pick<ConversionAdvisor, "name" | "photoUrl">) {
+  const [hasImageError, setHasImageError] = useState(false);
+
+  useEffect(() => {
+    setHasImageError(false);
+  }, [photoUrl]);
+
+  const resolvedPhotoUrl = !hasImageError ? photoUrl : null;
+
+  return (
+    <div className="relative h-32 w-32 overflow-hidden rounded-full border border-emerald-100 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.96),_rgba(209,250,229,0.92)_68%,_rgba(167,243,208,0.72)_100%)] p-2 shadow-[0_20px_46px_rgba(16,185,129,0.2)] ring-4 ring-emerald-300/50">
+      <div className="relative h-full w-full overflow-hidden rounded-full bg-emerald-50">
+        {resolvedPhotoUrl ? (
+          <Image
+            src={resolvedPhotoUrl}
+            alt={`Foto de ${name}`}
+            fill
+            sizes="128px"
+            className="object-cover"
+            onError={() => setHasImageError(true)}
+          />
+        ) : (
+          <Image
+            src={DEFAULT_ADVISOR_PHOTO}
+            alt={`Avatar genérico de ${name}`}
+            fill
+            sizes="128px"
+            className="object-cover p-2"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ConversionPage({
   runtime,
   headline,
@@ -127,7 +153,7 @@ export function ConversionPage({
       return {
         name: context.assignment.sponsor.displayName,
         phone: context.assignment.sponsor.phone,
-        photoUrl: normalizeAdvisorPhotoUrl(fallbackAdvisor.photoUrl),
+        photoUrl: normalizeAdvisorPhotoUrl(context.assignment.sponsor.avatarUrl),
         bio:
           fallbackAdvisor.bio ?? "Especialista en Protocolos de Recuperación",
         whatsappUrl: context.handoff.whatsappUrl,
@@ -201,19 +227,7 @@ export function ConversionPage({
 
         <div className="mx-auto mt-8 max-w-xl rounded-[2rem] border border-emerald-100 bg-slate-50/80 p-6">
           <div className="flex flex-col items-center text-center">
-            {advisor.photoUrl ? (
-              // External advisor photos can come from runtime/API URLs that are not preconfigured for next/image.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={advisor.photoUrl}
-                alt={advisor.name}
-                className="h-28 w-28 rounded-full border-4 border-emerald-400 object-cover shadow-[0_16px_40px_rgba(16,185,129,0.18)]"
-              />
-            ) : (
-              <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-emerald-400 bg-slate-900 text-3xl font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.18)]">
-                {getInitials(advisor.name)}
-              </div>
-            )}
+            <AdvisorAvatar name={advisor.name} photoUrl={advisor.photoUrl} />
 
             <span className="mt-5 text-xs font-bold uppercase tracking-[0.28em] text-emerald-700">
               Especialista Asignado
