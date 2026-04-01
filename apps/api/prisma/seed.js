@@ -216,7 +216,6 @@ async function main() {
     update: {
       workspaceId: workspace.id,
       teamId: team.id,
-      sponsorId: null,
       fullName: 'Leadflow Team Admin',
       passwordHash: hashPassword('Team123!'),
       role: 'TEAM_ADMIN',
@@ -230,6 +229,42 @@ async function main() {
       passwordHash: hashPassword('Team123!'),
       role: 'TEAM_ADMIN',
       status: 'active',
+    },
+  });
+
+  const teamAdminSponsor = await prisma.sponsor.upsert({
+    where: { id: 'c1f18c79-6504-4427-a74d-f10be0a84501' },
+    update: {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      displayName: 'Leadflow Team Admin',
+      status: 'active',
+      isActive: true,
+      email: 'team@leadflow.local',
+      phone: '+57 300 555 0199',
+      availabilityStatus: 'available',
+      routingWeight: 1,
+      memberPortalEnabled: true,
+    },
+    create: {
+      id: 'c1f18c79-6504-4427-a74d-f10be0a84501',
+      workspaceId: workspace.id,
+      teamId: team.id,
+      displayName: 'Leadflow Team Admin',
+      status: 'active',
+      isActive: true,
+      email: 'team@leadflow.local',
+      phone: '+57 300 555 0199',
+      availabilityStatus: 'available',
+      routingWeight: 1,
+      memberPortalEnabled: true,
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: teamAdminUser.id },
+    data: {
+      sponsorId: teamAdminSponsor.id,
     },
   });
 

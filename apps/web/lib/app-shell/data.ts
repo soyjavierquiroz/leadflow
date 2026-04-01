@@ -149,6 +149,7 @@ const buildTeamCatalog = (ids: string[], workspaceId: string) => {
       description:
         mock?.description ??
         "Metadata temporal mientras llega el endpoint HTTP de teams.",
+      maxSeats: mock?.maxSeats ?? 10,
     } satisfies TeamMetadata;
   });
 };
@@ -426,6 +427,8 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           workspaceId: currentUser.workspaceId ?? mockWorkspace.id,
           teamId: currentUser.teamId ?? mockTeamMetadata[0].id,
           displayName: currentUser.sponsor.displayName,
+          isActive: true,
+          avatarUrl: null,
           email: currentUser.sponsor.email,
           availabilityStatus: currentUser.sponsor.availabilityStatus,
         }
@@ -477,6 +480,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
                     status: "active",
                     description:
                       "Team resuelto desde la sesión autenticada del usuario.",
+                    maxSeats: mockTeamMetadata[0].maxSeats,
                   },
                 ]
               : mockTeamMetadata,
@@ -606,6 +610,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
       code: liveTeam?.code ?? team.code,
       status: liveTeam?.status ?? team.status,
       description: liveTeam?.description ?? team.description,
+      maxSeats: liveTeam?.maxSeats ?? team.maxSeats,
     };
   });
   const publicationViews = buildPublicationViews({

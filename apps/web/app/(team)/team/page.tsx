@@ -40,10 +40,10 @@ export default async function TeamPage() {
               Onboard domains
             </Link>
             <Link
-              href="/team/publications"
+              href="/team/members"
               className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
             >
-              Revisar publicaciones
+              Gestionar equipo
             </Link>
           </>
         }
@@ -67,7 +67,9 @@ export default async function TeamPage() {
         <KpiCard
           label="Sponsors habilitados"
           value={formatCompactNumber(
-            teamSponsors.filter((item) => item.status === "active").length,
+            teamSponsors.filter(
+              (item) => item.status === "active" && item.isActive,
+            ).length,
           )}
           hint="Miembros comerciales que hoy pueden absorber handoffs sin fricción."
         />
@@ -94,7 +96,8 @@ export default async function TeamPage() {
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 {formatCompactNumber(
                   teamSponsors.filter(
-                    (item) => item.availabilityStatus === "available",
+                    (item) =>
+                      item.availabilityStatus === "available" && item.isActive,
                   ).length,
                 )}{" "}
                 sponsors disponibles para tomar leads ahora mismo.

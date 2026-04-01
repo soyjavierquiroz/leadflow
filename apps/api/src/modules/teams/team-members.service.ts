@@ -1,0 +1,412 @@
+import { randomBytes } from 'crypto';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma, UserRole, UserStatus } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { hashPassword } from '../auth/password-hash.util';
+import type { CreateTeamMemberDto } from './dto/create-team-member.dto';
+import type { UpdateTeamMemberStatusDto } from './dto/update-team-member-status.dto';
+
+type TeamMemberScope = {
+  workspaceId: string;
+  teamId: string;
+};
+
+type TeamSeatSummary = {
+  teamId: string;
+  teamName: string;
+  maxSeats: number;
+  activeSeats: number;
+  availableSeats: number;
+};
+
+export type TeamMemberRecord = {
+  id: string;
+  userId: string;
+  sponsorId: string | null;
+  fullName: string;
+  displayName: string | null;
+  email: string;
+  phone: string | null;
+  role: UserRole;
+  userStatus: UserStatus;
+  sponsorStatus: string | null;
+  availabilityStatus: string | null;
+  isActive: boolean;
+  memberPortalEnabled: boolean;
+  avatarUrl: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeamMembersSnapshot = {
+  team: TeamSeatSummary;
+  members: TeamMemberRecord[];
+};
+
+export type TeamMemberMutationResult = {
+  team: TeamSeatSummary;
+  member: TeamMemberRecord;
+};
+
+export type TeamMemberInvitationResult = TeamMemberMutationResult & {
+  temporaryPassword: string;
+};
+
+const sanitizeRequiredText = (
+  value: string | null | undefined,
+  field: string,
+) => {
+  if (typeof value !== 'string') {
+    throw new BadRequestException({
+      code: 'FIELD_REQUIRED',
+      message: `${field} is required.`,
+      field,
+    });
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    throw new BadRequestException({
+      code: 'FIELD_REQUIRED',
+      message: `${field} is required.`,
+      field,
+    });
+  }
+
+  return trimmed;
+};
+
+const toIso = (value: Date | null) => (value ? value.toISOString() : null);
+
+const teamMemberInclude = {
+  sponsor: true,
+} satisfies Prisma.UserInclude;
+
+type TeamMemberUserRecord = Prisma.UserGetPayload<{
+  include: typeof teamMemberInclude;
+}>;
+
+@Injectable()
+export class TeamMembersService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async list(scope: TeamMemberScope): Promise<TeamMembersSnapshot> {
+    const [team, members] = await Promise.all([
+      this.requireTeam(scope),
+      this.prisma.user.findMany({
+        where: {
+          workspaceId: scope.workspaceId,
+          teamId: scope.teamId,
+        },
+        include: teamMemberInclude,
+        orderBy: [{ createdAt: 'asc' }],
+      }),
+    ]);
+
+    const activeSeats = await this.countActiveSeats(scope);
+
+    return {
+      team: this.buildSeatSummary(team, activeSeats),
+      members: members
+        .map((member) => this.mapTeamMember(member))
+        .sort((left, right) => this.compareMembers(left, right)),
+    };
+  }
+
+  async getSeatSummary(scope: TeamMemberScope): Promise<TeamSeatSummary> {
+    const [team, activeSeats] = await Promise.all([
+      this.requireTeam(scope),
+      this.countActiveSeats(scope),
+    ]);
+
+    return this.buildSeatSummary(team, activeSeats);
+  }
+
+  async updateStatus(
+    scope: TeamMemberScope,
+    memberId: string,
+    dto: UpdateTeamMemberStatusDto,
+  ): Promise<TeamMemberMutationResult> {
+    if (typeof dto.isActive !== 'boolean') {
+      throw new BadRequestException({
+        code: 'TEAM_MEMBER_STATUS_REQUIRED',
+        message: 'isActive must be provided as a boolean value.',
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const member = await tx.user.findFirst({
+        where: {
+          id: memberId,
+          workspaceId: scope.workspaceId,
+          teamId: scope.teamId,
+        },
+        include: teamMemberInclude,
+      });
+
+      if (!member) {
+        throw new NotFoundException({
+          code: 'TEAM_MEMBER_NOT_FOUND',
+          message: 'The requested team member was not found.',
+        });
+      }
+
+      if (!member.sponsor) {
+        throw new ConflictException({
+          code: 'TEAM_MEMBER_SPONSOR_MISSING',
+          message:
+            'The requested team member does not have an operational sponsor profile.',
+        });
+      }
+
+      const team = await this.requireTeam(scope, tx);
+
+      if (dto.isActive && !member.sponsor.isActive) {
+        await this.assertSeatAvailability(
+          scope,
+          team.maxSeats,
+          tx,
+          member.sponsor.id,
+        );
+      }
+
+      const sponsor = await tx.sponsor.update({
+        where: {
+          id: member.sponsor.id,
+        },
+        data: {
+          isActive: dto.isActive,
+        },
+      });
+
+      const activeSeats = await this.countActiveSeats(scope, tx);
+
+      return {
+        team: this.buildSeatSummary(team, activeSeats),
+        member: this.mapTeamMember({
+          ...member,
+          sponsor,
+        }),
+      };
+    });
+  }
+
+  async invite(
+    scope: TeamMemberScope,
+    dto: CreateTeamMemberDto,
+  ): Promise<TeamMemberInvitationResult> {
+    const fullName = sanitizeRequiredText(dto.fullName, 'fullName');
+    const email = sanitizeRequiredText(dto.email, 'email').toLowerCase();
+    const isActive = dto.isActive ?? false;
+    const temporaryPassword = this.generateTemporaryPassword();
+
+    return this.prisma.$transaction(async (tx) => {
+      const team = await this.requireTeam(scope, tx);
+
+      const existingUser = await tx.user.findUnique({
+        where: {
+          email,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (existingUser) {
+        throw new ConflictException({
+          code: 'TEAM_MEMBER_EMAIL_TAKEN',
+          message: 'A user with this email already exists.',
+        });
+      }
+
+      if (isActive) {
+        await this.assertSeatAvailability(scope, team.maxSeats, tx);
+      }
+
+      const user = await tx.user.create({
+        data: {
+          workspaceId: scope.workspaceId,
+          teamId: scope.teamId,
+          fullName,
+          email,
+          passwordHash: hashPassword(temporaryPassword),
+          role: UserRole.MEMBER,
+          status: UserStatus.active,
+        },
+        include: teamMemberInclude,
+      });
+
+      const sponsor = await tx.sponsor.create({
+        data: {
+          workspaceId: scope.workspaceId,
+          teamId: scope.teamId,
+          displayName: fullName,
+          status: 'active',
+          isActive,
+          email,
+          availabilityStatus: 'available',
+          routingWeight: 1,
+          memberPortalEnabled: true,
+        },
+      });
+
+      const linkedUser = await tx.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          sponsorId: sponsor.id,
+        },
+        include: teamMemberInclude,
+      });
+
+      const activeSeats = await this.countActiveSeats(scope, tx);
+
+      return {
+        team: this.buildSeatSummary(team, activeSeats),
+        member: this.mapTeamMember(linkedUser),
+        temporaryPassword,
+      };
+    });
+  }
+
+  private async requireTeam(
+    scope: TeamMemberScope,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const team = await tx.team.findFirst({
+      where: {
+        id: scope.teamId,
+        workspaceId: scope.workspaceId,
+      },
+      select: {
+        id: true,
+        name: true,
+        maxSeats: true,
+      },
+    });
+
+    if (!team) {
+      throw new NotFoundException({
+        code: 'TEAM_NOT_FOUND',
+        message: 'The requested team was not found.',
+      });
+    }
+
+    return team;
+  }
+
+  private async countActiveSeats(
+    scope: TeamMemberScope,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    return tx.sponsor.count({
+      where: {
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        isActive: true,
+      },
+    });
+  }
+
+  private async assertSeatAvailability(
+    scope: TeamMemberScope,
+    maxSeats: number,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+    excludedSponsorId?: string,
+  ) {
+    const activeSeats = await tx.sponsor.count({
+      where: {
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        isActive: true,
+        ...(excludedSponsorId
+          ? {
+              id: {
+                not: excludedSponsorId,
+              },
+            }
+          : {}),
+      },
+    });
+
+    if (activeSeats >= maxSeats) {
+      throw new ConflictException({
+        code: 'TEAM_SEAT_LIMIT_REACHED',
+        message: `Has alcanzado el limite de ${maxSeats} licencias activas. Desactiva un usuario primero.`,
+      });
+    }
+  }
+
+  private buildSeatSummary(
+    team: {
+      id: string;
+      name: string;
+      maxSeats: number;
+    },
+    activeSeats: number,
+  ): TeamSeatSummary {
+    return {
+      teamId: team.id,
+      teamName: team.name,
+      maxSeats: team.maxSeats,
+      activeSeats,
+      availableSeats: Math.max(team.maxSeats - activeSeats, 0),
+    };
+  }
+
+  private mapTeamMember(member: TeamMemberUserRecord): TeamMemberRecord {
+    return {
+      id: member.id,
+      userId: member.id,
+      sponsorId: member.sponsor?.id ?? null,
+      fullName: member.fullName,
+      displayName: member.sponsor?.displayName ?? null,
+      email: member.email,
+      phone: member.sponsor?.phone ?? null,
+      role: member.role,
+      userStatus: member.status,
+      sponsorStatus: member.sponsor?.status ?? null,
+      availabilityStatus: member.sponsor?.availabilityStatus ?? null,
+      isActive: member.sponsor?.isActive ?? false,
+      memberPortalEnabled: member.sponsor?.memberPortalEnabled ?? false,
+      avatarUrl: member.sponsor?.avatarUrl ?? null,
+      lastLoginAt: toIso(member.lastLoginAt),
+      createdAt: member.createdAt.toISOString(),
+      updatedAt: member.updatedAt.toISOString(),
+    };
+  }
+
+  private compareMembers(left: TeamMemberRecord, right: TeamMemberRecord) {
+    const leftPriority = this.resolveRolePriority(left.role);
+    const rightPriority = this.resolveRolePriority(right.role);
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return left.createdAt.localeCompare(right.createdAt);
+  }
+
+  private resolveRolePriority(role: UserRole) {
+    switch (role) {
+      case UserRole.TEAM_ADMIN:
+        return 0;
+      case UserRole.MEMBER:
+        return 1;
+      case UserRole.SUPER_ADMIN:
+        return 2;
+    }
+  }
+
+  private generateTemporaryPassword() {
+    return `Leadflow-${randomBytes(9).toString('base64url')}`;
+  }
+}

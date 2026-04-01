@@ -63,11 +63,7 @@ type TeamLeadInboxRecord = Prisma.LeadGetPayload<{
   include: typeof teamLeadInboxInclude;
 }>;
 
-type TeamLeadSupervisionStatus =
-  | 'orphaned'
-  | 'stagnant'
-  | 'active'
-  | 'closed';
+type TeamLeadSupervisionStatus = 'orphaned' | 'stagnant' | 'active' | 'closed';
 
 export type TeamLeadInboxItem = {
   id: string;
@@ -181,6 +177,7 @@ export class TeamLeadsService {
       select: {
         id: true,
         displayName: true,
+        isActive: true,
         status: true,
         availabilityStatus: true,
       },
@@ -197,6 +194,13 @@ export class TeamLeadsService {
       throw new BadRequestException({
         code: 'TARGET_SPONSOR_INACTIVE',
         message: 'The selected sponsor is not active for reassignment.',
+      });
+    }
+
+    if (!targetSponsor.isActive) {
+      throw new BadRequestException({
+        code: 'TARGET_SPONSOR_SEAT_INACTIVE',
+        message: 'The selected sponsor does not have an active seat.',
       });
     }
 

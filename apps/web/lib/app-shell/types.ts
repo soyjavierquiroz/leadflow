@@ -25,6 +25,7 @@ export type TeamMetadata = {
   code: string;
   status: string;
   description: string | null;
+  maxSeats: number;
 };
 
 export type FunnelTemplateRecord = {
@@ -129,6 +130,8 @@ export type SponsorRecord = {
   teamId: string;
   displayName: string;
   status: string;
+  isActive: boolean;
+  avatarUrl: string | null;
   email: string | null;
   phone: string | null;
   availabilityStatus: string;

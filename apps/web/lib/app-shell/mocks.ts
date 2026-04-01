@@ -42,6 +42,7 @@ export const mockTeamMetadata: TeamMetadata[] = [
     code: "sales-core",
     status: "active",
     description: "Equipo operativo base para funnels, tracking y handoff.",
+    maxSeats: 10,
   },
 ];
 
@@ -203,8 +204,7 @@ export const mockDomains: DomainRecord[] = [
         value: saasCustomerCnameTarget,
         status: "required",
         label: "CNAME required",
-        detail:
-          `Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo ${saasFallbackOrigin}.`,
+        detail: `Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo ${saasFallbackOrigin}.`,
       },
     ],
     createdAt: now,
@@ -236,8 +236,7 @@ export const mockDomains: DomainRecord[] = [
     operationalStatus: "recreate_required",
     isLegacyConfiguration: true,
     recreateRequired: true,
-    legacyReason:
-      `DNS target legado detectado: ${legacyDnsTarget}. El target sano es ${saasCustomerCnameTarget}.`,
+    legacyReason: `DNS target legado detectado: ${legacyDnsTarget}. El target sano es ${saasCustomerCnameTarget}.`,
     dnsTarget: legacyDnsTarget,
     lastCloudflareSyncAt: null,
     activatedAt: null,
@@ -249,8 +248,7 @@ export const mockDomains: DomainRecord[] = [
         value: saasCustomerCnameTarget,
         status: "required",
         label: "CNAME required",
-        detail:
-          `Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo ${saasFallbackOrigin}.`,
+        detail: `Apunta el subdominio del cliente al target publico del SaaS. Cloudflare reenviara ese trafico al origin fijo ${saasFallbackOrigin}.`,
       },
     ],
     createdAt: now,
@@ -296,6 +294,8 @@ export const mockSponsors: SponsorRecord[] = [
     teamId: mockTeamMetadata[0].id,
     displayName: "Ana Sponsor",
     status: "active",
+    isActive: true,
+    avatarUrl: null,
     email: "ana@leadflow.local",
     phone: "+57 300 555 0101",
     availabilityStatus: "available",
@@ -310,6 +310,8 @@ export const mockSponsors: SponsorRecord[] = [
     teamId: mockTeamMetadata[0].id,
     displayName: "Bruno Sponsor",
     status: "active",
+    isActive: true,
+    avatarUrl: null,
     email: "bruno@leadflow.local",
     phone: "+57 300 555 0102",
     availabilityStatus: "available",

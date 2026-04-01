@@ -3,6 +3,8 @@ import { MessagingAutomationModule } from '../messaging-automation/messaging-aut
 import { TeamPrismaRepository } from '../../prisma/repositories/team-prisma.repository';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import { SystemApiGuard } from '../webhooks/system-api.guard';
+import { TeamMembersController } from './team-members.controller';
+import { TeamMembersService } from './team-members.service';
 import { SystemTeamsController } from './system-teams.controller';
 import { TeamsController } from './teams.controller';
 import { TeamLeadsController } from './team-leads.controller';
@@ -11,10 +13,16 @@ import { TeamsService } from './teams.service';
 
 @Module({
   imports: [MessagingAutomationModule],
-  controllers: [TeamsController, TeamLeadsController, SystemTeamsController],
+  controllers: [
+    TeamsController,
+    TeamLeadsController,
+    TeamMembersController,
+    SystemTeamsController,
+  ],
   providers: [
     TeamsService,
     TeamLeadsService,
+    TeamMembersService,
     SystemApiGuard,
     TeamPrismaRepository,
     {
@@ -22,6 +30,11 @@ import { TeamsService } from './teams.service';
       useExisting: TeamPrismaRepository,
     },
   ],
-  exports: [TeamsService, TeamLeadsService, TEAM_REPOSITORY],
+  exports: [
+    TeamsService,
+    TeamLeadsService,
+    TeamMembersService,
+    TEAM_REPOSITORY,
+  ],
 })
 export class TeamsModule {}

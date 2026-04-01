@@ -14,8 +14,20 @@ export type TeamLeadInboxItem = {
   email: string | null;
   companyName: string | null;
   sourceChannel: string;
-  leadStatus: "captured" | "qualified" | "assigned" | "nurturing" | "won" | "lost";
-  assignmentStatus: "pending" | "assigned" | "accepted" | "reassigned" | "closed" | null;
+  leadStatus:
+    | "captured"
+    | "qualified"
+    | "assigned"
+    | "nurturing"
+    | "won"
+    | "lost";
+  assignmentStatus:
+    | "pending"
+    | "assigned"
+    | "accepted"
+    | "reassigned"
+    | "closed"
+    | null;
   supervisionStatus: TeamLeadSupervisionStatus;
   currentAssignmentId: string | null;
   assignedAt: string | null;
@@ -34,7 +46,7 @@ export type TeamLeadInboxItem = {
 
 export type TeamLeadAvailableSponsor = Pick<
   SponsorRecord,
-  "id" | "displayName" | "email" | "phone" | "status"
+  "id" | "displayName" | "email" | "phone" | "status" | "isActive"
 > & {
   availabilityStatus: "available" | "paused" | "offline";
   isAvailable: boolean;
@@ -100,10 +112,14 @@ export const getTeamLeadInboxSnapshot =
       displayName: sponsor.displayName,
       email: sponsor.email,
       phone: sponsor.phone,
-      availabilityStatus: sponsor.availabilityStatus as TeamLeadAvailableSponsor["availabilityStatus"],
+      isActive: sponsor.isActive,
+      availabilityStatus:
+        sponsor.availabilityStatus as TeamLeadAvailableSponsor["availabilityStatus"],
       status: sponsor.status,
       isAvailable:
-        sponsor.status === "active" && sponsor.availabilityStatus === "available",
+        sponsor.isActive &&
+        sponsor.status === "active" &&
+        sponsor.availabilityStatus === "available",
     }));
 
     return {

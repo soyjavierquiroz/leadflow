@@ -24,9 +24,9 @@ const teamNav = [
     description: "Rutas activas donde ya está captando el funnel.",
   },
   {
-    href: "/team/sponsors",
-    label: "Sponsors",
-    description: "Quién está disponible para recibir y trabajar leads.",
+    href: "/team/members",
+    label: "Mi Equipo",
+    description: "Licencias activas, invitados y control operativo del squad.",
   },
   {
     href: "/team/pools",

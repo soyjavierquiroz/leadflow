@@ -45,6 +45,7 @@ const flowPublicationInclude = {
             where: {
               isActive: true,
               sponsor: {
+                isActive: true,
                 status: 'active',
                 availabilityStatus: 'available',
               },
@@ -1091,6 +1092,7 @@ export class LeadCaptureAssignmentService {
           where: {
             isActive: true,
             sponsor: {
+              isActive: true,
               status: 'active',
               availabilityStatus: 'available',
             },
@@ -1194,6 +1196,7 @@ export class LeadCaptureAssignmentService {
           where: {
             isActive: true,
             sponsor: {
+              isActive: true,
               status: 'active',
               availabilityStatus: 'available',
             },
@@ -1232,6 +1235,7 @@ export class LeadCaptureAssignmentService {
       where: {
         workspaceId: publication.workspaceId,
         teamId: publication.teamId,
+        isActive: true,
         status: 'active',
         availabilityStatus: 'available',
       },
