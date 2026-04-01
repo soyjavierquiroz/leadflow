@@ -22,6 +22,7 @@ const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
   "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+const campaignDurationOptions = [7, 14, 30] as const;
 
 const sortRows = (rows: TeamAdWheelRecord[]) => {
   const statusOrder = {
@@ -43,16 +44,11 @@ const sortRows = (rows: TeamAdWheelRecord[]) => {
   });
 };
 
-const buildDefaultWindow = () => {
-  const startDate = new Date();
-  const endDate = new Date(startDate);
+const getCampaignDurationDays = (startDate: string, endDate: string) => {
+  const durationMs =
+    new Date(endDate).getTime() - new Date(startDate).getTime();
 
-  endDate.setDate(endDate.getDate() + 30);
-
-  return {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-  };
+  return Math.max(1, Math.round(durationMs / (1000 * 60 * 60 * 24)));
 };
 
 export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
@@ -60,6 +56,7 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createSeatPrice, setCreateSeatPrice] = useState("");
+  const [createDurationDays, setCreateDurationDays] = useState("30");
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     message: string;
@@ -75,6 +72,7 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
   const resetCreateState = () => {
     setCreateName("");
     setCreateSeatPrice("");
+    setCreateDurationDays("30");
   };
 
   const handleCreate = (event: React.FormEvent<HTMLFormElement>) => {
@@ -83,6 +81,7 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
 
     const normalizedName = createName.trim();
     const seatPriceUnits = Number(createSeatPrice);
+    const durationDays = Number(createDurationDays);
 
     if (!normalizedName) {
       setFeedback({
@@ -100,7 +99,13 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
       return;
     }
 
-    const { startDate, endDate } = buildDefaultWindow();
+    if (!Number.isInteger(durationDays) || durationDays < 1) {
+      setFeedback({
+        tone: "error",
+        message: "Selecciona una duración válida para la campaña.",
+      });
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -111,9 +116,8 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
           body: JSON.stringify({
             name: normalizedName,
             seatPrice: Math.round(seatPriceUnits * 100),
+            durationDays,
             status: "ACTIVE",
-            startDate,
-            endDate,
           }),
         });
 
@@ -228,10 +232,13 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
                 </div>
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Creada
+                    Duración
                   </p>
                   <p className="mt-3 text-lg font-semibold text-slate-950">
-                    {formatDateTime(wheel.createdAt)}
+                    {getCampaignDurationDays(wheel.startDate, wheel.endDate)} días
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Finaliza {formatDateTime(wheel.endDate)}.
                   </p>
                 </div>
               </div>
@@ -248,7 +255,7 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
       {isCreateOpen ? (
         <ModalShell
           title="Crear rueda publicitaria"
-          description="Solo definimos nombre y seat price. La rueda nace activa y con una ventana operativa de 30 días desde hoy."
+          description="Define el nombre, el seat price y la duración. La rueda nace activa y el backend calcula la ventana operativa desde hoy."
           onClose={() => {
             if (isPending) {
               return;
@@ -286,6 +293,27 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
               <p className="text-sm leading-6 text-slate-500">
                 Ingresa el valor en USD. Ejemplo: `50` envía `5000` centavos al
                 backend; `50.25` envía `5025`.
+              </p>
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-slate-900">
+                Duración de la campaña
+              </span>
+              <select
+                value={createDurationDays}
+                onChange={(event) => setCreateDurationDays(event.target.value)}
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+              >
+                {campaignDurationOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option} días
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm leading-6 text-slate-500">
+                El API calculará automáticamente la fecha de finalización desde
+                la fecha de creación.
               </p>
             </label>
 

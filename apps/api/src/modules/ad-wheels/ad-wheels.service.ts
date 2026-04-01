@@ -87,22 +87,20 @@ const sanitizeRequiredText = (
   return trimmed;
 };
 
-const parseRequiredDate = (
-  value: string | null | undefined,
+const requirePositiveInteger = (
+  value: number,
   field: string,
-): Date => {
-  const normalized = sanitizeRequiredText(value, field);
-  const parsed = new Date(normalized);
-
-  if (Number.isNaN(parsed.getTime())) {
+  minimum = 1,
+) => {
+  if (!Number.isInteger(value) || value < minimum) {
     throw new BadRequestException({
-      code: 'INVALID_DATE',
-      message: `${field} must be a valid ISO-8601 date.`,
+      code: `INVALID_${field.toUpperCase()}`,
+      message: `${field} must be an integer greater than or equal to ${minimum}.`,
       field,
     });
   }
 
-  return parsed;
+  return value;
 };
 
 const mapAdWheelRecord = (
@@ -133,8 +131,11 @@ export class AdWheelsService {
     await this.requireTeam(scope);
 
     const name = sanitizeRequiredText(dto.name, 'name');
-    const startDate = parseRequiredDate(dto.startDate, 'startDate');
-    const endDate = parseRequiredDate(dto.endDate, 'endDate');
+    const durationDays = requirePositiveInteger(dto.durationDays, 'durationDays');
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+
+    endDate.setUTCDate(endDate.getUTCDate() + durationDays);
 
     if (!Number.isInteger(dto.seatPrice) || dto.seatPrice <= 0) {
       throw new BadRequestException({
@@ -150,13 +151,6 @@ export class AdWheelsService {
         code: 'INVALID_AD_WHEEL_STATUS',
         message: 'status must be either DRAFT or ACTIVE when creating a wheel.',
         field: 'status',
-      });
-    }
-
-    if (endDate.getTime() < startDate.getTime()) {
-      throw new BadRequestException({
-        code: 'INVALID_AD_WHEEL_WINDOW',
-        message: 'endDate must be greater than or equal to startDate.',
       });
     }
 

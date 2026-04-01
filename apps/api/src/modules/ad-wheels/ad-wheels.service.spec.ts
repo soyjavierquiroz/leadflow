@@ -3,6 +3,10 @@ import type { PrismaService } from '../../prisma/prisma.service';
 import { AdWheelsService } from './ad-wheels.service';
 
 describe('AdWheelsService', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   const buildService = () => {
     const prisma = {
       team: {
@@ -36,6 +40,10 @@ describe('AdWheelsService', () => {
 
   it('creates an active wheel for the team when no active wheel exists', async () => {
     const { prisma, service } = buildService();
+    const startDate = new Date('2026-04-01T10:15:00.000Z');
+    const endDate = new Date('2026-04-15T10:15:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(startDate);
 
     prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue(null);
@@ -45,10 +53,10 @@ describe('AdWheelsService', () => {
       status: 'ACTIVE',
       name: 'Abril',
       seatPrice: 5_000,
-      startDate: new Date('2026-04-01T00:00:00.000Z'),
-      endDate: new Date('2026-04-30T23:59:59.000Z'),
-      createdAt: new Date('2026-04-01T00:00:00.000Z'),
-      updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+      startDate,
+      endDate,
+      createdAt: startDate,
+      updatedAt: startDate,
     });
 
     const result = await service.createForTeam(
@@ -60,8 +68,7 @@ describe('AdWheelsService', () => {
         status: 'ACTIVE',
         name: 'Abril',
         seatPrice: 5_000,
-        startDate: '2026-04-01T00:00:00.000Z',
-        endDate: '2026-04-30T23:59:59.000Z',
+        durationDays: 14,
       },
     );
 
@@ -72,9 +79,34 @@ describe('AdWheelsService', () => {
         status: 'ACTIVE',
         name: 'Abril',
         seatPrice: 5_000,
-        startDate: new Date('2026-04-01T00:00:00.000Z'),
-        endDate: new Date('2026-04-30T23:59:59.000Z'),
+        startDate,
+        endDate,
       },
+    });
+  });
+
+  it('rejects wheel durations shorter than one day', async () => {
+    const { prisma, service } = buildService();
+
+    prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
+
+    await expect(
+      service.createForTeam(
+        {
+          workspaceId: 'workspace-1',
+          teamId: 'team-1',
+        },
+        {
+          status: 'ACTIVE',
+          name: 'Abril',
+          seatPrice: 5_000,
+          durationDays: 0,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        field: 'durationDays',
+      }),
     });
   });
 
@@ -259,8 +291,7 @@ describe('AdWheelsService', () => {
           status: 'ACTIVE',
           name: 'Abril',
           seatPrice: 5_000,
-          startDate: '2026-04-01T00:00:00.000Z',
-          endDate: '2026-04-30T23:59:59.000Z',
+          durationDays: 14,
         },
       ),
     ).rejects.toBeInstanceOf(ConflictException);
