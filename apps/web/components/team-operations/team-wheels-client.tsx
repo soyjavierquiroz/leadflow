@@ -110,7 +110,7 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
           method: "POST",
           body: JSON.stringify({
             name: normalizedName,
-            seatPrice: Math.round(seatPriceUnits * 1_000_000),
+            seatPrice: Math.round(seatPriceUnits * 100),
             status: "ACTIVE",
             startDate,
             endDate,
@@ -277,15 +277,15 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
               <input
                 type="number"
                 min="1"
-                step="1"
+                step="0.01"
                 value={createSeatPrice}
                 onChange={(event) => setCreateSeatPrice(event.target.value)}
-                placeholder="25"
+                placeholder="50"
                 className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               />
               <p className="text-sm leading-6 text-slate-500">
-                Ingresa el valor en KREDIT enteros. Ejemplo: `25` envía
-                `25.000000` al motor financiero.
+                Ingresa el valor en USD. Ejemplo: `50` envía `5000` centavos al
+                backend; `50.25` envía `5025`.
               </p>
             </label>
 

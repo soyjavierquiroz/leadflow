@@ -63,8 +63,8 @@ type WalletEngineExceptionResponse = {
 
 const PLATFORM_KEY = 'leadflow';
 const PRODUCT_KEY = 'ads_wheel';
-const UNIT_CODE = 'KREDIT';
-const UNIT_SCALE = 6;
+const UNIT_CODE = 'USD';
+const UNIT_SCALE = 2;
 const SEAT_DEBIT_FEATURE_KEY = 'ads_wheel.seat';
 
 const sanitizeNullableText = (value: string | null | undefined) => {

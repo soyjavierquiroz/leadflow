@@ -44,7 +44,7 @@ describe('AdWheelsService', () => {
       teamId: 'team-1',
       status: 'ACTIVE',
       name: 'Abril',
-      seatPrice: 25_000_000,
+      seatPrice: 5_000,
       startDate: new Date('2026-04-01T00:00:00.000Z'),
       endDate: new Date('2026-04-30T23:59:59.000Z'),
       createdAt: new Date('2026-04-01T00:00:00.000Z'),
@@ -59,7 +59,7 @@ describe('AdWheelsService', () => {
       {
         status: 'ACTIVE',
         name: 'Abril',
-        seatPrice: 25_000_000,
+        seatPrice: 5_000,
         startDate: '2026-04-01T00:00:00.000Z',
         endDate: '2026-04-30T23:59:59.000Z',
       },
@@ -71,7 +71,7 @@ describe('AdWheelsService', () => {
         teamId: 'team-1',
         status: 'ACTIVE',
         name: 'Abril',
-        seatPrice: 25_000_000,
+        seatPrice: 5_000,
         startDate: new Date('2026-04-01T00:00:00.000Z'),
         endDate: new Date('2026-04-30T23:59:59.000Z'),
       },
@@ -88,7 +88,7 @@ describe('AdWheelsService', () => {
         teamId: 'team-1',
         status: 'DRAFT',
         name: 'Mayo',
-        seatPrice: 30_000_000,
+        seatPrice: 3_000,
         startDate: new Date('2026-05-01T00:00:00.000Z'),
         endDate: new Date('2026-05-31T23:59:59.000Z'),
         createdAt: new Date('2026-04-02T00:00:00.000Z'),
@@ -102,7 +102,7 @@ describe('AdWheelsService', () => {
         teamId: 'team-1',
         status: 'ACTIVE',
         name: 'Abril',
-        seatPrice: 25_000_000,
+        seatPrice: 5_000,
         startDate: new Date('2026-04-01T00:00:00.000Z'),
         endDate: new Date('2026-04-30T23:59:59.000Z'),
         createdAt: new Date('2026-04-01T00:00:00.000Z'),
@@ -140,7 +140,7 @@ describe('AdWheelsService', () => {
       teamId: 'team-1',
       status: 'ACTIVE',
       name: 'Abril',
-      seatPrice: 25_000_000,
+      seatPrice: 5_000,
       startDate: new Date('2026-04-01T00:00:00.000Z'),
       endDate: new Date('2026-04-30T23:59:59.000Z'),
       createdAt: new Date('2026-04-01T00:00:00.000Z'),
@@ -172,7 +172,7 @@ describe('AdWheelsService', () => {
       teamId: 'team-1',
       status: 'ACTIVE',
       name: 'Abril',
-      seatPrice: 25_000_000,
+      seatPrice: 5_000,
       startDate: new Date('2026-04-01T00:00:00.000Z'),
       endDate: new Date('2026-04-30T23:59:59.000Z'),
       createdAt: new Date('2026-04-01T00:00:00.000Z'),
@@ -182,7 +182,7 @@ describe('AdWheelsService', () => {
     walletEngineService.upsertTeamAccount.mockResolvedValue({
       id: 'account-1',
     });
-    walletEngineService.formatMinorUnits.mockReturnValue('25.000000');
+    walletEngineService.formatMinorUnits.mockReturnValue('50.00');
     walletEngineService.debitSeat.mockRejectedValue(
       new BadGatewayException({
         code: 'WALLET_ENGINE_REQUEST_FAILED',
@@ -215,7 +215,7 @@ describe('AdWheelsService', () => {
       teamId: 'team-1',
       status: 'ACTIVE',
       name: 'Abril',
-      seatPrice: 25_000_000,
+      seatPrice: 5_000,
       startDate: new Date('2026-04-01T00:00:00.000Z'),
       endDate: new Date('2026-04-30T23:59:59.000Z'),
       createdAt: new Date('2026-04-01T00:00:00.000Z'),
@@ -258,7 +258,7 @@ describe('AdWheelsService', () => {
         {
           status: 'ACTIVE',
           name: 'Abril',
-          seatPrice: 25_000_000,
+          seatPrice: 5_000,
           startDate: '2026-04-01T00:00:00.000Z',
           endDate: '2026-04-30T23:59:59.000Z',
         },

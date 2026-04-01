@@ -21,10 +21,12 @@ export type MemberActiveAdWheelSnapshot = {
   isParticipating: boolean;
 };
 
-const adWheelPriceFormatter = new Intl.NumberFormat("es-CO", {
+const adWheelPriceFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
-  minimumFractionDigits: 0,
 });
 
 export const formatAdWheelSeatPrice = (seatPrice: number) =>
-  `${adWheelPriceFormatter.format(seatPrice / 1_000_000)} KREDIT`;
+  `${adWheelPriceFormatter.format(seatPrice / 100)} USD`;

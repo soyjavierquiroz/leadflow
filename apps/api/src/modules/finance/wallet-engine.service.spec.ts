@@ -45,11 +45,11 @@ describe('WalletEngineService', () => {
       of(
         buildAxiosResponse({
           account_id: 'account-1',
-          unit_code: 'KREDIT',
-          unit_scale: 6,
-          balance: '10.000000',
-          held_amount: '0.000000',
-          available_balance: '10.000000',
+          unit_code: 'USD',
+          unit_scale: 2,
+          balance: '10.00',
+          held_amount: '0.00',
+          available_balance: '10.00',
           updated_at: '2026-04-01T00:00:00.000Z',
         }),
       ),
@@ -81,8 +81,8 @@ describe('WalletEngineService', () => {
           product_key: 'ads_wheel',
           tenant_id: 'team-1',
           external_ref: 'team-1',
-          unit_code: 'KREDIT',
-          unit_scale: 6,
+          unit_code: 'USD',
+          unit_scale: 2,
           status: 'active',
           created_at: '2026-04-01T00:00:00.000Z',
           updated_at: '2026-04-01T00:00:00.000Z',
@@ -99,8 +99,8 @@ describe('WalletEngineService', () => {
         product_key: 'ads_wheel',
         tenant_id: 'team-1',
         external_ref: 'team-1',
-        unit_code: 'KREDIT',
-        unit_scale: 6,
+        unit_code: 'USD',
+        unit_scale: 2,
       },
       expect.objectContaining({
         headers: expect.objectContaining({
@@ -121,10 +121,10 @@ describe('WalletEngineService', () => {
             id: 'ledger-1',
             account_id: 'account-1',
             movement_type: 'debit',
-            amount: '25.000000',
-            balance_after: '75.000000',
-            unit_code: 'KREDIT',
-            unit_scale: 6,
+            amount: '25.00',
+            balance_after: '75.00',
+            unit_code: 'USD',
+            unit_scale: 2,
             feature_key: 'ads_wheel.seat',
             reference_type: 'seat_billing',
             reference_id: 'seat-1',
@@ -134,19 +134,19 @@ describe('WalletEngineService', () => {
           },
           balance: {
             account_id: 'account-1',
-            unit_code: 'KREDIT',
-            unit_scale: 6,
-            balance: '75.000000',
-            held_amount: '0.000000',
-            available_balance: '75.000000',
+            unit_code: 'USD',
+            unit_scale: 2,
+            balance: '75.00',
+            held_amount: '0.00',
+            available_balance: '75.00',
             updated_at: '2026-04-01T00:00:00.000Z',
           },
         }),
       ),
     );
 
-    await service.debitSeat('account-1', '25.000000', 'seat-1');
-    await service.debitSeat('account-1', '25.000000', 'seat-1');
+    await service.debitSeat('account-1', '25.00', 'seat-1');
+    await service.debitSeat('account-1', '25.00', 'seat-1');
 
     const firstHeaders = httpService.post.mock.calls[0]?.[2]?.headers;
     const secondHeaders = httpService.post.mock.calls[1]?.[2]?.headers;
@@ -168,10 +168,10 @@ describe('WalletEngineService', () => {
             id: 'ledger-1',
             account_id: 'account-1',
             movement_type: 'debit',
-            amount: '25.000000',
-            balance_after: '75.000000',
-            unit_code: 'KREDIT',
-            unit_scale: 6,
+            amount: '25.00',
+            balance_after: '75.00',
+            unit_code: 'USD',
+            unit_scale: 2,
             feature_key: 'ads_wheel.seat',
             reference_type: 'seat_billing',
             reference_id: 'join_wheel-1_sponsor-1',
@@ -181,11 +181,11 @@ describe('WalletEngineService', () => {
           },
           balance: {
             account_id: 'account-1',
-            unit_code: 'KREDIT',
-            unit_scale: 6,
-            balance: '75.000000',
-            held_amount: '0.000000',
-            available_balance: '75.000000',
+            unit_code: 'USD',
+            unit_scale: 2,
+            balance: '75.00',
+            held_amount: '0.00',
+            available_balance: '75.00',
             updated_at: '2026-04-01T00:00:00.000Z',
           },
         }),
@@ -194,7 +194,7 @@ describe('WalletEngineService', () => {
 
     await service.debitSeat(
       'account-1',
-      '25.000000',
+      '25.00',
       'join_wheel-1_sponsor-1',
       {
         idempotencyKey: 'join_wheel-1_sponsor-1',
@@ -209,8 +209,8 @@ describe('WalletEngineService', () => {
   it('formats integer minor units using the wallet scale', () => {
     const { service } = createService();
 
-    expect(service.formatMinorUnits(25_000_000)).toBe('25.000000');
-    expect(service.formatMinorUnits(1)).toBe('0.000001');
+    expect(service.formatMinorUnits(2_500)).toBe('25.00');
+    expect(service.formatMinorUnits(1)).toBe('0.01');
   });
 
   it('exposes the upstream wallet status from wrapped exceptions', () => {
