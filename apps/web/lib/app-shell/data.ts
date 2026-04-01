@@ -427,7 +427,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           workspaceId: currentUser.workspaceId ?? mockWorkspace.id,
           teamId: currentUser.teamId ?? mockTeamMetadata[0].id,
           displayName: currentUser.sponsor.displayName,
-          isActive: true,
+          isActive: currentUser.sponsor.isActive,
           avatarUrl: null,
           email: currentUser.sponsor.email,
           availabilityStatus: currentUser.sponsor.availabilityStatus,

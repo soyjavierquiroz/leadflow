@@ -199,6 +199,7 @@ export class AuthService {
             id: user.sponsor.id,
             displayName: user.sponsor.displayName,
             email: user.sponsor.email,
+            isActive: user.sponsor.isActive,
             availabilityStatus: user.sponsor.availabilityStatus,
           }
         : null,

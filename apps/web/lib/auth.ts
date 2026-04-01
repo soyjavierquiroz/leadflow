@@ -29,6 +29,7 @@ export type AuthenticatedAppUser = {
     id: string;
     displayName: string;
     email: string | null;
+    isActive: boolean;
     availabilityStatus: string;
   } | null;
 };

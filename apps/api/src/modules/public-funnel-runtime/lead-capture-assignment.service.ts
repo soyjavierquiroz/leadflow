@@ -105,7 +105,7 @@ type LeadCaptureResult = {
 };
 
 type AssignmentResolution = {
-  assignment: AssignmentSummary;
+  assignment: AssignmentSummary | null;
   wasCreated: boolean;
 };
 
@@ -135,6 +135,11 @@ const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
   'ROTATION_POOL_NOT_FOUND',
   'NO_ELIGIBLE_SPONSORS',
   'ROTATION_MEMBER_NOT_FOUND',
+]);
+
+const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
+  ...ASSIGNMENT_FALLBACK_ERROR_CODES,
+  'NO_FALLBACK_SPONSOR_AVAILABLE',
 ]);
 
 type DirectEligibleSponsor = Prisma.SponsorGetPayload<Record<string, never>>;
@@ -225,7 +230,7 @@ export class LeadCaptureAssignmentService {
         };
 
         const { assignment, wasCreated } =
-          await this.assignLeadToNextSponsorInTransaction(
+          await this.assignLeadOrLeaveUnassignedInTransaction(
             tx,
             publication,
             lead,
@@ -247,7 +252,7 @@ export class LeadCaptureAssignmentService {
         };
       });
 
-      if (result.assignmentWasCreated) {
+      if (result.assignmentWasCreated && result.assignment) {
         this.dispatchAssignmentCreatedSideEffects({
           assignmentId: result.assignment.id,
           sponsorId: result.assignment.sponsor.id,
@@ -346,7 +351,7 @@ export class LeadCaptureAssignmentService {
         };
 
         const { assignment, wasCreated } =
-          await this.assignLeadToNextSponsorInTransaction(
+          await this.assignLeadOrLeaveUnassignedInTransaction(
             tx,
             publication,
             leadResult.lead,
@@ -417,7 +422,7 @@ export class LeadCaptureAssignmentService {
         };
       });
 
-      if (result.assignmentWasCreated) {
+      if (result.assignmentWasCreated && result.assignment) {
         this.dispatchAssignmentCreatedSideEffects({
           assignmentId: result.assignment.id,
           sponsorId: result.assignment.sponsor.id,
@@ -1033,6 +1038,43 @@ export class LeadCaptureAssignmentService {
     };
   }
 
+  private async assignLeadOrLeaveUnassignedInTransaction(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+    lead: {
+      id: string;
+      currentAssignmentId: string | null;
+    },
+    input?: {
+      triggerEventId?: string | null;
+      funnelStepId?: string | null;
+    },
+  ): Promise<AssignmentResolution> {
+    try {
+      return await this.assignLeadToNextSponsorInTransaction(
+        tx,
+        publication,
+        lead,
+        input,
+      );
+    } catch (error) {
+      if (!this.shouldLeaveLeadUnassigned(error)) {
+        throw error;
+      }
+
+      const { code, message } = this.getConflictErrorDetails(error);
+
+      this.logger.warn(
+        `Lead ${lead.id} captured without assignment for publication ${publication.id}. code=${code ?? 'UNKNOWN'} message=${message ?? 'Lead will remain unassigned for manual review.'}`,
+      );
+
+      return {
+        assignment: null,
+        wasCreated: false,
+      };
+    }
+  }
+
   private async recordAssignmentFailure(
     context: AssignmentFailureTrackingContext | null,
     error: unknown,
@@ -1163,21 +1205,46 @@ export class LeadCaptureAssignmentService {
   }
 
   private shouldFallbackAssignment(error: unknown) {
+    const { code } = this.getConflictErrorDetails(error);
+
+    return code ? ASSIGNMENT_FALLBACK_ERROR_CODES.has(code) : false;
+  }
+
+  private shouldLeaveLeadUnassigned(error: unknown) {
+    const { code } = this.getConflictErrorDetails(error);
+
+    return code ? UNASSIGNED_ASSIGNMENT_ERROR_CODES.has(code) : false;
+  }
+
+  private getConflictErrorDetails(error: unknown) {
     if (!(error instanceof ConflictException)) {
-      return false;
+      return {
+        code: null,
+        message: null,
+      };
     }
 
     const response = error.getResponse();
     if (!response || typeof response !== 'object' || Array.isArray(response)) {
-      return false;
+      return {
+        code: null,
+        message: error.message,
+      };
     }
 
     const code =
       'code' in response && typeof response.code === 'string'
         ? response.code
         : null;
+    const message =
+      'message' in response && typeof response.message === 'string'
+        ? response.message
+        : error.message;
 
-    return code ? ASSIGNMENT_FALLBACK_ERROR_CODES.has(code) : false;
+    return {
+      code,
+      message,
+    };
   }
 
   private async resolveFallbackSponsorOrThrow(

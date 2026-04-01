@@ -25,6 +25,7 @@ export type AuthenticatedUser = {
     id: string;
     displayName: string;
     email: string | null;
+    isActive: boolean;
     availabilityStatus: string;
   } | null;
 };
