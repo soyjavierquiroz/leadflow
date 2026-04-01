@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { SectionHeader } from "@/components/app-shell/section-header";
+import { MemberActiveWheelCard } from "@/components/member-operations/member-active-wheel-card";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import {
   type MemberDashboardAssignmentStatus,
@@ -292,63 +293,67 @@ export function MemberDashboardClient({
           />
         </div>
 
-        <aside className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-6 shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
-                Capacidad
-              </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                {availability.title}
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isReceivingLeads}
-              aria-label="Recibir leads nuevos"
-              disabled={loadingAction === "availability"}
-              onClick={() => handleAvailabilityChange(!isReceivingLeads)}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                isReceivingLeads ? "bg-emerald-500" : "bg-slate-300"
-              }`}
-            >
-              <span
-                className={`inline-block h-6 w-6 rounded-full bg-white shadow transition ${
-                  isReceivingLeads ? "translate-x-7" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            {availability.description}
-          </p>
-
-          <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center justify-between gap-3">
+        <div className="space-y-4">
+          <aside className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-6 shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-slate-950">
-                  Estado del asesor
+                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
+                  Capacidad
                 </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {isReceivingLeads
-                    ? "Tu bandeja sigue abierta para nuevos handoffs."
-                    : "Tu carga actual queda protegida sin nuevas entradas."}
-                </p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                  {availability.title}
+                </h2>
               </div>
-              <SoftBadge
-                label={isReceivingLeads ? "Activo" : "Pausado"}
-                tone={
-                  isReceivingLeads
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-white text-slate-700"
-                }
-              />
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isReceivingLeads}
+                aria-label="Recibir leads nuevos"
+                disabled={loadingAction === "availability"}
+                onClick={() => handleAvailabilityChange(!isReceivingLeads)}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  isReceivingLeads ? "bg-emerald-500" : "bg-slate-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 rounded-full bg-white shadow transition ${
+                    isReceivingLeads ? "translate-x-7" : "translate-x-1"
+                  }`}
+                />
+              </button>
             </div>
-          </div>
-        </aside>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {availability.description}
+            </p>
+
+            <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">
+                    Estado del asesor
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {isReceivingLeads
+                      ? "Tu bandeja sigue abierta para nuevos handoffs."
+                      : "Tu carga actual queda protegida sin nuevas entradas."}
+                  </p>
+                </div>
+                <SoftBadge
+                  label={isReceivingLeads ? "Activo" : "Pausado"}
+                  tone={
+                    isReceivingLeads
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-white text-slate-700"
+                  }
+                />
+              </div>
+            </div>
+          </aside>
+
+          <MemberActiveWheelCard />
+        </div>
       </section>
 
       <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.07)]">

@@ -35,6 +35,15 @@ type AdWheelRecord = {
   updatedAt: string;
 };
 
+type TeamAdWheelRecord = AdWheelRecord & {
+  participantCount: number;
+};
+
+type SponsorActiveAdWheelResult = {
+  wheel: AdWheelRecord | null;
+  isParticipating: boolean;
+};
+
 type AdWheelJoinResult = {
   wheel: AdWheelRecord;
   participant: {
@@ -185,30 +194,89 @@ export class AdWheelsService {
     return mapAdWheelRecord(record);
   }
 
+  async listForTeam(scope: TeamScope): Promise<TeamAdWheelRecord[]> {
+    await this.requireTeam(scope);
+
+    const records = await this.prisma.adWheel.findMany({
+      where: {
+        teamId: scope.teamId,
+      },
+      include: {
+        _count: {
+          select: {
+            participants: true,
+          },
+        },
+      },
+    });
+
+    const statusOrder = {
+      ACTIVE: 0,
+      DRAFT: 1,
+      COMPLETED: 2,
+    } satisfies Record<AdWheelRecord['status'], number>;
+
+    return records
+      .sort((left, right) => {
+        const statusDelta =
+          statusOrder[left.status] - statusOrder[right.status];
+
+        if (statusDelta !== 0) {
+          return statusDelta;
+        }
+
+        return right.createdAt.getTime() - left.createdAt.getTime();
+      })
+      .map((record) => ({
+        ...mapAdWheelRecord(record),
+        participantCount: record._count.participants,
+      }));
+  }
+
+  async getActiveForSponsor(
+    scope: SponsorScope,
+  ): Promise<SponsorActiveAdWheelResult> {
+    await this.requireActiveSponsor(scope);
+
+    const wheel = await this.prisma.adWheel.findFirst({
+      where: {
+        teamId: scope.teamId,
+        status: 'ACTIVE',
+      },
+      include: {
+        participants: {
+          where: {
+            sponsorId: scope.sponsorId,
+          },
+          select: {
+            sponsorId: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!wheel) {
+      return {
+        wheel: null,
+        isParticipating: false,
+      };
+    }
+
+    return {
+      wheel: mapAdWheelRecord(wheel),
+      isParticipating: wheel.participants.length > 0,
+    };
+  }
+
   async joinForSponsor(
     scope: SponsorScope,
     wheelId: string,
   ): Promise<AdWheelJoinResult> {
     const normalizedWheelId = sanitizeRequiredText(wheelId, 'wheelId');
-    const sponsor = await this.prisma.sponsor.findFirst({
-      where: {
-        id: scope.sponsorId,
-        workspaceId: scope.workspaceId,
-        teamId: scope.teamId,
-        status: 'active',
-        isActive: true,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!sponsor) {
-      throw new NotFoundException({
-        code: 'SPONSOR_NOT_FOUND',
-        message: 'The current sponsor is not active for this team.',
-      });
-    }
+    await this.requireActiveSponsor(scope);
 
     const wheel = await this.prisma.adWheel.findFirst({
       where: {
@@ -378,5 +446,29 @@ export class AdWheelsService {
     }
 
     return team;
+  }
+
+  private async requireActiveSponsor(scope: SponsorScope) {
+    const sponsor = await this.prisma.sponsor.findFirst({
+      where: {
+        id: scope.sponsorId,
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        status: 'active',
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!sponsor) {
+      throw new NotFoundException({
+        code: 'SPONSOR_NOT_FOUND',
+        message: 'The current sponsor is not active for this team.',
+      });
+    }
+
+    return sponsor;
   }
 }

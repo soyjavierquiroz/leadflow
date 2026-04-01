@@ -24,6 +24,11 @@ const teamNav = [
     description: "Rutas activas donde ya está captando el funnel.",
   },
   {
+    href: "/team/wheels",
+    label: "Ruedas",
+    description: "Bolsa comun activa, buy-ins y ocupacion de asientos.",
+  },
+  {
     href: "/team/members",
     label: "Mi Equipo",
     description: "Licencias activas, invitados y control operativo del squad.",

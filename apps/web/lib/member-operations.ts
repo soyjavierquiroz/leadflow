@@ -7,6 +7,17 @@ type ErrorPayload = {
   error?: string;
 };
 
+export class MemberOperationRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "MemberOperationRequestError";
+    this.status = status;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export type MemberSponsorDashboardStatus =
   | "PROVISIONED"
   | "REGISTERED"
@@ -32,7 +43,7 @@ export const memberOperationRequest = async <T>(
     },
   });
 
-  const payload = (await response.json()) as unknown;
+  const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
     const errorPayload = payload as ErrorPayload;
@@ -43,7 +54,7 @@ export const memberOperationRequest = async <T>(
       (typeof errorPayload.error === "string" ? errorPayload.error : null) ??
       "No pudimos completar la operación.";
 
-    throw new Error(message);
+    throw new MemberOperationRequestError(message, response.status);
   }
 
   return payload as T;

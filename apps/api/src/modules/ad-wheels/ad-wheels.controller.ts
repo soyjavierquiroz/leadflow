@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -9,6 +9,15 @@ import { AdWheelsService } from './ad-wheels.service';
 @Controller()
 export class AdWheelsController {
   constructor(private readonly adWheelsService: AdWheelsService) {}
+
+  @Get('team/wheels')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  listForTeam(@CurrentAuthUser() user: AuthenticatedUser) {
+    return this.adWheelsService.listForTeam({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+    });
+  }
 
   @Post('team/wheels')
   @RequireRoles(UserRole.TEAM_ADMIN)
@@ -23,6 +32,16 @@ export class AdWheelsController {
       },
       dto,
     );
+  }
+
+  @Get('sponsors/me/wheels/active')
+  @RequireRoles(UserRole.MEMBER)
+  getActiveForSponsor(@CurrentAuthUser() user: AuthenticatedUser) {
+    return this.adWheelsService.getActiveForSponsor({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+      sponsorId: user.sponsorId!,
+    });
   }
 
   @Post('sponsors/me/wheels/:wheelId/join')
