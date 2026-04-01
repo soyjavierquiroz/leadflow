@@ -19,6 +19,7 @@ describe('AdWheelsService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
       adWheelParticipant: {
         create: jest.fn(),
@@ -38,12 +39,10 @@ describe('AdWheelsService', () => {
     };
   };
 
-  it('creates an active wheel for the team when no active wheel exists', async () => {
+  it('creates an active wheel using the provided start date and duration', async () => {
     const { prisma, service } = buildService();
-    const startDate = new Date('2026-04-01T10:15:00.000Z');
-    const endDate = new Date('2026-04-15T10:15:00.000Z');
-
-    jest.useFakeTimers().setSystemTime(startDate);
+    const startDate = new Date('2026-04-10T00:00:00.000Z');
+    const endDate = new Date('2026-04-24T00:00:00.000Z');
 
     prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue(null);
@@ -55,8 +54,8 @@ describe('AdWheelsService', () => {
       seatPrice: 5_000,
       startDate,
       endDate,
-      createdAt: startDate,
-      updatedAt: startDate,
+      createdAt: new Date('2026-04-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-01T00:00:00.000Z'),
     });
 
     const result = await service.createForTeam(
@@ -68,6 +67,7 @@ describe('AdWheelsService', () => {
         status: 'ACTIVE',
         name: 'Abril',
         seatPrice: 5_000,
+        startDate: startDate.toISOString(),
         durationDays: 14,
       },
     );
@@ -100,6 +100,7 @@ describe('AdWheelsService', () => {
           status: 'ACTIVE',
           name: 'Abril',
           seatPrice: 5_000,
+          startDate: '2026-04-10T00:00:00.000Z',
           durationDays: 0,
         },
       ),
@@ -107,6 +108,154 @@ describe('AdWheelsService', () => {
       response: expect.objectContaining({
         field: 'durationDays',
       }),
+    });
+  });
+
+  it('updates the wheel schedule when the wheel has not started yet', async () => {
+    const { prisma, service } = buildService();
+    const now = new Date('2026-04-01T00:00:00.000Z');
+    const currentStartDate = new Date('2026-04-10T00:00:00.000Z');
+    const nextStartDate = new Date('2026-04-20T00:00:00.000Z');
+    const nextEndDate = new Date('2026-05-05T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
+    prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
+    prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
+      id: 'wheel-1',
+      teamId: 'team-1',
+      status: 'ACTIVE',
+      name: 'Abril',
+      seatPrice: 5_000,
+      startDate: currentStartDate,
+      endDate: new Date('2026-04-24T00:00:00.000Z'),
+      createdAt: now,
+      updatedAt: now,
+    });
+    prisma.adWheel.update = jest.fn().mockResolvedValue({
+      id: 'wheel-1',
+      teamId: 'team-1',
+      status: 'ACTIVE',
+      name: 'Abril Plus',
+      seatPrice: 7_500,
+      startDate: nextStartDate,
+      endDate: nextEndDate,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await service.updateForTeam(
+      {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+      },
+      'wheel-1',
+      {
+        name: 'Abril Plus',
+        seatPrice: 7_500,
+        startDate: nextStartDate.toISOString(),
+        durationDays: 15,
+      },
+    );
+
+    expect(result).toMatchObject({
+      id: 'wheel-1',
+      name: 'Abril Plus',
+      seatPrice: 7_500,
+    });
+    expect(prisma.adWheel.update).toHaveBeenCalledWith({
+      where: {
+        id: 'wheel-1',
+      },
+      data: {
+        name: 'Abril Plus',
+        seatPrice: 7_500,
+        startDate: nextStartDate,
+        endDate: nextEndDate,
+      },
+    });
+  });
+
+  it('rejects seat price and timing edits after the wheel has started', async () => {
+    const { prisma, service } = buildService();
+    const now = new Date('2026-04-20T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
+    prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
+    prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
+      id: 'wheel-1',
+      teamId: 'team-1',
+      status: 'ACTIVE',
+      name: 'Abril',
+      seatPrice: 5_000,
+      startDate: new Date('2026-04-10T00:00:00.000Z'),
+      endDate: new Date('2026-04-24T00:00:00.000Z'),
+      createdAt: new Date('2026-04-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.updateForTeam(
+        {
+          workspaceId: 'workspace-1',
+          teamId: 'team-1',
+        },
+        'wheel-1',
+        {
+          seatPrice: 7_500,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('still allows renaming a wheel after it has started', async () => {
+    const { prisma, service } = buildService();
+    const now = new Date('2026-04-20T00:00:00.000Z');
+    const wheel = {
+      id: 'wheel-1',
+      teamId: 'team-1',
+      status: 'ACTIVE',
+      name: 'Abril',
+      seatPrice: 5_000,
+      startDate: new Date('2026-04-10T00:00:00.000Z'),
+      endDate: new Date('2026-04-24T00:00:00.000Z'),
+      createdAt: new Date('2026-04-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+    };
+
+    jest.useFakeTimers().setSystemTime(now);
+
+    prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
+    prisma.adWheel.findFirst = jest.fn().mockResolvedValue(wheel);
+    prisma.adWheel.update = jest.fn().mockResolvedValue({
+      ...wheel,
+      name: 'Abril Renombrada',
+      updatedAt: now,
+    });
+
+    const result = await service.updateForTeam(
+      {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+      },
+      'wheel-1',
+      {
+        name: 'Abril Renombrada',
+      },
+    );
+
+    expect(result.name).toBe('Abril Renombrada');
+    expect(prisma.adWheel.update).toHaveBeenCalledWith({
+      where: {
+        id: 'wheel-1',
+      },
+      data: {
+        name: 'Abril Renombrada',
+        seatPrice: 5_000,
+        startDate: wheel.startDate,
+        endDate: wheel.endDate,
+      },
     });
   });
 
@@ -291,6 +440,7 @@ describe('AdWheelsService', () => {
           status: 'ACTIVE',
           name: 'Abril',
           seatPrice: 5_000,
+          startDate: '2026-04-10T00:00:00.000Z',
           durationDays: 14,
         },
       ),

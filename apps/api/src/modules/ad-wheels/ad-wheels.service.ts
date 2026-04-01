@@ -13,6 +13,7 @@ import {
   WalletEngineService,
 } from '../finance/wallet-engine.service';
 import type { CreateTeamAdWheelDto } from './dto/create-team-ad-wheel.dto';
+import type { UpdateTeamAdWheelDto } from './dto/update-team-ad-wheel.dto';
 
 type TeamScope = {
   workspaceId: string;
@@ -62,6 +63,8 @@ type AdWheelJoinResult = {
   alreadyJoined: boolean;
 };
 
+const DAY_IN_MS = 1000 * 60 * 60 * 24;
+
 const sanitizeRequiredText = (
   value: string | null | undefined,
   field: string,
@@ -103,6 +106,35 @@ const requirePositiveInteger = (
   return value;
 };
 
+const parseRequiredDate = (
+  value: string | null | undefined,
+  field: string,
+): Date => {
+  const normalized = sanitizeRequiredText(value, field);
+  const parsed = new Date(normalized);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException({
+      code: 'INVALID_DATE',
+      message: `${field} must be a valid ISO-8601 date.`,
+      field,
+    });
+  }
+
+  return parsed;
+};
+
+const calculateEndDate = (startDate: Date, durationDays: number) => {
+  const endDate = new Date(startDate);
+
+  endDate.setUTCDate(endDate.getUTCDate() + durationDays);
+
+  return endDate;
+};
+
+const calculateDurationDays = (startDate: Date, endDate: Date) =>
+  Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / DAY_IN_MS));
+
 const mapAdWheelRecord = (
   record: Prisma.AdWheelGetPayload<Record<string, never>>,
 ): AdWheelRecord => ({
@@ -131,11 +163,9 @@ export class AdWheelsService {
     await this.requireTeam(scope);
 
     const name = sanitizeRequiredText(dto.name, 'name');
+    const startDate = parseRequiredDate(dto.startDate, 'startDate');
     const durationDays = requirePositiveInteger(dto.durationDays, 'durationDays');
-    const startDate = new Date();
-    const endDate = new Date(startDate);
-
-    endDate.setUTCDate(endDate.getUTCDate() + durationDays);
+    const endDate = calculateEndDate(startDate, durationDays);
 
     if (!Number.isInteger(dto.seatPrice) || dto.seatPrice <= 0) {
       throw new BadRequestException({
@@ -182,6 +212,88 @@ export class AdWheelsService {
         seatPrice: dto.seatPrice,
         startDate,
         endDate,
+      },
+    });
+
+    return mapAdWheelRecord(record);
+  }
+
+  async updateForTeam(
+    scope: TeamScope,
+    wheelId: string,
+    dto: UpdateTeamAdWheelDto,
+  ): Promise<AdWheelRecord> {
+    await this.requireTeam(scope);
+
+    const normalizedWheelId = sanitizeRequiredText(wheelId, 'wheelId');
+    const wheel = await this.prisma.adWheel.findFirst({
+      where: {
+        id: normalizedWheelId,
+        teamId: scope.teamId,
+      },
+      select: {
+        id: true,
+        teamId: true,
+        status: true,
+        name: true,
+        seatPrice: true,
+        startDate: true,
+        endDate: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!wheel) {
+      throw new NotFoundException({
+        code: 'AD_WHEEL_NOT_FOUND',
+        message: 'The requested ad wheel was not found for this team.',
+      });
+    }
+
+    const currentDurationDays = calculateDurationDays(
+      wheel.startDate,
+      wheel.endDate,
+    );
+    const nextName =
+      dto.name === undefined ? wheel.name : sanitizeRequiredText(dto.name, 'name');
+    const nextSeatPrice =
+      dto.seatPrice === undefined
+        ? wheel.seatPrice
+        : requirePositiveInteger(dto.seatPrice, 'seatPrice');
+    const nextStartDate =
+      dto.startDate === undefined
+        ? wheel.startDate
+        : parseRequiredDate(dto.startDate, 'startDate');
+    const nextDurationDays =
+      dto.durationDays === undefined
+        ? currentDurationDays
+        : requirePositiveInteger(dto.durationDays, 'durationDays');
+    const nextEndDate = calculateEndDate(nextStartDate, nextDurationDays);
+    const scheduleIsEditable =
+      wheel.status === 'DRAFT' || Date.now() < wheel.startDate.getTime();
+    const scheduleChanged =
+      nextSeatPrice !== wheel.seatPrice ||
+      nextStartDate.getTime() !== wheel.startDate.getTime() ||
+      nextDurationDays !== currentDurationDays;
+
+    if (!scheduleIsEditable && scheduleChanged) {
+      throw new ConflictException({
+        code: 'AD_WHEEL_SCHEDULE_LOCKED',
+        message:
+          'Seat price and wheel timing can only be edited while the wheel is in draft or before the start date.',
+      });
+    }
+
+    const record = await this.prisma.adWheel.update({
+      where: {
+        id: wheel.id,
+      },
+      data: {
+        name: nextName,
+        seatPrice: nextSeatPrice,
+        startDate: nextStartDate,
+        endDate: nextEndDate,
       },
     });
 

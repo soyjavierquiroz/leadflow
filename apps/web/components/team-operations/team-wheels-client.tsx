@@ -18,11 +18,20 @@ type TeamWheelsClientProps = {
   initialRows: TeamAdWheelRecord[];
 };
 
+type WheelEditorState =
+  | {
+      mode: "create";
+    }
+  | {
+      mode: "edit";
+      wheelId: string;
+    }
+  | null;
+
 const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
   "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
-const campaignDurationOptions = [7, 14, 30] as const;
 
 const sortRows = (rows: TeamAdWheelRecord[]) => {
   const statusOrder = {
@@ -51,12 +60,18 @@ const getCampaignDurationDays = (startDate: string, endDate: string) => {
   return Math.max(1, Math.round(durationMs / (1000 * 60 * 60 * 24)));
 };
 
+const toDateInputValue = (value: string) => value.slice(0, 10);
+const toIsoDateStart = (value: string) => `${value}T00:00:00.000Z`;
+const canEditWheelSchedule = (wheel: TeamAdWheelRecord) =>
+  wheel.status === "DRAFT" || Date.now() < new Date(wheel.startDate).getTime();
+
 export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
   const [rows, setRows] = useState(() => sortRows(initialRows));
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [createSeatPrice, setCreateSeatPrice] = useState("");
-  const [createDurationDays, setCreateDurationDays] = useState("30");
+  const [editorState, setEditorState] = useState<WheelEditorState>(null);
+  const [formName, setFormName] = useState("");
+  const [formSeatPrice, setFormSeatPrice] = useState("");
+  const [formStartDate, setFormStartDate] = useState("");
+  const [formDurationDays, setFormDurationDays] = useState("30");
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     message: string;
@@ -68,25 +83,64 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
     (total, item) => total + item.participantCount,
     0,
   );
+  const editingWheel =
+    editorState?.mode === "edit"
+      ? rows.find((wheel) => wheel.id === editorState.wheelId) ?? null
+      : null;
+  const scheduleIsEditable =
+    editorState?.mode === "create"
+      ? true
+      : editingWheel
+        ? canEditWheelSchedule(editingWheel)
+        : false;
 
-  const resetCreateState = () => {
-    setCreateName("");
-    setCreateSeatPrice("");
-    setCreateDurationDays("30");
+  const resetEditorForm = () => {
+    setFormName("");
+    setFormSeatPrice("");
+    setFormStartDate("");
+    setFormDurationDays("30");
   };
 
-  const handleCreate = (event: React.FormEvent<HTMLFormElement>) => {
+  const openCreateModal = () => {
+    resetEditorForm();
+    setFormStartDate(toDateInputValue(new Date().toISOString()));
+    setEditorState({
+      mode: "create",
+    });
+  };
+
+  const openEditModal = (wheel: TeamAdWheelRecord) => {
+    setFormName(wheel.name);
+    setFormSeatPrice((wheel.seatPrice / 100).toFixed(2));
+    setFormStartDate(toDateInputValue(wheel.startDate));
+    setFormDurationDays(String(getCampaignDurationDays(wheel.startDate, wheel.endDate)));
+    setEditorState({
+      mode: "edit",
+      wheelId: wheel.id,
+    });
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
 
-    const normalizedName = createName.trim();
-    const seatPriceUnits = Number(createSeatPrice);
-    const durationDays = Number(createDurationDays);
+    const normalizedName = formName.trim();
+    const seatPriceUnits = Number(formSeatPrice);
+    const durationDays = Number(formDurationDays);
+    const startDate = formStartDate.trim();
 
     if (!normalizedName) {
       setFeedback({
         tone: "error",
         message: "Asigna un nombre claro para la rueda.",
+      });
+      return;
+    }
+
+    if (!startDate) {
+      setFeedback({
+        tone: "error",
+        message: "Selecciona una fecha de inicio para la campaña.",
       });
       return;
     }
@@ -102,33 +156,62 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
     if (!Number.isInteger(durationDays) || durationDays < 1) {
       setFeedback({
         tone: "error",
-        message: "Selecciona una duración válida para la campaña.",
+        message: "Ingresa una duración válida para la campaña.",
       });
       return;
     }
 
     startTransition(async () => {
       try {
+        const payload = {
+          name: normalizedName,
+          seatPrice: Math.round(seatPriceUnits * 100),
+          startDate: toIsoDateStart(startDate),
+          durationDays,
+        };
         const record = await teamOperationRequest<
           Omit<TeamAdWheelRecord, "participantCount">
-        >("/team/wheels", {
-          method: "POST",
-          body: JSON.stringify({
-            name: normalizedName,
-            seatPrice: Math.round(seatPriceUnits * 100),
-            durationDays,
-            status: "ACTIVE",
-          }),
-        });
-
-        setRows((current) =>
-          sortRows([{ ...record, participantCount: 0 }, ...current]),
+        >(
+          editorState?.mode === "edit"
+            ? `/team/wheels/${editorState.wheelId}`
+            : "/team/wheels",
+          {
+            method: editorState?.mode === "edit" ? "PATCH" : "POST",
+            body: JSON.stringify(
+              editorState?.mode === "edit"
+                ? payload
+                : {
+                    ...payload,
+                    status: "ACTIVE",
+                  },
+            ),
+          },
         );
-        resetCreateState();
-        setIsCreateOpen(false);
+
+        setRows((current) => {
+          if (editorState?.mode === "edit") {
+            return sortRows(
+              current.map((row) =>
+                row.id === record.id
+                  ? {
+                      ...row,
+                      ...record,
+                    }
+                  : row,
+              ),
+            );
+          }
+
+          return sortRows([{ ...record, participantCount: 0 }, ...current]);
+        });
+        resetEditorForm();
+        setEditorState(null);
         setFeedback({
           tone: "success",
-          message: "La rueda publicitaria quedó creada y activa para buy-ins.",
+          message:
+            editorState?.mode === "edit"
+              ? "La rueda publicitaria quedó actualizada."
+              : "La rueda publicitaria quedó creada y activa para buy-ins.",
         });
       } catch (error) {
         setFeedback({
@@ -136,7 +219,7 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
           message:
             error instanceof Error
               ? error.message
-              : "No pudimos crear la rueda publicitaria.",
+              : "No pudimos guardar la rueda publicitaria.",
         });
       }
     });
@@ -153,7 +236,7 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
             type="button"
             onClick={() => {
               setFeedback(null);
-              setIsCreateOpen(true);
+              openCreateModal();
             }}
             className={primaryButtonClassName}
           >
@@ -210,7 +293,16 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
                   </p>
                 </div>
 
-                <StatusBadge value={wheel.status} />
+                <div className="flex flex-col items-end gap-3">
+                  <StatusBadge value={wheel.status} />
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(wheel)}
+                    className={secondaryButtonClassName}
+                  >
+                    Editar
+                  </button>
+                </div>
               </div>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
@@ -252,26 +344,34 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
         />
       )}
 
-      {isCreateOpen ? (
+      {editorState ? (
         <ModalShell
-          title="Crear rueda publicitaria"
-          description="Define el nombre, el seat price y la duración. La rueda nace activa y el backend calcula la ventana operativa desde hoy."
+          title={
+            editorState.mode === "edit"
+              ? "Editar rueda publicitaria"
+              : "Crear rueda publicitaria"
+          }
+          description={
+            editorState.mode === "edit"
+              ? "Ajusta nombre, precio y calendario. Si la rueda ya comenzó, solo podrás cambiar el nombre."
+              : "Define el nombre, el seat price, la fecha de inicio y la duración para abrir la rueda."
+          }
           onClose={() => {
             if (isPending) {
               return;
             }
 
-            setIsCreateOpen(false);
+            setEditorState(null);
           }}
         >
-          <form className="space-y-5" onSubmit={handleCreate}>
+          <form className="space-y-5" onSubmit={handleSubmit}>
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-slate-900">
                 Nombre
               </span>
               <input
-                value={createName}
-                onChange={(event) => setCreateName(event.target.value)}
+                value={formName}
+                onChange={(event) => setFormName(event.target.value)}
                 placeholder="Abril Premium"
                 className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               />
@@ -285,10 +385,11 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
                 type="number"
                 min="1"
                 step="0.01"
-                value={createSeatPrice}
-                onChange={(event) => setCreateSeatPrice(event.target.value)}
+                value={formSeatPrice}
+                onChange={(event) => setFormSeatPrice(event.target.value)}
                 placeholder="50"
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                disabled={!scheduleIsEditable}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
               />
               <p className="text-sm leading-6 text-slate-500">
                 Ingresa el valor en USD. Ejemplo: `50` envía `5000` centavos al
@@ -298,29 +399,51 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
 
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-slate-900">
-                Duración de la campaña
+                Start Date
               </span>
-              <select
-                value={createDurationDays}
-                onChange={(event) => setCreateDurationDays(event.target.value)}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-              >
-                {campaignDurationOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option} días
-                  </option>
-                ))}
-              </select>
+              <input
+                type="date"
+                value={formStartDate}
+                onChange={(event) => setFormStartDate(event.target.value)}
+                disabled={!scheduleIsEditable}
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
               <p className="text-sm leading-6 text-slate-500">
-                El API calculará automáticamente la fecha de finalización desde
-                la fecha de creación.
+                Selecciona la fecha exacta en la que la rueda debe comenzar.
               </p>
             </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-slate-900">
+                Duración de la campaña
+              </span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={formDurationDays}
+                onChange={(event) => setFormDurationDays(event.target.value)}
+                placeholder="30"
+                disabled={!scheduleIsEditable}
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+              <p className="text-sm leading-6 text-slate-500">
+                Ingresa el total de días. El API recalculará la fecha de
+                finalización automáticamente.
+              </p>
+            </label>
+
+            {editorState.mode === "edit" && !scheduleIsEditable ? (
+              <OperationBanner
+                tone="error"
+                message="Esta rueda ya comenzó. Solo puedes cambiar el nombre; el precio y las fechas quedaron bloqueados."
+              />
+            ) : null}
 
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={() => setEditorState(null)}
                 disabled={isPending}
                 className={secondaryButtonClassName}
               >
@@ -331,7 +454,13 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
                 disabled={isPending}
                 className={primaryButtonClassName}
               >
-                {isPending ? "Creando..." : "Guardar Rueda"}
+                {isPending
+                  ? editorState.mode === "edit"
+                    ? "Guardando..."
+                    : "Creando..."
+                  : editorState.mode === "edit"
+                    ? "Guardar Cambios"
+                    : "Guardar Rueda"}
               </button>
             </div>
           </form>

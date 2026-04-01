@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
 import type { CreateTeamAdWheelDto } from './dto/create-team-ad-wheel.dto';
+import type { UpdateTeamAdWheelDto } from './dto/update-team-ad-wheel.dto';
 import { AdWheelsService } from './ad-wheels.service';
 
 @Controller()
@@ -30,6 +31,23 @@ export class AdWheelsController {
         workspaceId: user.workspaceId!,
         teamId: user.teamId!,
       },
+      dto,
+    );
+  }
+
+  @Patch('team/wheels/:id')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  update(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') wheelId: string,
+    @Body() dto: UpdateTeamAdWheelDto,
+  ) {
+    return this.adWheelsService.updateForTeam(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+      },
+      wheelId,
       dto,
     );
   }
