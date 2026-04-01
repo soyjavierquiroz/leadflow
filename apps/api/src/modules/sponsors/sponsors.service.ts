@@ -12,6 +12,7 @@ import { buildEntity } from '../shared/domain.factory';
 import { SPONSOR_REPOSITORY } from '../shared/domain.tokens';
 import { mapSponsorRecord } from '../../prisma/prisma.mappers';
 import { PrismaService } from '../../prisma/prisma.service';
+import { WalletEngineService } from '../finance/wallet-engine.service';
 import { buildLeadWorkflow } from '../leads/leads-workflows';
 import { N8nAutomationClient } from '../messaging-automation/n8n-automation.client';
 import {
@@ -117,6 +118,7 @@ export class SponsorsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly walletEngineService: WalletEngineService,
     private readonly n8nAutomationClient: N8nAutomationClient,
     @Optional()
     @Inject(SPONSOR_REPOSITORY)
@@ -388,6 +390,23 @@ export class SponsorsService {
     }
 
     return mapSponsorRecord(sponsor);
+  }
+
+  async getKreditsForMember(scope: {
+    workspaceId: string;
+    teamId: string;
+    sponsorId: string;
+  }): Promise<{ balance: string }> {
+    await this.findForMember(scope);
+
+    const account = await this.walletEngineService.upsertSponsorAccount(
+      scope.sponsorId,
+    );
+    const balance = await this.walletEngineService.getSponsorKredits(
+      account.accountId,
+    );
+
+    return { balance };
   }
 
   async updateForTeam(

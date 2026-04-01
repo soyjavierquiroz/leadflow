@@ -3,11 +3,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { hashPassword } from '../auth/password-hash.util';
+import { WalletEngineService } from '../finance/wallet-engine.service';
 import type { CreateTeamMemberDto } from './dto/create-team-member.dto';
 import type { UpdateTeamMemberStatusDto } from './dto/update-team-member-status.dto';
 
@@ -95,7 +97,12 @@ type TeamMemberUserRecord = Prisma.UserGetPayload<{
 
 @Injectable()
 export class TeamMembersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(TeamMembersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly walletEngineService: WalletEngineService,
+  ) {}
 
   async list(scope: TeamMemberScope): Promise<TeamMembersSnapshot> {
     const [team, members] = await Promise.all([
@@ -207,7 +214,7 @@ export class TeamMembersService {
     const isActive = dto.isActive ?? false;
     const temporaryPassword = this.generateTemporaryPassword();
 
-    return this.prisma.$transaction(async (tx) => {
+    const invitation = await this.prisma.$transaction(async (tx) => {
       const team = await this.requireTeam(scope, tx);
 
       const existingUser = await tx.user.findUnique({
@@ -275,6 +282,12 @@ export class TeamMembersService {
         temporaryPassword,
       };
     });
+
+    if (invitation.member.sponsorId) {
+      void this.provisionSponsorWelcomeKredits(invitation.member.sponsorId);
+    }
+
+    return invitation;
   }
 
   private async requireTeam(
@@ -408,5 +421,24 @@ export class TeamMembersService {
 
   private generateTemporaryPassword() {
     return `Leadflow-${randomBytes(9).toString('base64url')}`;
+  }
+
+  private async provisionSponsorWelcomeKredits(sponsorId: string) {
+    try {
+      const account = await this.walletEngineService.upsertSponsorAccount(
+        sponsorId,
+      );
+
+      await this.walletEngineService.creditInitialKredits(
+        account.accountId,
+        sponsorId,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Sponsor ${sponsorId} wallet provisioning failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
   }
 }

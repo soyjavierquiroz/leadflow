@@ -56,6 +56,16 @@ export class SponsorsController {
     });
   }
 
+  @Get('me/kredits')
+  @RequireRoles(UserRole.MEMBER)
+  getMemberKredits(@CurrentAuthUser() user: AuthenticatedUser) {
+    return this.sponsorsService.getKreditsForMember({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+      sponsorId: user.sponsorId!,
+    });
+  }
+
   @Get('me')
   @RequireRoles(UserRole.MEMBER)
   findMe(@CurrentAuthUser() user: AuthenticatedUser) {

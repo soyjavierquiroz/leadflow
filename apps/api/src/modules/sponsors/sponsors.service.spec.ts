@@ -111,10 +111,15 @@ describe('SponsorsService', () => {
         url: 'https://n8n.example.com/webhook/outbound/rescue',
       }),
     };
+    const walletEngineService = {
+      upsertSponsorAccount: jest.fn(),
+      getSponsorKredits: jest.fn(),
+    };
 
     const service = new SponsorsService(
       prisma as never,
       configService as never,
+      walletEngineService as never,
       n8nAutomationClient as never,
     );
 
@@ -222,10 +227,15 @@ describe('SponsorsService', () => {
     const n8nAutomationClient = {
       dispatch: jest.fn(),
     };
+    const walletEngineService = {
+      upsertSponsorAccount: jest.fn(),
+      getSponsorKredits: jest.fn(),
+    };
 
     const service = new SponsorsService(
       prisma as never,
       configService as never,
+      walletEngineService as never,
       n8nAutomationClient as never,
     );
 

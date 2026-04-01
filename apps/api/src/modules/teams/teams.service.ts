@@ -3,12 +3,14 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
 import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { hashPassword } from '../auth/password-hash.util';
+import { WalletEngineService } from '../finance/wallet-engine.service';
 import { buildEntity } from '../shared/domain.factory';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import type { CreateTeamDto } from './dto/create-team.dto';
@@ -61,8 +63,11 @@ const sanitizeOptionalText = (value: string | null | undefined) => {
 
 @Injectable()
 export class TeamsService {
+  private readonly logger = new Logger(TeamsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
+    private readonly walletEngineService: WalletEngineService,
     @Optional()
     @Inject(TEAM_REPOSITORY)
     private readonly repository?: TeamRepository,
@@ -183,7 +188,7 @@ export class TeamsService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const provisionedTenant = await this.prisma.$transaction(async (tx) => {
         const workspace =
           workspaceId !== null
             ? await tx.workspace.findUnique({
@@ -361,6 +366,10 @@ export class TeamsService {
           },
         };
       });
+
+      void this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
+
+      return provisionedTenant;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -377,6 +386,25 @@ export class TeamsService {
       }
 
       throw error;
+    }
+  }
+
+  private async provisionSponsorWelcomeKredits(sponsorId: string) {
+    try {
+      const account = await this.walletEngineService.upsertSponsorAccount(
+        sponsorId,
+      );
+
+      await this.walletEngineService.creditInitialKredits(
+        account.accountId,
+        sponsorId,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Sponsor ${sponsorId} wallet provisioning failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
     }
   }
 }

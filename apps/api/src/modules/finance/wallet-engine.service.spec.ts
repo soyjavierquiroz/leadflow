@@ -111,6 +111,103 @@ describe('WalletEngineService', () => {
     );
   });
 
+  it('upserts sponsor wallet accounts for the ai assistant product', async () => {
+    const { service, httpService } = createService();
+
+    httpService.post.mockReturnValue(
+      of(
+        buildAxiosResponse({
+          account_id: 'account-kredit-1',
+          platform_key: 'leadflow',
+          product_key: 'ai_assistant',
+          tenant_id: 'sponsor-1',
+          status: 'active',
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+        }),
+      ),
+    );
+
+    await expect(service.upsertSponsorAccount('sponsor-1')).resolves.toEqual({
+      accountId: 'account-kredit-1',
+    });
+
+    expect(httpService.post).toHaveBeenCalledWith(
+      'http://wallet-engine:3000/accounts/upsert',
+      {
+        tenant_id: 'sponsor-1',
+        platform_key: 'leadflow',
+        product_key: 'ai_assistant',
+      },
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer wallet-secret',
+          'Idempotency-Key': expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it('credits the welcome KREDIT bonus with an explicit idempotency key', async () => {
+    const { service, httpService } = createService();
+
+    httpService.post.mockReturnValue(of(buildAxiosResponse({ ok: true })));
+
+    await service.creditInitialKredits('account-kredit-1', 'sponsor-1');
+
+    expect(httpService.post).toHaveBeenCalledWith(
+      'http://wallet-engine:3000/wallets/credit',
+      {
+        account_id: 'account-kredit-1',
+        amount: '5000000',
+        unit_code: 'KREDIT',
+        reference_type: 'welcome_bonus',
+        reference_id: 'sponsor-1',
+      },
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer wallet-secret',
+          'Idempotency-Key': 'welcome_bonus_kredit_sponsor-1',
+        }),
+      }),
+    );
+  });
+
+  it('reads the KREDIT balance from wallet balance collections', async () => {
+    const { service, httpService } = createService();
+
+    httpService.get.mockReturnValue(
+      of(
+        buildAxiosResponse({
+          balances: [
+            {
+              account_id: 'account-kredit-1',
+              unit_code: 'USD',
+              unit_scale: 2,
+              balance: '10.00',
+              held_amount: '0.00',
+              available_balance: '10.00',
+              updated_at: '2026-04-01T00:00:00.000Z',
+            },
+            {
+              account_id: 'account-kredit-1',
+              unit_code: 'KREDIT',
+              unit_scale: 0,
+              balance: '5000000',
+              held_amount: '0',
+              available_balance: '5000000',
+              updated_at: '2026-04-01T00:00:00.000Z',
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(service.getSponsorKredits('account-kredit-1')).resolves.toBe(
+      '5000000',
+    );
+  });
+
   it('uses a deterministic Idempotency-Key for repeated seat debits', async () => {
     const { service, httpService } = createService();
 

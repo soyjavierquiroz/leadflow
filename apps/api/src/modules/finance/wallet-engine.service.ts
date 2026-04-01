@@ -22,6 +22,18 @@ type WalletEngineAccount = {
   updated_at: string;
 };
 
+type WalletEngineAccountUpsertResponse =
+  | WalletEngineAccount
+  | {
+      account_id: string;
+      platform_key: string;
+      product_key: string;
+      tenant_id: string;
+      status?: string;
+      created_at?: string;
+      updated_at?: string;
+    };
+
 export type WalletEngineBalance = {
   account_id: string;
   unit_code: string;
@@ -55,6 +67,17 @@ export type WalletEngineDebitOptions = {
   idempotencyKey?: string;
 };
 
+export type WalletEngineAccountRef = {
+  accountId: string;
+};
+
+type WalletEngineBalanceResponse =
+  | WalletEngineBalance
+  | WalletEngineBalance[]
+  | {
+      balances: WalletEngineBalance[];
+    };
+
 type WalletEngineExceptionResponse = {
   code: string;
   message: string;
@@ -62,10 +85,13 @@ type WalletEngineExceptionResponse = {
 };
 
 const PLATFORM_KEY = 'leadflow';
-const PRODUCT_KEY = 'ads_wheel';
+const TEAM_PRODUCT_KEY = 'ads_wheel';
+const SPONSOR_PRODUCT_KEY = 'ai_assistant';
 const UNIT_CODE = 'USD';
 const UNIT_SCALE = 2;
 const SEAT_DEBIT_FEATURE_KEY = 'ads_wheel.seat';
+const KREDIT_UNIT_CODE = 'KREDIT';
+const WELCOME_BONUS_AMOUNT = '5000000';
 
 const sanitizeNullableText = (value: string | null | undefined) => {
   if (value === undefined || value === null) {
@@ -122,7 +148,7 @@ export class WalletEngineService {
       '/accounts/upsert',
       {
         platform_key: PLATFORM_KEY,
-        product_key: PRODUCT_KEY,
+        product_key: TEAM_PRODUCT_KEY,
         tenant_id: normalizedTeamId,
         external_ref: normalizedTeamId,
         unit_code: UNIT_CODE,
@@ -140,12 +166,66 @@ export class WalletEngineService {
     return response;
   }
 
+  async upsertSponsorAccount(sponsorId: string): Promise<WalletEngineAccountRef> {
+    const normalizedSponsorId = this.requireText(sponsorId, 'sponsorId');
+    const response = await this.post<WalletEngineAccountUpsertResponse>(
+      '/accounts/upsert',
+      {
+        tenant_id: normalizedSponsorId,
+        platform_key: PLATFORM_KEY,
+        product_key: SPONSOR_PRODUCT_KEY,
+      },
+      this.buildIdempotencyKey('sponsor-account-upsert', normalizedSponsorId),
+    );
+    const accountId = this.readAccountId(response);
+
+    if (!accountId) {
+      throw new BadGatewayException(
+        'Wallet engine did not return an account id for the sponsor account.',
+      );
+    }
+
+    return {
+      accountId,
+    };
+  }
+
   async getTeamBalance(accountId: string): Promise<WalletEngineBalance> {
     const normalizedAccountId = this.requireText(accountId, 'accountId');
 
     return await this.get<WalletEngineBalance>(
       `/wallets/${encodeURIComponent(normalizedAccountId)}/balance`,
     );
+  }
+
+  async creditInitialKredits(accountId: string, sponsorId: string) {
+    const normalizedAccountId = this.requireText(accountId, 'accountId');
+    const normalizedSponsorId = this.requireText(sponsorId, 'sponsorId');
+
+    return await this.post<unknown>(
+      '/wallets/credit',
+      {
+        account_id: normalizedAccountId,
+        amount: WELCOME_BONUS_AMOUNT,
+        unit_code: KREDIT_UNIT_CODE,
+        reference_type: 'welcome_bonus',
+        reference_id: normalizedSponsorId,
+      },
+      `welcome_bonus_kredit_${normalizedSponsorId}`,
+    );
+  }
+
+  async getSponsorKredits(accountId: string): Promise<string> {
+    const normalizedAccountId = this.requireText(accountId, 'accountId');
+    const response = await this.get<WalletEngineBalanceResponse>(
+      `/wallets/${encodeURIComponent(normalizedAccountId)}/balance`,
+    );
+    const balances = this.toBalanceList(response);
+    const kredietBalance = balances.find(
+      (balance) => balance.unit_code === KREDIT_UNIT_CODE,
+    );
+
+    return kredietBalance?.balance ?? '0';
   }
 
   async debitSeat(
@@ -177,7 +257,7 @@ export class WalletEngineService {
         reference_id: normalizedReferenceId,
         meta: {
           platform_key: PLATFORM_KEY,
-          product_key: PRODUCT_KEY,
+          product_key: TEAM_PRODUCT_KEY,
         },
       },
       normalizedIdempotencyKey,
@@ -240,6 +320,14 @@ export class WalletEngineService {
     return `${this.internalUrl}${path.startsWith('/') ? path : `/${path}`}`;
   }
 
+  private readAccountId(response: WalletEngineAccountUpsertResponse) {
+    if ('account_id' in response) {
+      return sanitizeNullableText(response.account_id);
+    }
+
+    return sanitizeNullableText(response.id);
+  }
+
   private buildHeaders(idempotencyKey?: string): AxiosRequestConfig['headers'] {
     return {
       Accept: 'application/json',
@@ -266,6 +354,24 @@ export class WalletEngineService {
     );
 
     return normalized.slice(0, maxLength);
+  }
+
+  private toBalanceList(
+    response: WalletEngineBalanceResponse,
+  ): WalletEngineBalance[] {
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    if ('balances' in response && Array.isArray(response.balances)) {
+      return response.balances;
+    }
+
+    if ('unit_code' in response) {
+      return [response];
+    }
+
+    return [];
   }
 
   private ensureConfigured() {

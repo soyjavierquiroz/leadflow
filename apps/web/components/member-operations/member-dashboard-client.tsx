@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { MemberActiveWheelCard } from "@/components/member-operations/member-active-wheel-card";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
@@ -17,6 +17,10 @@ import { memberOperationRequest } from "@/lib/member-operations";
 
 type MemberDashboardClientProps = {
   initialDashboard: MemberDashboardSnapshot;
+};
+
+type SponsorKreditsResponse = {
+  balance: string | number;
 };
 
 const leadStatusTone: Record<MemberDashboardLeadStatus, string> = {
@@ -61,6 +65,10 @@ const availabilityCopy = {
 const toSentenceCase = (value: string) =>
   value.replace(/[_-]+/g, " ").replace(/^./, (letter) => letter.toUpperCase());
 
+const kreditBalanceFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 2,
+});
+
 const buildKpis = (inbox: MemberDashboardLead[]) => ({
   handoffsNew: inbox.filter((item) => item.assignmentStatus === "assigned")
     .length,
@@ -93,6 +101,16 @@ const buildOriginLabel = (lead: MemberDashboardLead) => {
   }
 
   return "Origen pendiente";
+};
+
+const formatKreditsBalance = (value: string | number) => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+
+  if (Number.isFinite(numericValue)) {
+    return kreditBalanceFormatter.format(numericValue);
+  }
+
+  return typeof value === "string" ? value : String(value);
 };
 
 function MetricCard({
@@ -151,6 +169,11 @@ export function MemberDashboardClient({
 }: MemberDashboardClientProps) {
   const [sponsor, setSponsor] = useState(initialDashboard.sponsor);
   const [inbox, setInbox] = useState(initialDashboard.inbox);
+  const [kreditsBalance, setKreditsBalance] = useState<string | number | null>(
+    null,
+  );
+  const [kreditsError, setKreditsError] = useState<string | null>(null);
+  const [loadingKredits, setLoadingKredits] = useState(true);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
@@ -161,6 +184,48 @@ export function MemberDashboardClient({
   const availability =
     availabilityCopy[sponsor.availabilityStatus] ?? availabilityCopy.paused;
   const isReceivingLeads = sponsor.availabilityStatus === "available";
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadKreditsBalance = async () => {
+      try {
+        const response = await memberOperationRequest<SponsorKreditsResponse>(
+          "/sponsors/me/kredits",
+          {
+            method: "GET",
+          },
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        setKreditsBalance(response.balance);
+        setKreditsError(null);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setKreditsError(
+          error instanceof Error
+            ? error.message
+            : "No pudimos cargar tu saldo de KREDITs.",
+        );
+      } finally {
+        if (isMounted) {
+          setLoadingKredits(false);
+        }
+      }
+    };
+
+    void loadKreditsBalance();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleAvailabilityChange = async (nextChecked: boolean) => {
     const availabilityStatus = nextChecked ? "available" : "paused";
@@ -328,7 +393,39 @@ export function MemberDashboardClient({
               {availability.description}
             </p>
 
-            <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+            <div className="mt-5 rounded-[1.6rem] border border-cyan-200 bg-[linear-gradient(135deg,_rgba(236,254,255,0.95)_0%,_rgba(255,255,255,1)_100%)] p-4 shadow-[0_18px_45px_rgba(8,145,178,0.12)]">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-700">
+                    IA Wallet
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-slate-950">
+                    Saldo disponible para automatizaciones con IA
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Leadflow provisiona tu bono inicial y n8n consumirá desde
+                    esta wallet descentralizada.
+                  </p>
+                </div>
+
+                <div className="inline-flex items-center rounded-full border border-cyan-200 bg-white px-4 py-2 text-sm font-semibold text-cyan-900 shadow-sm">
+                  🧠{" "}
+                  {loadingKredits
+                    ? "Cargando KREDITs..."
+                    : kreditsBalance !== null
+                      ? `${formatKreditsBalance(kreditsBalance)} KREDITs`
+                      : "Saldo no disponible"}
+                </div>
+              </div>
+
+              {kreditsError ? (
+                <p className="mt-3 text-xs font-medium text-rose-600">
+                  {kreditsError}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mt-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-950">
