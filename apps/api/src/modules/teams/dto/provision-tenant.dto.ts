@@ -6,13 +6,14 @@ export class ProvisionTenantDto {
   readonly workspaceDefaultCurrency?: string;
   readonly workspacePrimaryLocale?: string;
   readonly workspacePrimaryDomain?: string | null;
-  readonly teamName!: string;
-  readonly teamCode!: string;
+  readonly teamName?: string;
+  readonly teamCode?: string;
   readonly teamDescription?: string;
   readonly maxSeats?: number;
-  readonly adminFullName!: string;
+  readonly adminName?: string;
+  readonly adminFullName?: string;
   readonly adminEmail!: string;
-  readonly adminPassword!: string;
+  readonly adminPassword?: string;
   readonly adminRole?: 'TEAM_ADMIN' | 'SUPER_ADMIN';
   readonly sponsorDisplayName?: string;
   readonly sponsorEmail?: string | null;

@@ -9,6 +9,11 @@ const adminNav = [
     description: "Pulso general de plataforma, equipos y funnel runtime.",
   },
   {
+    href: "/admin/tenants",
+    label: "Tenants",
+    description: "Provisioning, seats y lectura global de agencias cliente.",
+  },
+  {
     href: "/admin/teams",
     label: "Teams",
     description: "Capacidad instalada, ownership y cobertura operativa.",

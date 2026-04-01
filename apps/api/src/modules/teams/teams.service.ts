@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { hashPassword } from '../auth/password-hash.util';
@@ -61,6 +62,23 @@ const sanitizeOptionalText = (value: string | null | undefined) => {
   return trimmed ? trimmed : null;
 };
 
+const toIso = (value: Date) => value.toISOString();
+
+export type SystemTenantSummary = {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceSlug: string;
+  name: string;
+  code: string;
+  status: string;
+  maxSeats: number;
+  occupiedSeats: number;
+  activeSponsorsCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 @Injectable()
 export class TeamsService {
   private readonly logger = new Logger(TeamsService.name);
@@ -105,6 +123,44 @@ export class TeamsService {
     return this.repository.findAll();
   }
 
+  async listSystemTenants(): Promise<SystemTenantSummary[]> {
+    const records = await this.prisma.team.findMany({
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        sponsors: {
+          where: {
+            isActive: true,
+          },
+          select: {
+            id: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+
+    return records.map((record) => ({
+      id: record.id,
+      workspaceId: record.workspaceId,
+      workspaceName: record.workspace.name,
+      workspaceSlug: record.workspace.slug,
+      name: record.name,
+      code: record.code,
+      status: record.status,
+      maxSeats: record.maxSeats,
+      occupiedSeats: record.sponsors.length,
+      activeSponsorsCount: record.sponsors.length,
+      createdAt: toIso(record.createdAt),
+      updatedAt: toIso(record.updatedAt),
+    }));
+  }
+
   async provisionTenant(dto: ProvisionTenantDto) {
     const maxSeats = dto.maxSeats ?? 10;
 
@@ -115,9 +171,17 @@ export class TeamsService {
       });
     }
 
-    const teamName = sanitizeRequiredText(dto.teamName, 'teamName');
+    const teamName = sanitizeRequiredText(
+      dto.teamName ?? dto.workspaceName,
+      'teamName',
+    );
     const normalizedTeamCode =
-      slugify(sanitizeRequiredText(dto.teamCode, 'teamCode')) || null;
+      slugify(
+        sanitizeRequiredText(
+          dto.teamCode ?? dto.workspaceSlug ?? dto.teamName ?? dto.workspaceName,
+          'teamCode',
+        ),
+      ) || null;
 
     if (!normalizedTeamCode) {
       throw new BadRequestException({
@@ -127,17 +191,16 @@ export class TeamsService {
     }
 
     const adminFullName = sanitizeRequiredText(
-      dto.adminFullName,
+      dto.adminFullName ?? dto.adminName,
       'adminFullName',
     );
     const adminEmail = sanitizeRequiredText(
       dto.adminEmail,
       'adminEmail',
     ).toLowerCase();
-    const adminPassword = sanitizeRequiredText(
-      dto.adminPassword,
-      'adminPassword',
-    );
+    const providedAdminPassword = sanitizeOptionalText(dto.adminPassword);
+    const adminPassword =
+      providedAdminPassword ?? this.generateTemporaryPassword();
     const adminRole = dto.adminRole ?? UserRole.TEAM_ADMIN;
 
     if (
@@ -359,6 +422,7 @@ export class TeamsService {
           team: linkedTeam,
           adminUser: linkedAdminUser,
           sponsor,
+          temporaryPassword: providedAdminPassword ? null : adminPassword,
           seatUsage: {
             maxSeats: linkedTeam.maxSeats,
             activeSeats: sponsor.isActive ? 1 : 0,
@@ -406,5 +470,9 @@ export class TeamsService {
         }`,
       );
     }
+  }
+
+  private generateTemporaryPassword() {
+    return `Leadflow-${randomBytes(9).toString('base64url')}`;
   }
 }

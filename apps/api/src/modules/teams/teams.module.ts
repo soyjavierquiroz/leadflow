@@ -6,6 +6,7 @@ import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import { SystemApiGuard } from '../webhooks/system-api.guard';
 import { TeamMembersController } from './team-members.controller';
 import { TeamMembersService } from './team-members.service';
+import { SystemTenantAccessGuard } from './system-tenant-access.guard';
 import { SystemTeamsController } from './system-teams.controller';
 import { TeamsController } from './teams.controller';
 import { TeamLeadsController } from './team-leads.controller';
@@ -25,6 +26,7 @@ import { TeamsService } from './teams.service';
     TeamLeadsService,
     TeamMembersService,
     SystemApiGuard,
+    SystemTenantAccessGuard,
     TeamPrismaRepository,
     {
       provide: TEAM_REPOSITORY,

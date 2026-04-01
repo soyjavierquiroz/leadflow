@@ -11,6 +11,13 @@ export const teamOperationRequest = async <T>(
   path: string,
   init: RequestInit,
 ): Promise<T> => {
+  return authenticatedOperationRequest<T>(path, init);
+};
+
+export const authenticatedOperationRequest = async <T>(
+  path: string,
+  init: RequestInit,
+): Promise<T> => {
   let response: Response;
 
   try {

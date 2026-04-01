@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 type ModalShellProps = {
+  eyebrow?: string;
   title: string;
   description: string;
   onClose: () => void;
@@ -10,6 +11,7 @@ type ModalShellProps = {
 };
 
 export function ModalShell({
+  eyebrow = "Team Operations",
   title,
   description,
   onClose,
@@ -21,7 +23,7 @@ export function ModalShell({
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Team Operations
+              {eyebrow}
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-slate-950">
               {title}
