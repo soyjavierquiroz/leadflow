@@ -48,6 +48,7 @@ export class TeamPrismaRepository implements TeamRepository {
         status: 'draft',
         description: data.description ?? null,
         managerUserId: data.managerUserId ?? null,
+        maxSeats: data.maxSeats ?? 10,
       },
       include: teamInclude,
     });
@@ -66,6 +67,7 @@ export class TeamPrismaRepository implements TeamRepository {
         status: entity.status,
         description: entity.description,
         managerUserId: entity.managerUserId,
+        maxSeats: entity.maxSeats,
         createdAt: new Date(entity.createdAt),
         updatedAt: new Date(entity.updatedAt),
       },
@@ -75,6 +77,7 @@ export class TeamPrismaRepository implements TeamRepository {
         status: entity.status,
         description: entity.description,
         managerUserId: entity.managerUserId,
+        maxSeats: entity.maxSeats,
       },
       include: teamInclude,
     });

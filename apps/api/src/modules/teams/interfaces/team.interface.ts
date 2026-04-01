@@ -14,6 +14,7 @@ export interface Team extends BaseDomainEntity, WorkspaceScoped {
   status: TeamStatus;
   description: string | null;
   managerUserId: DomainId | null;
+  maxSeats: number;
   sponsorIds: DomainId[];
   funnelIds: DomainId[];
   domainIds: DomainId[];

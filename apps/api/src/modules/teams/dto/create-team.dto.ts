@@ -4,4 +4,5 @@ export class CreateTeamDto {
   readonly code!: string;
   readonly description?: string;
   readonly managerUserId?: string | null;
+  readonly maxSeats?: number;
 }

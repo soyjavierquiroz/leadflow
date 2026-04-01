@@ -13,6 +13,7 @@ export interface Sponsor extends BaseDomainEntity, WorkspaceScoped {
   teamId: DomainId;
   displayName: string;
   status: SponsorStatus;
+  isActive: boolean;
   avatarUrl: string | null;
   email: string | null;
   phone: string | null;

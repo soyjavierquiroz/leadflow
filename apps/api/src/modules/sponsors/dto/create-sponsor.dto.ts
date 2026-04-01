@@ -9,4 +9,5 @@ export class CreateSponsorDto {
   readonly availabilityStatus?: AvailabilityStatus;
   readonly routingWeight?: number;
   readonly memberPortalEnabled?: boolean;
+  readonly isActive?: boolean;
 }
