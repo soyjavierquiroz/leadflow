@@ -3,6 +3,7 @@ import { AssignmentsModule } from '../assignments/assignments.module';
 import { ConversionEventMappingsModule } from '../conversion-event-mappings/conversion-event-mappings.module';
 import { DomainsModule } from '../domains/domains.module';
 import { EventsModule } from '../events/events.module';
+import { WalletEngineModule } from '../finance/wallet-engine.module';
 import { FunnelInstancesModule } from '../funnel-instances/funnel-instances.module';
 import { FunnelPublicationsModule } from '../funnel-publications/funnel-publications.module';
 import { FunnelStepsModule } from '../funnel-steps/funnel-steps.module';
@@ -46,6 +47,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     VisitorsModule,
     WebhooksModule,
     LeadsModule,
+    WalletEngineModule,
     MessagingAutomationModule,
     MessagingIntegrationsModule,
     AssignmentsModule,
@@ -72,6 +74,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     VisitorsModule,
     WebhooksModule,
     LeadsModule,
+    WalletEngineModule,
     MessagingAutomationModule,
     MessagingIntegrationsModule,
     AssignmentsModule,

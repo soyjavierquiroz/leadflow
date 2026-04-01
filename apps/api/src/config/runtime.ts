@@ -16,6 +16,7 @@ export type ApiRuntimeConfig = {
   n8nDispatcherWebhookUrl: string | null;
   n8nDispatcherApiKey: string | null;
   n8nOutboundWebhookUrl: string | null;
+  walletEngineInternalUrl: string | null;
 };
 
 const parseCsv = (value: string | undefined) => {
@@ -48,6 +49,47 @@ const sanitizeEnv = (value: string | undefined) => {
 
 const toHttpsUrl = (host: string) => `https://${host}`;
 
+const normalizeUrl = (value: string | undefined, field: string) => {
+  const sanitized = sanitizeEnv(value);
+
+  if (!sanitized) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(sanitized);
+    return url.toString().replace(/\/+$/, '');
+  } catch {
+    throw new Error(`${field} must be a valid URL.`);
+  }
+};
+
+export const validateApiEnvironment = (env: NodeJS.ProcessEnv) => {
+  const walletEngineInternalUrl = normalizeUrl(
+    env.WALLET_ENGINE_INTERNAL_URL,
+    'WALLET_ENGINE_INTERNAL_URL',
+  );
+  const walletEngineApiKey = sanitizeEnv(env.WALLET_ENGINE_API_KEY);
+
+  if (walletEngineInternalUrl && !walletEngineApiKey) {
+    throw new Error(
+      'WALLET_ENGINE_API_KEY is required when WALLET_ENGINE_INTERNAL_URL is configured.',
+    );
+  }
+
+  if (!walletEngineInternalUrl && walletEngineApiKey) {
+    throw new Error(
+      'WALLET_ENGINE_INTERNAL_URL is required when WALLET_ENGINE_API_KEY is configured.',
+    );
+  }
+
+  return {
+    ...env,
+    WALLET_ENGINE_INTERNAL_URL: walletEngineInternalUrl,
+    WALLET_ENGINE_API_KEY: walletEngineApiKey,
+  };
+};
+
 export const getApiRuntimeConfig = (
   env: NodeJS.ProcessEnv = process.env,
 ): ApiRuntimeConfig => {
@@ -72,6 +114,11 @@ export const getApiRuntimeConfig = (
   const n8nDispatcherWebhookUrl = sanitizeEnv(env.N8N_DISPATCHER_WEBHOOK_URL);
   const n8nDispatcherApiKey = sanitizeEnv(env.N8N_DISPATCHER_API_KEY);
   const n8nOutboundWebhookUrl = sanitizeEnv(env.N8N_OUTBOUND_WEBHOOK_URL);
+  const walletEngineInternalUrl =
+    normalizeUrl(
+      env.WALLET_ENGINE_INTERNAL_URL,
+      'WALLET_ENGINE_INTERNAL_URL',
+    ) ?? null;
 
   return {
     appName: env.API_NAME ?? 'leadflow-api',
@@ -94,5 +141,6 @@ export const getApiRuntimeConfig = (
     n8nDispatcherWebhookUrl: n8nDispatcherWebhookUrl ?? null,
     n8nDispatcherApiKey: n8nDispatcherApiKey ?? null,
     n8nOutboundWebhookUrl: n8nOutboundWebhookUrl ?? null,
+    walletEngineInternalUrl,
   };
 };
