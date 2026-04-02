@@ -151,6 +151,7 @@ export const mapFunnelRecord = (record: FunnelRecord): Funnel => ({
   id: record.id,
   workspaceId: record.workspaceId,
   name: record.name,
+  description: record.description,
   code: record.code,
   thumbnailUrl: record.thumbnailUrl,
   status: record.status,

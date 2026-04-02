@@ -82,9 +82,15 @@ export type SystemFunnelTemplateRecord = {
   id: string;
   workspaceId: string;
   name: string;
+  description: string | null;
   code: string;
+  thumbnailUrl: string | null;
+  status: "draft" | "active" | "archived";
   isTemplate: boolean;
+  stages: string[];
+  entrySources: string[];
   defaultTeamId: string | null;
+  defaultRotationPoolId: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -231,4 +237,26 @@ export const getSystemTenantDomains = async (teamId: string) => {
   }
 
   return payload as SystemTenantDomainRecord[];
+};
+
+export const getSystemFunnelTemplates = async () => {
+  noStore();
+
+  const response = await apiFetchWithSession("/system/funnels/templates");
+
+  if (!response.ok) {
+    throw new Error(
+      `No pudimos cargar los templates globales (${response.status}).`,
+    );
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  if (!Array.isArray(payload)) {
+    throw new Error(
+      "El API devolvió un payload inválido para system/funnels/templates.",
+    );
+  }
+
+  return payload as SystemFunnelTemplateRecord[];
 };

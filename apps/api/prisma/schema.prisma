@@ -478,6 +478,7 @@ model Funnel {
   id                    String              @id @default(uuid())
   workspaceId           String
   name                  String
+  description           String?
   code                  String
   thumbnailUrl          String?
   status                FunnelStatus

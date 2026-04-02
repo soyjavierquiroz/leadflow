@@ -20,7 +20,10 @@ type PrismaMock = {
     >;
   };
   funnel: {
-    findFirst: jest.Mock<Promise<FunnelRecord | { id: string } | null>, [FunnelFindFirstArgs]>;
+    findFirst: jest.Mock<
+      Promise<FunnelRecord | { id: string } | null>,
+      [FunnelFindFirstArgs]
+    >;
     create: jest.Mock<Promise<FunnelRecord>, [FunnelCreateArgs]>;
   };
 };
@@ -34,6 +37,7 @@ const buildFunnelRecord = (
     id: 'funnel-template-1',
     workspaceId: 'workspace-template',
     name: 'Base Funnel',
+    description: null,
     code: 'base-funnel',
     thumbnailUrl: 'https://cdn.kurukin.com/funnels/base.png',
     status: 'active',
@@ -134,9 +138,7 @@ describe('FunnelsService', () => {
       id: 'team-1',
       workspaceId: 'workspace-team-1',
     });
-    funnelFindFirst
-      .mockResolvedValueOnce(template)
-      .mockResolvedValueOnce(null);
+    funnelFindFirst.mockResolvedValueOnce(template).mockResolvedValueOnce(null);
     funnelCreate.mockResolvedValue(clonedRecord);
 
     const result = await service.cloneTemplateToTeam(
@@ -149,6 +151,7 @@ describe('FunnelsService', () => {
       data: {
         workspaceId: 'workspace-team-1',
         name: 'Funnel Equipo Norte',
+        description: null,
         code: 'base-funnel-copy',
         thumbnailUrl: 'https://cdn.kurukin.com/funnels/base.png',
         status: 'active',

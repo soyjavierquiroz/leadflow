@@ -12,7 +12,25 @@ import { buildEntity } from '../shared/domain.factory';
 import { FUNNEL_REPOSITORY } from '../shared/domain.tokens';
 import { mapFunnelRecord } from '../../prisma/prisma.mappers';
 import type { CreateFunnelDto } from './dto/create-funnel.dto';
+import type { CreateSystemFunnelTemplateDto } from './dto/create-system-funnel-template.dto';
+import type { UpdateSystemFunnelTemplateDto } from './dto/update-system-funnel-template.dto';
 import type { Funnel, FunnelRepository } from './interfaces/funnel.interface';
+
+const DEFAULT_TEMPLATE_STAGES = ['captured', 'qualified', 'won'];
+const DEFAULT_TEMPLATE_ENTRY_SOURCES: Funnel['entrySources'] = [
+  'manual',
+  'form',
+  'landing-page',
+  'api',
+];
+const ALLOWED_FUNNEL_STATUSES: Funnel['status'][] = [
+  'draft',
+  'active',
+  'archived',
+];
+type FunnelCodeLookupClient =
+  | Pick<PrismaService, 'funnel'>
+  | Prisma.TransactionClient;
 
 @Injectable()
 export class FunnelsService {
@@ -27,6 +45,7 @@ export class FunnelsService {
     return buildEntity<Funnel>({
       workspaceId: dto.workspaceId,
       name: dto.name,
+      description: dto.description ?? null,
       code: dto.code,
       thumbnailUrl: null,
       status: 'draft',
@@ -102,6 +121,7 @@ export class FunnelsService {
         data: {
           workspaceId: targetTeam.workspaceId,
           name,
+          description: template.description,
           code,
           thumbnailUrl: template.thumbnailUrl,
           status: template.status,
@@ -112,6 +132,37 @@ export class FunnelsService {
           defaultRotationPoolId: null,
         },
       });
+    });
+
+    return mapFunnelRecord(record);
+  }
+
+  async createSystemTemplate(
+    dto: CreateSystemFunnelTemplateDto,
+  ): Promise<Funnel> {
+    const workspaceId = await this.resolveSystemTemplateWorkspaceId();
+    const name = this.sanitizeRequiredText(dto.name, 'name');
+    const description = this.sanitizeOptionalText(dto.description);
+    const status = this.resolveTemplateStatus(dto.status);
+    const stages = this.resolveStages(dto.stages);
+    const entrySources = this.resolveEntrySources(dto.entrySources);
+    const thumbnailUrl = this.sanitizeOptionalText(dto.thumbnailUrl);
+    const code = await this.createAvailableCode(this.prisma, workspaceId, name);
+
+    const record = await this.prisma.funnel.create({
+      data: {
+        workspaceId,
+        name,
+        description,
+        code,
+        thumbnailUrl,
+        status,
+        isTemplate: true,
+        stages,
+        entrySources: entrySources.map((item) => this.toDbSource(item)),
+        defaultTeamId: null,
+        defaultRotationPoolId: null,
+      },
     });
 
     return mapFunnelRecord(record);
@@ -129,18 +180,178 @@ export class FunnelsService {
     return records.map(mapFunnelRecord);
   }
 
+  async getSystemTemplate(templateId: string): Promise<Funnel> {
+    const record = await this.findSystemTemplateRecord(templateId);
+    return mapFunnelRecord(record);
+  }
+
+  async updateSystemTemplate(
+    templateId: string,
+    dto: UpdateSystemFunnelTemplateDto,
+  ): Promise<Funnel> {
+    const existing = await this.findSystemTemplateRecord(templateId);
+    const name =
+      dto.name === undefined
+        ? existing.name
+        : this.sanitizeRequiredText(dto.name, 'name');
+    const description =
+      dto.description === undefined
+        ? existing.description
+        : this.sanitizeOptionalText(dto.description);
+    const status =
+      dto.status === undefined
+        ? existing.status
+        : this.resolveTemplateStatus(dto.status);
+    const stages =
+      dto.stages === undefined
+        ? existing.stages
+        : this.resolveStages(dto.stages);
+    const entrySources =
+      dto.entrySources === undefined
+        ? existing.entrySources.map((item) =>
+            item === 'landing_page' ? 'landing-page' : item,
+          )
+        : this.resolveEntrySources(dto.entrySources);
+    const thumbnailUrl =
+      dto.thumbnailUrl === undefined
+        ? existing.thumbnailUrl
+        : this.sanitizeOptionalText(dto.thumbnailUrl);
+
+    const record = await this.prisma.funnel.update({
+      where: { id: existing.id },
+      data: {
+        name,
+        description,
+        status,
+        stages,
+        entrySources: entrySources.map((item) => this.toDbSource(item)),
+        thumbnailUrl,
+        isTemplate: true,
+        defaultTeamId: null,
+        defaultRotationPoolId: null,
+      },
+    });
+
+    return mapFunnelRecord(record);
+  }
+
+  async deleteSystemTemplate(templateId: string): Promise<{
+    id: string;
+    deleted: true;
+  }> {
+    const existing = await this.findSystemTemplateRecord(templateId);
+
+    await this.prisma.funnel.delete({
+      where: { id: existing.id },
+    });
+
+    return {
+      id: existing.id,
+      deleted: true,
+    };
+  }
+
   private resolveCloneName(originalName: string, nextName?: string) {
     const normalized = nextName?.trim();
     return normalized ? normalized : `Copia de ${originalName}`;
   }
 
+  private async findSystemTemplateRecord(templateId: string) {
+    const normalizedTemplateId = this.sanitizeRequiredText(
+      templateId,
+      'templateId',
+    );
+    const record = await this.prisma.funnel.findFirst({
+      where: {
+        id: normalizedTemplateId,
+        isTemplate: true,
+        defaultTeamId: null,
+      },
+    });
+
+    if (!record) {
+      throw new NotFoundException({
+        code: 'FUNNEL_TEMPLATE_NOT_FOUND',
+        message: 'The requested funnel template was not found.',
+      });
+    }
+
+    return record;
+  }
+
+  private async resolveSystemTemplateWorkspaceId() {
+    const existingTemplate = await this.prisma.funnel.findFirst({
+      where: {
+        isTemplate: true,
+        defaultTeamId: null,
+      },
+      select: {
+        workspaceId: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    if (existingTemplate?.workspaceId) {
+      return existingTemplate.workspaceId;
+    }
+
+    const workspace = await this.prisma.workspace.findFirst({
+      select: {
+        id: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    if (!workspace) {
+      throw new ConflictException({
+        code: 'SYSTEM_TEMPLATE_WORKSPACE_UNAVAILABLE',
+        message:
+          'A workspace is required before creating the first global funnel template.',
+      });
+    }
+
+    return workspace.id;
+  }
+
   private async createUniqueCode(
-    tx: Prisma.TransactionClient,
+    tx: FunnelCodeLookupClient,
     workspaceId: string,
     sourceCode: string,
   ) {
-    const baseCode = this.normalizeCode(`${sourceCode}-copy`);
+    return this.createCodeWithFallback(
+      tx,
+      workspaceId,
+      this.normalizeCode(`${sourceCode}-copy`),
+      'FUNNEL_CLONE_CODE_CONFLICT',
+      'We could not generate a unique code for the cloned funnel.',
+    );
+  }
 
+  private async createAvailableCode(
+    tx: FunnelCodeLookupClient,
+    workspaceId: string,
+    sourceName: string,
+  ) {
+    return this.createCodeWithFallback(
+      tx,
+      workspaceId,
+      this.normalizeCode(sourceName),
+      'FUNNEL_TEMPLATE_CODE_CONFLICT',
+      'We could not generate a unique code for the funnel template.',
+    );
+  }
+
+  private async createCodeWithFallback(
+    tx: FunnelCodeLookupClient,
+    workspaceId: string,
+    baseCode: string,
+    errorCode: string,
+    errorMessage: string,
+  ) {
     for (let attempt = 0; attempt < 50; attempt += 1) {
       const code = attempt === 0 ? baseCode : `${baseCode}-${attempt + 1}`;
       const existing = await tx.funnel.findFirst({
@@ -157,9 +368,131 @@ export class FunnelsService {
     }
 
     throw new ConflictException({
-      code: 'FUNNEL_CLONE_CODE_CONFLICT',
-      message: 'We could not generate a unique code for the cloned funnel.',
+      code: errorCode,
+      message: errorMessage,
     });
+  }
+
+  private sanitizeRequiredText(
+    value: string | null | undefined,
+    field: string,
+  ) {
+    if (typeof value !== 'string') {
+      throw new BadRequestException({
+        code: 'FIELD_REQUIRED',
+        message: `${field} is required.`,
+        field,
+      });
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      throw new BadRequestException({
+        code: 'FIELD_REQUIRED',
+        message: `${field} is required.`,
+        field,
+      });
+    }
+
+    return trimmed;
+  }
+
+  private sanitizeOptionalText(value: string | null | undefined) {
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  private resolveTemplateStatus(status?: string): Funnel['status'] {
+    if (!status) {
+      return 'draft';
+    }
+
+    if (ALLOWED_FUNNEL_STATUSES.includes(status as Funnel['status'])) {
+      return status as Funnel['status'];
+    }
+
+    throw new BadRequestException({
+      code: 'INVALID_FUNNEL_STATUS',
+      message: 'status must be one of: draft, active, archived.',
+      field: 'status',
+    });
+  }
+
+  private resolveStages(stages?: string[]) {
+    if (!stages) {
+      return [...DEFAULT_TEMPLATE_STAGES];
+    }
+
+    if (!Array.isArray(stages) || stages.length === 0) {
+      throw new BadRequestException({
+        code: 'INVALID_FUNNEL_STAGES',
+        message: 'stages must contain at least one valid stage.',
+        field: 'stages',
+      });
+    }
+
+    const normalized = stages.map((item) => item.trim()).filter(Boolean);
+
+    if (normalized.length === 0) {
+      throw new BadRequestException({
+        code: 'INVALID_FUNNEL_STAGES',
+        message: 'stages must contain at least one valid stage.',
+        field: 'stages',
+      });
+    }
+
+    return normalized;
+  }
+
+  private resolveEntrySources(
+    entrySources?: Funnel['entrySources'],
+  ): Funnel['entrySources'] {
+    if (!entrySources) {
+      return [...DEFAULT_TEMPLATE_ENTRY_SOURCES];
+    }
+
+    const allowed = new Set<Funnel['entrySources'][number]>([
+      'manual',
+      'form',
+      'landing-page',
+      'api',
+      'import',
+      'automation',
+    ]);
+
+    if (!Array.isArray(entrySources) || entrySources.length === 0) {
+      throw new BadRequestException({
+        code: 'INVALID_FUNNEL_ENTRY_SOURCES',
+        message:
+          'entrySources must contain at least one supported lead source.',
+        field: 'entrySources',
+      });
+    }
+
+    const normalized = entrySources.map((item) => {
+      const value = item.trim() as Funnel['entrySources'][number];
+
+      if (!allowed.has(value)) {
+        throw new BadRequestException({
+          code: 'INVALID_FUNNEL_ENTRY_SOURCE',
+          message: `Unsupported entry source: ${item}.`,
+          field: 'entrySources',
+        });
+      }
+
+      return value;
+    });
+
+    return normalized;
+  }
+
+  private toDbSource(value: Funnel['entrySources'][number]) {
+    return value === 'landing-page' ? 'landing_page' : value;
   }
 
   private normalizeCode(value: string) {
