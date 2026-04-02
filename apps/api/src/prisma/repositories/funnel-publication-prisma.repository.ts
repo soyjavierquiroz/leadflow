@@ -64,7 +64,8 @@ export class FunnelPublicationPrismaRepository implements FunnelPublicationRepos
         trackingProfileId: data.trackingProfileId ?? null,
         handoffStrategyId: data.handoffStrategyId ?? null,
         pathPrefix: normalizePublicationPathPrefix(data.pathPrefix),
-        status: 'draft',
+        status: data.isActive ? 'active' : 'draft',
+        isActive: data.isActive ?? false,
         isPrimary: data.isPrimary ?? false,
       },
     });
@@ -85,6 +86,7 @@ export class FunnelPublicationPrismaRepository implements FunnelPublicationRepos
         handoffStrategyId: entity.handoffStrategyId,
         pathPrefix: normalizePublicationPathPrefix(entity.pathPrefix),
         status: entity.status,
+        isActive: entity.isActive,
         isPrimary: entity.isPrimary,
         createdAt: new Date(entity.createdAt),
         updatedAt: new Date(entity.updatedAt),
@@ -97,6 +99,7 @@ export class FunnelPublicationPrismaRepository implements FunnelPublicationRepos
         handoffStrategyId: entity.handoffStrategyId,
         pathPrefix: normalizePublicationPathPrefix(entity.pathPrefix),
         status: entity.status,
+        isActive: entity.isActive,
         isPrimary: entity.isPrimary,
       },
     });

@@ -6,5 +6,6 @@ export class CreateFunnelPublicationDto {
   readonly trackingProfileId?: string | null;
   readonly handoffStrategyId?: string | null;
   readonly pathPrefix!: string;
+  readonly isActive?: boolean;
   readonly isPrimary?: boolean;
 }

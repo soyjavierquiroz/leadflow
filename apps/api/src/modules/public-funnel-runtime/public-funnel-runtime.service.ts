@@ -70,6 +70,7 @@ export class PublicFunnelRuntimeService {
     const publications = await this.prisma.funnelPublication.findMany({
       where: {
         status: 'active',
+        isActive: true,
         domain: {
           normalizedHost,
           status: 'active',
@@ -114,6 +115,7 @@ export class PublicFunnelRuntimeService {
     if (
       !publication ||
       publication.status !== 'active' ||
+      !publication.isActive ||
       publication.domain.status !== 'active'
     ) {
       throw new NotFoundException({

@@ -17,6 +17,7 @@ export interface FunnelPublication
   handoffStrategyId: DomainId | null;
   pathPrefix: string;
   status: FunnelPublicationStatus;
+  isActive: boolean;
   isPrimary: boolean;
 }
 

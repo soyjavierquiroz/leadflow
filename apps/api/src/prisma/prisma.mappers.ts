@@ -266,6 +266,7 @@ export const mapFunnelPublicationRecord = (
   handoffStrategyId: record.handoffStrategyId,
   pathPrefix: record.pathPrefix,
   status: record.status,
+  isActive: record.isActive,
   isPrimary: record.isPrimary,
   createdAt: toIso(record.createdAt),
   updatedAt: toIso(record.updatedAt),

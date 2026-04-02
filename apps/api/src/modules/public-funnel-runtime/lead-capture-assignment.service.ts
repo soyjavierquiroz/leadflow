@@ -555,7 +555,11 @@ export class LeadCaptureAssignmentService {
       include: flowPublicationInclude,
     });
 
-    if (!publication || publication.status !== 'active') {
+    if (
+      !publication ||
+      publication.status !== 'active' ||
+      !publication.isActive
+    ) {
       throw new NotFoundException({
         code: 'PUBLICATION_NOT_FOUND',
         message: `Publication ${publicationId} is not active.`,

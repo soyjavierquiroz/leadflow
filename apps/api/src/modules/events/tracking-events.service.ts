@@ -204,6 +204,7 @@ export class TrackingEventsService {
     if (
       !publication ||
       publication.status !== 'active' ||
+      !publication.isActive ||
       publication.domain.status !== 'active' ||
       publication.funnelInstance.status !== 'active'
     ) {

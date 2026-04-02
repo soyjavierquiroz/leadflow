@@ -37,7 +37,8 @@ export class FunnelPublicationsService {
       trackingProfileId: dto.trackingProfileId ?? null,
       handoffStrategyId: dto.handoffStrategyId ?? null,
       pathPrefix: this.normalizePathPrefix(dto.pathPrefix),
-      status: 'draft',
+      status: dto.isActive ? 'active' : 'draft',
+      isActive: dto.isActive ?? false,
       isPrimary: dto.isPrimary ?? false,
     });
   }
@@ -82,6 +83,7 @@ export class FunnelPublicationsService {
       funnelInstanceId: dto.funnelInstanceId,
       trackingProfileId: dto.trackingProfileId,
       handoffStrategyId: dto.handoffStrategyId,
+      isActive: false,
       status: 'draft',
     });
     await this.assertPathConflict(dto.domainId, pathPrefix);
@@ -110,6 +112,7 @@ export class FunnelPublicationsService {
           handoffStrategyId: dto.handoffStrategyId ?? null,
           pathPrefix,
           status: 'draft',
+          isActive: false,
           isPrimary: dto.isPrimary ?? false,
         },
       });
@@ -148,6 +151,8 @@ export class FunnelPublicationsService {
         ? this.normalizePathPrefix(dto.pathPrefix)
         : existing.pathPrefix;
     const status = dto.status ?? existing.status;
+    const isActive =
+      dto.status !== undefined ? dto.status === 'active' : existing.isActive;
 
     await this.assertPublicationDependencies(scope, {
       domainId,
@@ -160,6 +165,7 @@ export class FunnelPublicationsService {
         dto.handoffStrategyId !== undefined
           ? dto.handoffStrategyId
           : existing.handoffStrategyId,
+      isActive,
       status,
     });
     await this.assertPathConflict(domainId, pathPrefix, existing.id);
@@ -196,6 +202,7 @@ export class FunnelPublicationsService {
               : existing.handoffStrategyId,
           pathPrefix,
           status,
+          isActive,
           isPrimary: shouldBePrimary,
         },
       });
@@ -214,6 +221,7 @@ export class FunnelPublicationsService {
       funnelInstanceId: string;
       trackingProfileId?: string | null;
       handoffStrategyId?: string | null;
+      isActive: boolean;
       status: 'draft' | 'active' | 'archived';
     },
   ) {
@@ -247,7 +255,7 @@ export class FunnelPublicationsService {
       });
     }
 
-    if (input.status === 'active') {
+    if (input.status === 'active' || input.isActive) {
       if (domain.status !== 'active') {
         throw new ConflictException({
           code: 'DOMAIN_MUST_BE_ACTIVE',

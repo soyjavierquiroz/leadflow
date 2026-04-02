@@ -309,34 +309,34 @@ model Workspace {
 }
 
 model Team {
-  id                   String                @id @default(uuid())
-  workspaceId          String
-  name                 String
-  code                 String
-  status               TeamStatus
-  isActive             Boolean               @default(true)
+  id                    String                @id @default(uuid())
+  workspaceId           String
+  name                  String
+  code                  String
+  status                TeamStatus
+  isActive              Boolean               @default(true)
   subscriptionExpiresAt DateTime?
-  description          String?
-  managerUserId        String?
-  maxSeats             Int                   @default(10)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sponsors             Sponsor[]
-  funnels              Funnel[]              @relation("TeamDefaultFunnels")
-  domains              Domain[]
-  funnelInstances      FunnelInstance[]
-  funnelSteps          FunnelStep[]
-  funnelPublications   FunnelPublication[]
-  trackingProfiles     TrackingProfile[]
-  handoffStrategies    HandoffStrategy[]
-  rotationPools        RotationPool[]
-  adWheels             AdWheel[]
-  assignments          Assignment[]
-  users                User[]
-  messagingConnections MessagingConnection[]
-  automationDispatches AutomationDispatch[]
-  leadNotes            LeadNote[]
+  description           String?
+  managerUserId         String?
+  maxSeats              Int                   @default(10)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  workspace             Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sponsors              Sponsor[]
+  funnels               Funnel[]              @relation("TeamDefaultFunnels")
+  domains               Domain[]
+  funnelInstances       FunnelInstance[]
+  funnelSteps           FunnelStep[]
+  funnelPublications    FunnelPublication[]
+  trackingProfiles      TrackingProfile[]
+  handoffStrategies     HandoffStrategy[]
+  rotationPools         RotationPool[]
+  adWheels              AdWheel[]
+  assignments           Assignment[]
+  users                 User[]
+  messagingConnections  MessagingConnection[]
+  automationDispatches  AutomationDispatch[]
+  leadNotes             LeadNote[]
 
   @@unique([workspaceId, code])
 }
@@ -619,6 +619,7 @@ model FunnelPublication {
   handoffStrategyId    String?
   pathPrefix           String
   status               FunnelPublicationStatus
+  isActive             Boolean                 @default(true)
   isPrimary            Boolean                 @default(false)
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt

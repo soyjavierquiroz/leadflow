@@ -82,8 +82,9 @@ export class HybridFunnelPublicationsService {
       });
     }
 
-    const step = publication.funnelInstance.steps.find((item) => item.isEntryStep)
-      ?? publication.funnelInstance.steps[0];
+    const step =
+      publication.funnelInstance.steps.find((item) => item.isEntryStep) ??
+      publication.funnelInstance.steps[0];
 
     if (!step) {
       throw new NotFoundException({
@@ -117,7 +118,10 @@ export class HybridFunnelPublicationsService {
         mediaMap: step.mediaMap as JsonValue,
         settingsJson: step.settingsJson as JsonValue,
       },
-      seo: this.extractSeo(step.settingsJson as JsonValue, publication.funnelInstance.name),
+      seo: this.extractSeo(
+        step.settingsJson as JsonValue,
+        publication.funnelInstance.name,
+      ),
     };
   }
 
@@ -128,11 +132,22 @@ export class HybridFunnelPublicationsService {
     const normalized = this.normalizeEditorInput(dto);
 
     await this.assertDomain(scope, normalized.domainId);
-    const template = await this.assertTemplate(scope.workspaceId, normalized.templateId);
-    await this.assertPublicationPathConflict(normalized.domainId, normalized.pathPrefix);
+    const template = await this.assertTemplate(
+      scope.workspaceId,
+      normalized.templateId,
+    );
+    await this.assertPublicationPathConflict(
+      normalized.domainId,
+      normalized.pathPrefix,
+    );
 
     const detail = await this.prisma.$transaction(async (tx) => {
-      const code = await this.createUniqueCode(tx, scope.teamId, normalized.name, normalized.pathPrefix);
+      const code = await this.createUniqueCode(
+        tx,
+        scope.teamId,
+        normalized.name,
+        normalized.pathPrefix,
+      );
 
       const legacyFunnel = await tx.funnel.create({
         data: {
@@ -215,6 +230,7 @@ export class HybridFunnelPublicationsService {
           handoffStrategyId: funnelInstance.handoffStrategyId,
           pathPrefix: normalized.pathPrefix,
           status: 'active',
+          isActive: true,
           isPrimary: normalized.pathPrefix === '/',
         },
       });
@@ -287,8 +303,9 @@ export class HybridFunnelPublicationsService {
       });
     }
 
-    const currentStep = existing.funnelInstance.steps.find((item) => item.isEntryStep)
-      ?? existing.funnelInstance.steps[0];
+    const currentStep =
+      existing.funnelInstance.steps.find((item) => item.isEntryStep) ??
+      existing.funnelInstance.steps[0];
 
     if (!currentStep) {
       throw new NotFoundException({
@@ -304,18 +321,25 @@ export class HybridFunnelPublicationsService {
       templateId: dto.templateId ?? existing.funnelInstance.templateId,
       seoTitle:
         dto.seoTitle ??
-        this.extractSeo(currentStep.settingsJson as JsonValue, existing.funnelInstance.name)
-          .title,
+        this.extractSeo(
+          currentStep.settingsJson as JsonValue,
+          existing.funnelInstance.name,
+        ).title,
       metaDescription:
         dto.metaDescription ??
-        this.extractSeo(currentStep.settingsJson as JsonValue, existing.funnelInstance.name)
-          .metaDescription,
+        this.extractSeo(
+          currentStep.settingsJson as JsonValue,
+          existing.funnelInstance.name,
+        ).metaDescription,
       blocksJson: (dto.blocksJson ?? currentStep.blocksJson) as JsonValue,
       mediaMap: (dto.mediaMap ?? currentStep.mediaMap) as JsonValue,
     });
 
     await this.assertDomain(scope, normalized.domainId);
-    const template = await this.assertTemplate(scope.workspaceId, normalized.templateId);
+    const template = await this.assertTemplate(
+      scope.workspaceId,
+      normalized.templateId,
+    );
     await this.assertPublicationPathConflict(
       normalized.domainId,
       normalized.pathPrefix,
@@ -337,7 +361,9 @@ export class HybridFunnelPublicationsService {
           templateId: template.id,
           name: normalized.name,
           status: 'active',
-          handoffStrategyId: template.defaultHandoffStrategyId ?? existing.funnelInstance.handoffStrategyId,
+          handoffStrategyId:
+            template.defaultHandoffStrategyId ??
+            existing.funnelInstance.handoffStrategyId,
           settingsJson: toInputJson(
             this.buildInstanceSettings(
               template.settingsJson as JsonValue,
@@ -366,7 +392,8 @@ export class HybridFunnelPublicationsService {
         },
       });
 
-      const shouldBePrimary = normalized.pathPrefix === '/' || existing.isPrimary;
+      const shouldBePrimary =
+        normalized.pathPrefix === '/' || existing.isPrimary;
       if (shouldBePrimary) {
         await tx.funnelPublication.updateMany({
           where: {
@@ -389,6 +416,7 @@ export class HybridFunnelPublicationsService {
           handoffStrategyId: funnelInstance.handoffStrategyId,
           pathPrefix: normalized.pathPrefix,
           status: 'active',
+          isActive: true,
           isPrimary: shouldBePrimary,
         },
       });
@@ -432,18 +460,16 @@ export class HybridFunnelPublicationsService {
     };
   }
 
-  private normalizeEditorInput(
-    input: {
-      name: string;
-      domainId: string;
-      pathPrefix: string;
-      templateId: string;
-      seoTitle?: string;
-      metaDescription?: string;
-      blocksJson: JsonValue;
-      mediaMap: JsonValue;
-    },
-  ) {
+  private normalizeEditorInput(input: {
+    name: string;
+    domainId: string;
+    pathPrefix: string;
+    templateId: string;
+    seoTitle?: string;
+    metaDescription?: string;
+    blocksJson: JsonValue;
+    mediaMap: JsonValue;
+  }) {
     const name = input.name.trim();
     if (!name) {
       throw new BadRequestException({
@@ -476,7 +502,7 @@ export class HybridFunnelPublicationsService {
       pathPrefix,
       templateId: input.templateId,
       seoTitle: (input.seoTitle ?? name).trim() || name,
-      metaDescription: (input.metaDescription ?? "").trim(),
+      metaDescription: (input.metaDescription ?? '').trim(),
       blocksJson,
       mediaMap,
     };
@@ -513,7 +539,9 @@ export class HybridFunnelPublicationsService {
     },
   ): JsonValue {
     const safeTemplateSettings =
-      templateSettings && typeof templateSettings === 'object' && !Array.isArray(templateSettings)
+      templateSettings &&
+      typeof templateSettings === 'object' &&
+      !Array.isArray(templateSettings)
         ? (templateSettings as Record<string, JsonValue>)
         : {};
 
@@ -546,7 +574,9 @@ export class HybridFunnelPublicationsService {
 
   private extractSeo(stepSettings: JsonValue, fallbackTitle: string) {
     const safeStepSettings =
-      stepSettings && typeof stepSettings === 'object' && !Array.isArray(stepSettings)
+      stepSettings &&
+      typeof stepSettings === 'object' &&
+      !Array.isArray(stepSettings)
         ? (stepSettings as Record<string, JsonValue>)
         : {};
     const seoValue = safeStepSettings.seo;
@@ -557,7 +587,8 @@ export class HybridFunnelPublicationsService {
 
     return {
       title:
-        (typeof safeSeo.title === 'string' && safeSeo.title.trim()) || fallbackTitle,
+        (typeof safeSeo.title === 'string' && safeSeo.title.trim()) ||
+        fallbackTitle,
       metaDescription:
         (typeof safeSeo.metaDescription === 'string' &&
           safeSeo.metaDescription.trim()) ||
