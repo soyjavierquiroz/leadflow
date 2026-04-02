@@ -40,6 +40,10 @@ const buildFunnelRecord = (
     description: null,
     code: 'base-funnel',
     thumbnailUrl: 'https://cdn.kurukin.com/funnels/base.png',
+    config: {
+      steps: [{ id: 'landing', title: 'Landing principal' }],
+      texts: { cta: 'Quiero mas informacion' },
+    },
     status: 'active',
     isTemplate: true,
     stages: ['captured', 'qualified', 'assigned'],
@@ -154,6 +158,10 @@ describe('FunnelsService', () => {
         description: null,
         code: 'base-funnel-copy',
         thumbnailUrl: 'https://cdn.kurukin.com/funnels/base.png',
+        config: {
+          steps: [{ id: 'landing', title: 'Landing principal' }],
+          texts: { cta: 'Quiero mas informacion' },
+        },
         status: 'active',
         isTemplate: false,
         stages: ['captured', 'qualified', 'assigned'],

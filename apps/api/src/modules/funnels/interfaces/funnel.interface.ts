@@ -2,6 +2,7 @@ import type { CreateFunnelDto } from '../dto/create-funnel.dto';
 import type {
   BaseDomainEntity,
   DomainId,
+  JsonValue,
   LeadSourceChannel,
   RepositoryPort,
   WorkspaceScoped,
@@ -14,6 +15,7 @@ export interface Funnel extends BaseDomainEntity, WorkspaceScoped {
   description: string | null;
   code: string;
   thumbnailUrl: string | null;
+  config: JsonValue;
   status: FunnelStatus;
   isTemplate: boolean;
   stages: string[];

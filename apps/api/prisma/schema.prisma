@@ -481,6 +481,7 @@ model Funnel {
   description           String?
   code                  String
   thumbnailUrl          String?
+  config                Json                @default("{}")
   status                FunnelStatus
   isTemplate            Boolean             @default(false)
   stages                String[]

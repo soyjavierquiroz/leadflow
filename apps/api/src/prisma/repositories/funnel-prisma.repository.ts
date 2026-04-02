@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { LeadSourceChannel as PrismaLeadSourceChannel } from '@prisma/client';
+import {
+  LeadSourceChannel as PrismaLeadSourceChannel,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { mapFunnelRecord } from '../prisma.mappers';
 import type { CreateFunnelDto } from '../../modules/funnels/dto/create-funnel.dto';
@@ -7,6 +10,7 @@ import type {
   Funnel,
   FunnelRepository,
 } from '../../modules/funnels/interfaces/funnel.interface';
+import type { JsonValue } from '../../modules/shared/domain.types';
 
 const toDbSource = (value: string): PrismaLeadSourceChannel => {
   switch (value) {
@@ -22,6 +26,9 @@ const toDbSource = (value: string): PrismaLeadSourceChannel => {
       return 'manual';
   }
 };
+
+const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
+  value as Prisma.InputJsonValue;
 
 @Injectable()
 export class FunnelPrismaRepository implements FunnelRepository {
@@ -57,6 +64,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
         description: data.description ?? null,
         code: data.code,
         thumbnailUrl: null,
+        config: {},
         status: 'draft',
         isTemplate: data.isTemplate ?? false,
         stages: data.stages ?? ['captured', 'qualified', 'won'],
@@ -81,6 +89,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
         description: entity.description,
         code: entity.code,
         thumbnailUrl: entity.thumbnailUrl,
+        config: toInputJson(entity.config),
         status: entity.status,
         isTemplate: entity.isTemplate,
         stages: entity.stages,
@@ -95,6 +104,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
         description: entity.description,
         code: entity.code,
         thumbnailUrl: entity.thumbnailUrl,
+        config: toInputJson(entity.config),
         status: entity.status,
         isTemplate: entity.isTemplate,
         stages: entity.stages,

@@ -154,6 +154,7 @@ export const mapFunnelRecord = (record: FunnelRecord): Funnel => ({
   description: record.description,
   code: record.code,
   thumbnailUrl: record.thumbnailUrl,
+  config: toJson(record.config),
   status: record.status,
   isTemplate: record.isTemplate,
   stages: record.stages,

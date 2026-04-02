@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { buildEntity } from '../shared/domain.factory';
 import { FUNNEL_REPOSITORY } from '../shared/domain.tokens';
 import { mapFunnelRecord } from '../../prisma/prisma.mappers';
+import type { JsonValue } from '../shared/domain.types';
 import type { CreateFunnelDto } from './dto/create-funnel.dto';
 import type { CreateSystemFunnelTemplateDto } from './dto/create-system-funnel-template.dto';
 import type { UpdateSystemFunnelTemplateDto } from './dto/update-system-funnel-template.dto';
@@ -28,6 +29,10 @@ const ALLOWED_FUNNEL_STATUSES: Funnel['status'][] = [
   'active',
   'archived',
 ];
+
+const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
+  value as Prisma.InputJsonValue;
+
 type FunnelCodeLookupClient =
   | Pick<PrismaService, 'funnel'>
   | Prisma.TransactionClient;
@@ -48,6 +53,7 @@ export class FunnelsService {
       description: dto.description ?? null,
       code: dto.code,
       thumbnailUrl: null,
+      config: {},
       status: 'draft',
       isTemplate: dto.isTemplate ?? false,
       stages: dto.stages ?? ['captured', 'qualified', 'won'],
@@ -124,6 +130,9 @@ export class FunnelsService {
           description: template.description,
           code,
           thumbnailUrl: template.thumbnailUrl,
+          config: toInputJson(
+            this.cloneJsonValue(template.config as JsonValue),
+          ),
           status: template.status,
           isTemplate: false,
           stages: [...template.stages],
@@ -147,6 +156,7 @@ export class FunnelsService {
     const stages = this.resolveStages(dto.stages);
     const entrySources = this.resolveEntrySources(dto.entrySources);
     const thumbnailUrl = this.sanitizeOptionalText(dto.thumbnailUrl);
+    const config = this.resolveFunnelConfig(dto.config);
     const code = await this.createAvailableCode(this.prisma, workspaceId, name);
 
     const record = await this.prisma.funnel.create({
@@ -156,6 +166,7 @@ export class FunnelsService {
         description,
         code,
         thumbnailUrl,
+        config: toInputJson(config),
         status,
         isTemplate: true,
         stages,
@@ -216,6 +227,10 @@ export class FunnelsService {
       dto.thumbnailUrl === undefined
         ? existing.thumbnailUrl
         : this.sanitizeOptionalText(dto.thumbnailUrl);
+    const config =
+      dto.config === undefined
+        ? this.cloneJsonValue(existing.config as JsonValue)
+        : this.resolveFunnelConfig(dto.config);
 
     const record = await this.prisma.funnel.update({
       where: { id: existing.id },
@@ -226,6 +241,7 @@ export class FunnelsService {
         stages,
         entrySources: entrySources.map((item) => this.toDbSource(item)),
         thumbnailUrl,
+        config: toInputJson(config),
         isTemplate: true,
         defaultTeamId: null,
         defaultRotationPoolId: null,
@@ -254,6 +270,14 @@ export class FunnelsService {
   private resolveCloneName(originalName: string, nextName?: string) {
     const normalized = nextName?.trim();
     return normalized ? normalized : `Copia de ${originalName}`;
+  }
+
+  private resolveFunnelConfig(value: JsonValue | undefined): JsonValue {
+    return this.cloneJsonValue(value ?? {});
+  }
+
+  private cloneJsonValue(value: JsonValue): JsonValue {
+    return JSON.parse(JSON.stringify(value)) as JsonValue;
   }
 
   private async findSystemTemplateRecord(templateId: string) {

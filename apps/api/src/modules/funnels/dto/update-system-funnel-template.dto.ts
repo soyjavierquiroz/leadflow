@@ -1,4 +1,4 @@
-import type { LeadSourceChannel } from '../../shared/domain.types';
+import type { JsonValue, LeadSourceChannel } from '../../shared/domain.types';
 import type { FunnelStatus } from '../interfaces/funnel.interface';
 
 export class UpdateSystemFunnelTemplateDto {
@@ -8,4 +8,5 @@ export class UpdateSystemFunnelTemplateDto {
   readonly stages?: string[];
   readonly entrySources?: LeadSourceChannel[];
   readonly thumbnailUrl?: string | null;
+  readonly config?: JsonValue;
 }

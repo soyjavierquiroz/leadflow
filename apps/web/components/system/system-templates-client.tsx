@@ -9,7 +9,10 @@ import { StatusBadge } from "@/components/app-shell/status-badge";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
-import type { SystemFunnelTemplateRecord } from "@/lib/system-tenants";
+import type {
+  JsonValue,
+  SystemFunnelTemplateRecord,
+} from "@/lib/system-tenants";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 type SystemTemplatesClientProps = {
@@ -30,6 +33,7 @@ type TemplateFormState = {
   name: string;
   description: string;
   status: SystemFunnelTemplateRecord["status"];
+  configText: string;
 };
 
 const primaryButtonClassName =
@@ -43,6 +47,7 @@ const buildInitialFormState = (): TemplateFormState => ({
   name: "",
   description: "",
   status: "draft",
+  configText: "{}",
 });
 
 const sortRows = (rows: SystemFunnelTemplateRecord[]) => {
@@ -78,6 +83,7 @@ export function SystemTemplatesClient({
     tone: "success" | "error";
     message: string;
   } | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -97,6 +103,7 @@ export function SystemTemplatesClient({
 
   const resetForm = () => {
     setFormState(buildInitialFormState());
+    setConfigError(null);
   };
 
   const closeEditor = () => {
@@ -116,6 +123,7 @@ export function SystemTemplatesClient({
       name: template.name,
       description: template.description ?? "",
       status: template.status,
+      configText: JSON.stringify(template.config ?? {}, null, 2),
     });
     setEditorState({
       mode: "edit",
@@ -126,14 +134,27 @@ export function SystemTemplatesClient({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
+    setConfigError(null);
 
     const name = formState.name.trim();
     const description = formState.description.trim();
+    let config: JsonValue;
 
     if (!name) {
       setFeedback({
         tone: "error",
         message: "Asigna un nombre claro para el template.",
+      });
+      return;
+    }
+
+    try {
+      config = JSON.parse(formState.configText) as JsonValue;
+    } catch {
+      setConfigError("Ingresa un JSON valido antes de guardar el template.");
+      setFeedback({
+        tone: "error",
+        message: "La configuracion no es un JSON valido.",
       });
       return;
     }
@@ -144,6 +165,7 @@ export function SystemTemplatesClient({
           name,
           description: description || null,
           status: formState.status,
+          config,
         };
         const record =
           await authenticatedOperationRequest<SystemFunnelTemplateRecord>(
@@ -416,6 +438,40 @@ export function SystemTemplatesClient({
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
               </select>
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-slate-900">
+                Configuracion JSON
+              </span>
+              <textarea
+                value={formState.configText}
+                onChange={(event) => {
+                  setConfigError(null);
+                  setFormState((current) => ({
+                    ...current,
+                    configText: event.target.value,
+                  }));
+                }}
+                placeholder='{\n  "steps": [],\n  "texts": {}\n}'
+                rows={14}
+                className={`w-full rounded-2xl px-4 py-3 font-mono text-sm text-slate-900 outline-none transition ${
+                  configError
+                    ? "border border-rose-300 focus:border-rose-500"
+                    : "border border-slate-300 focus:border-slate-950"
+                }`}
+                disabled={isPending}
+                spellCheck={false}
+              />
+              <p className="text-xs leading-5 text-slate-500">
+                Edita la configuracion interna del embudo en formato JSON. Se
+                validara antes de enviarse al backend.
+              </p>
+              {configError ? (
+                <p className="text-sm font-medium text-rose-600">
+                  {configError}
+                </p>
+              ) : null}
             </label>
 
             <div className="flex flex-wrap justify-end gap-3">

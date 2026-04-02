@@ -1,6 +1,12 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { apiFetchWithSession } from "@/lib/auth";
 
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue =
+  | JsonPrimitive
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 export type SystemTenantRecord = {
   id: string;
   workspaceId: string;
@@ -85,6 +91,7 @@ export type SystemFunnelTemplateRecord = {
   description: string | null;
   code: string;
   thumbnailUrl: string | null;
+  config: JsonValue;
   status: "draft" | "active" | "archived";
   isTemplate: boolean;
   stages: string[];
@@ -119,6 +126,7 @@ export type SystemTenantFunnelRecord = {
   name: string;
   code: string;
   thumbnailUrl: string | null;
+  config: JsonValue;
   status: string;
   isTemplate: boolean;
   stages: string[];
