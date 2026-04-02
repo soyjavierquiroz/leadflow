@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/app-shell/data-table";
@@ -295,9 +296,17 @@ export function SystemTenantsClient({
             header: "Agencia",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">{row.name}</p>
+                <Link
+                  href={`/admin/tenants/${row.id}`}
+                  className="font-semibold text-slate-950 transition hover:text-teal-700 hover:underline"
+                >
+                  {row.name}
+                </Link>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   {row.code}
+                </p>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
+                  Abrir mesa de operaciones
                 </p>
               </div>
             ),

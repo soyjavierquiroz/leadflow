@@ -10,6 +10,7 @@ import {
 import { randomBytes } from 'crypto';
 import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { mapFunnelRecord } from '../../prisma/prisma.mappers';
 import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { FunnelsService } from '../funnels/funnels.service';
@@ -80,6 +81,24 @@ export type SystemTenantSummary = {
   activeSponsorsCount: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SystemTenantDetail = SystemTenantSummary & {
+  description: string | null;
+  managerUserId: string | null;
+  availableSeats: number;
+  funnelCount: number;
+  domainCount: number;
+  workspace: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+    timezone: string;
+    defaultCurrency: string;
+    primaryLocale: string;
+    primaryDomain: string | null;
+  };
 };
 
 @Injectable()
@@ -169,6 +188,123 @@ export class TeamsService {
       createdAt: toIso(record.createdAt),
       updatedAt: toIso(record.updatedAt),
     }));
+  }
+
+  async getSystemTenantDetail(id: string): Promise<SystemTenantDetail> {
+    const tenantId = sanitizeRequiredText(id, 'id');
+
+    const record = await this.prisma.team.findUnique({
+      where: {
+        id: tenantId,
+      },
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            timezone: true,
+            defaultCurrency: true,
+            primaryLocale: true,
+            primaryDomain: true,
+          },
+        },
+        sponsors: {
+          where: {
+            isActive: true,
+          },
+          select: {
+            id: true,
+          },
+        },
+        funnels: {
+          where: {
+            isTemplate: false,
+          },
+          select: {
+            id: true,
+          },
+        },
+        domains: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      throw new NotFoundException({
+        code: 'TENANT_NOT_FOUND',
+        message: 'The requested tenant was not found.',
+      });
+    }
+
+    const occupiedSeats = record.sponsors.length;
+
+    return {
+      id: record.id,
+      workspaceId: record.workspaceId,
+      workspaceName: record.workspace.name,
+      workspaceSlug: record.workspace.slug,
+      name: record.name,
+      code: record.code,
+      status: record.status,
+      isActive: record.isActive,
+      subscriptionExpiresAt: record.subscriptionExpiresAt
+        ? toIso(record.subscriptionExpiresAt)
+        : null,
+      maxSeats: record.maxSeats,
+      occupiedSeats,
+      activeSponsorsCount: occupiedSeats,
+      description: record.description,
+      managerUserId: record.managerUserId,
+      availableSeats: Math.max(record.maxSeats - occupiedSeats, 0),
+      funnelCount: record.funnels.length,
+      domainCount: record.domains.length,
+      workspace: {
+        id: record.workspace.id,
+        name: record.workspace.name,
+        slug: record.workspace.slug,
+        status: record.workspace.status,
+        timezone: record.workspace.timezone,
+        defaultCurrency: record.workspace.defaultCurrency,
+        primaryLocale: record.workspace.primaryLocale,
+        primaryDomain: record.workspace.primaryDomain,
+      },
+      createdAt: toIso(record.createdAt),
+      updatedAt: toIso(record.updatedAt),
+    };
+  }
+
+  async listSystemTenantFunnels(id: string) {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const tenant = await this.prisma.team.findUnique({
+      where: {
+        id: tenantId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException({
+        code: 'TENANT_NOT_FOUND',
+        message: 'The requested tenant was not found.',
+      });
+    }
+
+    const records = await this.prisma.funnel.findMany({
+      where: {
+        defaultTeamId: tenantId,
+        isTemplate: false,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+
+    return records.map(mapFunnelRecord);
   }
 
   async provisionTenant(dto: ProvisionTenantDto) {
