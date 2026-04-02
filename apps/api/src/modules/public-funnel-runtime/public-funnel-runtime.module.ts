@@ -4,11 +4,21 @@ import { MessagingAutomationModule } from '../messaging-automation/messaging-aut
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
 import { PublicFunnelRuntimeController } from './public-funnel-runtime.controller';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
+import { PublicRuntimeController } from './public-runtime.controller';
+import { PublicRuntimeService } from './public-runtime.service';
 
 @Module({
   imports: [EventsModule, MessagingAutomationModule],
-  controllers: [PublicFunnelRuntimeController],
-  providers: [PublicFunnelRuntimeService, LeadCaptureAssignmentService],
-  exports: [PublicFunnelRuntimeService, LeadCaptureAssignmentService],
+  controllers: [PublicFunnelRuntimeController, PublicRuntimeController],
+  providers: [
+    PublicFunnelRuntimeService,
+    PublicRuntimeService,
+    LeadCaptureAssignmentService,
+  ],
+  exports: [
+    PublicFunnelRuntimeService,
+    PublicRuntimeService,
+    LeadCaptureAssignmentService,
+  ],
 })
 export class PublicFunnelRuntimeModule {}
