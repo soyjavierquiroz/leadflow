@@ -18,4 +18,5 @@ export class ProvisionTenantDto {
   readonly sponsorDisplayName?: string;
   readonly sponsorEmail?: string | null;
   readonly sponsorPhone?: string | null;
+  readonly templateFunnelId?: string | null;
 }

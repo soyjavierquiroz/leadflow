@@ -9,6 +9,7 @@ import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type {
   ProvisionTenantResponse,
+  SystemFunnelTemplateRecord,
   SystemTenantRecord,
 } from "@/lib/system-tenants";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
@@ -23,6 +24,7 @@ type TenantProvisionFormState = {
   adminName: string;
   adminEmail: string;
   maxSeats: string;
+  templateFunnelId: string;
 };
 
 type ToastState = {
@@ -40,6 +42,7 @@ const buildInitialFormState = (): TenantProvisionFormState => ({
   adminName: "",
   adminEmail: "",
   maxSeats: "10",
+  templateFunnelId: "",
 });
 
 const toTenantRow = (
@@ -74,6 +77,10 @@ export function SystemTenantsClient({
   } | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [formState, setFormState] = useState(buildInitialFormState);
+  const [templateOptions, setTemplateOptions] = useState<
+    SystemFunnelTemplateRecord[] | null
+  >(null);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -87,6 +94,50 @@ export function SystemTenantsClient({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!isCreateOpen || templateOptions !== null || isLoadingTemplates) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadTemplates = async () => {
+      setIsLoadingTemplates(true);
+
+      try {
+        const payload = await authenticatedOperationRequest<
+          SystemFunnelTemplateRecord[]
+        >("/system/funnels/templates", {
+          method: "GET",
+        });
+
+        if (!isCancelled) {
+          setTemplateOptions(payload);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setFeedback({
+            tone: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "No pudimos cargar las plantillas base.",
+          });
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingTemplates(false);
+        }
+      }
+    };
+
+    void loadTemplates();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isCreateOpen, templateOptions, isLoadingTemplates]);
 
   const totalSeats = rows.reduce((sum, row) => sum + row.maxSeats, 0);
   const occupiedSeats = rows.reduce((sum, row) => sum + row.occupiedSeats, 0);
@@ -123,6 +174,7 @@ export function SystemTenantsClient({
     const adminName = formState.adminName.trim();
     const adminEmail = formState.adminEmail.trim().toLowerCase();
     const maxSeats = Number(formState.maxSeats);
+    const templateFunnelId = formState.templateFunnelId.trim();
 
     if (!workspaceName || !adminName || !adminEmail) {
       setFeedback({
@@ -152,6 +204,7 @@ export function SystemTenantsClient({
                 adminName,
                 adminEmail,
                 maxSeats,
+                templateFunnelId: templateFunnelId || undefined,
               }),
             },
           );
@@ -374,9 +427,39 @@ export function SystemTenantsClient({
               />
             </label>
 
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">
+                Plantilla Base (Opcional)
+              </span>
+              <select
+                value={formState.templateFunnelId}
+                onChange={(event) =>
+                  setFormState((current) => ({
+                    ...current,
+                    templateFunnelId: event.target.value,
+                  }))
+                }
+                disabled={isLoadingTemplates}
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                <option value="">
+                  {isLoadingTemplates
+                    ? "Cargando plantillas..."
+                    : "Sin plantilla base"}
+                </option>
+                {(templateOptions ?? []).map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} ({template.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
               El aprovisionamiento crea un sponsor activo inicial para el Team
-              Admin, por lo que la ocupación arranca con 1 asiento usado.
+              Admin, por lo que la ocupación arranca con 1 asiento usado. Si
+              eliges una plantilla base, el sistema la clonará y dejará el
+              funnel listo para el nuevo equipo.
             </div>
 
             <div className="flex flex-wrap justify-end gap-3">

@@ -78,6 +78,17 @@ export type ProvisionTenantResponse = {
   };
 };
 
+export type SystemFunnelTemplateRecord = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  code: string;
+  isTemplate: boolean;
+  defaultTeamId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const getSystemTenants = async () => {
   noStore();
 

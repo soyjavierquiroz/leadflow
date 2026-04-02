@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FunnelsModule } from '../funnels/funnels.module';
 import { WalletEngineModule } from '../finance/wallet-engine.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { TeamPrismaRepository } from '../../prisma/repositories/team-prisma.repository';
@@ -14,7 +15,7 @@ import { TeamLeadsService } from './team-leads.service';
 import { TeamsService } from './teams.service';
 
 @Module({
-  imports: [MessagingAutomationModule, WalletEngineModule],
+  imports: [MessagingAutomationModule, WalletEngineModule, FunnelsModule],
   controllers: [
     TeamsController,
     TeamLeadsController,

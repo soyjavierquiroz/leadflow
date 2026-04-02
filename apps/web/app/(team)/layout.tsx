@@ -9,19 +9,14 @@ const teamNav = [
     description: "Pulso del equipo, capacidad comercial y prioridades del día.",
   },
   {
-    href: "/team/funnels",
-    label: "Funnels",
-    description: "Embudos activos, readiness y salida al mercado.",
+    href: "/team/leads",
+    label: "Leads",
+    description: "Bandeja operativa para seguimiento, reminders y cierre.",
   },
   {
-    href: "/team/domains",
-    label: "Domains",
-    description: "Onboarding SaaS de dominios externos y su estado DNS/TLS.",
-  },
-  {
-    href: "/team/publications",
-    label: "Publicaciones",
-    description: "Rutas activas donde ya está captando el funnel.",
+    href: "/team/members",
+    label: "Equipo",
+    description: "Licencias activas, invitados y control operativo del squad.",
   },
   {
     href: "/team/wheels",
@@ -29,19 +24,9 @@ const teamNav = [
     description: "Bolsa comun activa, buy-ins y ocupacion de asientos.",
   },
   {
-    href: "/team/members",
-    label: "Mi Equipo",
-    description: "Licencias activas, invitados y control operativo del squad.",
-  },
-  {
     href: "/team/pools",
     label: "Pools",
     description: "Cobertura de rotación y fallback de handoff.",
-  },
-  {
-    href: "/team/leads",
-    label: "Leads",
-    description: "Bandeja operativa para seguimiento, reminders y cierre.",
   },
 ];
 

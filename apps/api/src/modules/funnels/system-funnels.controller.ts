@@ -1,4 +1,11 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { SystemTenantAccessGuard } from '../teams/system-tenant-access.guard';
 import type { CloneFunnelTemplateDto } from './dto/clone-funnel-template.dto';
 import { FunnelsService } from './funnels.service';
@@ -7,6 +14,11 @@ import { FunnelsService } from './funnels.service';
 @UseGuards(SystemTenantAccessGuard)
 export class SystemFunnelsController {
   constructor(private readonly funnelsService: FunnelsService) {}
+
+  @Get('templates')
+  listTemplates() {
+    return this.funnelsService.listSystemTemplates();
+  }
 
   @Post(':templateId/clone')
   cloneTemplateToTeam(

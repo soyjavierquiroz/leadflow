@@ -34,10 +34,10 @@ export default async function TeamPage() {
         actions={
           <>
             <Link
-              href="/team/domains"
+              href="/team/leads"
               className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
-              Onboard domains
+              Revisar leads
             </Link>
             <Link
               href="/team/members"

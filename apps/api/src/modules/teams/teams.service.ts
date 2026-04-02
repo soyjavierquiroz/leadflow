@@ -12,6 +12,7 @@ import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
+import { FunnelsService } from '../funnels/funnels.service';
 import { buildEntity } from '../shared/domain.factory';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import type { CreateTeamDto } from './dto/create-team.dto';
@@ -88,6 +89,7 @@ export class TeamsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
+    private readonly funnelsService: FunnelsService,
     @Optional()
     @Inject(TEAM_REPOSITORY)
     private readonly repository?: TeamRepository,
@@ -242,6 +244,7 @@ export class TeamsService {
       sanitizeOptionalText(dto.sponsorDisplayName) ?? adminFullName;
     const sponsorEmail = sanitizeOptionalText(dto.sponsorEmail) ?? adminEmail;
     const sponsorPhone = sanitizeOptionalText(dto.sponsorPhone);
+    const templateFunnelId = sanitizeOptionalText(dto.templateFunnelId);
 
     if (workspaceId === null && !workspaceName) {
       throw new BadRequestException({
@@ -256,6 +259,24 @@ export class TeamsService {
         message:
           'workspaceSlug must contain at least one alphanumeric character when workspaceId is not provided.',
       });
+    }
+
+    if (templateFunnelId) {
+      const template = await this.prisma.funnel.findFirst({
+        where: {
+          id: templateFunnelId,
+          isTemplate: true,
+          defaultTeamId: null,
+        },
+        select: { id: true },
+      });
+
+      if (!template) {
+        throw new NotFoundException({
+          code: 'FUNNEL_TEMPLATE_NOT_FOUND',
+          message: 'The selected base funnel template was not found.',
+        });
+      }
     }
 
     try {
@@ -444,6 +465,13 @@ export class TeamsService {
           },
         };
       });
+
+      if (templateFunnelId) {
+        await this.funnelsService.cloneTemplateToTeam(
+          templateFunnelId,
+          provisionedTenant.team.id,
+        );
+      }
 
       void this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
 

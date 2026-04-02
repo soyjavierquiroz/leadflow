@@ -117,6 +117,18 @@ export class FunnelsService {
     return mapFunnelRecord(record);
   }
 
+  async listSystemTemplates(): Promise<Funnel[]> {
+    const records = await this.prisma.funnel.findMany({
+      where: {
+        isTemplate: true,
+        defaultTeamId: null,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return records.map(mapFunnelRecord);
+  }
+
   private resolveCloneName(originalName: string, nextName?: string) {
     const normalized = nextName?.trim();
     return normalized ? normalized : `Copia de ${originalName}`;
