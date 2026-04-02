@@ -46,6 +46,10 @@ export class TeamPrismaRepository implements TeamRepository {
         name: data.name,
         code: data.code,
         status: 'draft',
+        isActive: data.isActive ?? true,
+        subscriptionExpiresAt: data.subscriptionExpiresAt
+          ? new Date(data.subscriptionExpiresAt)
+          : null,
         description: data.description ?? null,
         managerUserId: data.managerUserId ?? null,
         maxSeats: data.maxSeats ?? 10,
@@ -65,6 +69,10 @@ export class TeamPrismaRepository implements TeamRepository {
         name: entity.name,
         code: entity.code,
         status: entity.status,
+        isActive: entity.isActive,
+        subscriptionExpiresAt: entity.subscriptionExpiresAt
+          ? new Date(entity.subscriptionExpiresAt)
+          : null,
         description: entity.description,
         managerUserId: entity.managerUserId,
         maxSeats: entity.maxSeats,
@@ -75,6 +83,10 @@ export class TeamPrismaRepository implements TeamRepository {
         name: entity.name,
         code: entity.code,
         status: entity.status,
+        isActive: entity.isActive,
+        subscriptionExpiresAt: entity.subscriptionExpiresAt
+          ? new Date(entity.subscriptionExpiresAt)
+          : null,
         description: entity.description,
         managerUserId: entity.managerUserId,
         maxSeats: entity.maxSeats,

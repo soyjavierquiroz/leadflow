@@ -314,6 +314,8 @@ model Team {
   name                 String
   code                 String
   status               TeamStatus
+  isActive             Boolean               @default(true)
+  subscriptionExpiresAt DateTime?
   description          String?
   managerUserId        String?
   maxSeats             Int                   @default(10)
@@ -479,6 +481,7 @@ model Funnel {
   code                  String
   thumbnailUrl          String?
   status                FunnelStatus
+  isTemplate            Boolean             @default(false)
   stages                String[]
   entrySources          LeadSourceChannel[]
   defaultTeamId         String?

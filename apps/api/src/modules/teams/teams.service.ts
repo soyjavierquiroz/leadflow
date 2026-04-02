@@ -72,6 +72,8 @@ export type SystemTenantSummary = {
   name: string;
   code: string;
   status: string;
+  isActive: boolean;
+  subscriptionExpiresAt: string | null;
   maxSeats: number;
   occupiedSeats: number;
   activeSponsorsCount: number;
@@ -97,6 +99,8 @@ export class TeamsService {
       name: dto.name,
       code: dto.code,
       status: 'draft',
+      isActive: dto.isActive ?? true,
+      subscriptionExpiresAt: dto.subscriptionExpiresAt ?? null,
       description: dto.description ?? null,
       managerUserId: dto.managerUserId ?? null,
       maxSeats: dto.maxSeats ?? 10,
@@ -153,6 +157,10 @@ export class TeamsService {
       name: record.name,
       code: record.code,
       status: record.status,
+      isActive: record.isActive,
+      subscriptionExpiresAt: record.subscriptionExpiresAt
+        ? toIso(record.subscriptionExpiresAt)
+        : null,
       maxSeats: record.maxSeats,
       occupiedSeats: record.sponsors.length,
       activeSponsorsCount: record.sponsors.length,
@@ -304,6 +312,8 @@ export class TeamsService {
             name: teamName,
             code: normalizedTeamCode,
             status: 'active',
+            isActive: true,
+            subscriptionExpiresAt: null,
             description: teamDescription,
             maxSeats,
           },
@@ -313,6 +323,8 @@ export class TeamsService {
             name: true,
             code: true,
             status: true,
+            isActive: true,
+            subscriptionExpiresAt: true,
             description: true,
             managerUserId: true,
             maxSeats: true,
@@ -409,6 +421,8 @@ export class TeamsService {
             name: true,
             code: true,
             status: true,
+            isActive: true,
+            subscriptionExpiresAt: true,
             description: true,
             managerUserId: true,
             maxSeats: true,

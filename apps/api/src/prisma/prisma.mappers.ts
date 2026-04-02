@@ -111,6 +111,10 @@ export const mapTeamRecord = (record: TeamRecord): Team => ({
   name: record.name,
   code: record.code,
   status: record.status,
+  isActive: record.isActive,
+  subscriptionExpiresAt: record.subscriptionExpiresAt
+    ? toIso(record.subscriptionExpiresAt)
+    : null,
   description: record.description,
   managerUserId: record.managerUserId,
   maxSeats: record.maxSeats,
@@ -150,6 +154,7 @@ export const mapFunnelRecord = (record: FunnelRecord): Funnel => ({
   code: record.code,
   thumbnailUrl: record.thumbnailUrl,
   status: record.status,
+  isTemplate: record.isTemplate,
   stages: record.stages,
   entrySources: record.entrySources.map((item) =>
     item === 'landing_page' ? 'landing-page' : item,

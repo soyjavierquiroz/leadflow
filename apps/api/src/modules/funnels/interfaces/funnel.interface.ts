@@ -14,6 +14,7 @@ export interface Funnel extends BaseDomainEntity, WorkspaceScoped {
   code: string;
   thumbnailUrl: string | null;
   status: FunnelStatus;
+  isTemplate: boolean;
   stages: string[];
   entrySources: LeadSourceChannel[];
   defaultTeamId: DomainId | null;

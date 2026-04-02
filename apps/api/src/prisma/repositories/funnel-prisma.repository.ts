@@ -57,6 +57,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
         code: data.code,
         thumbnailUrl: null,
         status: 'draft',
+        isTemplate: data.isTemplate ?? false,
         stages: data.stages ?? ['captured', 'qualified', 'won'],
         entrySources: (
           data.entrySources ?? ['manual', 'form', 'landing-page', 'api']
@@ -79,6 +80,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
         code: entity.code,
         thumbnailUrl: entity.thumbnailUrl,
         status: entity.status,
+        isTemplate: entity.isTemplate,
         stages: entity.stages,
         entrySources: entity.entrySources.map((item) => toDbSource(item)),
         defaultTeamId: entity.defaultTeamId,
@@ -91,6 +93,7 @@ export class FunnelPrismaRepository implements FunnelRepository {
         code: entity.code,
         thumbnailUrl: entity.thumbnailUrl,
         status: entity.status,
+        isTemplate: entity.isTemplate,
         stages: entity.stages,
         entrySources: entity.entrySources.map((item) => toDbSource(item)),
         defaultTeamId: entity.defaultTeamId,

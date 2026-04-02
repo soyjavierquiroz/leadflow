@@ -52,6 +52,8 @@ const toTenantRow = (
   name: response.team.name,
   code: response.team.code,
   status: response.team.status,
+  isActive: response.team.isActive,
+  subscriptionExpiresAt: response.team.subscriptionExpiresAt,
   maxSeats: response.team.maxSeats,
   occupiedSeats: response.seatUsage.activeSeats,
   activeSponsorsCount: response.seatUsage.activeSeats,

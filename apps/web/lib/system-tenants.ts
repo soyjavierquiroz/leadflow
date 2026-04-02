@@ -9,6 +9,8 @@ export type SystemTenantRecord = {
   name: string;
   code: string;
   status: string;
+  isActive: boolean;
+  subscriptionExpiresAt: string | null;
   maxSeats: number;
   occupiedSeats: number;
   activeSponsorsCount: number;
@@ -33,6 +35,8 @@ export type ProvisionTenantResponse = {
     name: string;
     code: string;
     status: string;
+    isActive: boolean;
+    subscriptionExpiresAt: string | null;
     description: string | null;
     managerUserId: string | null;
     maxSeats: number;

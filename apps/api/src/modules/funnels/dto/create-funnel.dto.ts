@@ -4,6 +4,7 @@ export class CreateFunnelDto {
   readonly workspaceId!: string;
   readonly name!: string;
   readonly code!: string;
+  readonly isTemplate?: boolean;
   readonly stages?: string[];
   readonly entrySources?: LeadSourceChannel[];
   readonly defaultTeamId?: string | null;

@@ -19,6 +19,7 @@ export class FunnelsService {
       code: dto.code,
       thumbnailUrl: null,
       status: 'draft',
+      isTemplate: dto.isTemplate ?? false,
       stages: dto.stages ?? ['captured', 'qualified', 'won'],
       entrySources: dto.entrySources ?? [
         'manual',
