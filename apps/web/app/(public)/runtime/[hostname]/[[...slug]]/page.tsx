@@ -3,6 +3,7 @@ import {
   fetchPublicRuntimeResolution,
   resolvePublicRuntimePath,
 } from '@/lib/public-runtime';
+import { RuntimeLeadSubmitForm } from '@/components/public-runtime/runtime-lead-submit-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +62,8 @@ export default async function PublicRuntimePage({
             <code>{JSON.stringify(runtime.funnel.config, null, 2)}</code>
           </pre>
         </section>
+
+        <RuntimeLeadSubmitForm hostname={hostname} path={path} />
       </section>
     </main>
   );

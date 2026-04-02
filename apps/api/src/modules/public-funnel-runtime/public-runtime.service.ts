@@ -3,36 +3,28 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
-import {
-  normalizeDomainHost,
-  normalizePath,
-} from '../shared/publication-resolution.utils';
+import type { SubmitRuntimeLeadDto } from './dto/submit-runtime-lead.dto';
+import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
+import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
 
 @Injectable()
 export class PublicRuntimeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly publicFunnelRuntimeService: PublicFunnelRuntimeService,
+    private readonly leadCaptureAssignmentService: LeadCaptureAssignmentService,
+  ) {}
 
   async resolve(hostname: string, path?: string) {
-    const normalizedHostname = normalizeDomainHost(hostname);
-    const normalizedPath = normalizePath(path);
-
-    if (!normalizedHostname) {
-      throw new BadRequestException({
-        code: 'HOSTNAME_REQUIRED',
-        message: 'A hostname is required to resolve a public funnel runtime.',
-      });
-    }
-
-    const publication = await this.prisma.funnelPublication.findFirst({
+    const runtime = await this.publicFunnelRuntimeService.resolveByHostAndPath(
+      hostname,
+      path ?? '/',
+    );
+    const publication = await this.prisma.funnelPublication.findUnique({
       where: {
-        pathPrefix: normalizedPath,
-        status: 'active',
-        isActive: true,
-        domain: {
-          normalizedHost: normalizedHostname,
-          status: 'active',
-        },
+        id: runtime.publication.id,
       },
       include: {
         domain: {
@@ -71,7 +63,7 @@ export class PublicRuntimeService {
     if (!publication) {
       throw new NotFoundException({
         code: 'PUBLIC_RUNTIME_NOT_FOUND',
-        message: `No active funnel publication matched ${normalizedHostname}${normalizedPath}.`,
+        message: `No active funnel publication matched ${runtime.domain.normalizedHost}${runtime.request.path}.`,
       });
     }
 
@@ -88,13 +80,13 @@ export class PublicRuntimeService {
 
     return {
       request: {
-        hostname: normalizedHostname,
-        path: normalizedPath,
+        hostname: runtime.domain.normalizedHost,
+        path: runtime.request.path,
       },
       publication: {
-        id: publication.id,
-        path: publication.pathPrefix,
-        isActive: publication.isActive,
+        id: runtime.publication.id,
+        path: runtime.publication.pathPrefix,
+        isActive: true,
       },
       domain: {
         id: publication.domain.id,
@@ -113,5 +105,49 @@ export class PublicRuntimeService {
         config: funnel.config,
       },
     };
+  }
+
+  async submitLead(dto: SubmitRuntimeLeadDto) {
+    if (!dto.hostname?.trim()) {
+      throw new BadRequestException({
+        code: 'HOSTNAME_REQUIRED',
+        message: 'A hostname is required to submit a public runtime lead.',
+      });
+    }
+
+    const runtime = await this.publicFunnelRuntimeService.resolveByHostAndPath(
+      dto.hostname,
+      dto.path ?? '/',
+    );
+    const fullName =
+      dto.fullName?.trim() ||
+      `${dto.firstName?.trim() ?? ''} ${dto.lastName?.trim() ?? ''}`.trim() ||
+      dto.firstName?.trim() ||
+      null;
+
+    return this.leadCaptureAssignmentService.submitLeadCapture({
+      submissionEventId: dto.submissionEventId ?? `runtime-submit-${randomUUID()}`,
+      publicationId: runtime.publication.id,
+      currentStepId: runtime.currentStep.id,
+      anonymousId: dto.anonymousId?.trim() || `runtime-anon-${randomUUID()}`,
+      sourceChannel: dto.sourceChannel ?? 'form',
+      sourceUrl:
+        dto.sourceUrl?.trim() ??
+        `https://${runtime.domain.host}${runtime.request.path}`,
+      utmSource: dto.utmSource ?? null,
+      utmCampaign: dto.utmCampaign ?? null,
+      utmMedium: dto.utmMedium ?? null,
+      utmContent: dto.utmContent ?? null,
+      utmTerm: dto.utmTerm ?? null,
+      fbclid: dto.fbclid ?? null,
+      gclid: dto.gclid ?? null,
+      ttclid: dto.ttclid ?? null,
+      fullName,
+      email: dto.email?.trim() || null,
+      phone: dto.phone?.trim() || null,
+      companyName: dto.companyName?.trim() || null,
+      fieldValues: dto.fieldValues ?? {},
+      tags: dto.tags ?? ['runtime-public-submit'],
+    });
   }
 }
