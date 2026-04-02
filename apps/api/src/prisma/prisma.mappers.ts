@@ -169,6 +169,7 @@ export const mapDomainRecord = (record: DomainRecord): DomainEntity => ({
   id: record.id,
   workspaceId: record.workspaceId,
   teamId: record.teamId,
+  linkedFunnelId: record.linkedFunnelId,
   host: record.host,
   normalizedHost: record.normalizedHost,
   status: record.status,

@@ -123,6 +123,20 @@ export type SystemTenantFunnelRecord = {
   updatedAt: string;
 };
 
+export type SystemTenantDomainRecord = {
+  id: string;
+  workspaceId: string;
+  teamId: string;
+  linkedFunnelId: string | null;
+  host: string;
+  normalizedHost: string;
+  status: string;
+  onboardingStatus: string;
+  verificationStatus: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const encodePathSegment = (value: string) => encodeURIComponent(value);
 
 export const getSystemTenants = async () => {
@@ -193,4 +207,28 @@ export const getSystemTenantFunnels = async (teamId: string) => {
   }
 
   return payload as SystemTenantFunnelRecord[];
+};
+
+export const getSystemTenantDomains = async (teamId: string) => {
+  noStore();
+
+  const response = await apiFetchWithSession(
+    `/system/tenants/${encodePathSegment(teamId)}/domains`,
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `No pudimos cargar los dominios del tenant (${response.status}).`,
+    );
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  if (!Array.isArray(payload)) {
+    throw new Error(
+      "El API devolvió un payload inválido para system/tenants/:id/domains.",
+    );
+  }
+
+  return payload as SystemTenantDomainRecord[];
 };

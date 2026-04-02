@@ -17,6 +17,7 @@ export type DomainStatus = 'draft' | 'active' | 'archived';
 
 export interface DomainEntity
   extends BaseDomainEntity, WorkspaceScoped, TeamScoped {
+  linkedFunnelId: string | null;
   host: string;
   normalizedHost: string;
   status: DomainStatus;

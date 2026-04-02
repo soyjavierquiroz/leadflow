@@ -6,6 +6,7 @@ import type {
 export class CreateDomainDto {
   readonly workspaceId!: string;
   readonly teamId!: string;
+  readonly linkedFunnelId?: string | null;
   readonly host!: string;
   readonly domainType?: DomainType;
   readonly isPrimary?: boolean;

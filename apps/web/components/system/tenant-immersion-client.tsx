@@ -8,7 +8,6 @@ import {
   type FormEvent,
 } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
-import { EmptyState } from "@/components/app-shell/empty-state";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
@@ -17,6 +16,7 @@ import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime, toSentenceCase } from "@/lib/app-shell/utils";
 import type {
   SystemFunnelTemplateRecord,
+  SystemTenantDomainRecord,
   SystemTenantDetailRecord,
   SystemTenantFunnelRecord,
 } from "@/lib/system-tenants";
@@ -25,6 +25,7 @@ import { authenticatedOperationRequest } from "@/lib/team-operations";
 type TenantImmersionClientProps = {
   teamId: string;
   initialTenant: SystemTenantDetailRecord;
+  initialDomains: SystemTenantDomainRecord[];
   initialFunnels: SystemTenantFunnelRecord[];
 };
 
@@ -35,6 +36,11 @@ type CloneFormState = {
   newName: string;
 };
 
+type DomainFormState = {
+  hostname: string;
+  funnelId: string;
+};
+
 const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
@@ -43,6 +49,11 @@ const secondaryButtonClassName =
 const buildInitialCloneFormState = (): CloneFormState => ({
   templateFunnelId: "",
   newName: "",
+});
+
+const buildInitialDomainFormState = (): DomainFormState => ({
+  hostname: "",
+  funnelId: "",
 });
 
 const tabs: Array<{
@@ -63,7 +74,7 @@ const tabs: Array<{
   {
     id: "domains",
     label: "Dominios",
-    description: "Espacio reservado para rollout de hosts.",
+    description: "Hosts del tenant y funnel enlazado para salida publica.",
   },
 ];
 
@@ -72,19 +83,28 @@ const buildTenantStatusBadgeClassName = (isActive: boolean) =>
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
     : "border-slate-200 bg-slate-100 text-slate-600";
 
+const buildVerificationBadgeClassName = (isVerified: boolean) =>
+  isVerified
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : "border-amber-200 bg-amber-50 text-amber-700";
+
 export function TenantImmersionClient({
   teamId,
   initialTenant,
+  initialDomains,
   initialFunnels,
 }: TenantImmersionClientProps) {
   const [tenant, setTenant] = useState(initialTenant);
   const [activeTab, setActiveTab] = useState<ImmersionTab>("overview");
+  const [domains, setDomains] = useState(initialDomains);
   const [funnels, setFunnels] = useState(initialFunnels);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     message: string;
   } | null>(null);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
+  const [isLoadingDomains, setIsLoadingDomains] = useState(false);
   const [isLoadingFunnels, setIsLoadingFunnels] = useState(false);
   const [templateOptions, setTemplateOptions] = useState<
     SystemFunnelTemplateRecord[] | null
@@ -92,6 +112,9 @@ export function TenantImmersionClient({
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [cloneFormState, setCloneFormState] = useState(
     buildInitialCloneFormState(),
+  );
+  const [domainFormState, setDomainFormState] = useState(
+    buildInitialDomainFormState(),
   );
   const [isPending, startTransition] = useTransition();
 
@@ -102,6 +125,10 @@ export function TenantImmersionClient({
   useEffect(() => {
     setFunnels(initialFunnels);
   }, [initialFunnels]);
+
+  useEffect(() => {
+    setDomains(initialDomains);
+  }, [initialDomains]);
 
   useEffect(() => {
     if (!isAssignOpen || templateOptions !== null || isLoadingTemplates) {
@@ -152,6 +179,11 @@ export function TenantImmersionClient({
     setCloneFormState(buildInitialCloneFormState());
   };
 
+  const closeDomainModal = () => {
+    setIsAddDomainOpen(false);
+    setDomainFormState(buildInitialDomainFormState());
+  };
+
   const reloadFunnels = async () => {
     setIsLoadingFunnels(true);
 
@@ -179,6 +211,36 @@ export function TenantImmersionClient({
       return null;
     } finally {
       setIsLoadingFunnels(false);
+    }
+  };
+
+  const reloadDomains = async () => {
+    setIsLoadingDomains(true);
+
+    try {
+      const payload = await authenticatedOperationRequest<
+        SystemTenantDomainRecord[]
+      >(`/system/tenants/${encodeURIComponent(teamId)}/domains`, {
+        method: "GET",
+      });
+
+      setDomains(payload);
+      setTenant((current) => ({
+        ...current,
+        domainCount: payload.length,
+      }));
+      return payload;
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No pudimos refrescar los dominios del tenant.",
+      });
+      return null;
+    } finally {
+      setIsLoadingDomains(false);
     }
   };
 
@@ -232,6 +294,62 @@ export function TenantImmersionClient({
       }
     });
   };
+
+  const handleCreateDomainSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFeedback(null);
+
+    const hostname = domainFormState.hostname.trim();
+    const funnelId = domainFormState.funnelId.trim();
+
+    if (!hostname) {
+      setFeedback({
+        tone: "error",
+        message: "Escribe un hostname valido antes de registrar el dominio.",
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await authenticatedOperationRequest<SystemTenantDomainRecord>(
+          `/system/tenants/${encodeURIComponent(teamId)}/domains`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              hostname,
+              funnelId: funnelId || undefined,
+            }),
+          },
+        );
+
+        const nextDomains = await reloadDomains();
+        closeDomainModal();
+
+        if (nextDomains) {
+          setActiveTab("domains");
+          setFeedback({
+            tone: "success",
+            message:
+              "Dominio registrado correctamente. La tabla ya refleja el host y su funnel enlazado.",
+          });
+        }
+      } catch (error) {
+        setFeedback({
+          tone: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "No pudimos crear el dominio para este tenant.",
+        });
+      }
+    });
+  };
+
+  const linkedDomainCount = domains.filter((domain) => domain.linkedFunnelId).length;
+  const verifiedDomainCount = domains.filter(
+    (domain) => domain.verificationStatus === "verified",
+  ).length;
 
   return (
     <div className="space-y-8">
@@ -528,32 +646,132 @@ export function TenantImmersionClient({
 
       {activeTab === "domains" ? (
         <div className="space-y-6">
+          <div className="flex flex-col gap-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)] md:flex-row md:items-end md:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+                Dominios del tenant
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                Inventario publico de {tenant.name}
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                Registra el hostname del cliente, enlaza uno de los funnels que
+                ya pertenece al tenant y deja lista la salida publica desde el
+                control plane.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setFeedback(null);
+                  setIsAddDomainOpen(true);
+                  void reloadFunnels();
+                }}
+                className={primaryButtonClassName}
+              >
+                Añadir Dominio
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void reloadDomains();
+                }}
+                disabled={isLoadingDomains}
+                className={secondaryButtonClassName}
+              >
+                {isLoadingDomains ? "Recargando..." : "Recargar lista"}
+              </button>
+            </div>
+          </div>
+
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               label="Dominios registrados"
-              value={formatCompactNumber(tenant.domainCount)}
+              value={formatCompactNumber(domains.length)}
               hint="Conteo actual de hosts ligados a este tenant."
             />
             <KpiCard
-              label="Workspace status"
-              value={toSentenceCase(tenant.workspace.status)}
-              hint="Estado del workspace que sostiene los recursos del tenant."
+              label="Verificados"
+              value={formatCompactNumber(verifiedDomainCount)}
+              hint="Hosts cuyo onboarding ya marca verificacion completa."
             />
             <KpiCard
-              label="Slug base"
-              value={tenant.workspace.slug}
-              hint="Identificador operativo usado por el workspace en plataforma."
+              label="Con funnel"
+              value={formatCompactNumber(linkedDomainCount)}
+              hint="Dominios que ya quedaron enchufados a un funnel del tenant."
             />
             <KpiCard
               label="Dominio principal"
               value={tenant.workspace.primaryDomain ?? "Pendiente"}
-              hint="Referencia inicial mientras revivimos la tabla de dominios."
+              hint="Referencia del workspace mientras operas hosts dedicados."
             />
           </section>
 
-          <EmptyState
-            title="La operación de dominios vuelve en el siguiente sprint"
-            description="El chasis de la inmersión ya está listo. Esta pestaña queda reservada para conectar el inventario real de dominios bajo control del Super Admin."
+          <DataTable
+            columns={[
+              {
+                key: "host",
+                header: "Hostname",
+                render: (row) => (
+                  <div>
+                    <p className="font-semibold text-slate-950">{row.host}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      {row.normalizedHost}
+                    </p>
+                  </div>
+                ),
+              },
+              {
+                key: "status",
+                header: "Estado",
+                render: (row) => {
+                  const isVerified = row.verificationStatus === "verified";
+
+                  return (
+                    <span
+                      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${buildVerificationBadgeClassName(
+                        isVerified,
+                      )}`}
+                    >
+                      {isVerified ? "Verificado" : "Pendiente"}
+                    </span>
+                  );
+                },
+              },
+              {
+                key: "linkedFunnel",
+                header: "Funnel enlazado",
+                render: (row) => {
+                  const linkedFunnel = funnels.find(
+                    (funnel) => funnel.id === row.linkedFunnelId,
+                  );
+
+                  if (!linkedFunnel) {
+                    return "Sin funnel enlazado";
+                  }
+
+                  return (
+                    <div>
+                      <p className="font-semibold text-slate-950">
+                        {linkedFunnel.name}
+                      </p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        {linkedFunnel.code}
+                      </p>
+                    </div>
+                  );
+                },
+              },
+              {
+                key: "updatedAt",
+                header: "Actualizado",
+                render: (row) => formatDateTime(row.updatedAt),
+              },
+            ]}
+            rows={domains}
+            emptyTitle="Este tenant aún no tiene dominios registrados"
+            emptyDescription="Añade el primer hostname del cliente y enlázalo a uno de sus funnels para completar la salida publica."
           />
         </div>
       ) : null}
@@ -638,6 +856,88 @@ export function TenantImmersionClient({
                 className={primaryButtonClassName}
               >
                 {isPending ? "Asignando..." : "Clonar al tenant"}
+              </button>
+            </div>
+          </form>
+        </ModalShell>
+      ) : null}
+
+      {isAddDomainOpen ? (
+        <ModalShell
+          eyebrow="Tenant Domains"
+          title={`Añadir dominio para ${tenant.name}`}
+          description="Registra el hostname publico del cliente y, si ya corresponde, enlázalo a un funnel propio del tenant."
+          onClose={closeDomainModal}
+        >
+          <form className="space-y-5" onSubmit={handleCreateDomainSubmit}>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">
+                Hostname
+              </span>
+              <input
+                type="text"
+                value={domainFormState.hostname}
+                onChange={(event) =>
+                  setDomainFormState((current) => ({
+                    ...current,
+                    hostname: event.target.value,
+                  }))
+                }
+                placeholder="campana.agencia.com"
+                disabled={isPending}
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">
+                Enlazar a Funnel
+              </span>
+              <select
+                value={domainFormState.funnelId}
+                onChange={(event) =>
+                  setDomainFormState((current) => ({
+                    ...current,
+                    funnelId: event.target.value,
+                  }))
+                }
+                disabled={isPending || isLoadingFunnels}
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
+              >
+                <option value="">
+                  {isLoadingFunnels
+                    ? "Cargando funnels..."
+                    : "Sin enlace inicial"}
+                </option>
+                {funnels.map((funnel) => (
+                  <option key={funnel.id} value={funnel.id}>
+                    {funnel.name} ({funnel.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+              El backend registrará el dominio directamente sobre este
+              `teamId`, y si eliges un funnel verificará que también pertenezca
+              al tenant antes de persistir el enlace.
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeDomainModal}
+                disabled={isPending}
+                className={secondaryButtonClassName}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isPending}
+                className={primaryButtonClassName}
+              >
+                {isPending ? "Creando..." : "Registrar dominio"}
               </button>
             </div>
           </form>

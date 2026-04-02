@@ -492,6 +492,7 @@ model Funnel {
   defaultTeam           Team?               @relation("TeamDefaultFunnels", fields: [defaultTeamId], references: [id], onDelete: SetNull)
   defaultRotationPool   RotationPool?       @relation("PoolDefaultFunnels", fields: [defaultRotationPoolId], references: [id], onDelete: SetNull)
   funnelInstanceBridge  FunnelInstance?     @relation("LegacyFunnelLink")
+  linkedDomains         Domain[]            @relation("DomainLinkedFunnel")
   leads                 Lead[]
   assignments           Assignment[]
 
@@ -502,6 +503,7 @@ model Domain {
   id                         String                   @id @default(uuid())
   workspaceId                String
   teamId                     String
+  linkedFunnelId             String?
   host                       String
   normalizedHost             String                   @unique
   status                     DomainStatus
@@ -522,10 +524,12 @@ model Domain {
   updatedAt                  DateTime                 @updatedAt
   workspace                  Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team                       Team                     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  linkedFunnel               Funnel?                  @relation("DomainLinkedFunnel", fields: [linkedFunnelId], references: [id], onDelete: SetNull)
   funnelPublications         FunnelPublication[]
 
   @@index([teamId, isPrimary])
   @@index([teamId, onboardingStatus])
+  @@index([teamId, linkedFunnelId])
 }
 
 model FunnelTemplate {

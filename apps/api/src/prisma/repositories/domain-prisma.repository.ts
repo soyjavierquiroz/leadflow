@@ -81,6 +81,7 @@ export class DomainPrismaRepository implements DomainRepository {
       data: {
         workspaceId: data.workspaceId,
         teamId: data.teamId,
+        linkedFunnelId: data.linkedFunnelId ?? null,
         host: data.host.trim(),
         normalizedHost,
         status: 'draft',
@@ -122,6 +123,7 @@ export class DomainPrismaRepository implements DomainRepository {
         id: entity.id,
         workspaceId: entity.workspaceId,
         teamId: entity.teamId,
+        linkedFunnelId: entity.linkedFunnelId,
         host: entity.host.trim(),
         normalizedHost,
         status: entity.status,
@@ -145,6 +147,7 @@ export class DomainPrismaRepository implements DomainRepository {
       },
       update: {
         teamId: entity.teamId,
+        linkedFunnelId: entity.linkedFunnelId,
         host: entity.host.trim(),
         normalizedHost,
         status: entity.status,

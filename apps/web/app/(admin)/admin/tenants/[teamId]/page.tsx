@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { TenantImmersionClient } from "@/components/system/tenant-immersion-client";
-import { getSystemTenant, getSystemTenantFunnels } from "@/lib/system-tenants";
+import {
+  getSystemTenant,
+  getSystemTenantDomains,
+  getSystemTenantFunnels,
+} from "@/lib/system-tenants";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +24,16 @@ export default async function AdminTenantImmersionPage({
     notFound();
   }
 
-  const funnels = await getSystemTenantFunnels(teamId);
+  const [funnels, domains] = await Promise.all([
+    getSystemTenantFunnels(teamId),
+    getSystemTenantDomains(teamId),
+  ]);
 
   return (
     <TenantImmersionClient
       teamId={teamId}
       initialTenant={tenant}
+      initialDomains={domains}
       initialFunnels={funnels}
     />
   );

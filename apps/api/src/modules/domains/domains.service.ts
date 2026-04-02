@@ -51,6 +51,13 @@ const toNullableJsonInput = (
   return value as Prisma.InputJsonValue;
 };
 
+const inferDomainTypeFromHost = (
+  host: string,
+): DomainEntity['domainType'] => {
+  const labelCount = normalizeDomainHost(host).split('.').length;
+  return labelCount > 2 ? 'custom_subdomain' : 'custom_apex';
+};
+
 @Injectable()
 export class DomainsService {
   constructor(
@@ -84,6 +91,7 @@ export class DomainsService {
     return buildEntity<DomainEntity>({
       workspaceId: dto.workspaceId,
       teamId: dto.teamId,
+      linkedFunnelId: dto.linkedFunnelId ?? null,
       host: dto.host.trim(),
       normalizedHost,
       status: lifecycle.status,
@@ -143,7 +151,8 @@ export class DomainsService {
     const normalizedHost = this.assertAndNormalizeHost(dto.host);
     await this.assertHostAvailable(normalizedHost);
 
-    const domainType = dto.domainType;
+    const linkedFunnelId = await this.assertLinkedFunnel(scope, dto.linkedFunnelId);
+    const domainType = dto.domainType ?? inferDomainTypeFromHost(dto.host);
     const verificationMethod =
       dto.verificationMethod ??
       defaultVerificationMethodForDomainType(domainType);
@@ -172,6 +181,7 @@ export class DomainsService {
         data: {
           workspaceId: scope.workspaceId,
           teamId: scope.teamId,
+          linkedFunnelId,
           host: dto.host.trim(),
           normalizedHost,
           status: baseLifecycle.status,
@@ -451,6 +461,41 @@ export class DomainsService {
         message: `The host ${normalizedHost} is already registered.`,
       });
     }
+  }
+
+  private async assertLinkedFunnel(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+    },
+    linkedFunnelId?: string | null,
+  ) {
+    const normalizedLinkedFunnelId = linkedFunnelId?.trim() ?? null;
+
+    if (!normalizedLinkedFunnelId) {
+      return null;
+    }
+
+    const funnel = await this.prisma.funnel.findFirst({
+      where: {
+        id: normalizedLinkedFunnelId,
+        workspaceId: scope.workspaceId,
+        defaultTeamId: scope.teamId,
+        isTemplate: false,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!funnel) {
+      throw new NotFoundException({
+        code: 'FUNNEL_NOT_FOUND',
+        message: 'The selected funnel is not available for this tenant.',
+      });
+    }
+
+    return funnel.id;
   }
 
   private async findDomainRecord(

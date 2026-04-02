@@ -85,6 +85,7 @@ export type DomainRecord = {
   id: string;
   workspaceId: string;
   teamId: string;
+  linkedFunnelId?: string | null;
   host: string;
   requestedHostname: string;
   normalizedHost: string;

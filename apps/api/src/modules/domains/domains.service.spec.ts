@@ -39,6 +39,7 @@ const buildDomainRecord = (
     id: 'domain-1',
     workspaceId: 'workspace-1',
     teamId: 'team-1',
+    linkedFunnelId: null,
     host: 'www.retodetransformacion.com',
     normalizedHost: 'www.retodetransformacion.com',
     status: 'active',
