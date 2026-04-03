@@ -11,6 +11,7 @@ import {
 } from "next/navigation";
 import type { Country } from "react-phone-number-input";
 import { SmartPhoneInput } from "@/components/public-funnel/smart-phone-input";
+import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-runtime-lead-submit-provider";
 import {
   getOrCreateAnonymousId,
   persistSubmissionContext,
@@ -150,6 +151,7 @@ export function LeadCaptureModal({
     () => readUrlAttribution(searchParams),
     [searchParams],
   );
+  const runtimeLeadSubmit = usePublicRuntimeLeadSubmit();
   const isFormReady = fullName.trim().length > 1 && isPhoneValid;
 
   useEffect(() => {
@@ -221,7 +223,9 @@ export function LeadCaptureModal({
         },
       });
 
-      const response = await submitPublicLeadCapture({
+      const submitLeadCapture =
+        runtimeLeadSubmit?.submitLeadCapture ?? submitPublicLeadCapture;
+      const response = await submitLeadCapture({
         publicationId,
         currentStepId,
         anonymousId,

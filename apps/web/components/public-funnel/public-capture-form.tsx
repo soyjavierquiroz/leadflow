@@ -15,6 +15,7 @@ import {
   PublicSectionSurface,
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-runtime-lead-submit-provider";
 import {
   getOrCreateAnonymousId,
   readSubmissionContext,
@@ -189,6 +190,7 @@ export function PublicCaptureForm({
     () => block.fields.filter((field) => !field.hidden),
     [block.fields],
   );
+  const runtimeLeadSubmit = usePublicRuntimeLeadSubmit();
   const [values, setValues] = useState<Record<string, string>>(() =>
     buildInitialValues(block.fields, urlAttribution),
   );
@@ -272,7 +274,9 @@ export function PublicCaptureForm({
         },
       });
 
-      const response = await submitPublicLeadCapture({
+      const submitLeadCapture =
+        runtimeLeadSubmit?.submitLeadCapture ?? submitPublicLeadCapture;
+      const response = await submitLeadCapture({
         publicationId,
         currentStepId,
         anonymousId,

@@ -1,4 +1,9 @@
 import { notFound } from 'next/navigation';
+import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
+import { PublicRuntimeLeadSubmitProvider } from '@/components/public-runtime/public-runtime-lead-submit-provider';
+import {
+  fetchPublicFunnelRuntime,
+} from '@/lib/funnel-runtime';
 import {
   fetchPublicRuntimeResolution,
   resolvePublicRuntimePath,
@@ -26,6 +31,40 @@ export default async function PublicRuntimePage({
 
   if (!runtime) {
     notFound();
+  }
+
+  const normalizedHostname = runtime.request.hostname.trim().toLowerCase();
+  const normalizedPath = path.trim().toLowerCase();
+  const runtimeIdentity = [
+    runtime.funnel.name,
+    runtime.funnelInstance.name,
+    runtime.funnelInstance.code,
+  ]
+    .join(' ')
+    .toLowerCase();
+  const shouldRenderImmunocalUi =
+    runtimeIdentity.includes('immunocal') ||
+    runtimeIdentity.includes('inmuno') ||
+    ((normalizedHostname === 'retodetransformacion.com' ||
+      normalizedHostname === 'www.retodetransformacion.com') &&
+      normalizedPath === '/inmuno');
+
+  if (shouldRenderImmunocalUi) {
+    const legacyRuntime = await fetchPublicFunnelRuntime({
+      host: runtime.request.hostname,
+      path,
+    });
+
+    if (legacyRuntime) {
+      return (
+        <PublicRuntimeLeadSubmitProvider
+          hostname={runtime.request.hostname}
+          path={path}
+        >
+          <FunnelRuntimePage runtime={legacyRuntime} />
+        </PublicRuntimeLeadSubmitProvider>
+      );
+    }
   }
 
   return (

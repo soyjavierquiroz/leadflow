@@ -67,6 +67,29 @@ export type LeadCaptureSubmissionResponse = {
   } | null;
 };
 
+export type LeadCaptureSubmissionPayload = {
+  publicationId: string;
+  currentStepId: string;
+  anonymousId: string;
+  submissionEventId?: string | null;
+  sourceUrl?: string | null;
+  utmSource?: string | null;
+  utmCampaign?: string | null;
+  utmMedium?: string | null;
+  utmContent?: string | null;
+  utmTerm?: string | null;
+  fbclid?: string | null;
+  gclid?: string | null;
+  ttclid?: string | null;
+  fullName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  companyName?: string | null;
+  fieldValues?: Record<string, string | null>;
+  tags?: string[];
+  sourceChannel?: string | null;
+};
+
 type StoredSubmissionContext = {
   publicationId: string;
   visitorId: string;
@@ -193,28 +216,9 @@ const parseErrorMessage = async (response: Response) => {
   return `La solicitud fallo con estado ${response.status}.`;
 };
 
-export const submitPublicLeadCapture = async (payload: {
-  publicationId: string;
-  currentStepId: string;
-  anonymousId: string;
-  submissionEventId?: string | null;
-  sourceUrl?: string | null;
-  utmSource?: string | null;
-  utmCampaign?: string | null;
-  utmMedium?: string | null;
-  utmContent?: string | null;
-  utmTerm?: string | null;
-  fbclid?: string | null;
-  gclid?: string | null;
-  ttclid?: string | null;
-  fullName?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  companyName?: string | null;
-  fieldValues?: Record<string, string | null>;
-  tags?: string[];
-  sourceChannel?: string | null;
-}) => {
+export const submitPublicLeadCapture = async (
+  payload: LeadCaptureSubmissionPayload,
+) => {
   const response = await fetch(
     `${webPublicConfig.urls.api}/v1/public/funnel-runtime/submissions`,
     {
@@ -229,6 +233,48 @@ export const submitPublicLeadCapture = async (payload: {
       }),
     },
   );
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response));
+  }
+
+  return (await response.json()) as LeadCaptureSubmissionResponse;
+};
+
+export const submitRuntimeLeadCapture = async (params: {
+  hostname: string;
+  path: string;
+  payload: LeadCaptureSubmissionPayload;
+}) => {
+  const { hostname, path, payload } = params;
+  const response = await fetch(`${webPublicConfig.urls.api}/v1/public/runtime/submit`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      hostname,
+      path,
+      anonymousId: payload.anonymousId,
+      submissionEventId: payload.submissionEventId,
+      sourceChannel: payload.sourceChannel ?? "form",
+      sourceUrl: payload.sourceUrl,
+      utmSource: payload.utmSource ?? null,
+      utmCampaign: payload.utmCampaign ?? null,
+      utmMedium: payload.utmMedium ?? null,
+      utmContent: payload.utmContent ?? null,
+      utmTerm: payload.utmTerm ?? null,
+      fbclid: payload.fbclid ?? null,
+      gclid: payload.gclid ?? null,
+      ttclid: payload.ttclid ?? null,
+      fullName: payload.fullName?.trim() || null,
+      email: payload.email?.trim() || null,
+      phone: payload.phone?.trim() || null,
+      companyName: payload.companyName?.trim() || null,
+      fieldValues: payload.fieldValues ?? {},
+      tags: payload.tags ?? ["runtime-public-submit"],
+    }),
+  });
 
   if (!response.ok) {
     throw new Error(await parseErrorMessage(response));
