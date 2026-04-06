@@ -1,12 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import {
-  useEffect,
-  useState,
-  useTransition,
-  type FormEvent,
-} from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
@@ -15,7 +11,6 @@ import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime, toSentenceCase } from "@/lib/app-shell/utils";
 import type {
-  JsonValue,
   SystemFunnelTemplateRecord,
   SystemTenantDomainRecord,
   SystemTenantDetailRecord,
@@ -42,16 +37,6 @@ type DomainFormState = {
   funnelId: string;
 };
 
-type FunnelEditorState = {
-  funnelId: string;
-} | null;
-
-type FunnelFormState = {
-  name: string;
-  description: string;
-  configText: string;
-};
-
 const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
@@ -65,12 +50,6 @@ const buildInitialCloneFormState = (): CloneFormState => ({
 const buildInitialDomainFormState = (): DomainFormState => ({
   hostname: "",
   funnelId: "",
-});
-
-const buildInitialFunnelFormState = (): FunnelFormState => ({
-  name: "",
-  description: "",
-  configText: "{}",
 });
 
 const tabs: Array<{
@@ -111,6 +90,7 @@ export function TenantImmersionClient({
   initialDomains,
   initialFunnels,
 }: TenantImmersionClientProps) {
+  const router = useRouter();
   const [tenant, setTenant] = useState(initialTenant);
   const [activeTab, setActiveTab] = useState<ImmersionTab>("overview");
   const [domains, setDomains] = useState(initialDomains);
@@ -133,11 +113,6 @@ export function TenantImmersionClient({
   const [domainFormState, setDomainFormState] = useState(
     buildInitialDomainFormState(),
   );
-  const [editorState, setEditorState] = useState<FunnelEditorState>(null);
-  const [funnelFormState, setFunnelFormState] = useState(
-    buildInitialFunnelFormState(),
-  );
-  const [configError, setConfigError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -204,25 +179,6 @@ export function TenantImmersionClient({
   const closeDomainModal = () => {
     setIsAddDomainOpen(false);
     setDomainFormState(buildInitialDomainFormState());
-  };
-
-  const closeEditorModal = () => {
-    setEditorState(null);
-    setFunnelFormState(buildInitialFunnelFormState());
-    setConfigError(null);
-  };
-
-  const openEditorModal = (funnel: SystemTenantFunnelRecord) => {
-    setFeedback(null);
-    setConfigError(null);
-    setFunnelFormState({
-      name: funnel.name,
-      description: funnel.description ?? "",
-      configText: JSON.stringify(funnel.config, null, 2) ?? "null",
-    });
-    setEditorState({
-      funnelId: funnel.id,
-    });
   };
 
   const reloadFunnels = async () => {
@@ -382,83 +338,6 @@ export function TenantImmersionClient({
             error instanceof Error
               ? error.message
               : "No pudimos crear el dominio para este tenant.",
-        });
-      }
-    });
-  };
-
-  const handleEditFunnelSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setFeedback(null);
-    setConfigError(null);
-
-    const funnelId = editorState?.funnelId;
-    const name = funnelFormState.name.trim();
-    const description = funnelFormState.description.trim();
-    let config: JsonValue;
-
-    if (!funnelId) {
-      setFeedback({
-        tone: "error",
-        message: "No encontramos el funnel que intentas editar.",
-      });
-      return;
-    }
-
-    if (!name) {
-      setFeedback({
-        tone: "error",
-        message: "Escribe un nombre antes de guardar el funnel.",
-      });
-      return;
-    }
-
-    try {
-      config = JSON.parse(funnelFormState.configText) as JsonValue;
-    } catch {
-      setConfigError("Ingresa un JSON valido antes de guardar el funnel.");
-      setFeedback({
-        tone: "error",
-        message: "La configuracion no es un JSON valido.",
-      });
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const updated = await authenticatedOperationRequest<SystemTenantFunnelRecord>(
-          `/system/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(funnelId)}`,
-          {
-            method: "PATCH",
-            body: JSON.stringify({
-              name,
-              description: description || null,
-              config,
-            }),
-          },
-        );
-
-        setFunnels((current) =>
-          current.map((funnel) => (funnel.id === updated.id ? updated : funnel)),
-        );
-        closeEditorModal();
-
-        const nextFunnels = await reloadFunnels();
-
-        setActiveTab("funnels");
-        setFeedback({
-          tone: nextFunnels ? "success" : "error",
-          message: nextFunnels
-            ? "El funnel clonado quedó actualizado y la lista ya refleja la versión más reciente."
-            : "El funnel se actualizó, pero no pudimos refrescar la lista completa. Puedes reintentar desde Recargar lista.",
-        });
-      } catch (error) {
-        setFeedback({
-          tone: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "No pudimos actualizar el funnel del tenant.",
         });
       }
     });
@@ -769,10 +648,14 @@ export function TenantImmersionClient({
                 render: (row) => (
                   <button
                     type="button"
-                    onClick={() => openEditorModal(row)}
+                    onClick={() =>
+                      router.push(
+                        `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(row.id)}/builder`,
+                      )
+                    }
                     className={secondaryButtonClassName}
                   >
-                    Editar
+                    Abrir Funnel Builder
                   </button>
                 ),
               },
@@ -1084,106 +967,6 @@ export function TenantImmersionClient({
         </ModalShell>
       ) : null}
 
-      {editorState ? (
-        <ModalShell
-          eyebrow="Tenant Funnels"
-          title={`Editar funnel de ${tenant.name}`}
-          description="Ajusta el nombre, la descripción interna y el JSON completo del funnel clonado sin salir de la inmersión."
-          onClose={closeEditorModal}
-        >
-          <form className="space-y-5" onSubmit={handleEditFunnelSubmit}>
-            <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
-                Nombre
-              </span>
-              <input
-                type="text"
-                value={funnelFormState.name}
-                onChange={(event) =>
-                  setFunnelFormState((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                placeholder="Ej. Funnel Captacion Kuruk"
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                disabled={isPending}
-              />
-            </label>
-
-            <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
-                Descripcion
-              </span>
-              <textarea
-                value={funnelFormState.description}
-                onChange={(event) =>
-                  setFunnelFormState((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="Contexto operativo del funnel clonado."
-                rows={4}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                disabled={isPending}
-              />
-            </label>
-
-            <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
-                Configuracion JSON
-              </span>
-              <textarea
-                value={funnelFormState.configText}
-                onChange={(event) => {
-                  setConfigError(null);
-                  setFunnelFormState((current) => ({
-                    ...current,
-                    configText: event.target.value,
-                  }));
-                }}
-                placeholder='{\n  "blocks": [],\n  "settings": {}\n}'
-                rows={16}
-                className={`w-full rounded-2xl px-4 py-3 font-mono text-sm text-slate-900 outline-none transition ${
-                  configError
-                    ? "border border-rose-300 focus:border-rose-500"
-                    : "border border-slate-300 focus:border-slate-950"
-                }`}
-                disabled={isPending}
-                spellCheck={false}
-              />
-              <p className="text-xs leading-5 text-slate-500">
-                Pega o corrige aquí el JSON del funnel. Se validará antes de
-                enviarlo al backend para evitar guardar estructuras inválidas.
-              </p>
-              {configError ? (
-                <p className="text-sm font-medium text-rose-600">
-                  {configError}
-                </p>
-              ) : null}
-            </label>
-
-            <div className="flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={closeEditorModal}
-                className={secondaryButtonClassName}
-                disabled={isPending}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className={primaryButtonClassName}
-                disabled={isPending}
-              >
-                {isPending ? "Guardando..." : "Guardar Cambios"}
-              </button>
-            </div>
-          </form>
-        </ModalShell>
-      ) : null}
     </div>
   );
 }

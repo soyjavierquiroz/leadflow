@@ -20,10 +20,6 @@ import {
 
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
-import type {
-  DomainRecord,
-  FunnelTemplateRecord,
-} from "@/lib/app-shell/types";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import { teamOperationRequest } from "@/lib/team-operations";
 
@@ -149,9 +145,30 @@ type HybridPublicationDetail = {
   };
 };
 
+type PublicationEditorDomainOption = {
+  id: string;
+  host: string;
+  status: string;
+};
+
+type PublicationEditorTemplateOption = {
+  id: string;
+  name: string;
+  code: string;
+};
+
 type TeamVslPublicationEditorProps = {
-  domains: DomainRecord[];
-  templates: FunnelTemplateRecord[];
+  domains: PublicationEditorDomainOption[];
+  templates: PublicationEditorTemplateOption[];
+  mode?: "team" | "system";
+  teamId?: string;
+  initialPublicationId?: string | null;
+  backHref?: string;
+  backLabel?: string;
+  editorHref?: string;
+  headerEyebrow?: string;
+  headerTitle?: string;
+  headerDescription?: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -166,7 +183,7 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-const buildTemplateOptions = (templates: FunnelTemplateRecord[]) => {
+const buildTemplateOptions = (templates: PublicationEditorTemplateOption[]) => {
   return [...templates].sort((left, right) => {
     const leftPriority =
       left.name === "VexerCore Pro (Split 50/50)" || left.code === "vexercore-pro-split-50-50"
@@ -206,10 +223,19 @@ const toMediaRows = (value: unknown) => {
 export function TeamVslPublicationEditor({
   domains,
   templates,
+  mode = "team",
+  teamId,
+  initialPublicationId = null,
+  backHref = "/team/publications",
+  backLabel = "Volver a publicaciones",
+  editorHref,
+  headerEyebrow = "Team Admin / Publicaciones híbridas",
+  headerTitle = "Crear o editar funnel VSL/Landing",
+  headerDescription = "Gestiona el blocksJson y el mediaMap como dos capas separadas del assembly engine. Guardamos la instancia, el landing step y la publicación activa en una sola transacción.",
 }: TeamVslPublicationEditorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const publicationId = searchParams.get("publicationId");
+  const publicationId = initialPublicationId ?? searchParams.get("publicationId");
   const templateOptions = useMemo(() => buildTemplateOptions(templates), [templates]);
   const activeDomains = useMemo(
     () => domains.filter((domain) => domain.status === "active"),
@@ -236,6 +262,11 @@ export function TeamVslPublicationEditor({
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
 
+  const publicationApiBasePath =
+    mode === "system" && teamId
+      ? `/system/tenants/${encodeURIComponent(teamId)}/hybrid-funnel-publications`
+      : "/hybrid-funnel-publications";
+
   useEffect(() => {
     if (!publicationId) {
       setCurrentPublicationId(null);
@@ -246,7 +277,7 @@ export function TeamVslPublicationEditor({
     setErrorMessage(null);
 
     void teamOperationRequest<HybridPublicationDetail>(
-      `/hybrid-funnel-publications/${publicationId}`,
+      `${publicationApiBasePath}/${publicationId}`,
       { method: "GET" },
     )
       .then((payload) => {
@@ -268,7 +299,7 @@ export function TeamVslPublicationEditor({
         );
       })
       .finally(() => setIsLoadingExisting(false));
-  }, [publicationId]);
+  }, [publicationApiBasePath, publicationId]);
 
   const parsedBlocks = useMemo(() => {
     try {
@@ -423,21 +454,28 @@ export function TeamVslPublicationEditor({
           mediaMap,
         };
 
-        const response = currentPublicationId
-          ? await teamOperationRequest<HybridPublicationDetail>(
-              `/hybrid-funnel-publications/${currentPublicationId}`,
-              {
-                method: "PATCH",
-                body: JSON.stringify(payload),
-              },
-            )
-          : await teamOperationRequest<HybridPublicationDetail>(
-              "/hybrid-funnel-publications",
-              {
-                method: "POST",
-                body: JSON.stringify(payload),
-              },
-            );
+        if (!currentPublicationId && mode === "system") {
+          throw new Error(
+            "Este builder de admin solo puede abrir publicaciones híbridas existentes.",
+          );
+        }
+
+        const response =
+          currentPublicationId || mode === "system"
+            ? await teamOperationRequest<HybridPublicationDetail>(
+                `${publicationApiBasePath}/${currentPublicationId}`,
+                {
+                  method: "PATCH",
+                  body: JSON.stringify(payload),
+                },
+              )
+            : await teamOperationRequest<HybridPublicationDetail>(
+                publicationApiBasePath,
+                {
+                  method: "POST",
+                  body: JSON.stringify(payload),
+                },
+              );
 
         setCurrentPublicationId(response.publication.id);
         setSuccessMessage(
@@ -445,6 +483,11 @@ export function TeamVslPublicationEditor({
             ? "Funnel híbrido actualizado y publicado."
             : "Funnel híbrido creado, publicado y listo para edición.",
         );
+        if (editorHref) {
+          router.replace(editorHref);
+          return;
+        }
+
         router.replace(
           `/team/publications/new-vsl?publicationId=${response.publication.id}`,
         );
@@ -469,13 +512,13 @@ export function TeamVslPublicationEditor({
       />
 
       <SectionHeader
-        eyebrow="Team Admin / Publicaciones híbridas"
-        title="Crear o editar funnel VSL/Landing"
-        description="Gestiona el blocksJson y el mediaMap como dos capas separadas del assembly engine. Guardamos la instancia, el landing step y la publicación activa en una sola transacción."
+        eyebrow={headerEyebrow}
+        title={headerTitle}
+        description={headerDescription}
         actions={
           <>
-            <Link href="/team/publications" className={secondaryButtonClassName}>
-              Volver a publicaciones
+            <Link href={backHref} className={secondaryButtonClassName}>
+              {backLabel}
             </Link>
             <button
               type="button"

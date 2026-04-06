@@ -54,6 +54,14 @@ type HybridPublicationDetail = {
 export class HybridFunnelPublicationsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findForSystemTenant(
+    teamId: string,
+    publicationId: string,
+  ): Promise<HybridPublicationDetail> {
+    const scope = await this.resolveSystemScope(teamId);
+    return this.findForTeam(scope, publicationId);
+  }
+
   async findForTeam(
     scope: TeamScope,
     publicationId: string,
@@ -460,6 +468,15 @@ export class HybridFunnelPublicationsService {
     };
   }
 
+  async updateForSystemTenant(
+    teamId: string,
+    publicationId: string,
+    dto: UpdateTeamHybridFunnelPublicationDto,
+  ): Promise<HybridPublicationDetail> {
+    const scope = await this.resolveSystemScope(teamId);
+    return this.updateForTeam(scope, publicationId, dto);
+  }
+
   private normalizeEditorInput(input: {
     name: string;
     domainId: string;
@@ -703,5 +720,36 @@ export class HybridFunnelPublicationsService {
     }
 
     return normalized;
+  }
+
+  private async resolveSystemScope(teamId: string): Promise<TeamScope> {
+    const normalizedTeamId = teamId.trim();
+
+    if (!normalizedTeamId) {
+      throw new BadRequestException({
+        code: 'HYBRID_TEAM_REQUIRED',
+        message: 'A tenant id is required.',
+      });
+    }
+
+    const team = await this.prisma.team.findUnique({
+      where: { id: normalizedTeamId },
+      select: {
+        id: true,
+        workspaceId: true,
+      },
+    });
+
+    if (!team) {
+      throw new NotFoundException({
+        code: 'HYBRID_TEAM_NOT_FOUND',
+        message: 'The selected tenant was not found.',
+      });
+    }
+
+    return {
+      workspaceId: team.workspaceId,
+      teamId: team.id,
+    };
   }
 }

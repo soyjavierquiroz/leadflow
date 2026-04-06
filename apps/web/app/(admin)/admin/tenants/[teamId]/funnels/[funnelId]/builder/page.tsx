@@ -1,0 +1,85 @@
+import { notFound } from "next/navigation";
+import { TeamVslPublicationEditor } from "@/components/team-operations/team-vsl-publication-editor";
+import { getSystemPublications } from "@/lib/system-publications";
+import {
+  getSystemFunnelTemplates,
+  getSystemTenant,
+  getSystemTenantDomains,
+} from "@/lib/system-tenants";
+
+export const dynamic = "force-dynamic";
+
+type AdminTenantFunnelBuilderPageProps = {
+  params: Promise<{
+    teamId: string;
+    funnelId: string;
+  }>;
+};
+
+const pickBuilderPublication = <
+  T extends {
+    isPrimary: boolean;
+    status: string;
+    updatedAt: string;
+    pathPrefix: string;
+  },
+>(
+  rows: T[],
+) =>
+  [...rows].sort((left, right) => {
+    if (left.isPrimary !== right.isPrimary) {
+      return left.isPrimary ? -1 : 1;
+    }
+
+    if ((left.status === "active") !== (right.status === "active")) {
+      return left.status === "active" ? -1 : 1;
+    }
+
+    if ((left.pathPrefix === "/") !== (right.pathPrefix === "/")) {
+      return left.pathPrefix === "/" ? -1 : 1;
+    }
+
+    return right.updatedAt.localeCompare(left.updatedAt);
+  })[0] ?? null;
+
+export default async function AdminTenantFunnelBuilderPage({
+  params,
+}: AdminTenantFunnelBuilderPageProps) {
+  const { teamId, funnelId } = await params;
+  const [tenant, domains, templates, publications] = await Promise.all([
+    getSystemTenant(teamId),
+    getSystemTenantDomains(teamId),
+    getSystemFunnelTemplates(),
+    getSystemPublications(),
+  ]);
+
+  if (!tenant) {
+    notFound();
+  }
+
+  const publication = pickBuilderPublication(
+    publications.filter(
+      (row) => row.teamId === teamId && row.funnel.legacyFunnelId === funnelId,
+    ),
+  );
+
+  if (!publication) {
+    notFound();
+  }
+
+  return (
+    <TeamVslPublicationEditor
+      mode="system"
+      teamId={teamId}
+      initialPublicationId={publication.id}
+      editorHref={`/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(funnelId)}/builder`}
+      backHref={`/admin/tenants/${encodeURIComponent(teamId)}`}
+      backLabel="Volver al tenant"
+      headerEyebrow={`Super Admin / Tenant / ${tenant.code}`}
+      headerTitle={`Funnel Builder de ${tenant.name}`}
+      headerDescription="Esta vista reutiliza el builder híbrido real del embudo publicado, incluyendo media dictionary, blocksJson y configuración SEO."
+      domains={domains.filter((item) => item.status === "active")}
+      templates={templates.filter((item) => item.status !== "archived")}
+    />
+  );
+}
