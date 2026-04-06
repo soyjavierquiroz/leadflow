@@ -9,6 +9,10 @@ type PresignedUploadPayload = {
   publicUrl: string;
 };
 
+type PresignedUploadScope = {
+  teamId?: string;
+};
+
 type ErrorPayload = {
   message?: string;
   error?: string;
@@ -17,6 +21,7 @@ type ErrorPayload = {
 const requestPresignedUploadUrl = async (
   file: File,
   context: StorageUploadContext,
+  scope?: PresignedUploadScope,
 ) => {
   const response = await fetch(
     `${webPublicConfig.urls.api}/v1/storage/presigned-url`,
@@ -30,6 +35,7 @@ const requestPresignedUploadUrl = async (
         fileName: file.name,
         mimeType: file.type,
         context,
+        teamId: scope?.teamId,
       }),
     },
   );
@@ -54,10 +60,12 @@ const requestPresignedUploadUrl = async (
 export const uploadFileWithPresignedUrl = async (
   file: File,
   context: StorageUploadContext,
+  scope?: PresignedUploadScope,
 ) => {
   const { uploadUrl, publicUrl } = await requestPresignedUploadUrl(
     file,
     context,
+    scope,
   );
 
   const uploadResponse = await fetch(uploadUrl, {

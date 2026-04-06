@@ -6,4 +6,5 @@ export class CreatePresignedUploadUrlDto {
   readonly fileName?: string;
   readonly mimeType?: string;
   readonly context?: StorageUploadContext;
+  readonly teamId?: string;
 }

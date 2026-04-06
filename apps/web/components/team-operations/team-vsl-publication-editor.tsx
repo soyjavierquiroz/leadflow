@@ -418,7 +418,9 @@ export function TeamVslPublicationEditor({
     setUploadingRowIndex(targetIndex);
 
     try {
-      const publicUrl = await uploadFileWithPresignedUrl(file, "funnels");
+      const publicUrl = await uploadFileWithPresignedUrl(file, "funnels", {
+        teamId: mode === "system" ? teamId : undefined,
+      });
       handleMediaRowChange(targetIndex, { value: publicUrl });
       setSuccessMessage(`Imagen subida al CDN para ${rowKey}.`);
     } catch (error) {

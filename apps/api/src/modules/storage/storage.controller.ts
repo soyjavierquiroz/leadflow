@@ -2,12 +2,14 @@ import {
   BadRequestException,
   Body,
   Controller,
+  NotFoundException,
   Post,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
+import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreatePresignedUploadUrlDto,
   storageUploadContexts,
@@ -27,7 +29,10 @@ const isStorageUploadContext = (
 @Controller('storage')
 @RequireRoles(UserRole.MEMBER, UserRole.TEAM_ADMIN, UserRole.SUPER_ADMIN)
 export class StorageController {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(
+    private readonly storageService: StorageService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post('presigned-url')
   async createPresignedUploadUrl(
@@ -59,7 +64,7 @@ export class StorageController {
       });
     }
 
-    const bucketPath = this.resolveBucketPath(user, context);
+    const bucketPath = await this.resolveBucketPath(user, context, dto);
     const result = await this.storageService.generatePresignedUploadUrl(
       fileName,
       mimeType,
@@ -69,23 +74,23 @@ export class StorageController {
     return new PresignedUploadUrlDto(result);
   }
 
-  private resolveBucketPath(
+  private async resolveBucketPath(
     user: AuthenticatedUser,
     context: StorageUploadContext,
+    dto: CreatePresignedUploadUrlDto,
   ) {
     const workspaceId = user.workspaceId?.trim();
     const teamId = user.teamId?.trim();
     const sponsorId = user.sponsorId?.trim();
 
-    if (!workspaceId) {
-      throw new BadRequestException({
-        code: 'STORAGE_SCOPE_INVALID',
-        message:
-          'The authenticated user is missing workspace scope.',
-      });
-    }
-
     if (context === 'avatars') {
+      if (!workspaceId) {
+        throw new BadRequestException({
+          code: 'STORAGE_SCOPE_INVALID',
+          message: 'The authenticated user is missing workspace scope.',
+        });
+      }
+
       if (!sponsorId) {
         throw new BadRequestException({
           code: 'STORAGE_SCOPE_INVALID',
@@ -97,7 +102,38 @@ export class StorageController {
       return `${STORAGE_PUBLIC_BUCKET}/avatars/${workspaceId}/${sponsorId}`;
     }
 
-    if (!teamId) {
+    if (user.role === UserRole.SUPER_ADMIN) {
+      const requestedTeamId = dto.teamId?.trim() || teamId;
+
+      if (!requestedTeamId) {
+        throw new BadRequestException({
+          code: 'STORAGE_SCOPE_INVALID',
+          message:
+            'A teamId is required for super admin funnel asset uploads.',
+        });
+      }
+
+      const targetTeam = await this.prisma.team.findUnique({
+        where: {
+          id: requestedTeamId,
+        },
+        select: {
+          id: true,
+          workspaceId: true,
+        },
+      });
+
+      if (!targetTeam) {
+        throw new NotFoundException({
+          code: 'TEAM_NOT_FOUND',
+          message: 'The requested team was not found.',
+        });
+      }
+
+      return `${STORAGE_PUBLIC_BUCKET}/funnels/${targetTeam.workspaceId}/${targetTeam.id}`;
+    }
+
+    if (!workspaceId || !teamId) {
       throw new BadRequestException({
         code: 'STORAGE_SCOPE_INVALID',
         message:
