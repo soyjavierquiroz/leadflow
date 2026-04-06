@@ -57,6 +57,19 @@ const resolveSeoFromRuntime = (runtime: PublicFunnelRuntimePayload) => {
   return { title, description };
 };
 
+const loadRuntimeSafely = async (host: string, path: string) => {
+  try {
+    return await fetchPublicFunnelRuntime({ host, path });
+  } catch (error) {
+    console.error('[site-runtime] Failed to load public funnel runtime', {
+      host,
+      path,
+      error,
+    });
+    return null;
+  }
+};
+
 export async function generateMetadata({
   params,
   searchParams,
@@ -72,7 +85,7 @@ export async function generateMetadata({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtime = await fetchPublicFunnelRuntime({ host, path });
+  const runtime = await loadRuntimeSafely(host, path);
 
   if (!runtime) {
     return {};
@@ -119,7 +132,7 @@ export default async function SiteRuntimePage({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtime = await fetchPublicFunnelRuntime({ host, path });
+  const runtime = await loadRuntimeSafely(host, path);
 
   if (!runtime) {
     notFound();

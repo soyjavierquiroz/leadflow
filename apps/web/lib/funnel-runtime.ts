@@ -1,6 +1,7 @@
 import 'server-only';
 import { webPublicConfig } from '@/lib/public-env';
 import type { PublicFunnelRuntimePayload } from '@/lib/public-funnel-runtime.types';
+import { normalizePublicFunnelRuntimePayload } from '@/lib/public-funnel-runtime-safety';
 
 const normalizeHost = (value: string) => value.trim().toLowerCase().replace(/:\d+$/, '');
 
@@ -43,5 +44,8 @@ export async function fetchPublicFunnelRuntime(params: {
     throw new Error(`Public runtime request failed with ${response.status}.`);
   }
 
-  return (await response.json()) as PublicFunnelRuntimePayload;
+  return normalizePublicFunnelRuntimePayload(await response.json(), {
+    host: params.host,
+    path: params.path,
+  }) as PublicFunnelRuntimePayload;
 }

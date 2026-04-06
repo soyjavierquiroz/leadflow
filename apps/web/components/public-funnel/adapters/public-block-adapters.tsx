@@ -1401,157 +1401,167 @@ export function PublicBlockAdapter({
   blocks,
   layoutVariant = "single_column",
 }: PublicBlockAdapterProps) {
-  switch (normalizeRuntimeBlockType(block.type)) {
-    case "announcement":
-    case "lead_capture_config":
-      return null;
-    case "hero":
-      return (
-        <HeroBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-          layoutVariant={layoutVariant}
-        />
-      );
-    case "hook_and_promise":
-      return (
-        <HookAndPromiseBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-          layoutVariant={layoutVariant}
-        />
-      );
-    case "unique_mechanism":
-      return (
-        <UniqueMechanismBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-          layoutVariant={layoutVariant}
-        />
-      );
-    case "urgency_timer":
-      return (
-        <UrgencyTimerBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-          layoutVariant={layoutVariant}
-        />
-      );
-    case "text":
-      return <TextBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
-    case "video":
-      return <VideoBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
-    case "cta":
-      return <CtaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
-    case "faq":
-    case "faq_social_proof":
-      return (
-        <FaqBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-          layoutVariant={layoutVariant}
-        />
-      );
-    case "lead_capture_form":
-      return (
-        <PublicCaptureForm
-          publicationId={runtime.publication.id}
-          currentStepId={runtime.currentStep.id}
-          block={normalizeLeadCaptureFormBlock(block)}
-        />
-      );
-    case "thank_you":
-      return (
-        <ThankYouBlockAdapter block={block} runtime={runtime} blocks={blocks} />
-      );
-    case "thank_you_reveal":
-      return (
-        <ThankYouRevealBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-        />
-      );
-    case "conversion_page_config":
-      return (
-        <ConversionPageBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-        />
-      );
-    case "sponsor_reveal_placeholder":
-      return (
-        <AssignedSponsorReveal
-          runtime={runtime}
-          title={asString(block.title, "Sponsor asignado")}
-          description={asString(block.description) || undefined}
-        />
-      );
-    case "social_proof":
-      return (
-        <SocialProofBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-          layoutVariant={layoutVariant}
-        />
-      );
-    case "risk_reversal":
-      return (
-        <RiskReversalBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-          layoutVariant={layoutVariant}
-        />
-      );
-    case "testimonial":
-    case "testimonials":
-      return (
-        <TestimonialsBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-        />
-      );
-    case "feature_grid":
-      return (
-        <FeatureGridBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-        />
-      );
-    case "media":
-    case "image":
-      return <MediaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
-    case "offer_pricing":
-      return <OfferBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
-    case "grand_slam_offer":
-      return (
-        <PublicGrandSlamOfferBlock
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-          hideDesktopMedia={layoutVariant === "sticky_media"}
-          variant={layoutVariant === "sticky_media" ? "flat" : "default"}
-        />
-      );
-    case "whatsapp_handoff_cta":
-      return (
-        <WhatsappHandoffCtaBlockAdapter
-          block={block}
-          runtime={runtime}
-          blocks={blocks}
-        />
-      );
-    default:
+  try {
+    switch (normalizeRuntimeBlockType(block.type)) {
+      case "announcement":
+      case "lead_capture_config":
+        return null;
+      case "hero":
+        return (
+          <HeroBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "hook_and_promise":
+        return (
+          <HookAndPromiseBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "unique_mechanism":
+        return (
+          <UniqueMechanismBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "urgency_timer":
+        return (
+          <UrgencyTimerBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "text":
+        return <TextBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+      case "video":
+        return <VideoBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+      case "cta":
+        return <CtaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+      case "faq":
+      case "faq_social_proof":
+        return (
+          <FaqBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "lead_capture_form":
+        return (
+          <PublicCaptureForm
+            publicationId={runtime.publication.id}
+            currentStepId={runtime.currentStep.id}
+            block={normalizeLeadCaptureFormBlock(block)}
+          />
+        );
+      case "thank_you":
+        return (
+          <ThankYouBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+        );
+      case "thank_you_reveal":
+        return (
+          <ThankYouRevealBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+          />
+        );
+      case "conversion_page_config":
+        return (
+          <ConversionPageBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+          />
+        );
+      case "sponsor_reveal_placeholder":
+        return (
+          <AssignedSponsorReveal
+            runtime={runtime}
+            title={asString(block.title, "Sponsor asignado")}
+            description={asString(block.description) || undefined}
+          />
+        );
+      case "social_proof":
+        return (
+          <SocialProofBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "risk_reversal":
+        return (
+          <RiskReversalBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "testimonial":
+      case "testimonials":
+        return (
+          <TestimonialsBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+          />
+        );
+      case "feature_grid":
+        return (
+          <FeatureGridBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+          />
+        );
+      case "media":
+      case "image":
+        return <MediaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+      case "offer_pricing":
+        return <OfferBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+      case "grand_slam_offer":
+        return (
+          <PublicGrandSlamOfferBlock
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            hideDesktopMedia={layoutVariant === "sticky_media"}
+            variant={layoutVariant === "sticky_media" ? "flat" : "default"}
+          />
+        );
+      case "whatsapp_handoff_cta":
+        return (
+          <WhatsappHandoffCtaBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+          />
+        );
+      default:
+        return null;
+    }
+  } catch (error) {
+    console.error("[public-funnel] Failed to render block", {
+      blockType: block?.type ?? "unknown",
+      layoutVariant,
+      error,
+    });
+
       return null;
   }
 }

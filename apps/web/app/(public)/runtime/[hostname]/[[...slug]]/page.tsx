@@ -24,22 +24,29 @@ export default async function PublicRuntimePage({
 }: PublicRuntimePageProps) {
   const { hostname, slug } = await params;
   const path = resolvePublicRuntimePath(slug);
-  const runtime = await fetchPublicRuntimeResolution({
-    hostname,
-    path,
-  });
+  let runtime = null;
 
-  if (!runtime) {
-    notFound();
+  try {
+    runtime = await fetchPublicRuntimeResolution({
+      hostname,
+      path,
+    });
+  } catch (error) {
+    console.error('[public-runtime] Runtime resolution failed', {
+      hostname,
+      path,
+      error,
+    });
   }
 
-  const normalizedHostname = runtime.request.hostname.trim().toLowerCase();
+  const normalizedHostname = runtime?.request?.hostname?.trim().toLowerCase() || hostname.trim().toLowerCase();
   const normalizedPath = path.trim().toLowerCase();
   const runtimeIdentity = [
-    runtime.funnel.name,
-    runtime.funnelInstance.name,
-    runtime.funnelInstance.code,
+    runtime?.funnel?.name,
+    runtime?.funnelInstance?.name,
+    runtime?.funnelInstance?.code,
   ]
+    .filter((value): value is string => Boolean(value))
     .join(' ')
     .toLowerCase();
   const shouldRenderImmunocalUi =
@@ -49,22 +56,34 @@ export default async function PublicRuntimePage({
       normalizedHostname === 'www.retodetransformacion.com') &&
       normalizedPath === '/inmuno');
 
-  if (shouldRenderImmunocalUi) {
-    const legacyRuntime = await fetchPublicFunnelRuntime({
-      host: runtime.request.hostname,
-      path,
-    });
+  if (!runtime || shouldRenderImmunocalUi) {
+    try {
+      const legacyRuntime = await fetchPublicFunnelRuntime({
+        host: runtime?.request?.hostname || hostname,
+        path,
+      });
 
-    if (legacyRuntime) {
-      return (
-        <PublicRuntimeLeadSubmitProvider
-          hostname={runtime.request.hostname}
-          path={path}
-        >
-          <FunnelRuntimePage runtime={legacyRuntime} />
-        </PublicRuntimeLeadSubmitProvider>
-      );
+      if (legacyRuntime) {
+        return (
+          <PublicRuntimeLeadSubmitProvider
+            hostname={runtime?.request?.hostname || hostname}
+            path={path}
+          >
+            <FunnelRuntimePage runtime={legacyRuntime} />
+          </PublicRuntimeLeadSubmitProvider>
+        );
+      }
+    } catch (error) {
+      console.error('[public-runtime] Legacy runtime fallback failed', {
+        hostname,
+        path,
+        error,
+      });
     }
+  }
+
+  if (!runtime) {
+    notFound();
   }
 
   return (
@@ -75,20 +94,20 @@ export default async function PublicRuntimePage({
             Public Runtime
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950">
-            {runtime.funnel.name}
+            {runtime.funnel?.name || 'Public Runtime'}
           </h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            {runtime.funnel.description?.trim() || 'Sin descripcion configurada para este funnel aun.'}
+            {runtime.funnel?.description?.trim() || 'Sin descripcion configurada para este funnel aun.'}
           </p>
           <div className="mt-6 flex flex-wrap gap-3 text-sm text-slate-500">
             <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
-              Host: {runtime.request.hostname}
+              Host: {runtime.request?.hostname || hostname}
             </span>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
-              Path: {runtime.request.path}
+              Path: {runtime.request?.path || path}
             </span>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
-              Publication: {runtime.publication.id}
+              Publication: {runtime.publication?.id || 'n/a'}
             </span>
           </div>
         </header>
@@ -98,7 +117,7 @@ export default async function PublicRuntimePage({
             Funnel config JSON
           </div>
           <pre className="overflow-x-auto p-6 text-sm leading-7 text-slate-100">
-            <code>{JSON.stringify(runtime.funnel.config, null, 2)}</code>
+            <code>{JSON.stringify(runtime.funnel?.config ?? {}, null, 2)}</code>
           </pre>
         </section>
 

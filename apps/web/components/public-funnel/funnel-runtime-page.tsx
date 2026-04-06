@@ -26,23 +26,30 @@ export function FunnelRuntimePage({
   runtime,
   previewHost,
 }: FunnelRuntimePageProps) {
-  const parsedBlocks = parseRuntimeBlocks(runtime.currentStep.blocksJson);
+  const currentStep = runtime.currentStep;
+  const steps = runtime.steps ?? [];
+  const totalSteps = Math.max(steps.length, 1);
+  const currentStepPath = currentStep?.path || '/';
+  const currentStepPosition = Math.min(
+    Math.max(currentStep?.position ?? 1, 1),
+    totalSteps,
+  );
+  const parsedBlocks = parseRuntimeBlocks(currentStep?.blocksJson ?? []);
   const blocks = parsedBlocks.blocks;
   const hasRenderableBlocks = blocks.length > 0;
   const isConversionPage = blocks.some(
     (block) => normalizeRuntimeBlockType(block.type) === "conversion_page_config",
   );
   const entryStepPath =
-    runtime.steps.find((step) => step.isEntryStep)?.path ??
-    runtime.currentStep.path;
+    steps.find((step) => step.isEntryStep)?.path ?? currentStepPath;
   const progressValue = Math.max(
     1,
-    Math.round((runtime.currentStep.position / runtime.steps.length) * 100),
+    Math.round((currentStepPosition / totalSteps) * 100),
   );
   const mediaAssetCount = [
-    runtime.currentStep.mediaMap,
-    runtime.funnel.mediaMap,
-    runtime.funnel.template.mediaMap,
+    currentStep?.mediaMap ?? {},
+    runtime.funnel?.mediaMap ?? {},
+    runtime.funnel?.template?.mediaMap ?? {},
   ].reduce<number>((count, candidate) => {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
       return count;
@@ -122,9 +129,9 @@ export function FunnelRuntimePage({
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <PublicPill>{runtime.domain.host}</PublicPill>
-                  <PublicPill>{runtime.request.path}</PublicPill>
+                  <PublicPill>{runtime.request.path || currentStepPath}</PublicPill>
                   <PublicPill>
-                    Template {runtime.funnel.template.name}
+                    Template {runtime.funnel.template?.name || "Legacy Template"}
                   </PublicPill>
                   {parsedBlocks.compatibility.mode === "leadflow_compatible" ? (
                     <PublicPill tone="warm">JSON compatible</PublicPill>
@@ -143,7 +150,7 @@ export function FunnelRuntimePage({
                 <StatusBadge value={runtime.currentStep.stepType} />
                 <PublicPill>Funnel {runtime.funnel.name}</PublicPill>
                 <PublicPill>
-                  Paso {runtime.currentStep.position} de {runtime.steps.length}
+                  Paso {currentStepPosition} de {totalSteps}
                 </PublicPill>
               </div>
             </div>
