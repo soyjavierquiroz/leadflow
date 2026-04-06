@@ -24,11 +24,11 @@ describe('messaging integrations utils', () => {
 
     expect(
       buildAutomationWebhookUrl(
-        'https://n8n.leadflow.kurukin.com/webhook/leadflow',
+        'https://n8n.leadflow.kuruk.in/webhook/leadflow',
         'leadflow-north-ana',
       ),
     ).toBe(
-      'https://n8n.leadflow.kurukin.com/webhook/leadflow/leadflow-north-ana',
+      'https://n8n.leadflow.kuruk.in/webhook/leadflow/leadflow-north-ana',
     );
   });
 

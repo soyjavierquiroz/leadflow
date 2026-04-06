@@ -25,7 +25,7 @@ Stack file: `infra/swarm/docker-stack.yml`
 - [ ] Verificar acceso pull desde entorno Swarm/Portainer.
 
 3. Dominio y red
-- [ ] DNS de `exitosos.com`, `members.exitosos.com`, `admin.exitosos.com`, `api.exitosos.com` apuntando a `104.236.36.75`.
+- [ ] DNS de `exitosos.com`, `members.exitosos.com`, `admin.exitosos.com`, `api.exitosos.com` apuntando a `${LEADFLOW_SWARM_ORIGIN_IP}`.
 - [ ] Red externa `traefik_public` existente en Swarm.
 - [ ] Sin colision de routers/hosts en Traefik.
 

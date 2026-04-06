@@ -8,6 +8,10 @@ Flujo operativo real:
 
 `Traefik -> Docker Swarm -> web -> api -> Prisma/Postgres -> Runtime Context Central -> n8n dispatcher`
 
+Leadflow ahora opera en un clúster Swarm unificado, conectado a las redes externas `traefik_public` y `general_network`.
+
+La base de datos ya no está aislada por stack. El despliegue consume el clúster centralizado en `postgres_postgres`.
+
 Piezas principales:
 
 - `apps/web`: Next.js. Atiende el sitio principal y el runtime público por `HostRegexp`.
@@ -53,7 +57,6 @@ Secuencia operativa actual:
 Usa solo estos archivos:
 
 - producción: `infra/swarm/docker-stack.yml`
-- local Swarm: `infra/swarm/docker-stack.local.yml`
 - desarrollo con Compose: `infra/docker/docker-compose.dev.yml`
 - variables ejemplo de Swarm: `infra/swarm/.env.example`
 - variables ejemplo de API: `apps/api/.env.example`
@@ -174,36 +177,21 @@ pnpm db:seed
 
 ## Despliegue a Swarm
 
-1. Crea un archivo de entorno a partir de `infra/swarm/.env.example`.
-2. Define al menos `DATABASE_URL` y `N8N_DISPATCHER_WEBHOOK_URL`.
-3. Construye y publica imágenes.
-4. Despliega el stack canónico.
+El despliegue oficial se realiza a través del Web Editor de Portainer, no por consola directa.
 
-Ejemplo de despliegue desde la raíz:
+Procedimiento oficial:
 
-```bash
-set -a
-source infra/swarm/.env.deploy
-set +a
+1. Usa `infra/swarm/docker-stack.yml` como fuente de verdad para el stack.
+2. Abre el stack en Portainer y pega el contenido en el Web Editor.
+3. Inyecta las variables de entorno en `Advanced Mode`, tomando como referencia `infra/swarm/.env.example`.
+4. Define al menos `DATABASE_URL`, `N8N_DISPATCHER_WEBHOOK_URL` y los hosts `*.kuruk.in` antes de desplegar.
+5. Publica el stack sobre las redes externas `traefik_public` y `general_network`.
+6. Verifica que la conexión a Postgres apunte al servicio central `postgres_postgres`.
 
-docker build \
-  --target runner \
-  -f apps/api/Dockerfile \
-  -t ghcr.io/soyjavierquiroz/leadflow-api:latest \
-  .
+Notas operativas:
 
-docker build \
-  --target runner \
-  -f apps/web/Dockerfile \
-  -t ghcr.io/soyjavierquiroz/leadflow-web:latest \
-  .
-
-docker stack deploy \
-  --with-registry-auth \
-  --resolve-image never \
-  -c infra/swarm/docker-stack.yml \
-  leadflow
-```
+- No se considera flujo oficial ejecutar `docker stack deploy` manualmente desde shell en este servidor.
+- Los secretos deben existir solo en Portainer `Advanced Mode` o en archivos locales ignorados por Git.
 
 ## Dispatcher n8n
 

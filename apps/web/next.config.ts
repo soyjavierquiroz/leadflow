@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'cdn.kurukin.com',
+        hostname: 'cdn.kuruk.in',
       },
     ],
   },

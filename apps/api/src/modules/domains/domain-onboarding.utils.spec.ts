@@ -21,10 +21,10 @@ describe('domain onboarding utils', () => {
     const instructions = buildDomainDnsInstructions({
       host: 'promo.cliente.com',
       domainType: 'custom_subdomain',
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       verificationMethod: 'cname',
       cloudflareStatusJson: null,
-      fallbackOrigin: 'proxy-fallback.leadflow.kurukin.com',
+      fallbackOrigin: 'proxy-fallback.leadflow.kuruk.in',
     });
 
     expect(instructions).toEqual(
@@ -32,7 +32,7 @@ describe('domain onboarding utils', () => {
         expect.objectContaining({
           type: 'cname',
           host: 'promo.cliente.com',
-          value: 'customers.leadflow.kurukin.com',
+          value: 'customers.leadflow.kuruk.in',
         }),
       ]),
     );
@@ -47,13 +47,13 @@ describe('domain onboarding utils', () => {
   it('marks a managed custom hostname as active when hostname and ssl are active', () => {
     const lifecycle = deriveDomainLifecycle({
       domainType: 'custom_subdomain',
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       cloudflareCustomHostnameId: 'cf-hostname-1',
       cloudflareStatusJson: {
         id: 'cf-hostname-1',
         hostname: 'promo.cliente.com',
         status: 'active',
-        customOriginServer: 'proxy-fallback.leadflow.kurukin.com',
+        customOriginServer: 'proxy-fallback.leadflow.kuruk.in',
         verificationErrors: [],
         ownershipVerification: null,
         ssl: {
@@ -77,7 +77,7 @@ describe('domain onboarding utils', () => {
   it('keeps a custom hostname in pending_dns before Cloudflare activation', () => {
     const lifecycle = deriveDomainLifecycle({
       domainType: 'custom_subdomain',
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       cloudflareCustomHostnameId: null,
       cloudflareStatusJson: null,
     });
@@ -112,8 +112,8 @@ describe('domain onboarding utils', () => {
         },
       },
       {
-        customerCnameTarget: 'customers.leadflow.kurukin.com',
-        fallbackOrigin: 'proxy-fallback.leadflow.kurukin.com',
+        customerCnameTarget: 'customers.leadflow.kuruk.in',
+        fallbackOrigin: 'proxy-fallback.leadflow.kuruk.in',
       },
     );
 

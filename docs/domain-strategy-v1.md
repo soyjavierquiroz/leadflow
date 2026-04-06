@@ -6,7 +6,7 @@ Definir estrategia de dominio desacoplada para que Leadflow cambie de dominio en
 ## Estado actual
 - Dominio temporal de staging: `exitosos.com`.
 - Dominio definitivo de lanzamiento: pendiente de definicion.
-- IP de referencia para fase de infraestructura: `104.236.36.75`.
+- IP de referencia para fase de infraestructura: `${LEADFLOW_SWARM_ORIGIN_IP}`.
 
 ## Principio rector
 El dominio es configuracion de entorno, no una constante del producto.

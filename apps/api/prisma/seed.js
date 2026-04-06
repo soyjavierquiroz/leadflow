@@ -141,7 +141,7 @@ async function main() {
       pairingCode: null,
       pairingExpiresAt: null,
       automationWebhookUrl:
-        'https://n8n.leadflow.kurukin.com/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
+        'https://n8n.leadflow.kuruk.in/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
       automationEnabled: true,
       metadataJson: {
         seeded: true,
@@ -167,7 +167,7 @@ async function main() {
       pairingCode: null,
       pairingExpiresAt: null,
       automationWebhookUrl:
-        'https://n8n.leadflow.kurukin.com/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
+        'https://n8n.leadflow.kuruk.in/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
       automationEnabled: true,
       metadataJson: {
         seeded: true,
@@ -437,7 +437,7 @@ async function main() {
         id: 'cf-custom-hostname-promo-acme-test',
         hostname: secondaryDomainHost,
         status: 'active',
-        customOriginServer: 'proxy-fallback.leadflow.kurukin.com',
+        customOriginServer: 'proxy-fallback.leadflow.kuruk.in',
         verificationErrors: [],
         ownershipVerification: null,
         ssl: {
@@ -450,7 +450,7 @@ async function main() {
         error: null,
         raw: null,
       },
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       lastCloudflareSyncAt: new Date(),
       activatedAt: new Date(),
     },
@@ -473,7 +473,7 @@ async function main() {
         id: 'cf-custom-hostname-promo-acme-test',
         hostname: secondaryDomainHost,
         status: 'active',
-        customOriginServer: 'proxy-fallback.leadflow.kurukin.com',
+        customOriginServer: 'proxy-fallback.leadflow.kuruk.in',
         verificationErrors: [],
         ownershipVerification: null,
         ssl: {
@@ -486,7 +486,7 @@ async function main() {
         error: null,
         raw: null,
       },
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       lastCloudflareSyncAt: new Date(),
       activatedAt: new Date(),
     },
@@ -511,7 +511,7 @@ async function main() {
       verificationMethod: 'cname',
       cloudflareCustomHostnameId: null,
       cloudflareStatusJson: null,
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       lastCloudflareSyncAt: null,
       activatedAt: null,
     },
@@ -531,7 +531,7 @@ async function main() {
       verificationMethod: 'cname',
       cloudflareCustomHostnameId: null,
       cloudflareStatusJson: null,
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       lastCloudflareSyncAt: null,
       activatedAt: null,
     },

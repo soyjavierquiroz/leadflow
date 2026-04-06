@@ -102,8 +102,8 @@ describe('DomainsService', () => {
 
     const cloudflareSaasClient: CloudflareSaasClientMock = {
       isConfigured: jest.fn(() => true),
-      getFallbackOrigin: jest.fn(() => 'proxy-fallback.leadflow.kurukin.com'),
-      getCustomerCnameTarget: jest.fn(() => 'customers.leadflow.kurukin.com'),
+      getFallbackOrigin: jest.fn(() => 'proxy-fallback.leadflow.kuruk.in'),
+      getCustomerCnameTarget: jest.fn(() => 'customers.leadflow.kuruk.in'),
       deleteCustomHostname: jest.fn<Promise<void>, [string]>(() =>
         Promise.resolve(),
       ),
@@ -131,7 +131,7 @@ describe('DomainsService', () => {
       onboardingStatus: 'pending_dns',
       verificationStatus: 'pending',
       sslStatus: 'pending',
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       cloudflareCustomHostnameId: null,
       cloudflareStatusJson: null,
       lastCloudflareSyncAt: null,
@@ -165,12 +165,12 @@ describe('DomainsService', () => {
     );
     expect(updateCall?.data.domainType).toBe('custom_subdomain');
     expect(updateCall?.data.canonicalHost).toBe('www.retodetransformacion.com');
-    expect(updateCall?.data.dnsTarget).toBe('customers.leadflow.kurukin.com');
+    expect(updateCall?.data.dnsTarget).toBe('customers.leadflow.kuruk.in');
     expect(updateCall?.data.cloudflareCustomHostnameId).toBeNull();
     expect(syncDomainToCloudflareSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         host: 'www.retodetransformacion.com',
-        dnsTarget: 'customers.leadflow.kurukin.com',
+        dnsTarget: 'customers.leadflow.kuruk.in',
       }),
       {
         mode: 'create',
@@ -178,7 +178,7 @@ describe('DomainsService', () => {
       },
     );
     expect(result.host).toBe('www.retodetransformacion.com');
-    expect(result.dnsTarget).toBe('customers.leadflow.kurukin.com');
+    expect(result.dnsTarget).toBe('customers.leadflow.kuruk.in');
   });
 
   it('recreates onboarding with explicit overrides from the request body', async () => {
@@ -196,7 +196,7 @@ describe('DomainsService', () => {
       onboardingStatus: 'pending_dns',
       verificationStatus: 'pending',
       sslStatus: 'pending',
-      dnsTarget: 'customers.leadflow.kurukin.com',
+      dnsTarget: 'customers.leadflow.kuruk.in',
       cloudflareCustomHostnameId: null,
       cloudflareStatusJson: null,
       lastCloudflareSyncAt: null,
@@ -245,7 +245,7 @@ describe('DomainsService', () => {
     expect(updateCall?.data.isPrimary).toBe(true);
     expect(updateCall?.data.redirectToPrimary).toBe(true);
     expect(updateCall?.data.verificationMethod).toBe('txt');
-    expect(updateCall?.data.dnsTarget).toBe('customers.leadflow.kurukin.com');
+    expect(updateCall?.data.dnsTarget).toBe('customers.leadflow.kuruk.in');
     expect(result.host).toBe('clientes.retodetransformacion.com');
     expect(result.domainType).toBe('custom_apex');
     expect(result.canonicalHost).toBe('retodetransformacion.com');

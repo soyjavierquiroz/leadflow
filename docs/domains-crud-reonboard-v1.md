@@ -28,12 +28,12 @@ Cerrar la operación de `/team/domains` para que el team pueda:
 
 ## Reglas de negocio
 
-- El target sano del SaaS es siempre `customers.leadflow.kurukin.com`.
-- `proxy-fallback.leadflow.kurukin.com` queda solo como `fallback origin` interno.
+- El target sano del SaaS es siempre `customers.leadflow.kuruk.in`.
+- `proxy-fallback.leadflow.kuruk.in` queda solo como `fallback origin` interno.
 - Si un dominio usa un `dnsTarget` distinto al target sano, Leadflow lo marca:
   - `legacy`
   - `recreate required`
-- Si Cloudflare sigue apuntando a un `custom_origin_server` distinto de `proxy-fallback.leadflow.kurukin.com`, también se marca `legacy`.
+- Si Cloudflare sigue apuntando a un `custom_origin_server` distinto de `proxy-fallback.leadflow.kuruk.in`, también se marca `legacy`.
 - Un dominio `legacy` no se muestra como flujo sano en la UI aunque Cloudflare diga `active`.
 
 ## UI `/team/domains`
@@ -68,8 +68,8 @@ Flujo correcto:
 3. Ejecutar `Recrear onboarding`.
 4. Leadflow elimina el `custom hostname` viejo en Cloudflare.
 5. Leadflow crea un `custom hostname` nuevo usando:
-   - `dnsTarget=customers.leadflow.kurukin.com`
-   - `custom_origin_server=proxy-fallback.leadflow.kurukin.com`
+   - `dnsTarget=customers.leadflow.kuruk.in`
+   - `custom_origin_server=proxy-fallback.leadflow.kuruk.in`
 6. La UI vuelve a mostrar instrucciones DNS limpias y estado sincronizado.
 
 ## Ejemplo: `www.retodetransformacion.com`
@@ -84,7 +84,7 @@ Para recrearlo bajo el modelo nuevo:
    - `domainType=custom_subdomain`
 5. Guardar.
 6. Verificar que el dominio quede con:
-   - `dnsTarget=customers.leadflow.kurukin.com`
+   - `dnsTarget=customers.leadflow.kuruk.in`
    - `cloudflare status` en progreso o `active`
    - `ssl status` en progreso o `active`
    - sin badges `legacy` ni `recreate required`
@@ -93,7 +93,7 @@ Para recrearlo bajo el modelo nuevo:
 
 Este flujo no agrega dominios cliente a Traefik ni a YAML. El stack sigue usando solo:
 
-- `leadflow.kurukin.com`
-- `api.leadflow.kurukin.com`
-- `customers.leadflow.kurukin.com`
-- `proxy-fallback.leadflow.kurukin.com`
+- `leadflow.kuruk.in`
+- `api.leadflow.kuruk.in`
+- `customers.leadflow.kuruk.in`
+- `proxy-fallback.leadflow.kuruk.in`

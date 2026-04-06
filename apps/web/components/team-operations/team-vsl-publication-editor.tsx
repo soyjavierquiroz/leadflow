@@ -810,7 +810,7 @@ export function TeamVslPublicationEditor({
                         onChange={(event) =>
                           handleMediaRowChange(index, { value: event.target.value })
                         }
-                        placeholder="https://cdn.kurukin.com/funnels/..."
+                        placeholder="https://cdn.kuruk.in/funnels/..."
                         disabled={uploadingRowIndex !== null}
                         className="w-full min-w-72 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
                       />

@@ -17,7 +17,7 @@ Validar, despues de actualizar el stack `leadflow` en Portainer, que TLS en orig
 Usar la IP del origen:
 
 ```bash
-ORIGIN_IP=104.236.36.75
+ORIGIN_IP=${LEADFLOW_SWARM_ORIGIN_IP}
 ```
 
 ### 1) Apex

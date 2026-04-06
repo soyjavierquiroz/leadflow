@@ -10,7 +10,7 @@ Auditoria tecnica realizada el 29 de marzo de 2026 sobre el flujo publico de lea
 - Archivo: `apps/api/src/modules/public-funnel-runtime/public-funnel-runtime.controller.ts`
 - Prefijo global: `v1` configurado en `apps/api/src/main.ts`
 - Endpoint efectivo: `POST /v1/public/funnel-runtime/submissions`
-- URL de produccion esperada: `https://api.leadflow.kurukin.com/v1/public/funnel-runtime/submissions`
+- URL de produccion esperada: `https://api.leadflow.kuruk.in/v1/public/funnel-runtime/submissions`
 
 ### Flujo del submit
 
@@ -118,12 +118,12 @@ Fuente: `apps/api/src/config/runtime.ts`
 
 Fuente: `infra/swarm/docker-stack.yml`
 
-- `API_URL`: `https://api.leadflow.kurukin.com`
-- `CORS_ALLOWED_ORIGINS`: `https://leadflow.kurukin.com`
+- `API_URL`: `https://api.leadflow.kuruk.in`
+- `CORS_ALLOWED_ORIGINS`: `https://leadflow.kuruk.in`
 
 ### Evidencia del despliegue actual
 
-Prueba real ejecutada el 29 de marzo de 2026 contra `https://api.leadflow.kurukin.com/health`:
+Prueba real ejecutada el 29 de marzo de 2026 contra `https://api.leadflow.kuruk.in/health`:
 
 ```json
 {
@@ -132,8 +132,8 @@ Prueba real ejecutada el 29 de marzo de 2026 contra `https://api.leadflow.kuruki
   "version": "0.2.0",
   "environment": "production",
   "globalPrefix": "v1",
-  "baseUrl": "https://api.leadflow.kurukin.com",
-  "corsAllowedOrigins": ["https://leadflow.kurukin.com"]
+  "baseUrl": "https://api.leadflow.kuruk.in",
+  "corsAllowedOrigins": ["https://leadflow.kuruk.in"]
 }
 ```
 
@@ -141,7 +141,7 @@ Prueba real ejecutada el 29 de marzo de 2026 contra `https://api.leadflow.kuruki
 
 Hoy la whitelist efectiva observada en produccion es:
 
-- `https://leadflow.kurukin.com`
+- `https://leadflow.kuruk.in`
 
 No aparece:
 
@@ -152,14 +152,14 @@ No aparece:
 
 Diagnostico principal:
 
-1. El navegador envia un preflight `OPTIONS` a `https://api.leadflow.kurukin.com/v1/public/funnel-runtime/submissions` con `Origin: https://retodetransformacion.com`.
+1. El navegador envia un preflight `OPTIONS` a `https://api.leadflow.kuruk.in/v1/public/funnel-runtime/submissions` con `Origin: https://retodetransformacion.com`.
 2. El API responde `204`, pero no incluye `Access-Control-Allow-Origin` para ese origin porque no esta en `corsAllowedOrigins`.
 3. El navegador bloquea la respuesta por politica CORS.
 4. `fetch()` no expone el detalle del rechazo y el frontend ve el error generico `TypeError: Failed to fetch`.
 
 Diagnostico secundario posible:
 
-1. Si el frontend apunta por error a `https://leadflow.kurukin.com/v1/...` en lugar de `https://api.leadflow.kurukin.com/v1/...`,
+1. Si el frontend apunta por error a `https://leadflow.kuruk.in/v1/...` en lugar de `https://api.leadflow.kuruk.in/v1/...`,
 2. el request no golpea el backend Nest sino la app Next.js publica,
 3. y hoy eso devuelve `400` al preflight y `404` al `POST`.
 
@@ -169,11 +169,11 @@ Agregar como minimo estos origins al despliegue del API:
 
 - `https://retodetransformacion.com`
 - `https://www.retodetransformacion.com`
-- mantener `https://leadflow.kurukin.com`
+- mantener `https://leadflow.kuruk.in`
 
 Y confirmar que `NEXT_PUBLIC_API_URL` del frontend publico apunte a:
 
-- `https://api.leadflow.kurukin.com`
+- `https://api.leadflow.kuruk.in`
 
 ## 4. Contrato de respuesta del submit exitoso
 

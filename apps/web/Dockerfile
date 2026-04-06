@@ -16,10 +16,10 @@ COPY packages/types/package.json packages/types/package.json
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 FROM deps AS builder
-ARG NEXT_PUBLIC_APP_BASE_DOMAIN=leadflow.kurukin.com
-ARG NEXT_PUBLIC_API_URL=https://api.leadflow.kurukin.com
-ARG NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=customers.leadflow.kurukin.com
-ARG NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=proxy-fallback.leadflow.kurukin.com
+ARG NEXT_PUBLIC_APP_BASE_DOMAIN=leadflow.kuruk.in
+ARG NEXT_PUBLIC_API_URL=https://api.leadflow.kuruk.in
+ARG NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=customers.leadflow.kuruk.in
+ARG NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=proxy-fallback.leadflow.kuruk.in
 ENV NEXT_PUBLIC_APP_BASE_DOMAIN=$NEXT_PUBLIC_APP_BASE_DOMAIN
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=$NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET
@@ -38,10 +38,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-ARG NEXT_PUBLIC_APP_BASE_DOMAIN=leadflow.kurukin.com
-ARG NEXT_PUBLIC_API_URL=https://api.leadflow.kurukin.com
-ARG NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=customers.leadflow.kurukin.com
-ARG NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=proxy-fallback.leadflow.kurukin.com
+ARG NEXT_PUBLIC_APP_BASE_DOMAIN=leadflow.kuruk.in
+ARG NEXT_PUBLIC_API_URL=https://api.leadflow.kuruk.in
+ARG NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=customers.leadflow.kuruk.in
+ARG NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=proxy-fallback.leadflow.kuruk.in
 ENV NEXT_PUBLIC_APP_BASE_DOMAIN=$NEXT_PUBLIC_APP_BASE_DOMAIN
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=$NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET

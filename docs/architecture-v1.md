@@ -342,8 +342,8 @@ La arquitectura ya implementa:
 
 Hostnames fijos del SaaS:
 
-- `proxy-fallback.leadflow.kurukin.com`: origin fijo que Cloudflare usa para llegar al runtime
-- `customers.leadflow.kurukin.com`: target DNS único que Leadflow entrega a clientes
+- `proxy-fallback.leadflow.kuruk.in`: origin fijo que Cloudflare usa para llegar al runtime
+- `customers.leadflow.kuruk.in`: target DNS único que Leadflow entrega a clientes
 
 Flujo:
 
@@ -355,7 +355,7 @@ Flujo:
 6. `Refresh` reimpulsa la validación y consulta del custom hostname
 7. si el registro quedó con `dnsTarget` o `custom_origin_server` legado, Leadflow lo marca `legacy` y `recreate required`
 8. `Recreate onboarding` elimina el custom hostname viejo, crea uno nuevo bajo el flujo actual y regenera `dnsTarget`
-9. cuando hostname + SSL quedan en `active` y el target coincide con `customers.leadflow.kurukin.com`, el domain pasa a operación
+9. cuando hostname + SSL quedan en `active` y el target coincide con `customers.leadflow.kuruk.in`, el domain pasa a operación
 
 La UI devuelve:
 
@@ -379,7 +379,7 @@ Reglas por tipo:
 - `custom_subdomain`: flujo principal por `CNAME` hacia el target SaaS
 - `custom_apex`: onboarding modelado y documentado; la activación final depende de soporte real de apex proxying
 - `system_subdomain`: host gestionado internamente por Leadflow
-- nunca se expone `proxy-fallback.leadflow.kurukin.com` como target DNS del cliente; ese host queda solo como origin interno de Cloudflare
+- nunca se expone `proxy-fallback.leadflow.kuruk.in` como target DNS del cliente; ese host queda solo como origin interno de Cloudflare
 
 ### Resolucion `host + path`
 
@@ -455,12 +455,12 @@ Decision de transicion:
   - `leadflow_core`
   - `leadflow_automation` (placeholder)
 - Routing Traefik por host:
-  - `leadflow.kurukin.com` -> `web` (router explícito)
-  - `api.leadflow.kurukin.com` -> `api` (router explícito)
+  - `leadflow.kuruk.in` -> `web` (router explícito)
+  - `api.leadflow.kuruk.in` -> `api` (router explícito)
   - `HostRegexp({host:.+})` -> `web` (router catch-all público)
 - El catch-all sirve:
-  - `customers.leadflow.kurukin.com`
-  - `proxy-fallback.leadflow.kurukin.com`
+  - `customers.leadflow.kuruk.in`
+  - `proxy-fallback.leadflow.kuruk.in`
   - cualquier custom hostname proxied desde Cloudflare
 - No se agregan dominios cliente uno por uno al stack.
 

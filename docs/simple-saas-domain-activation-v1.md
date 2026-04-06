@@ -6,16 +6,16 @@ Dejar el onboarding de dominios con un flujo simple y soportado oficialmente par
 
 ## Hostnames fijos del SaaS
 
-- `customers.leadflow.kurukin.com`
+- `customers.leadflow.kuruk.in`
   - target CNAME único para clientes
-- `proxy-fallback.leadflow.kurukin.com`
+- `proxy-fallback.leadflow.kuruk.in`
   - fallback origin fijo para Cloudflare
 
 ## Flujo soportado oficialmente en v1
 
 1. el usuario registra un `custom_subdomain`
 2. Leadflow crea o actualiza el custom hostname en Cloudflare
-3. Leadflow devuelve `customers.leadflow.kurukin.com`
+3. Leadflow devuelve `customers.leadflow.kuruk.in`
 4. el usuario configura ese CNAME
 5. pulsa `Refresh`
 6. cuando Cloudflare y SSL quedan activos, el dominio pasa a `active`

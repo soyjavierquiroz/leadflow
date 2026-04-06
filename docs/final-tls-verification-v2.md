@@ -15,7 +15,7 @@ Documentar el paso final de verificacion TLS para `exitosos.com` y `api.exitosos
 Usar la IP origen:
 
 ```bash
-ORIGIN_IP=104.236.36.75
+ORIGIN_IP=${LEADFLOW_SWARM_ORIGIN_IP}
 ```
 
 ### 1) Apex: `exitosos.com`

@@ -44,7 +44,7 @@ Intentar emision directa temporal quitando proxy Cloudflare solo en los subdomin
 ## Verificacion OpenSSL (origen)
 Usar IP del servidor:
 ```bash
-ORIGIN_IP=104.236.36.75
+ORIGIN_IP=${LEADFLOW_SWARM_ORIGIN_IP}
 ```
 
 ```bash

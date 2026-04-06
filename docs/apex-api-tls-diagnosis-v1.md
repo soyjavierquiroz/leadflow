@@ -37,7 +37,7 @@ Confirmados como habilitados en proveedor Docker:
 Conclusion de routing/labels: **consistente**.
 
 ## 3) Certificado servido por origen (SNI)
-Verificado contra `104.236.36.75:443`.
+Verificado contra `${LEADFLOW_SWARM_ORIGIN_IP}:443`.
 
 ### `exitosos.com`
 - subject: `CN=exitosos.com`
@@ -88,10 +88,10 @@ Causa probable del 526 restante:
    ```
 3. Verificar validez nueva de certificados:
    ```bash
-   openssl s_client -connect 104.236.36.75:443 -servername exitosos.com </dev/null 2>/dev/null \
+   openssl s_client -connect ${LEADFLOW_SWARM_ORIGIN_IP}:443 -servername exitosos.com </dev/null 2>/dev/null \
      | openssl x509 -noout -subject -issuer -dates
 
-   openssl s_client -connect 104.236.36.75:443 -servername api.exitosos.com </dev/null 2>/dev/null \
+   openssl s_client -connect ${LEADFLOW_SWARM_ORIGIN_IP}:443 -servername api.exitosos.com </dev/null 2>/dev/null \
      | openssl x509 -noout -subject -issuer -dates
    ```
 4. Confirmar que `notAfter` sea futuro (respecto a 2026-03-21) antes de validar nuevamente en Cloudflare strict.

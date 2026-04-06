@@ -41,7 +41,7 @@ Para dominios Leadflow:
 - `members.exitosos.com` -> **no existe** certificado en acme.json
 - `admin.exitosos.com` -> **no existe** certificado en acme.json
 
-Verificacion de certificado servido por origen (SNI a `104.236.36.75:443`):
+Verificacion de certificado servido por origen (SNI a `${LEADFLOW_SWARM_ORIGIN_IP}:443`):
 - `exitosos.com` -> LE valido
 - `api.exitosos.com` -> LE valido
 - `members.exitosos.com` -> `TRAEFIK DEFAULT CERT`

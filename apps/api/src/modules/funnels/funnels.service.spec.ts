@@ -39,7 +39,7 @@ const buildFunnelRecord = (
     name: 'Base Funnel',
     description: null,
     code: 'base-funnel',
-    thumbnailUrl: 'https://cdn.kurukin.com/funnels/base.png',
+    thumbnailUrl: 'https://cdn.kuruk.in/funnels/base.png',
     config: {
       steps: [{ id: 'landing', title: 'Landing principal' }],
       texts: { cta: 'Quiero mas informacion' },
@@ -157,7 +157,7 @@ describe('FunnelsService', () => {
         name: 'Funnel Equipo Norte',
         description: null,
         code: 'base-funnel-copy',
-        thumbnailUrl: 'https://cdn.kurukin.com/funnels/base.png',
+        thumbnailUrl: 'https://cdn.kuruk.in/funnels/base.png',
         config: {
           steps: [{ id: 'landing', title: 'Landing principal' }],
           texts: { cta: 'Quiero mas informacion' },

@@ -22,6 +22,8 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+infra/docker/.env
+infra/swarm/.env
 
 # OS / Editor
 .DS_Store

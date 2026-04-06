@@ -7,7 +7,7 @@ Forzar un nuevo intento de emision ACME en Traefik para `members.exitosos.com` y
 - `traefik_traefik` (Swarm)
 
 ## Estado actual resumido
-- DNS de `members` y `admin` ya apunta directo al origen (`104.236.36.75`) en resolvers publicos.
+- DNS de `members` y `admin` ya apunta directo al origen (`${LEADFLOW_SWARM_ORIGIN_IP}`) en resolvers publicos.
 - Certificado servido actualmente por origen:
   - `members.exitosos.com` -> `TRAEFIK DEFAULT CERT`
   - `admin.exitosos.com` -> `TRAEFIK DEFAULT CERT`
@@ -51,7 +51,7 @@ docker service logs traefik_traefik --since 10m -f 2>&1 \
 
 ## Paso 4: Verificar el nuevo certificado
 ```bash
-ORIGIN_IP=104.236.36.75
+ORIGIN_IP=${LEADFLOW_SWARM_ORIGIN_IP}
 
 openssl s_client -connect ${ORIGIN_IP}:443 -servername members.exitosos.com </dev/null \
   | openssl x509 -noout -subject -issuer -ext subjectAltName
