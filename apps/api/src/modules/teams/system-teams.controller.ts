@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
 import { SystemTenantAccessGuard } from './system-tenant-access.guard';
 import { TeamsService } from './teams.service';
@@ -21,6 +30,15 @@ export class SystemTeamsController {
   @Get('tenants/:id/funnels')
   listTenantFunnels(@Param('id') id: string) {
     return this.teamsService.listSystemTenantFunnels(id);
+  }
+
+  @Patch('tenants/:id/funnels/:funnelId')
+  updateTenantFunnel(
+    @Param('id') id: string,
+    @Param('funnelId') funnelId: string,
+    @Body() dto: UpdateSystemTenantFunnelDto,
+  ) {
+    return this.teamsService.updateSystemTenantFunnel(id, funnelId, dto);
   }
 
   @Post('provision-tenant')

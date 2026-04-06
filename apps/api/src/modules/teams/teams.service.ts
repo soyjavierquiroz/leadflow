@@ -16,8 +16,10 @@ import { WalletEngineService } from '../finance/wallet-engine.service';
 import { FunnelsService } from '../funnels/funnels.service';
 import { buildEntity } from '../shared/domain.factory';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
+import type { JsonValue } from '../shared/domain.types';
 import type { CreateTeamDto } from './dto/create-team.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
+import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
 import type { Team, TeamRepository } from './interfaces/team.interface';
 
 const slugify = (value: string) =>
@@ -65,6 +67,8 @@ const sanitizeOptionalText = (value: string | null | undefined) => {
 };
 
 const toIso = (value: Date) => value.toISOString();
+const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
+  value as Prisma.InputJsonValue;
 
 export type SystemTenantSummary = {
   id: string;
@@ -280,21 +284,7 @@ export class TeamsService {
 
   async listSystemTenantFunnels(id: string) {
     const tenantId = sanitizeRequiredText(id, 'id');
-    const tenant = await this.prisma.team.findUnique({
-      where: {
-        id: tenantId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!tenant) {
-      throw new NotFoundException({
-        code: 'TENANT_NOT_FOUND',
-        message: 'The requested tenant was not found.',
-      });
-    }
+    await this.assertSystemTenantExists(tenantId);
 
     const records = await this.prisma.funnel.findMany({
       where: {
@@ -305,6 +295,59 @@ export class TeamsService {
     });
 
     return records.map(mapFunnelRecord);
+  }
+
+  async updateSystemTenantFunnel(
+    id: string,
+    funnelId: string,
+    dto: UpdateSystemTenantFunnelDto,
+  ) {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const normalizedFunnelId = sanitizeRequiredText(funnelId, 'funnelId');
+
+    await this.assertSystemTenantExists(tenantId);
+
+    const existing = await this.prisma.funnel.findFirst({
+      where: {
+        id: normalizedFunnelId,
+        defaultTeamId: tenantId,
+        isTemplate: false,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'TENANT_FUNNEL_NOT_FOUND',
+        message:
+          'The requested funnel was not found for the selected tenant.',
+      });
+    }
+
+    const name =
+      dto.name === undefined
+        ? existing.name
+        : sanitizeRequiredText(dto.name, 'name');
+    const description =
+      dto.description === undefined
+        ? existing.description
+        : sanitizeOptionalText(dto.description);
+    const config =
+      dto.config === undefined
+        ? this.cloneJsonValue(existing.config as JsonValue)
+        : this.cloneJsonValue(dto.config);
+
+    const record = await this.prisma.funnel.update({
+      where: {
+        id: existing.id,
+      },
+      data: {
+        name,
+        description,
+        config: toInputJson(config),
+      },
+    });
+
+    return mapFunnelRecord(record);
   }
 
   async provisionTenant(dto: ProvisionTenantDto) {
@@ -652,5 +695,27 @@ export class TeamsService {
 
   private generateTemporaryPassword() {
     return `Leadflow-${randomBytes(9).toString('base64url')}`;
+  }
+
+  private cloneJsonValue(value: JsonValue): JsonValue {
+    return JSON.parse(JSON.stringify(value)) as JsonValue;
+  }
+
+  private async assertSystemTenantExists(id: string) {
+    const tenant = await this.prisma.team.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException({
+        code: 'TENANT_NOT_FOUND',
+        message: 'The requested tenant was not found.',
+      });
+    }
   }
 }

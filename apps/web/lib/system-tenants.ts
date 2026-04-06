@@ -124,6 +124,7 @@ export type SystemTenantFunnelRecord = {
   id: string;
   workspaceId: string;
   name: string;
+  description: string | null;
   code: string;
   thumbnailUrl: string | null;
   config: JsonValue;
