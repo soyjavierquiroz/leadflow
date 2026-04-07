@@ -84,6 +84,13 @@ export type ProvisionTenantResponse = {
   };
 };
 
+export type CreateSystemTenantResponse = {
+  success: true;
+  tenantId: string;
+  workspaceId: string;
+  adminUserId: string;
+};
+
 export type SystemFunnelTemplateRecord = {
   id: string;
   workspaceId: string;

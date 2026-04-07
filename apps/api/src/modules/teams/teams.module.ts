@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { FunnelsModule } from '../funnels/funnels.module';
 import { WalletEngineModule } from '../finance/wallet-engine.module';
+import { MailModule } from '../mail/mail.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { TeamPrismaRepository } from '../../prisma/repositories/team-prisma.repository';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
@@ -15,7 +16,12 @@ import { TeamLeadsService } from './team-leads.service';
 import { TeamsService } from './teams.service';
 
 @Module({
-  imports: [MessagingAutomationModule, WalletEngineModule, FunnelsModule],
+  imports: [
+    MessagingAutomationModule,
+    WalletEngineModule,
+    FunnelsModule,
+    MailModule,
+  ],
   controllers: [
     TeamsController,
     TeamLeadsController,

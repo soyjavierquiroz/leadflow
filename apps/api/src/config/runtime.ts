@@ -70,23 +70,18 @@ export const validateApiEnvironment = (env: NodeJS.ProcessEnv) => {
     'WALLET_ENGINE_INTERNAL_URL',
   );
   const walletEngineApiKey = sanitizeEnv(env.WALLET_ENGINE_API_KEY);
-
-  if (walletEngineInternalUrl && !walletEngineApiKey) {
-    throw new Error(
-      'WALLET_ENGINE_API_KEY is required when WALLET_ENGINE_INTERNAL_URL is configured.',
-    );
-  }
-
-  if (!walletEngineInternalUrl && walletEngineApiKey) {
-    throw new Error(
-      'WALLET_ENGINE_INTERNAL_URL is required when WALLET_ENGINE_API_KEY is configured.',
-    );
-  }
+  const walletEngineConfigured = Boolean(
+    walletEngineInternalUrl && walletEngineApiKey,
+  );
 
   return {
     ...env,
-    WALLET_ENGINE_INTERNAL_URL: walletEngineInternalUrl,
-    WALLET_ENGINE_API_KEY: walletEngineApiKey,
+    WALLET_ENGINE_INTERNAL_URL: walletEngineConfigured
+      ? walletEngineInternalUrl
+      : undefined,
+    WALLET_ENGINE_API_KEY: walletEngineConfigured
+      ? walletEngineApiKey
+      : undefined,
   };
 };
 

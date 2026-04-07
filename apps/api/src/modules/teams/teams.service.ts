@@ -14,9 +14,11 @@ import { mapFunnelRecord } from '../../prisma/prisma.mappers';
 import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { FunnelsService } from '../funnels/funnels.service';
+import { MailService } from '../mail/mail.service';
 import { buildEntity } from '../shared/domain.factory';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import type { JsonValue } from '../shared/domain.types';
+import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { CreateTeamDto } from './dto/create-team.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
 import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
@@ -113,6 +115,7 @@ export class TeamsService {
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
     private readonly funnelsService: FunnelsService,
+    private readonly mailService: MailService,
     @Optional()
     @Inject(TEAM_REPOSITORY)
     private readonly repository?: TeamRepository,
@@ -348,6 +351,29 @@ export class TeamsService {
     });
 
     return mapFunnelRecord(record);
+  }
+
+  async createSystemTenant(dto: CreateSystemTenantDto) {
+    const tenantName = sanitizeRequiredText(dto.tenantName, 'tenantName');
+    const adminEmail = sanitizeRequiredText(
+      dto.adminEmail,
+      'adminEmail',
+    ).toLowerCase();
+    const adminFullName = this.deriveAdminFullName(adminEmail, tenantName);
+    const response = await this.provisionTenant({
+      workspaceName: tenantName,
+      teamName: tenantName,
+      adminFullName,
+      adminEmail,
+      sponsorDisplayName: adminFullName,
+    });
+
+    return {
+      success: true as const,
+      tenantId: response.team.id,
+      workspaceId: response.workspace.id,
+      adminUserId: response.adminUser.id,
+    };
   }
 
   async provisionTenant(dto: ProvisionTenantDto) {
@@ -652,6 +678,11 @@ export class TeamsService {
         );
       }
 
+      await this.mailService.sendWelcomeEmail(
+        provisionedTenant.adminUser.email,
+        adminPassword,
+        provisionedTenant.team.name,
+      );
       void this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
 
       return provisionedTenant;
@@ -694,7 +725,34 @@ export class TeamsService {
   }
 
   private generateTemporaryPassword() {
-    return `Leadflow-${randomBytes(9).toString('base64url')}`;
+    const alphabet =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+
+    return Array.from(randomBytes(10), (byte) => alphabet[byte % alphabet.length])
+      .join('')
+      .slice(0, 10);
+  }
+
+  private deriveAdminFullName(email: string, teamName: string) {
+    const localPart = sanitizeOptionalText(email.split('@')[0]);
+
+    if (!localPart) {
+      return `${teamName} Admin`;
+    }
+
+    const words = localPart
+      .split(/[^a-zA-Z0-9]+/)
+      .filter(Boolean)
+      .map(
+        (chunk: string) =>
+          `${chunk[0]?.toUpperCase() ?? ''}${chunk.slice(1)}`,
+      );
+
+    if (words.length === 0) {
+      return `${teamName} Admin`;
+    }
+
+    return words.join(' ');
   }
 
   private cloneJsonValue(value: JsonValue): JsonValue {

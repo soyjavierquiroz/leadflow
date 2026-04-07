@@ -9,8 +9,7 @@ import { SectionHeader } from "@/components/app-shell/section-header";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type {
-  ProvisionTenantResponse,
-  SystemFunnelTemplateRecord,
+  CreateSystemTenantResponse,
   SystemTenantRecord,
 } from "@/lib/system-tenants";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
@@ -21,11 +20,8 @@ type SystemTenantsClientProps = {
 };
 
 type TenantProvisionFormState = {
-  workspaceName: string;
-  adminName: string;
+  tenantName: string;
   adminEmail: string;
-  maxSeats: string;
-  templateFunnelId: string;
 };
 
 type ToastState = {
@@ -39,30 +35,8 @@ const secondaryButtonClassName =
   "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 const buildInitialFormState = (): TenantProvisionFormState => ({
-  workspaceName: "",
-  adminName: "",
+  tenantName: "",
   adminEmail: "",
-  maxSeats: "10",
-  templateFunnelId: "",
-});
-
-const toTenantRow = (
-  response: ProvisionTenantResponse,
-): SystemTenantRecord => ({
-  id: response.team.id,
-  workspaceId: response.workspace.id,
-  workspaceName: response.workspace.name,
-  workspaceSlug: response.workspace.slug,
-  name: response.team.name,
-  code: response.team.code,
-  status: response.team.status,
-  isActive: response.team.isActive,
-  subscriptionExpiresAt: response.team.subscriptionExpiresAt,
-  maxSeats: response.team.maxSeats,
-  occupiedSeats: response.seatUsage.activeSeats,
-  activeSponsorsCount: response.seatUsage.activeSeats,
-  createdAt: response.team.createdAt,
-  updatedAt: response.team.updatedAt,
 });
 
 export function SystemTenantsClient({
@@ -78,10 +52,6 @@ export function SystemTenantsClient({
   } | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [formState, setFormState] = useState(buildInitialFormState);
-  const [templateOptions, setTemplateOptions] = useState<
-    SystemFunnelTemplateRecord[] | null
-  >(null);
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -95,50 +65,6 @@ export function SystemTenantsClient({
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!isCreateOpen || templateOptions !== null || isLoadingTemplates) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    const loadTemplates = async () => {
-      setIsLoadingTemplates(true);
-
-      try {
-        const payload = await authenticatedOperationRequest<
-          SystemFunnelTemplateRecord[]
-        >("/system/funnels/templates", {
-          method: "GET",
-        });
-
-        if (!isCancelled) {
-          setTemplateOptions(payload);
-        }
-      } catch (error) {
-        if (!isCancelled) {
-          setFeedback({
-            tone: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : "No pudimos cargar las plantillas base.",
-          });
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoadingTemplates(false);
-        }
-      }
-    };
-
-    void loadTemplates();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [isCreateOpen, templateOptions, isLoadingTemplates]);
 
   const totalSeats = rows.reduce((sum, row) => sum + row.maxSeats, 0);
   const occupiedSeats = rows.reduce((sum, row) => sum + row.occupiedSeats, 0);
@@ -171,53 +97,32 @@ export function SystemTenantsClient({
     event.preventDefault();
     resetMessages();
 
-    const workspaceName = formState.workspaceName.trim();
-    const adminName = formState.adminName.trim();
+    const tenantName = formState.tenantName.trim();
     const adminEmail = formState.adminEmail.trim().toLowerCase();
-    const maxSeats = Number(formState.maxSeats);
-    const templateFunnelId = formState.templateFunnelId.trim();
 
-    if (!workspaceName || !adminName || !adminEmail) {
+    if (!tenantName || !adminEmail) {
       setFeedback({
         tone: "error",
-        message: "Completa nombre de agencia, administrador y correo.",
-      });
-      return;
-    }
-
-    if (!Number.isInteger(maxSeats) || maxSeats < 1) {
-      setFeedback({
-        tone: "error",
-        message: "El límite de asientos debe ser un entero mayor o igual a 1.",
+        message: "Completa nombre de agencia y correo del administrador.",
       });
       return;
     }
 
     startTransition(async () => {
       try {
-        const response =
-          await authenticatedOperationRequest<ProvisionTenantResponse>(
-            "/system/provision-tenant",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                workspaceName,
-                adminName,
-                adminEmail,
-                maxSeats,
-                templateFunnelId: templateFunnelId || undefined,
-              }),
-            },
-          );
-
-        setRows((current) => [toTenantRow(response), ...current]);
-        closeCreateModal();
-        showToast(
-          "Agencia aprovisionada. El Team Admin ha sido creado.",
-          response.temporaryPassword
-            ? `Password temporal: ${response.temporaryPassword}`
-            : null,
+        await authenticatedOperationRequest<CreateSystemTenantResponse>(
+          "/system/tenants",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              tenantName,
+              adminEmail,
+            }),
+          },
         );
+
+        closeCreateModal();
+        showToast("Agencia creada. Accesos enviados.");
         router.refresh();
       } catch (error) {
         setFeedback({
@@ -225,7 +130,7 @@ export function SystemTenantsClient({
           message:
             error instanceof Error
               ? error.message
-              : "No pudimos aprovisionar la nueva agencia.",
+              : "No pudimos crear la nueva agencia.",
         });
       }
     });
@@ -246,7 +151,7 @@ export function SystemTenantsClient({
             }}
             className={primaryButtonClassName}
           >
-            Aprovisionar Nueva Agencia
+            Crear Agencia
           </button>
         }
       />
@@ -353,23 +258,23 @@ export function SystemTenantsClient({
 
       {isCreateOpen ? (
         <ModalShell
-          eyebrow="System Provisioning"
-          title="Aprovisionar nueva agencia"
-          description="Crea el workspace, el team y el Team Admin inicial en una sola operación. Si no se especifica password, el backend generará una credencial temporal."
+          eyebrow="Super Admin"
+          title="Crear agencia"
+          description="Da de alta el tenant, genera el usuario administrador inicial y dispara el envio de accesos sin salir del panel."
           onClose={closeCreateModal}
         >
           <form className="space-y-5" onSubmit={handleSubmit}>
             <label className="block">
               <span className="text-sm font-medium text-slate-700">
-                Nombre del workspace
+                Nombre de la agencia
               </span>
               <input
                 type="text"
-                value={formState.workspaceName}
+                value={formState.tenantName}
                 onChange={(event) =>
                   setFormState((current) => ({
                     ...current,
-                    workspaceName: event.target.value,
+                    tenantName: event.target.value,
                   }))
                 }
                 placeholder="Agencia Inmobiliaria Sur"
@@ -380,26 +285,7 @@ export function SystemTenantsClient({
 
             <label className="block">
               <span className="text-sm font-medium text-slate-700">
-                Nombre del Team Admin
-              </span>
-              <input
-                type="text"
-                value={formState.adminName}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    adminName: event.target.value,
-                  }))
-                }
-                placeholder="Carlos Manager"
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                required
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">
-                Email del Team Admin
+                Correo del administrador
               </span>
               <input
                 type="email"
@@ -416,59 +302,10 @@ export function SystemTenantsClient({
               />
             </label>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">
-                Límite de asientos
-              </span>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={formState.maxSeats}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    maxSeats: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                required
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">
-                Plantilla Base (Opcional)
-              </span>
-              <select
-                value={formState.templateFunnelId}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    templateFunnelId: event.target.value,
-                  }))
-                }
-                disabled={isLoadingTemplates}
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
-              >
-                <option value="">
-                  {isLoadingTemplates
-                    ? "Cargando plantillas..."
-                    : "Sin plantilla base"}
-                </option>
-                {(templateOptions ?? []).map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name} ({template.code})
-                  </option>
-                ))}
-              </select>
-            </label>
-
             <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
-              El aprovisionamiento crea un sponsor activo inicial para el Team
-              Admin, por lo que la ocupación arranca con 1 asiento usado. Si
-              eliges una plantilla base, el sistema la clonará y dejará el
-              funnel listo para el nuevo equipo.
+              El backend genera la password, crea el Team Admin inicial y, si no
+              hay proveedor de correo configurado, deja las credenciales visibles
+              en los logs del servidor para no perder el acceso.
             </div>
 
             <div className="flex flex-wrap justify-end gap-3">
@@ -485,7 +322,7 @@ export function SystemTenantsClient({
                 disabled={isPending}
                 className={primaryButtonClassName}
               >
-                {isPending ? "Aprovisionando..." : "Crear agencia"}
+                {isPending ? "Creando..." : "Crear agencia"}
               </button>
             </div>
           </form>
