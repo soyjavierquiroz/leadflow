@@ -12,6 +12,7 @@ export type SystemTenantRecord = {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  managerUserId: string | null;
   name: string;
   code: string;
   status: string;

@@ -77,6 +77,7 @@ export type SystemTenantSummary = {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  managerUserId: string | null;
   name: string;
   code: string;
   status: string;
@@ -182,6 +183,7 @@ export class TeamsService {
       workspaceId: record.workspaceId,
       workspaceName: record.workspace.name,
       workspaceSlug: record.workspace.slug,
+      managerUserId: record.managerUserId,
       name: record.name,
       code: record.code,
       status: record.status,

@@ -29,6 +29,12 @@ type ToastState = {
   description: string | null;
 };
 
+type ImpersonateUserResponse = {
+  success: true;
+  message: string;
+  redirectPath: string;
+};
+
 const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
@@ -53,6 +59,9 @@ export function SystemTenantsClient({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [formState, setFormState] = useState(buildInitialFormState);
   const [isPending, startTransition] = useTransition();
+  const [impersonatingTenantId, setImpersonatingTenantId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     setRows(initialRows);
@@ -134,6 +143,42 @@ export function SystemTenantsClient({
         });
       }
     });
+  };
+
+  const handleImpersonate = async (row: SystemTenantRecord) => {
+    resetMessages();
+
+    if (!row.managerUserId) {
+      setFeedback({
+        tone: "error",
+        message:
+          "Esta agencia no tiene un TEAM_ADMIN asignado para iniciar la impersonación.",
+      });
+      return;
+    }
+
+    setImpersonatingTenantId(row.id);
+
+    try {
+      const payload = await authenticatedOperationRequest<ImpersonateUserResponse>(
+        `/system/auth/impersonate/${encodeURIComponent(row.managerUserId)}`,
+        {
+          method: "POST",
+        },
+      );
+
+      window.location.href = payload.redirectPath || "/team";
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No pudimos iniciar la sesión como cliente.",
+      });
+    } finally {
+      setImpersonatingTenantId(null);
+    }
   };
 
   return (
@@ -249,6 +294,31 @@ export function SystemTenantsClient({
             key: "createdAt",
             header: "Fecha de creación",
             render: (row) => formatDateTime(row.createdAt),
+          },
+          {
+            key: "actions",
+            header: "Acciones",
+            className: "whitespace-nowrap",
+            render: (row) => (
+              <div className="flex flex-col items-start gap-2">
+                <Link
+                  href={`/admin/tenants/${row.id}`}
+                  className="text-sm font-semibold text-slate-700 transition hover:text-teal-700 hover:underline"
+                >
+                  Ver operación
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void handleImpersonate(row)}
+                  disabled={!row.managerUserId || impersonatingTenantId === row.id}
+                  className={secondaryButtonClassName}
+                >
+                  {impersonatingTenantId === row.id
+                    ? "Ingresando..."
+                    : "Ingresar como Cliente"}
+                </button>
+              </div>
+            ),
           },
         ]}
         rows={rows}

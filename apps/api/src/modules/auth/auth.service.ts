@@ -1,6 +1,12 @@
 import { createHash, randomBytes } from 'crypto';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { UserStatus, type Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { UserRole, UserStatus, type Prisma } from '@prisma/client';
 import type { FastifyReply } from 'fastify';
 import { getApiRuntimeConfig } from '../../config/runtime';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -19,6 +25,8 @@ type AuthUserRecord = Prisma.UserGetPayload<{
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async authenticate(input: {
@@ -45,35 +53,57 @@ export class AuthService {
       });
     }
 
-    const sessionToken = this.generateSessionToken();
-    const sessionTokenHash = this.hashSessionToken(sessionToken);
-    const runtimeConfig = getApiRuntimeConfig();
-    const expiresAt = new Date(
-      Date.now() + runtimeConfig.authSessionTtlDays * 24 * 60 * 60 * 1000,
+    return this.createSessionForUser(user, {
+      ipAddress: input.ipAddress,
+      userAgent: input.userAgent,
+    });
+  }
+
+  async impersonate(input: {
+    targetUserId: string;
+    impersonator: AuthenticatedUser;
+    userAgent?: string | null;
+    ipAddress?: string | null;
+  }) {
+    const targetUserId = input.targetUserId.trim();
+
+    if (!targetUserId) {
+      throw new BadRequestException({
+        code: 'TARGET_USER_REQUIRED',
+        message: 'A target user id is required to impersonate a session.',
+      });
+    }
+
+    const targetUser = await this.prisma.user.findUnique({
+      where: {
+        id: targetUserId,
+      },
+      include: authUserInclude,
+    });
+
+    if (!targetUser || targetUser.status !== UserStatus.active) {
+      throw new NotFoundException({
+        code: 'TARGET_USER_NOT_FOUND',
+        message: 'The requested target user was not found or is inactive.',
+      });
+    }
+
+    if (targetUser.role === UserRole.SUPER_ADMIN || !targetUser.teamId) {
+      throw new BadRequestException({
+        code: 'TARGET_USER_NOT_IMPERSONABLE',
+        message:
+          'Only active tenant users with a team scope can be impersonated.',
+      });
+    }
+
+    this.logger.warn(
+      `Super admin ${input.impersonator.id} impersonated user ${targetUser.id} (${targetUser.role}) on team ${targetUser.teamId}.`,
     );
 
-    await this.prisma.authSession.create({
-      data: {
-        userId: user.id,
-        sessionTokenHash,
-        expiresAt,
-        lastSeenAt: new Date(),
-        userAgent: input.userAgent ?? null,
-        ipAddress: input.ipAddress ?? null,
-      },
+    return this.createSessionForUser(targetUser, {
+      ipAddress: input.ipAddress,
+      userAgent: input.userAgent,
     });
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        lastLoginAt: new Date(),
-      },
-    });
-
-    return {
-      sessionToken,
-      user: this.toAuthenticatedUser(user),
-    };
   }
 
   async resolveAuthenticatedUser(sessionToken: string) {
@@ -162,6 +192,44 @@ export class AuthService {
 
   private hashSessionToken(value: string) {
     return createHash('sha256').update(value).digest('hex');
+  }
+
+  private async createSessionForUser(
+    user: AuthUserRecord,
+    input?: {
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
+  ) {
+    const sessionToken = this.generateSessionToken();
+    const sessionTokenHash = this.hashSessionToken(sessionToken);
+    const runtimeConfig = getApiRuntimeConfig();
+    const expiresAt = new Date(
+      Date.now() + runtimeConfig.authSessionTtlDays * 24 * 60 * 60 * 1000,
+    );
+
+    await this.prisma.authSession.create({
+      data: {
+        userId: user.id,
+        sessionTokenHash,
+        expiresAt,
+        lastSeenAt: new Date(),
+        userAgent: input?.userAgent ?? null,
+        ipAddress: input?.ipAddress ?? null,
+      },
+    });
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: new Date(),
+      },
+    });
+
+    return {
+      sessionToken,
+      user: this.toAuthenticatedUser(user),
+    };
   }
 
   private toAuthenticatedUser(user: AuthUserRecord): AuthenticatedUser {
