@@ -164,6 +164,7 @@ export function SystemTenantsClient({
         `/system/auth/impersonate/${encodeURIComponent(row.managerUserId)}`,
         {
           method: "POST",
+          body: JSON.stringify({}),
         },
       );
 
