@@ -24,7 +24,7 @@ const adminNav = [
     description: "Catálogo base que define la experiencia pública.",
   },
   {
-    href: "/admin/structures",
+    href: "/admin/estructuras",
     label: "Estructuras",
     description: "Registro visual de core layouts para catálogo interno y builder.",
   },
