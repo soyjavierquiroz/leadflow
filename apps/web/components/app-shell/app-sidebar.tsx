@@ -16,6 +16,26 @@ export function AppSidebar({
   nav,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const hasStructuresLink = nav.some(
+    (candidate) => candidate.href === "/admin/structures",
+  );
+  const resolvedNav =
+    areaLabel === "Super Admin"
+      ? nav.reduce<ShellNavItem[]>((items, item) => {
+          items.push(item);
+
+          if (item.href === "/admin/templates" && !hasStructuresLink) {
+            items.push({
+              href: "/admin/structures",
+              label: "Structures",
+              description:
+                "Registro visual de core layouts para catálogo interno y builder.",
+            });
+          }
+
+          return items;
+        }, [])
+      : nav;
 
   return (
     <aside className="border-b border-white/60 bg-[linear-gradient(180deg,_#020617_0%,_#0f172a_42%,_#111827_100%)] px-5 py-6 text-slate-100 lg:min-h-screen lg:border-b-0 lg:border-r lg:border-r-white/10">
@@ -50,7 +70,7 @@ export function AppSidebar({
       </div>
 
       <nav className="mt-4 space-y-2">
-        {nav.map((item) => {
+        {resolvedNav.map((item) => {
           const match = item.match ?? item.href;
           const isActive =
             pathname === item.href ||
