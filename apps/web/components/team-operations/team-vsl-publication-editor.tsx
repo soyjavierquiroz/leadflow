@@ -582,6 +582,7 @@ export function TeamVslPublicationEditor({
 
       <HybridJsonMediaEditor
         blocksText={blocksText}
+        previewHref={mode === "system" ? "/admin/preview" : null}
         onBlocksTextChange={setBlocksText}
         parsedBlocksError={parsedBlocks.error}
         parsedBlocksCount={parsedBlocks.value?.length ?? 0}

@@ -1,9 +1,9 @@
 "use client";
 
-import type { ChangeEvent, RefObject } from "react";
+import { useEffect, type ChangeEvent, type RefObject } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
-import dynamic from "next/dynamic";
+import Link from "next/link";
 import {
   ChevronDown,
   FileJson,
@@ -12,29 +12,16 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import {
+  buildMediaMap,
+  writeHybridJsonPreviewDraft,
+} from "@/components/team-operations/hybrid-json-preview-state";
 
 const sectionClassName =
   "rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6";
 
 const secondaryButtonClassName =
   "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
-
-const HybridJsonLivePreview = dynamic(
-  () =>
-    import("@/components/team-operations/hybrid-json-live-preview").then(
-      (module) => module.HybridJsonLivePreview,
-    ),
-  {
-    ssr: false,
-    loading: () => (
-      <section className={`${sectionClassName} xl:sticky xl:top-6`}>
-        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 px-5 py-12 text-center text-sm text-slate-500">
-          Preparando live preview...
-        </div>
-      </section>
-    ),
-  },
-);
 
 export const requiredMediaKeys = [
   "hero",
@@ -161,6 +148,7 @@ type HybridJsonMediaEditorProps = {
   onAddMediaRow: (key?: string) => void;
   onUploadMediaClick: (index: number) => void;
   onRemoveMediaRow: (index: number) => void;
+  previewHref?: string | null;
 };
 
 export function HybridJsonMediaEditor({
@@ -178,7 +166,15 @@ export function HybridJsonMediaEditor({
   onAddMediaRow,
   onUploadMediaClick,
   onRemoveMediaRow,
+  previewHref = null,
 }: HybridJsonMediaEditorProps) {
+  useEffect(() => {
+    writeHybridJsonPreviewDraft({
+      blocks: blocksText,
+      media: buildMediaMap(mediaRows),
+    });
+  }, [blocksText, mediaRows]);
+
   return (
     <>
       <input
@@ -236,22 +232,22 @@ export function HybridJsonMediaEditor({
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-        <div className="space-y-6">
-          <details open className={sectionClassName}>
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                  Bloques
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-                  JSON engine del funnel
-                </h2>
-              </div>
-              <ChevronDown className="h-5 w-5 text-slate-400" />
-            </summary>
+      <div className="space-y-6">
+        <details open className={sectionClassName}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                Bloques
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                JSON engine del funnel
+              </h2>
+            </div>
+            <ChevronDown className="h-5 w-5 text-slate-400" />
+          </summary>
 
-            <div className="mt-6 space-y-4">
+          <div className="mt-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700">
                   <FileJson className="h-3.5 w-3.5" />
@@ -262,181 +258,190 @@ export function HybridJsonMediaEditor({
                 </span>
               </div>
 
-              <div className="overflow-hidden rounded-[1.5rem] border border-slate-200">
-                <CodeMirror
-                  value={blocksText}
-                  height="420px"
-                  extensions={[json()]}
-                  basicSetup={{
-                    lineNumbers: true,
-                    foldGutter: true,
-                    highlightActiveLine: true,
-                  }}
-                  onChange={onBlocksTextChange}
-                />
-              </div>
-
-              {parsedBlocksError ? (
-                <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {parsedBlocksError}
-                </p>
-              ) : (
-                <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  JSON válido. El engine detectó {parsedBlocksCount} bloque
-                  {parsedBlocksCount === 1 ? "" : "s"} listo
-                  {parsedBlocksCount === 1 ? "" : "s"} para persistir como{" "}
-                  <code>blocksJson</code>.
-                </p>
-              )}
-            </div>
-          </details>
-
-          <details open className={sectionClassName}>
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                  Media
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-                  CDN bridge y media dictionary
-                </h2>
-              </div>
-              <ChevronDown className="h-5 w-5 text-slate-400" />
-            </summary>
-
-            <div className="mt-6 space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                {requiredMediaKeys.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => {
-                      if (mediaRows.some((row) => row.key.trim() === key)) {
-                        return;
-                      }
-                      onAddMediaRow(key);
-                    }}
-                    disabled={uploadingRowIndex !== null}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    {key}
-                  </button>
-                ))}
-              </div>
-
-              <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200 text-left">
-                  <thead className="bg-slate-50">
-                    <tr className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      <th className="px-4 py-3">Key</th>
-                      <th className="px-4 py-3">URL</th>
-                      <th className="px-4 py-3">Preview</th>
-                      <th className="px-4 py-3">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
-                    {mediaRows.map((row, index) => (
-                      <tr key={`${row.key}-${index}`}>
-                        <td className="px-4 py-3 align-top">
-                          <input
-                            value={row.key}
-                            onChange={(event) =>
-                              onMediaRowChange(index, { key: event.target.value })
-                            }
-                            placeholder="hero"
-                            disabled={uploadingRowIndex !== null}
-                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
-                          />
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          <input
-                            value={row.value}
-                            onChange={(event) =>
-                              onMediaRowChange(index, { value: event.target.value })
-                            }
-                            placeholder="https://cdn.kuruk.in/funnels/..."
-                            disabled={uploadingRowIndex !== null}
-                            className="w-full min-w-72 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
-                          />
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          {isAbsoluteHttpUrl(row.value) ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={row.value}
-                              alt={row.key || `preview-${index}`}
-                              className="h-16 w-16 rounded-xl object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400">
-                              <Link2 className="h-4 w-4" />
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => onUploadMediaClick(index)}
-                              disabled={uploadingRowIndex !== null}
-                              className={secondaryButtonClassName}
-                            >
-                              <ImagePlus className="h-4 w-4" />
-                              {uploadingRowIndex === index
-                                ? "Subiendo..."
-                                : "Subir a CDN"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onRemoveMediaRow(index)}
-                              disabled={uploadingRowIndex !== null}
-                              className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Quitar
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-xs leading-6 text-slate-500">
-                  El media dictionary acepta URLs absolutas del CDN de Leadflow/MinIO y
-                  mantiene compatibilidad con <code>leadflow-media-resolver.ts</code>.
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onAddMediaRow()}
-                  disabled={uploadingRowIndex !== null}
+              {previewHref ? (
+                <Link
+                  href={previewHref}
+                  target="_blank"
+                  rel="noreferrer"
                   className={secondaryButtonClassName}
                 >
-                  <ImagePlus className="h-4 w-4" />
-                  Agregar fila
-                </button>
-              </div>
-
-              {mediaValidation ? (
-                <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {mediaValidation}
-                </p>
-              ) : (
-                <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  Llaves sugeridas listas:{" "}
-                  {mediaMapKeys.join(", ") ||
-                    "todavía faltan hero, product_box, gallery_1 y seo_cover"}
-                  .
-                </p>
-              )}
+                  👀 Ver Vista Previa
+                </Link>
+              ) : null}
             </div>
-          </details>
-        </div>
 
-        <HybridJsonLivePreview blocksText={blocksText} mediaRows={mediaRows} />
+            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200">
+              <CodeMirror
+                value={blocksText}
+                height="420px"
+                extensions={[json()]}
+                basicSetup={{
+                  lineNumbers: true,
+                  foldGutter: true,
+                  highlightActiveLine: true,
+                }}
+                onChange={onBlocksTextChange}
+              />
+            </div>
+
+            {parsedBlocksError ? (
+              <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {parsedBlocksError}
+              </p>
+            ) : (
+              <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                JSON válido. El engine detectó {parsedBlocksCount} bloque
+                {parsedBlocksCount === 1 ? "" : "s"} listo
+                {parsedBlocksCount === 1 ? "" : "s"} para persistir como{" "}
+                <code>blocksJson</code>.
+              </p>
+            )}
+          </div>
+        </details>
+
+        <details open className={sectionClassName}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                Media
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                CDN bridge y media dictionary
+              </h2>
+            </div>
+            <ChevronDown className="h-5 w-5 text-slate-400" />
+          </summary>
+
+          <div className="mt-6 space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {requiredMediaKeys.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    if (mediaRows.some((row) => row.key.trim() === key)) {
+                      return;
+                    }
+                    onAddMediaRow(key);
+                  }}
+                  disabled={uploadingRowIndex !== null}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {key}
+                </button>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200 text-left">
+                <thead className="bg-slate-50">
+                  <tr className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    <th className="px-4 py-3">Key</th>
+                    <th className="px-4 py-3">URL</th>
+                    <th className="px-4 py-3">Preview</th>
+                    <th className="px-4 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {mediaRows.map((row, index) => (
+                    <tr key={`${row.key}-${index}`}>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          value={row.key}
+                          onChange={(event) =>
+                            onMediaRowChange(index, { key: event.target.value })
+                          }
+                          placeholder="hero"
+                          disabled={uploadingRowIndex !== null}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <input
+                          value={row.value}
+                          onChange={(event) =>
+                            onMediaRowChange(index, { value: event.target.value })
+                          }
+                          placeholder="https://cdn.kuruk.in/funnels/..."
+                          disabled={uploadingRowIndex !== null}
+                          className="w-full min-w-72 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+                        />
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        {isAbsoluteHttpUrl(row.value) ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={row.value}
+                            alt={row.key || `preview-${index}`}
+                            className="h-16 w-16 rounded-xl object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400">
+                            <Link2 className="h-4 w-4" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onUploadMediaClick(index)}
+                            disabled={uploadingRowIndex !== null}
+                            className={secondaryButtonClassName}
+                          >
+                            <ImagePlus className="h-4 w-4" />
+                            {uploadingRowIndex === index
+                              ? "Subiendo..."
+                              : "Subir a CDN"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveMediaRow(index)}
+                            disabled={uploadingRowIndex !== null}
+                            className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Quitar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs leading-6 text-slate-500">
+                El media dictionary acepta URLs absolutas del CDN de Leadflow/MinIO y
+                mantiene compatibilidad con <code>leadflow-media-resolver.ts</code>.
+              </div>
+              <button
+                type="button"
+                onClick={() => onAddMediaRow()}
+                disabled={uploadingRowIndex !== null}
+                className={secondaryButtonClassName}
+              >
+                <ImagePlus className="h-4 w-4" />
+                Agregar fila
+              </button>
+            </div>
+
+            {mediaValidation ? (
+              <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {mediaValidation}
+              </p>
+            ) : (
+              <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Llaves sugeridas listas:{" "}
+                {mediaMapKeys.join(", ") ||
+                  "todavía faltan hero, product_box, gallery_1 y seo_cover"}
+                .
+              </p>
+            )}
+          </div>
+        </details>
       </div>
     </>
   );

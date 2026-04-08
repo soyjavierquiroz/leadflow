@@ -1,4 +1,4 @@
-import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
+import { AdminShellFrame } from "@/components/app-shell/admin-shell-frame";
 import { requireRole } from "@/lib/auth";
 import { getAppShellSnapshot } from "@/lib/app-shell/data";
 
@@ -39,17 +39,17 @@ export default async function AdminLayout({
   const snapshot = await getAppShellSnapshot();
 
   return (
-      <AppShellLayout
-        areaLabel="Super Admin"
-        areaDescription="Panel de plataforma para entender catálogo, equipos, publicaciones y salud del rollout sin perder el contexto comercial."
-        topBarTitle="Plataforma Leadflow"
-        personaLabel="Super Admin"
+    <AdminShellFrame
+      areaLabel="Super Admin"
+      areaDescription="Panel de plataforma para entender catálogo, equipos, publicaciones y salud del rollout sin perder el contexto comercial."
+      topBarTitle="Plataforma Leadflow"
+      personaLabel="Super Admin"
       workspaceName={snapshot.workspace.name}
       sourceMode={snapshot.sourceMode}
       currentUser={snapshot.currentUser}
       nav={adminNav}
     >
       {children}
-    </AppShellLayout>
+    </AdminShellFrame>
   );
 }

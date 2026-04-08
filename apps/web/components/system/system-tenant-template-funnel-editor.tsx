@@ -340,6 +340,7 @@ export function SystemTenantTemplateFunnelEditor({
 
       <HybridJsonMediaEditor
         blocksText={blocksText}
+        previewHref="/admin/preview"
         onBlocksTextChange={setBlocksText}
         parsedBlocksError={parsedBlocks.error}
         parsedBlocksCount={parsedBlocks.value?.length ?? 0}

@@ -1,10 +1,12 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { TopBar } from "@/components/app-shell/top-bar";
 import type { AuthenticatedAppUser } from "@/lib/auth";
 import type { DataSourceMode, ShellNavItem } from "@/lib/app-shell/types";
 
-type AppShellLayoutProps = {
+export type AppShellLayoutProps = {
   areaLabel: string;
   areaDescription: string;
   topBarTitle: string;
