@@ -1,4 +1,4 @@
-export const storageUploadContexts = ['avatars', 'funnels'] as const;
+export const storageUploadContexts = ['avatars', 'funnels', 'branding'] as const;
 
 export type StorageUploadContext = (typeof storageUploadContexts)[number];
 

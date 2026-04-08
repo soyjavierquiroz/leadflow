@@ -313,6 +313,7 @@ model Team {
   workspaceId           String
   name                  String
   code                  String
+  logoUrl               String?
   status                TeamStatus
   isActive              Boolean               @default(true)
   subscriptionExpiresAt DateTime?

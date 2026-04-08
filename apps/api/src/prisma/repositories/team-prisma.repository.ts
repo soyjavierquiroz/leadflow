@@ -45,6 +45,7 @@ export class TeamPrismaRepository implements TeamRepository {
         workspaceId: data.workspaceId,
         name: data.name,
         code: data.code,
+        logoUrl: data.logoUrl ?? null,
         status: 'draft',
         isActive: data.isActive ?? true,
         subscriptionExpiresAt: data.subscriptionExpiresAt
@@ -68,6 +69,7 @@ export class TeamPrismaRepository implements TeamRepository {
         workspaceId: entity.workspaceId,
         name: entity.name,
         code: entity.code,
+        logoUrl: entity.logoUrl,
         status: entity.status,
         isActive: entity.isActive,
         subscriptionExpiresAt: entity.subscriptionExpiresAt
@@ -82,6 +84,7 @@ export class TeamPrismaRepository implements TeamRepository {
       update: {
         name: entity.name,
         code: entity.code,
+        logoUrl: entity.logoUrl,
         status: entity.status,
         isActive: entity.isActive,
         subscriptionExpiresAt: entity.subscriptionExpiresAt

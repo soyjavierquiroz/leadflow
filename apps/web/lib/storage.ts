@@ -2,7 +2,7 @@
 
 import { webPublicConfig } from "@/lib/public-env";
 
-export type StorageUploadContext = "avatars" | "funnels";
+export type StorageUploadContext = "avatars" | "funnels" | "branding";
 
 type PresignedUploadPayload = {
   uploadUrl: string;

@@ -28,6 +28,16 @@ const teamNav = [
     label: "Pools",
     description: "Cobertura de rotación y fallback de handoff.",
   },
+  {
+    href: "/team/settings",
+    label: "Ajustes",
+    description: "Nombre, logo y dominio base del tenant.",
+  },
+  {
+    href: "/team/profile",
+    label: "Mi perfil",
+    description: "Datos personales, móvil y contraseña.",
+  },
 ];
 
 export default async function TeamLayout({

@@ -10,7 +10,7 @@ import { UserRole, UserStatus, type Prisma } from '@prisma/client';
 import type { FastifyReply } from 'fastify';
 import { getApiRuntimeConfig } from '../../config/runtime';
 import { PrismaService } from '../../prisma/prisma.service';
-import { verifyPassword } from './password-hash.util';
+import { hashPassword, verifyPassword } from './password-hash.util';
 import type { AuthRequest, AuthenticatedUser } from './auth.types';
 
 const authUserInclude = {
@@ -22,6 +22,17 @@ const authUserInclude = {
 type AuthUserRecord = Prisma.UserGetPayload<{
   include: typeof authUserInclude;
 }>;
+
+export type MyProfileSnapshot = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  phone: string | null;
+  sponsorDisplayName: string | null;
+  avatarUrl: string | null;
+  updatedAt: string;
+};
 
 @Injectable()
 export class AuthService {
@@ -155,6 +166,129 @@ export class AuthService {
     });
   }
 
+  async getMyProfile(userId: string): Promise<MyProfileSnapshot> {
+    const user = await this.requireUserProfileRecord(userId);
+    return this.toMyProfileSnapshot(user);
+  }
+
+  async updateMyProfile(
+    userId: string,
+    input: {
+      fullName?: string;
+      phone?: string | null;
+    },
+  ): Promise<MyProfileSnapshot> {
+    if (input.fullName === undefined && input.phone === undefined) {
+      throw new BadRequestException({
+        code: 'MY_PROFILE_UPDATE_EMPTY',
+        message: 'At least one profile field is required.',
+      });
+    }
+
+    const existing = await this.requireUserProfileRecord(userId);
+    const fullName =
+      input.fullName === undefined
+        ? existing.fullName
+        : this.normalizeRequiredName(input.fullName);
+    const phone =
+      input.phone === undefined
+        ? existing.sponsor?.phone ?? null
+        : this.normalizeOptionalText(input.phone);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: existing.id },
+        data: {
+          fullName,
+        },
+        include: authUserInclude,
+      });
+
+      if (existing.sponsorId) {
+        const sponsor = await tx.sponsor.update({
+          where: {
+            id: existing.sponsorId,
+          },
+          data: {
+            displayName: fullName,
+            phone,
+          },
+        });
+
+        user.sponsor = sponsor;
+      }
+
+      return user;
+    });
+
+    return this.toMyProfileSnapshot(updated);
+  }
+
+  async changeMyPassword(
+    userId: string,
+    input: {
+      currentPassword?: string;
+      newPassword?: string;
+    },
+  ) {
+    const currentPassword = input.currentPassword ?? '';
+    const newPassword = input.newPassword ?? '';
+
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestException({
+        code: 'PASSWORD_FIELDS_REQUIRED',
+        message: 'Current password and new password are required.',
+      });
+    }
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException({
+        code: 'PASSWORD_TOO_SHORT',
+        message: 'The new password must have at least 8 characters.',
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      throw new BadRequestException({
+        code: 'PASSWORD_UNCHANGED',
+        message: 'The new password must be different from the current one.',
+      });
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        passwordHash: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException({
+        code: 'USER_NOT_FOUND',
+        message: 'The authenticated user could not be found.',
+      });
+    }
+
+    if (!verifyPassword(currentPassword, user.passwordHash)) {
+      throw new UnauthorizedException({
+        code: 'CURRENT_PASSWORD_INVALID',
+        message: 'The current password is incorrect.',
+      });
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashPassword(newPassword),
+      },
+    });
+
+    return {
+      success: true as const,
+    };
+  }
+
   readSessionTokenFromRequest(request: AuthRequest) {
     const runtimeConfig = getApiRuntimeConfig();
     return request.cookies?.[runtimeConfig.authCookieName] ?? null;
@@ -271,6 +405,57 @@ export class AuthService {
             availabilityStatus: user.sponsor.availabilityStatus,
           }
         : null,
+    };
+  }
+
+  private async requireUserProfileRecord(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: authUserInclude,
+    });
+
+    if (!user) {
+      throw new NotFoundException({
+        code: 'USER_NOT_FOUND',
+        message: 'The authenticated user could not be found.',
+      });
+    }
+
+    return user;
+  }
+
+  private normalizeRequiredName(value: string) {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      throw new BadRequestException({
+        code: 'FULL_NAME_REQUIRED',
+        message: 'fullName is required.',
+      });
+    }
+
+    return trimmed;
+  }
+
+  private normalizeOptionalText(value: string | null | undefined) {
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  private toMyProfileSnapshot(user: AuthUserRecord): MyProfileSnapshot {
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      phone: user.sponsor?.phone ?? null,
+      sponsorDisplayName: user.sponsor?.displayName ?? null,
+      avatarUrl: user.sponsor?.avatarUrl ?? null,
+      updatedAt: user.updatedAt.toISOString(),
     };
   }
 }

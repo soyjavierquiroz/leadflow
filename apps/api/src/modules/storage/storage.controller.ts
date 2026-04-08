@@ -102,45 +102,52 @@ export class StorageController {
       return `${STORAGE_PUBLIC_BUCKET}/avatars/${workspaceId}/${sponsorId}`;
     }
 
-    if (user.role === UserRole.SUPER_ADMIN) {
-      const requestedTeamId = dto.teamId?.trim() || teamId;
+    if (context === 'funnels' || context === 'branding') {
+      const assetFolder = context === 'branding' ? 'branding' : 'funnels';
 
-      if (!requestedTeamId) {
+      if (user.role === UserRole.SUPER_ADMIN) {
+        const requestedTeamId = dto.teamId?.trim() || teamId;
+
+        if (!requestedTeamId) {
+          throw new BadRequestException({
+            code: 'STORAGE_SCOPE_INVALID',
+            message: `A teamId is required for super admin ${assetFolder} uploads.`,
+          });
+        }
+
+        const targetTeam = await this.prisma.team.findUnique({
+          where: {
+            id: requestedTeamId,
+          },
+          select: {
+            id: true,
+            workspaceId: true,
+          },
+        });
+
+        if (!targetTeam) {
+          throw new NotFoundException({
+            code: 'TEAM_NOT_FOUND',
+            message: 'The requested team was not found.',
+          });
+        }
+
+        return `${STORAGE_PUBLIC_BUCKET}/${assetFolder}/${targetTeam.workspaceId}/${targetTeam.id}`;
+      }
+
+      if (!workspaceId || !teamId) {
         throw new BadRequestException({
           code: 'STORAGE_SCOPE_INVALID',
-          message:
-            'A teamId is required for super admin funnel asset uploads.',
+          message: `The authenticated user is missing team scope for ${assetFolder} uploads.`,
         });
       }
 
-      const targetTeam = await this.prisma.team.findUnique({
-        where: {
-          id: requestedTeamId,
-        },
-        select: {
-          id: true,
-          workspaceId: true,
-        },
-      });
-
-      if (!targetTeam) {
-        throw new NotFoundException({
-          code: 'TEAM_NOT_FOUND',
-          message: 'The requested team was not found.',
-        });
-      }
-
-      return `${STORAGE_PUBLIC_BUCKET}/funnels/${targetTeam.workspaceId}/${targetTeam.id}`;
+      return `${STORAGE_PUBLIC_BUCKET}/${assetFolder}/${workspaceId}/${teamId}`;
     }
 
-    if (!workspaceId || !teamId) {
-      throw new BadRequestException({
-        code: 'STORAGE_SCOPE_INVALID',
-        message:
-          'The authenticated user is missing team scope for funnel asset uploads.',
-      });
-    }
-
-    return `${STORAGE_PUBLIC_BUCKET}/funnels/${workspaceId}/${teamId}`;
+    throw new BadRequestException({
+      code: 'STORAGE_CONTEXT_INVALID',
+      message: `context must be one of: ${storageUploadContexts.join(', ')}.`,
+    });
   }
 }

@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import type { AuthRequest } from './auth.types';
 import { CurrentAuthUser } from './current-auth-user.decorator';
+import type { ChangeMyPasswordDto } from './dto/change-my-password.dto';
 import type { LoginDto } from './dto/login.dto';
+import type { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 import { AuthService } from './auth.service';
 import { RequireAuth } from './roles.decorator';
 
@@ -52,5 +62,29 @@ export class AuthController {
     return {
       user,
     };
+  }
+
+  @Get('me/profile')
+  @RequireAuth()
+  getMyProfile(@CurrentAuthUser() user: NonNullable<AuthRequest['authUser']>) {
+    return this.authService.getMyProfile(user.id);
+  }
+
+  @Patch('me/profile')
+  @RequireAuth()
+  updateMyProfile(
+    @CurrentAuthUser() user: NonNullable<AuthRequest['authUser']>,
+    @Body() dto: UpdateMyProfileDto,
+  ) {
+    return this.authService.updateMyProfile(user.id, dto);
+  }
+
+  @Patch('me/password')
+  @RequireAuth()
+  changeMyPassword(
+    @CurrentAuthUser() user: NonNullable<AuthRequest['authUser']>,
+    @Body() dto: ChangeMyPasswordDto,
+  ) {
+    return this.authService.changeMyPassword(user.id, dto);
   }
 }

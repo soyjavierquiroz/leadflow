@@ -222,8 +222,17 @@ export default async function TeamPage() {
               },
             ]}
             rows={teamLeads.slice(0, 6)}
+            emptyEyebrow="Sin actividad todavía"
             emptyTitle="Sin leads para este team"
             emptyDescription="Cuando el funnel capture o rote nuevas oportunidades, aparecerán aquí para lectura rápida del equipo."
+            emptyAction={
+              <Link
+                href="/team/publications/new-vsl"
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Crear mi primer funnel
+              </Link>
+            }
           />
         </div>
       </section>

@@ -13,6 +13,7 @@ import { SystemTeamsController } from './system-teams.controller';
 import { TeamsController } from './teams.controller';
 import { TeamLeadsController } from './team-leads.controller';
 import { TeamLeadsService } from './team-leads.service';
+import { TeamSettingsController } from './team-settings.controller';
 import { TeamsService } from './teams.service';
 
 @Module({
@@ -24,6 +25,7 @@ import { TeamsService } from './teams.service';
   ],
   controllers: [
     TeamsController,
+    TeamSettingsController,
     TeamLeadsController,
     TeamMembersController,
     SystemTeamsController,

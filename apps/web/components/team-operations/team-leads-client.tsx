@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useDeferredValue,
   useMemo,
@@ -418,8 +419,14 @@ export function TeamLeadsClient({
           },
         ]}
         rows={filteredRows}
+        emptyEyebrow="Bandeja lista"
         emptyTitle="Sin leads para mostrar"
         emptyDescription="Cuando el team capture oportunidades o necesite rescates manuales, esta bandeja global mostrara el ownership y el pulso operativo completo."
+        emptyAction={
+          <Link href="/team/publications/new-vsl" className={buttonClassName}>
+            Crear mi primer funnel
+          </Link>
+        }
       />
 
       {selectedLead ? (

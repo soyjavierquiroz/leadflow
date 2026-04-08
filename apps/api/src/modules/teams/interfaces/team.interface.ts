@@ -11,6 +11,7 @@ export type TeamStatus = 'draft' | 'active' | 'archived';
 export interface Team extends BaseDomainEntity, WorkspaceScoped {
   name: string;
   code: string;
+  logoUrl: string | null;
   status: TeamStatus;
   isActive: boolean;
   subscriptionExpiresAt: string | null;

@@ -110,6 +110,7 @@ export const mapTeamRecord = (record: TeamRecord): Team => ({
   workspaceId: record.workspaceId,
   name: record.name,
   code: record.code,
+  logoUrl: record.logoUrl,
   status: record.status,
   isActive: record.isActive,
   subscriptionExpiresAt: record.subscriptionExpiresAt

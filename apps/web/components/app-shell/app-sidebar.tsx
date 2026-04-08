@@ -60,6 +60,7 @@ export function AppSidebar({
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={`block rounded-[1.35rem] border px-4 py-3 transition ${
                 isActive
                   ? "border-teal-300/40 bg-white text-slate-950 shadow-[0_16px_40px_rgba(15,23,42,0.2)]"
@@ -67,7 +68,14 @@ export function AppSidebar({
               }`}
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold">{item.label}</p>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`h-8 w-1 rounded-full ${
+                      isActive ? "bg-slate-950" : "bg-white/10"
+                    }`}
+                  />
+                  <p className="text-sm font-semibold">{item.label}</p>
+                </div>
                 {isActive ? (
                   <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
                     Actual

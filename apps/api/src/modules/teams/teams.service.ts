@@ -8,6 +8,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import { ConfigService } from '@nestjs/config';
 import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { mapFunnelRecord } from '../../prisma/prisma.mappers';
@@ -108,12 +109,28 @@ export type SystemTenantDetail = SystemTenantSummary & {
   };
 };
 
+export type TeamSettingsSnapshot = {
+  teamId: string;
+  workspaceId: string;
+  agencyName: string;
+  teamCode: string;
+  logoUrl: string | null;
+  baseDomain: string | null;
+  updatedAt: string;
+};
+
+type TeamScope = {
+  workspaceId: string;
+  teamId: string;
+};
+
 @Injectable()
 export class TeamsService {
   private readonly logger = new Logger(TeamsService.name);
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly walletEngineService: WalletEngineService,
     private readonly funnelsService: FunnelsService,
     private readonly mailService: MailService,
@@ -127,6 +144,7 @@ export class TeamsService {
       workspaceId: dto.workspaceId,
       name: dto.name,
       code: dto.code,
+      logoUrl: dto.logoUrl ?? null,
       status: 'draft',
       isActive: dto.isActive ?? true,
       subscriptionExpiresAt: dto.subscriptionExpiresAt ?? null,
@@ -154,6 +172,79 @@ export class TeamsService {
     }
 
     return this.repository.findAll();
+  }
+
+  async getTeamSettings(scope: TeamScope): Promise<TeamSettingsSnapshot> {
+    const record = await this.requireScopedTeam(scope);
+
+    return this.mapTeamSettings(record);
+  }
+
+  async updateTeamSettings(
+    scope: TeamScope,
+    dto: {
+      agencyName?: string;
+      logoUrl?: string | null;
+      baseDomain?: string | null;
+    },
+  ): Promise<TeamSettingsSnapshot> {
+    if (
+      dto.agencyName === undefined &&
+      dto.logoUrl === undefined &&
+      dto.baseDomain === undefined
+    ) {
+      throw new BadRequestException({
+        code: 'TEAM_SETTINGS_UPDATE_EMPTY',
+        message: 'At least one team settings field is required.',
+      });
+    }
+
+    const existing = await this.requireScopedTeam(scope);
+    const agencyName =
+      dto.agencyName === undefined
+        ? existing.name
+        : sanitizeRequiredText(dto.agencyName, 'agencyName');
+    const logoUrl =
+      dto.logoUrl === undefined
+        ? existing.logoUrl
+        : this.normalizeTeamLogoUrl(dto.logoUrl);
+    const baseDomain =
+      dto.baseDomain === undefined
+        ? existing.workspace.primaryDomain
+        : this.normalizeWorkspaceBaseDomain(dto.baseDomain);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const team = await tx.team.update({
+        where: { id: existing.id },
+        data: {
+          name: agencyName,
+          logoUrl,
+        },
+        include: {
+          workspace: {
+            select: {
+              id: true,
+              primaryDomain: true,
+            },
+          },
+        },
+      });
+
+      if (baseDomain !== existing.workspace.primaryDomain) {
+        await tx.workspace.update({
+          where: { id: existing.workspaceId },
+          data: {
+            primaryDomain: baseDomain,
+          },
+        });
+
+        team.workspace.primaryDomain = baseDomain;
+      }
+
+      return team;
+    });
+
+    return this.mapTeamSettings(updated);
   }
 
   async listSystemTenants(): Promise<SystemTenantSummary[]> {
@@ -755,6 +846,163 @@ export class TeamsService {
     }
 
     return words.join(' ');
+  }
+
+  private async requireScopedTeam(scope: TeamScope) {
+    const record = await this.prisma.team.findFirst({
+      where: {
+        id: scope.teamId,
+        workspaceId: scope.workspaceId,
+      },
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            primaryDomain: true,
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      throw new NotFoundException({
+        code: 'TEAM_NOT_FOUND',
+        message: 'The requested team was not found.',
+      });
+    }
+
+    return record;
+  }
+
+  private mapTeamSettings(record: {
+    id: string;
+    workspaceId: string;
+    name: string;
+    code: string;
+    logoUrl: string | null;
+    updatedAt: Date;
+    workspace: {
+      id: string;
+      primaryDomain: string | null;
+    };
+  }): TeamSettingsSnapshot {
+    return {
+      teamId: record.id,
+      workspaceId: record.workspaceId,
+      agencyName: record.name,
+      teamCode: record.code,
+      logoUrl: record.logoUrl,
+      baseDomain: record.workspace.primaryDomain,
+      updatedAt: toIso(record.updatedAt),
+    };
+  }
+
+  private normalizeTeamLogoUrl(
+    value: string | null | undefined,
+  ): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    let parsedUrl: URL;
+
+    try {
+      parsedUrl = new URL(trimmed);
+    } catch {
+      throw new BadRequestException({
+        code: 'TEAM_LOGO_URL_INVALID',
+        message: 'logoUrl must be a valid absolute URL.',
+      });
+    }
+
+    const configuredBaseUrl = this.configService
+      .get<string>('MINIO_PUBLIC_URL')
+      ?.trim();
+
+    if (configuredBaseUrl) {
+      try {
+        const publicBaseUrl = new URL(configuredBaseUrl);
+
+        if (parsedUrl.origin !== publicBaseUrl.origin) {
+          throw new BadRequestException({
+            code: 'TEAM_LOGO_URL_INVALID_ORIGIN',
+            message:
+              'The team logo must point to the configured Leadflow CDN origin.',
+          });
+        }
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+      }
+    }
+
+    return parsedUrl.toString();
+  }
+
+  private normalizeWorkspaceBaseDomain(
+    value: string | null | undefined,
+  ): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    const trimmed = value.trim().toLowerCase();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    let hostname = trimmed;
+
+    if (trimmed.includes('://')) {
+      let parsedUrl: URL;
+
+      try {
+        parsedUrl = new URL(trimmed);
+      } catch {
+        throw new BadRequestException({
+          code: 'WORKSPACE_BASE_DOMAIN_INVALID',
+          message: 'baseDomain must be a valid hostname or URL.',
+        });
+      }
+
+      if (
+        parsedUrl.pathname !== '/' ||
+        parsedUrl.search ||
+        parsedUrl.hash ||
+        parsedUrl.port
+      ) {
+        throw new BadRequestException({
+          code: 'WORKSPACE_BASE_DOMAIN_INVALID',
+          message:
+            'baseDomain must only contain the hostname, without path, query or port.',
+        });
+      }
+
+      hostname = parsedUrl.hostname.toLowerCase();
+    }
+
+    const normalizedHostname = hostname.replace(/\.$/, '');
+
+    if (
+      !/^(localhost|([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/.test(
+        normalizedHostname,
+      )
+    ) {
+      throw new BadRequestException({
+        code: 'WORKSPACE_BASE_DOMAIN_INVALID',
+        message: 'baseDomain must be a valid hostname.',
+      });
+    }
+
+    return normalizedHostname;
   }
 
   private cloneJsonValue(value: JsonValue): JsonValue {

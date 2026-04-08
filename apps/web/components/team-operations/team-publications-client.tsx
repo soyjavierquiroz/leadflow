@@ -489,8 +489,17 @@ export function TeamPublicationsClient({
           },
         ]}
         rows={rows}
+        emptyEyebrow="Aún no publicas funnels"
         emptyTitle="Sin publicaciones para este team"
         emptyDescription="Cuando el team publique funnels sobre dominios propios, esta tabla se llenará automáticamente."
+        emptyAction={
+          <Link
+            href="/team/publications/new-vsl"
+            className={primaryButtonClassName}
+          >
+            Crear mi primer funnel
+          </Link>
+        }
       />
 
       {isCreateOpen ? (
