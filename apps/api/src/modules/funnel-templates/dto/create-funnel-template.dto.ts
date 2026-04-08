@@ -3,6 +3,7 @@ import type { JsonValue } from '../../shared/domain.types';
 export class CreateFunnelTemplateDto {
   readonly workspaceId?: string | null;
   readonly name!: string;
+  readonly description?: string | null;
   readonly code!: string;
   readonly version?: number;
   readonly funnelType!: string;

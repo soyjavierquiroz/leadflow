@@ -203,6 +203,7 @@ export const mapFunnelTemplateRecord = (
   id: record.id,
   workspaceId: record.workspaceId,
   name: record.name,
+  description: record.description,
   code: record.code,
   status: record.status,
   version: record.version,

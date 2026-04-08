@@ -539,6 +539,7 @@ model FunnelTemplate {
   id                       String               @id @default(uuid())
   workspaceId              String?
   name                     String
+  description              String?
   code                     String               @unique
   status                   FunnelTemplateStatus
   version                  Int                  @default(1)

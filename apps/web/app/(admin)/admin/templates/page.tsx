@@ -1,8 +1,11 @@
 import { SystemTemplatesClient } from "@/components/system/system-templates-client";
-import { getSystemFunnelTemplates } from "@/lib/system-tenants";
+import { getSystemTemplates, getSystemTenants } from "@/lib/system-tenants";
 
 export default async function AdminTemplatesPage() {
-  const templates = await getSystemFunnelTemplates();
+  const [templates, teams] = await Promise.all([
+    getSystemTemplates(),
+    getSystemTenants(),
+  ]);
 
-  return <SystemTemplatesClient initialRows={templates} />;
+  return <SystemTemplatesClient initialRows={templates} teams={teams} />;
 }

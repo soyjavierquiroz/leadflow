@@ -110,6 +110,36 @@ export type SystemFunnelTemplateRecord = {
   updatedAt: string;
 };
 
+export type SystemTemplateRecord = {
+  id: string;
+  workspaceId: string | null;
+  name: string;
+  description: string | null;
+  code: string;
+  status: "draft" | "active" | "archived";
+  version: number;
+  funnelType: string;
+  blocks: JsonValue;
+  blocksJson: JsonValue;
+  mediaMap: JsonValue;
+  settingsJson: JsonValue;
+  allowedOverridesJson: JsonValue;
+  defaultHandoffStrategyId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SystemTemplateDeploymentResponse = {
+  funnel: SystemTenantFunnelRecord;
+  template: SystemTemplateRecord;
+  team: {
+    id: string;
+    workspaceId: string;
+    name: string;
+    code: string;
+  };
+};
+
 export type SystemTenantDetailRecord = SystemTenantRecord & {
   description: string | null;
   managerUserId: string | null;
@@ -276,4 +306,52 @@ export const getSystemFunnelTemplates = async () => {
   }
 
   return payload as SystemFunnelTemplateRecord[];
+};
+
+export const getSystemTemplates = async () => {
+  noStore();
+
+  const response = await apiFetchWithSession("/system/templates");
+
+  if (!response.ok) {
+    throw new Error(
+      `No pudimos cargar el catálogo global de templates (${response.status}).`,
+    );
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  if (!Array.isArray(payload)) {
+    throw new Error(
+      "El API devolvió un payload inválido para system/templates.",
+    );
+  }
+
+  return payload as SystemTemplateRecord[];
+};
+
+export const getSystemTemplate = async (templateId: string) => {
+  noStore();
+
+  const response = await apiFetchWithSession(
+    `/system/templates/${encodePathSegment(templateId)}`,
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `No pudimos cargar el template solicitado (${response.status}).`,
+    );
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("El API devolvió un payload inválido para el template.");
+  }
+
+  return payload as SystemTemplateRecord;
 };

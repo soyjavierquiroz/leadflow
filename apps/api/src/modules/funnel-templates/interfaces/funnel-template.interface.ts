@@ -11,6 +11,7 @@ export type FunnelTemplateStatus = 'draft' | 'active' | 'archived';
 export interface FunnelTemplate extends BaseDomainEntity {
   workspaceId: DomainId | null;
   name: string;
+  description: string | null;
   code: string;
   status: FunnelTemplateStatus;
   version: number;

@@ -84,6 +84,16 @@ const buildVerificationBadgeClassName = (isVerified: boolean) =>
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
     : "border-amber-200 bg-amber-50 text-amber-700";
 
+const isTemplateEngineFunnel = (config: unknown) =>
+  Boolean(
+    config &&
+      typeof config === "object" &&
+      !Array.isArray(config) &&
+      "source" in config &&
+      (config as { source?: unknown }).source === "global-template-engine" &&
+      "blocks" in config,
+  );
+
 export function TenantImmersionClient({
   teamId,
   initialTenant,
@@ -650,12 +660,16 @@ export function TenantImmersionClient({
                     type="button"
                     onClick={() =>
                       router.push(
-                        `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(row.id)}/builder`,
+                        isTemplateEngineFunnel(row.config)
+                          ? `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(row.id)}/edit`
+                          : `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(row.id)}/builder`,
                       )
                     }
                     className={secondaryButtonClassName}
                   >
-                    Abrir Funnel Builder
+                    {isTemplateEngineFunnel(row.config)
+                      ? "Editar Funnel JSON"
+                      : "Abrir Funnel Builder"}
                   </button>
                 ),
               },

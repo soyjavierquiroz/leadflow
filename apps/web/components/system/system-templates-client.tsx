@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
@@ -10,191 +11,135 @@ import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
 import type {
-  JsonValue,
-  SystemFunnelTemplateRecord,
+  SystemTemplateDeploymentResponse,
+  SystemTemplateRecord,
+  SystemTenantRecord,
 } from "@/lib/system-tenants";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 type SystemTemplatesClientProps = {
-  initialRows: SystemFunnelTemplateRecord[];
+  initialRows: SystemTemplateRecord[];
+  teams: SystemTenantRecord[];
 };
 
-type TemplateEditorState =
-  | {
-      mode: "create";
-    }
-  | {
-      mode: "edit";
-      templateId: string;
-    }
-  | null;
-
-type TemplateFormState = {
+type DeployTargetState = {
+  id: string;
   name: string;
-  description: string;
-  status: SystemFunnelTemplateRecord["status"];
-  configText: string;
+} | null;
+
+type ToastState = {
+  title: string;
+  description: string | null;
 };
 
 const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
   "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
-const dangerButtonClassName =
-  "rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60";
 
-const buildInitialFormState = (): TemplateFormState => ({
-  name: "",
-  description: "",
-  status: "draft",
-  configText: "{}",
-});
-
-const sortRows = (rows: SystemFunnelTemplateRecord[]) => {
-  const statusOrder = {
-    active: 0,
-    draft: 1,
-    archived: 2,
-  } satisfies Record<SystemFunnelTemplateRecord["status"], number>;
-
-  return [...rows].sort((left, right) => {
-    const statusDelta = statusOrder[left.status] - statusOrder[right.status];
-
-    if (statusDelta !== 0) {
-      return statusDelta;
-    }
-
-    return (
-      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-    );
-  });
-};
+const sortRows = (rows: SystemTemplateRecord[]) =>
+  [...rows].sort(
+    (left, right) =>
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+  );
 
 export function SystemTemplatesClient({
   initialRows,
+  teams,
 }: SystemTemplatesClientProps) {
   const router = useRouter();
+  const toastTimeoutRef = useRef<number | null>(null);
   const [rows, setRows] = useState(() => sortRows(initialRows));
-  const [editorState, setEditorState] = useState<TemplateEditorState>(null);
-  const [deleteTarget, setDeleteTarget] =
-    useState<SystemFunnelTemplateRecord | null>(null);
-  const [formState, setFormState] = useState(buildInitialFormState);
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     message: string;
   } | null>(null);
-  const [configError, setConfigError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [deployTarget, setDeployTarget] = useState<DeployTargetState>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id ?? "");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     setRows(sortRows(initialRows));
   }, [initialRows]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current !== null) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = (title: string, description?: string | null) => {
+    if (toastTimeoutRef.current !== null) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+
+    setToast({
+      title,
+      description: description ?? null,
+    });
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null);
+    }, 6000);
+  };
+
   const activeCount = rows.filter((item) => item.status === "active").length;
   const draftCount = rows.filter((item) => item.status === "draft").length;
-  const archivedCount = rows.filter(
-    (item) => item.status === "archived",
-  ).length;
+  const archivedCount = rows.filter((item) => item.status === "archived").length;
+  const totalBlocks = rows.reduce(
+    (sum, row) => sum + (Array.isArray(row.blocks) ? row.blocks.length : 0),
+    0,
+  );
 
-  const editingTemplate =
-    editorState?.mode === "edit"
-      ? (rows.find((row) => row.id === editorState.templateId) ?? null)
-      : null;
+  const sortedTeams = [...teams].sort((left, right) =>
+    left.name.localeCompare(right.name),
+  );
 
-  const resetForm = () => {
-    setFormState(buildInitialFormState());
-    setConfigError(null);
-  };
-
-  const closeEditor = () => {
-    setEditorState(null);
-    resetForm();
-  };
-
-  const openCreateModal = () => {
+  const openDeployModal = (row: SystemTemplateRecord) => {
     setFeedback(null);
-    resetForm();
-    setEditorState({ mode: "create" });
-  };
-
-  const openEditModal = (template: SystemFunnelTemplateRecord) => {
-    setFeedback(null);
-    setFormState({
-      name: template.name,
-      description: template.description ?? "",
-      status: template.status,
-      configText: JSON.stringify(template.config ?? {}, null, 2),
-    });
-    setEditorState({
-      mode: "edit",
-      templateId: template.id,
+    setSelectedTeamId(sortedTeams[0]?.id ?? "");
+    setDeployTarget({
+      id: row.id,
+      name: row.name,
     });
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleDeploySubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
-    setConfigError(null);
 
-    const name = formState.name.trim();
-    const description = formState.description.trim();
-    let config: JsonValue;
-
-    if (!name) {
-      setFeedback({
-        tone: "error",
-        message: "Asigna un nombre claro para el template.",
-      });
+    if (!deployTarget) {
       return;
     }
 
-    try {
-      config = JSON.parse(formState.configText) as JsonValue;
-    } catch {
-      setConfigError("Ingresa un JSON valido antes de guardar el template.");
+    const teamId = selectedTeamId.trim();
+
+    if (!teamId) {
       setFeedback({
         tone: "error",
-        message: "La configuracion no es un JSON valido.",
+        message: "Selecciona una agencia antes de desplegar el template.",
       });
       return;
     }
 
     startTransition(async () => {
       try {
-        const payload = {
-          name,
-          description: description || null,
-          status: formState.status,
-          config,
-        };
-        const record =
-          await authenticatedOperationRequest<SystemFunnelTemplateRecord>(
-            editorState?.mode === "edit"
-              ? `/system/funnels/templates/${encodeURIComponent(editorState.templateId)}`
-              : "/system/funnels/templates",
+        const payload =
+          await authenticatedOperationRequest<SystemTemplateDeploymentResponse>(
+            `/system/templates/${encodeURIComponent(deployTarget.id)}/deploy`,
             {
-              method: editorState?.mode === "edit" ? "PATCH" : "POST",
-              body: JSON.stringify(payload),
+              method: "POST",
+              body: JSON.stringify({ teamId }),
             },
           );
 
-        setRows((current) => {
-          if (editorState?.mode === "edit") {
-            return sortRows(
-              current.map((row) => (row.id === record.id ? record : row)),
-            );
-          }
-
-          return sortRows([record, ...current]);
-        });
-        closeEditor();
-        setFeedback({
-          tone: "success",
-          message:
-            editorState?.mode === "edit"
-              ? "El template global quedó actualizado."
-              : "El template global quedó creado y listo para clonación.",
-        });
+        setDeployTarget(null);
+        showToast(
+          "Template desplegado.",
+          `${payload.funnel.name} ya quedó creado en ${payload.team.name}.`,
+        );
         router.refresh();
       } catch (error) {
         setFeedback({
@@ -202,44 +147,7 @@ export function SystemTemplatesClient({
           message:
             error instanceof Error
               ? error.message
-              : "No pudimos guardar el template global.",
-        });
-      }
-    });
-  };
-
-  const handleDelete = () => {
-    if (!deleteTarget) {
-      return;
-    }
-
-    setFeedback(null);
-
-    startTransition(async () => {
-      try {
-        await authenticatedOperationRequest<{ id: string; deleted: true }>(
-          `/system/funnels/templates/${encodeURIComponent(deleteTarget.id)}`,
-          {
-            method: "DELETE",
-          },
-        );
-
-        setRows((current) =>
-          current.filter((row) => row.id !== deleteTarget.id),
-        );
-        setDeleteTarget(null);
-        setFeedback({
-          tone: "success",
-          message: "El template global fue eliminado del catálogo base.",
-        });
-        router.refresh();
-      } catch (error) {
-        setFeedback({
-          tone: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "No pudimos eliminar el template global.",
+              : "No pudimos desplegar el template al tenant.",
         });
       }
     });
@@ -249,12 +157,12 @@ export function SystemTemplatesClient({
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Super Admin / Templates"
-        title="CRUD de templates globales"
-        description="Administra los funnels legacy que funcionan como plantillas base del sistema y quedan disponibles para clonación hacia los tenants."
+        title="Catálogo global de templates"
+        description="Administra las plantillas base que nacen en el builder híbrido y luego se despliegan como funnels hacia los tenants."
         actions={
           <button
             type="button"
-            onClick={openCreateModal}
+            onClick={() => router.push("/admin/templates/new")}
             className={primaryButtonClassName}
           >
             Nuevo Template
@@ -266,37 +174,53 @@ export function SystemTemplatesClient({
         <OperationBanner tone={feedback.tone} message={feedback.message} />
       ) : null}
 
+      {toast ? (
+        <div className="fixed right-4 top-4 z-50 w-full max-w-sm rounded-[1.5rem] border border-emerald-200 bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+          <p className="text-sm font-semibold text-slate-950">{toast.title}</p>
+          {toast.description ? (
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {toast.description}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Templates Totales"
           value={formatCompactNumber(rows.length)}
-          hint="Catálogo legacy disponible para clonación global."
+          hint="Catálogo global disponible para creación y despliegue."
         />
         <KpiCard
           label="Activos"
           value={formatCompactNumber(activeCount)}
-          hint="Templates listos para uso inmediato en provisioning u operación."
+          hint="Templates listos para despliegue inmediato a tenants."
         />
         <KpiCard
           label="Drafts"
           value={formatCompactNumber(draftCount)}
-          hint="Base editable antes de quedar aprobada para equipos."
+          hint="Plantillas en edición dentro del builder compartido."
         />
         <KpiCard
-          label="Archivados"
-          value={formatCompactNumber(archivedCount)}
-          hint="Historial retirado sin perder trazabilidad administrativa."
+          label="Bloques totales"
+          value={formatCompactNumber(totalBlocks)}
+          hint="Inventario agregado de bloques persistidos en el catálogo."
         />
       </section>
 
       <DataTable
         columns={[
           {
-            key: "name",
+            key: "template",
             header: "Template",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">{row.name}</p>
+                <Link
+                  href={`/admin/templates/${row.id}/edit`}
+                  className="font-semibold text-slate-950 transition hover:text-teal-700 hover:underline"
+                >
+                  {row.name}
+                </Link>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   {row.code}
                 </p>
@@ -313,13 +237,18 @@ export function SystemTemplatesClient({
             ),
           },
           {
-            key: "configuration",
-            header: "Configuración",
+            key: "blocks",
+            header: "Blocks",
             render: (row) => (
               <div className="space-y-1">
-                <p>{row.stages.length} etapas</p>
+                <p>{Array.isArray(row.blocks) ? row.blocks.length : 0} bloques</p>
                 <p className="text-xs text-slate-500">
-                  {row.entrySources.join(", ")}
+                  {Object.keys(
+                    row.mediaMap && typeof row.mediaMap === "object" && !Array.isArray(row.mediaMap)
+                      ? row.mediaMap
+                      : {},
+                  ).length}{" "}
+                  llaves media
                 </p>
               </div>
             ),
@@ -339,22 +268,18 @@ export function SystemTemplatesClient({
             header: "Acciones",
             render: (row) => (
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => openEditModal(row)}
+                <Link
+                  href={`/admin/templates/${row.id}/edit`}
                   className={secondaryButtonClassName}
                 >
                   Editar
-                </button>
+                </Link>
                 <button
                   type="button"
-                  onClick={() => {
-                    setFeedback(null);
-                    setDeleteTarget(row);
-                  }}
-                  className={dangerButtonClassName}
+                  onClick={() => openDeployModal(row)}
+                  className={primaryButtonClassName}
                 >
-                  Eliminar
+                  Desplegar a Agencia
                 </button>
               </div>
             ),
@@ -362,175 +287,60 @@ export function SystemTemplatesClient({
         ]}
         rows={rows}
         emptyTitle="Sin templates globales"
-        emptyDescription="Crea el primer template base para que el catálogo del sistema quede operativo y clonable."
+        emptyDescription="Crea el primer template en el builder para activar el catálogo global del super admin."
       />
 
-      {editorState ? (
+      {deployTarget ? (
         <ModalShell
           eyebrow="Super Admin / Templates"
-          title={
-            editorState.mode === "edit"
-              ? "Editar template global"
-              : "Crear template global"
-          }
-          description={
-            editorState.mode === "edit"
-              ? "Ajusta el naming y la descripción del template base sin salir del panel."
-              : "Registra una nueva plantilla global que luego podrá clonarse en tenants."
-          }
-          onClose={closeEditor}
+          title={`Desplegar ${deployTarget.name}`}
+          description="Selecciona la agencia destino. El backend creará un nuevo funnel asignado a ese tenant usando los blocks y la metadata del template."
+          onClose={() => setDeployTarget(null)}
         >
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
-                Nombre
-              </span>
-              <input
-                type="text"
-                value={formState.name}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                placeholder="Ej. Funnel Base Captación Premium"
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                disabled={isPending}
-              />
-            </label>
-
-            <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
-                Descripción
-              </span>
-              <textarea
-                value={formState.description}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="Describe el propósito del template y su uso esperado."
-                rows={4}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                disabled={isPending}
-              />
-            </label>
-
-            <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
-                Estado
+          <form className="space-y-5" onSubmit={handleDeploySubmit}>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">
+                Agencia destino
               </span>
               <select
-                value={formState.status}
-                onChange={(event) =>
-                  setFormState((current) => ({
-                    ...current,
-                    status: event.target.value as TemplateFormState["status"],
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                value={selectedTeamId}
+                onChange={(event) => setSelectedTeamId(event.target.value)}
                 disabled={isPending}
+                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
               >
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
+                <option value="">Selecciona una agencia</option>
+                {sortedTeams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name} ({team.code})
+                  </option>
+                ))}
               </select>
             </label>
 
-            <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
-                Configuracion JSON
-              </span>
-              <textarea
-                value={formState.configText}
-                onChange={(event) => {
-                  setConfigError(null);
-                  setFormState((current) => ({
-                    ...current,
-                    configText: event.target.value,
-                  }));
-                }}
-                placeholder='{\n  "steps": [],\n  "texts": {}\n}'
-                rows={14}
-                className={`w-full rounded-2xl px-4 py-3 font-mono text-sm text-slate-900 outline-none transition ${
-                  configError
-                    ? "border border-rose-300 focus:border-rose-500"
-                    : "border border-slate-300 focus:border-slate-950"
-                }`}
-                disabled={isPending}
-                spellCheck={false}
-              />
-              <p className="text-xs leading-5 text-slate-500">
-                Edita la configuracion interna del embudo en formato JSON. Se
-                validara antes de enviarse al backend.
-              </p>
-              {configError ? (
-                <p className="text-sm font-medium text-rose-600">
-                  {configError}
-                </p>
-              ) : null}
-            </label>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+              Este despliegue crea un nuevo funnel del tenant usando el contrato
+              <code> POST /v1/system/templates/:templateId/deploy</code> con el
+              <code> teamId</code> seleccionado.
+            </div>
 
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                onClick={closeEditor}
-                className={secondaryButtonClassName}
+                onClick={() => setDeployTarget(null)}
                 disabled={isPending}
+                className={secondaryButtonClassName}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
+                disabled={isPending || sortedTeams.length === 0}
                 className={primaryButtonClassName}
-                disabled={isPending}
               >
-                {isPending
-                  ? "Guardando..."
-                  : editorState.mode === "edit"
-                    ? "Guardar Cambios"
-                    : "Crear Template"}
+                {isPending ? "Desplegando..." : "Desplegar"}
               </button>
             </div>
           </form>
-        </ModalShell>
-      ) : null}
-
-      {deleteTarget ? (
-        <ModalShell
-          eyebrow="Super Admin / Templates"
-          title="Eliminar template global"
-          description="Esta acción borra el registro base del catálogo legacy. Verifica que ya no sea necesario para nuevos tenants o clonaciones."
-          onClose={() => setDeleteTarget(null)}
-        >
-          <div className="space-y-5">
-            <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-700">
-              Vas a eliminar <strong>{deleteTarget.name}</strong>. Esta acción
-              no se puede deshacer desde esta vista.
-            </div>
-
-            <div className="flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className={secondaryButtonClassName}
-                disabled={isPending}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                className={dangerButtonClassName}
-                disabled={isPending}
-              >
-                {isPending ? "Eliminando..." : "Confirmar Eliminación"}
-              </button>
-            </div>
-          </div>
         </ModalShell>
       ) : null}
     </div>

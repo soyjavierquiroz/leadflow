@@ -22,6 +22,7 @@ import { SponsorsModule } from '../sponsors/sponsors.module';
 import { StorageModule } from '../storage/storage.module';
 import { TeamsModule } from '../teams/teams.module';
 import { TrackingProfilesModule } from '../tracking-profiles/tracking-profiles.module';
+import { TemplatesModule } from '../templates/templates.module';
 import { VisitorsModule } from '../visitors/visitors.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
@@ -40,6 +41,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     FunnelStepsModule,
     FunnelPublicationsModule,
     TrackingProfilesModule,
+    TemplatesModule,
     HandoffStrategiesModule,
     HybridFunnelPublicationsModule,
     ConversionEventMappingsModule,
@@ -68,6 +70,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     FunnelStepsModule,
     FunnelPublicationsModule,
     TrackingProfilesModule,
+    TemplatesModule,
     HandoffStrategiesModule,
     HybridFunnelPublicationsModule,
     ConversionEventMappingsModule,

@@ -47,6 +47,7 @@ export class FunnelTemplatePrismaRepository implements FunnelTemplateRepository 
       data: {
         workspaceId: data.workspaceId ?? null,
         name: data.name,
+        description: data.description ?? null,
         code: data.code,
         status: 'draft',
         version: data.version ?? 1,
@@ -69,6 +70,7 @@ export class FunnelTemplatePrismaRepository implements FunnelTemplateRepository 
         id: entity.id,
         workspaceId: entity.workspaceId,
         name: entity.name,
+        description: entity.description,
         code: entity.code,
         status: entity.status,
         version: entity.version,
@@ -84,6 +86,7 @@ export class FunnelTemplatePrismaRepository implements FunnelTemplateRepository 
       update: {
         workspaceId: entity.workspaceId,
         name: entity.name,
+        description: entity.description,
         code: entity.code,
         status: entity.status,
         version: entity.version,

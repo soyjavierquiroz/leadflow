@@ -19,6 +19,7 @@ export class FunnelTemplatesService {
     return buildEntity<FunnelTemplate>({
       workspaceId: dto.workspaceId ?? null,
       name: dto.name,
+      description: dto.description ?? null,
       code: dto.code,
       status: 'draft',
       version: dto.version ?? 1,
