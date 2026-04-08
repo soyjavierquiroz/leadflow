@@ -43,6 +43,9 @@ const sortRows = (rows: SystemTemplateRecord[]) =>
       new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
   );
 
+const getTemplateEditHref = (templateId: string) =>
+  `/admin/templates/${encodeURIComponent(templateId)}/edit`;
+
 export function SystemTemplatesClient({
   initialRows,
   teams,
@@ -216,7 +219,7 @@ export function SystemTemplatesClient({
             render: (row) => (
               <div>
                 <Link
-                  href={`/admin/templates/${row.id}/edit`}
+                  href={getTemplateEditHref(row.id)}
                   className="font-semibold text-slate-950 transition hover:text-teal-700 hover:underline"
                 >
                   {row.name}
@@ -269,7 +272,7 @@ export function SystemTemplatesClient({
             render: (row) => (
               <div className="flex flex-wrap gap-2">
                 <Link
-                  href={`/admin/templates/${row.id}/edit`}
+                  href={getTemplateEditHref(row.id)}
                   className={secondaryButtonClassName}
                 >
                   Editar
