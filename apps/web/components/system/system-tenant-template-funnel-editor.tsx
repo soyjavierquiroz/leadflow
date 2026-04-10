@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, FileJson, Save, Sparkles } from "lucide-react";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import {
@@ -122,6 +123,7 @@ export function SystemTenantTemplateFunnelEditor({
   tenant,
   funnel,
 }: SystemTenantTemplateFunnelEditorProps) {
+  const router = useRouter();
   const normalizedSteps = useMemo(
     () => normalizeStepRecords((funnel as { steps?: unknown }).steps),
     [funnel],
@@ -420,6 +422,7 @@ export function SystemTenantTemplateFunnelEditor({
         setSuccessMessage(
           `${stepTabs.find((tab) => tab.key === activeStepTab)?.label ?? "Paso"} actualizado correctamente.`,
         );
+        router.refresh();
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "No pudimos guardar el funnel del tenant.",
