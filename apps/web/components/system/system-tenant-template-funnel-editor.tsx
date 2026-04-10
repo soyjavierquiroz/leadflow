@@ -371,6 +371,11 @@ export function SystemTenantTemplateFunnelEditor({
 
     startTransition(async () => {
       try {
+        const funnelSettingsPayload = mergeThemeIntoSettings(
+          nextFunnelSettingsJson,
+          selectedThemeId,
+        );
+
         await authenticatedOperationRequest(
           `/system/tenants/${encodeURIComponent(tenant.id)}/funnels/${encodeURIComponent(funnel.id)}`,
           {
@@ -378,7 +383,7 @@ export function SystemTenantTemplateFunnelEditor({
             body: JSON.stringify({
               name: name.trim(),
               description: description.trim() || null,
-              settingsJson: nextFunnelSettingsJson,
+              settingsJson: funnelSettingsPayload,
             }),
           },
         );
@@ -409,8 +414,8 @@ export function SystemTenantTemplateFunnelEditor({
           ...current,
           [response.step.id]: buildStepDraft(response.step),
         }));
-        setFunnelSettingsJson(nextFunnelSettingsJson);
-        setSelectedThemeId(extractThemeFromSettings(nextFunnelSettingsJson));
+        setFunnelSettingsJson(funnelSettingsPayload);
+        setSelectedThemeId(extractThemeFromSettings(funnelSettingsPayload));
         setSuccessMessage(
           `${stepTabs.find((tab) => tab.key === activeStepTab)?.label ?? "Paso"} actualizado correctamente.`,
         );

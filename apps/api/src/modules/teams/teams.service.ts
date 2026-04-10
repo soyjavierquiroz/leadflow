@@ -496,7 +496,7 @@ export class TeamsService {
       dto.description === undefined
         ? existing.description
         : sanitizeOptionalText(dto.description);
-    const config =
+    const nextConfig =
       dto.config === undefined
         ? this.cloneJsonValue(existing.config as JsonValue)
         : this.cloneJsonValue(dto.config);
@@ -504,10 +504,12 @@ export class TeamsService {
       tenantId,
       normalizedFunnelId,
     );
-    const settingsJson =
-      dto.settingsJson === undefined
-        ? this.cloneJsonValue((funnelInstance?.settingsJson as JsonValue) ?? {})
-        : this.normalizeFunnelSettingsJson(dto.settingsJson);
+    const settingsJson = this.mergeFunnelSettingsJson(
+      (funnelInstance?.settingsJson as JsonValue) ?? {},
+      dto.settingsJson,
+      existing.config as JsonValue,
+    );
+    const config = this.mergeThemeIntoFunnelConfig(nextConfig, settingsJson);
 
     const record = await this.prisma.$transaction(async (tx) => {
       const updatedFunnel = await tx.funnel.update({
@@ -1215,6 +1217,65 @@ export class TeamsService {
       ...value,
       theme: themeValue,
     };
+  }
+
+  private mergeFunnelSettingsJson(
+    existingSettingsJson: JsonValue | null | undefined,
+    incomingSettingsJson: JsonValue | undefined,
+    legacyConfig: JsonValue | null | undefined,
+  ): JsonValue {
+    const safeExisting = isJsonRecord(existingSettingsJson)
+      ? this.cloneJsonValue(existingSettingsJson)
+      : {};
+    const safeIncoming =
+      incomingSettingsJson === undefined
+        ? {}
+        : this.normalizeFunnelSettingsJson(incomingSettingsJson);
+    const mergedSettings = {
+      ...(isJsonRecord(safeExisting) ? safeExisting : {}),
+      ...(isJsonRecord(safeIncoming) ? safeIncoming : {}),
+    } satisfies Record<string, JsonValue>;
+    const resolvedTheme =
+      this.extractFunnelThemeFromRecord(mergedSettings) ??
+      this.extractFunnelThemeFromRecord(legacyConfig);
+
+    return resolvedTheme
+      ? {
+          ...mergedSettings,
+          theme: resolvedTheme,
+        }
+      : mergedSettings;
+  }
+
+  private mergeThemeIntoFunnelConfig(
+    config: JsonValue,
+    settingsJson: JsonValue,
+  ): JsonValue {
+    if (!isJsonRecord(config)) {
+      return config;
+    }
+
+    const theme = this.extractFunnelThemeFromRecord(settingsJson);
+    if (!theme) {
+      return {
+        ...config,
+      };
+    }
+
+    return {
+      ...config,
+      theme,
+    };
+  }
+
+  private extractFunnelThemeFromRecord(
+    value: JsonValue | null | undefined,
+  ): FunnelThemeId | null {
+    if (!isJsonRecord(value)) {
+      return null;
+    }
+
+    return isFunnelThemeId(value.theme) ? value.theme : null;
   }
 
   private mapSystemTenantFunnelStep(step: {
