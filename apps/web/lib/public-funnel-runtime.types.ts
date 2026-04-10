@@ -1,3 +1,5 @@
+import type { FunnelThemeId } from '@/lib/funnel-theme.types';
+
 export type JsonValue =
   | string
   | number
@@ -35,6 +37,7 @@ export type PublicFunnelRuntimePayload = {
     trackingProfileId: string | null;
     handoffStrategyId: string | null;
   };
+  theme: FunnelThemeId;
   funnel: {
     id: string;
     name: string;

@@ -1,3 +1,4 @@
+import { resolveFunnelThemeId } from '@/lib/funnel-theme-registry';
 import type {
   JsonValue,
   PublicFunnelRuntimePayload,
@@ -137,6 +138,7 @@ export function normalizePublicFunnelRuntimePayload(
   const activeCurrentStep = isRecord(record.currentStep)
     ? currentStep
     : normalizedSteps[0] ?? currentStep;
+  const theme = resolveFunnelThemeId(record.theme);
 
   return {
     request: {
@@ -174,6 +176,7 @@ export function normalizePublicFunnelRuntimePayload(
           ? publicationRecord.handoffStrategyId
           : null,
     },
+    theme,
     funnel: {
       id: asString(funnelRecord.id, 'runtime-funnel'),
       name: asString(funnelRecord.name, 'Public Funnel'),

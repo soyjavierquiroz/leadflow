@@ -89,6 +89,7 @@ function buildPreviewRuntime(
       trackingProfileId: null,
       handoffStrategyId: null,
     },
+    theme: "default",
     funnel: {
       id: "preview-funnel",
       name: "Preview Funnel",
