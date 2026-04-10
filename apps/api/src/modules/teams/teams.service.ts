@@ -70,6 +70,18 @@ const sanitizeOptionalText = (value: string | null | undefined) => {
   return trimmed ? trimmed : null;
 };
 
+const funnelThemeIds = ['default', 'expert-secrets'] as const;
+type FunnelThemeId = (typeof funnelThemeIds)[number];
+
+const isJsonRecord = (
+  value: JsonValue | null | undefined,
+): value is Record<string, JsonValue> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const isFunnelThemeId = (value: unknown): value is FunnelThemeId =>
+  typeof value === 'string' &&
+  (funnelThemeIds as readonly string[]).includes(value);
+
 const toIso = (value: Date) => value.toISOString();
 const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
@@ -137,6 +149,7 @@ export type SystemTenantFunnelStepSnapshot = {
 
 export type SystemTenantFunnelDetail = ReturnType<typeof mapFunnelRecord> & {
   funnelInstanceId: string | null;
+  settingsJson: JsonValue;
   steps: SystemTenantFunnelStepSnapshot[];
 };
 
@@ -440,6 +453,9 @@ export class TeamsService {
     return {
       ...mapFunnelRecord(existing),
       funnelInstanceId: funnelInstance?.id ?? null,
+      settingsJson: this.cloneJsonValue(
+        (funnelInstance?.settingsJson as JsonValue) ?? {},
+      ),
       steps:
         funnelInstance?.steps.map((step) => this.mapSystemTenantFunnelStep(step)) ??
         [],
@@ -484,16 +500,39 @@ export class TeamsService {
       dto.config === undefined
         ? this.cloneJsonValue(existing.config as JsonValue)
         : this.cloneJsonValue(dto.config);
+    const funnelInstance = await this.findPrimarySystemTenantFunnelInstance(
+      tenantId,
+      normalizedFunnelId,
+    );
+    const settingsJson =
+      dto.settingsJson === undefined
+        ? this.cloneJsonValue((funnelInstance?.settingsJson as JsonValue) ?? {})
+        : this.normalizeFunnelSettingsJson(dto.settingsJson);
 
-    const record = await this.prisma.funnel.update({
-      where: {
-        id: existing.id,
-      },
-      data: {
-        name,
-        description,
-        config: toInputJson(config),
-      },
+    const record = await this.prisma.$transaction(async (tx) => {
+      const updatedFunnel = await tx.funnel.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          name,
+          description,
+          config: toInputJson(config),
+        },
+      });
+
+      if (funnelInstance) {
+        await tx.funnelInstance.update({
+          where: {
+            id: funnelInstance.id,
+          },
+          data: {
+            settingsJson: toInputJson(settingsJson),
+          },
+        });
+      }
+
+      return updatedFunnel;
     });
 
     return mapFunnelRecord(record);
@@ -1148,6 +1187,34 @@ export class TeamsService {
 
   private cloneJsonValue(value: JsonValue): JsonValue {
     return JSON.parse(JSON.stringify(value)) as JsonValue;
+  }
+
+  private normalizeFunnelSettingsJson(value: JsonValue): JsonValue {
+    if (!isJsonRecord(value)) {
+      throw new BadRequestException({
+        code: 'TENANT_FUNNEL_SETTINGS_INVALID',
+        message: 'settingsJson must be a JSON object.',
+      });
+    }
+
+    const themeValue = value.theme;
+    if (themeValue === undefined || themeValue === null) {
+      return {
+        ...value,
+      };
+    }
+
+    if (!isFunnelThemeId(themeValue)) {
+      throw new BadRequestException({
+        code: 'TENANT_FUNNEL_THEME_INVALID',
+        message: `theme must be one of: ${funnelThemeIds.join(', ')}.`,
+      });
+    }
+
+    return {
+      ...value,
+      theme: themeValue,
+    };
   }
 
   private mapSystemTenantFunnelStep(step: {

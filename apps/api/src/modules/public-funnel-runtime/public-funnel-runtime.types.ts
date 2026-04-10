@@ -38,6 +38,7 @@ export type PublicRuntimePayload = {
     trackingProfileId: string | null;
     handoffStrategyId: string | null;
   };
+  theme: string | null;
   funnel: {
     id: string;
     name: string;

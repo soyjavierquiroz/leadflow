@@ -7,6 +7,7 @@ import {
 import { StickyMediaGallery } from "@/components/public-funnel/sticky-media-gallery";
 import { SplitMediaFocusLayout } from "@/components/structures/SplitMediaFocusLayout";
 import { BlockRegistry } from "@/lib/blocks/registry";
+import { resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import type {
   JsonValue,
   PublicFunnelRuntimePayload,
@@ -21,6 +22,7 @@ export type BlockDefinition = {
 type BlockRendererProps = {
   blocks: BlockDefinition[];
   mediaMap?: Record<string, string>;
+  themeId?: string;
   template?: {
     id: string;
     code?: string;
@@ -46,6 +48,7 @@ function inferPreviewStepType(blocks: RuntimeBlock[]) {
 function buildPreviewRuntime(
   blocks: RuntimeBlock[],
   mediaMap: Record<string, string>,
+  themeId = "default",
   template?: BlockRendererProps["template"],
 ): PublicFunnelRuntimePayload {
   const stepType = inferPreviewStepType(blocks);
@@ -89,7 +92,7 @@ function buildPreviewRuntime(
       trackingProfileId: null,
       handoffStrategyId: null,
     },
-    theme: "default",
+    theme: resolveFunnelThemeId(themeId),
     funnel: {
       id: "preview-funnel",
       name: "Preview Funnel",
@@ -134,10 +137,11 @@ function buildPreviewRuntime(
 export function BlockRenderer({
   blocks,
   mediaMap = {},
+  themeId = "default",
   template,
 }: BlockRendererProps) {
   const parsedBlocks = parseRuntimeBlocks(blocks as JsonValue[]).blocks;
-  const runtime = buildPreviewRuntime(parsedBlocks, mediaMap, template);
+  const runtime = buildPreviewRuntime(parsedBlocks, mediaMap, themeId, template);
   const announcementBlock =
     parsedBlocks.find((block) => {
       const type = normalizeRuntimeBlockType(block.type);

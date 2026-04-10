@@ -5,6 +5,7 @@ export class UpdateTeamHybridFunnelPublicationDto {
   readonly domainId?: string;
   readonly pathPrefix?: string;
   readonly templateId?: string;
+  readonly theme?: string;
   readonly seoTitle?: string;
   readonly metaDescription?: string;
   readonly stepId?: string;

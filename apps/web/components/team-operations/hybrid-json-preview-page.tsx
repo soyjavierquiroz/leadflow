@@ -40,6 +40,7 @@ export function HybridJsonPreviewPage() {
       <HybridJsonLivePreview
         blocksText={draft.blocks}
         mediaMap={draft.media}
+        themeId={draft.theme}
       />
     </div>
   );

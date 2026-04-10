@@ -12,6 +12,7 @@ import {
   toMediaRows,
 } from "@/components/team-operations/hybrid-json-media-editor";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
+import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import type {
@@ -72,6 +73,25 @@ const buildStepDraftMap = (steps: SystemTenantFunnelStepRecord[]) =>
 const normalizeStepRecords = (value: unknown): SystemTenantFunnelStepRecord[] =>
   Array.isArray(value) ? (value as SystemTenantFunnelStepRecord[]) : [];
 
+const asRecord = (value: JsonValue | null | undefined) =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, JsonValue>)
+    : null;
+
+const extractThemeFromSettings = (value: JsonValue | null | undefined) => {
+  const record = asRecord(value);
+  return resolveFunnelThemeId(record?.theme);
+};
+
+const mergeThemeIntoSettings = (value: JsonValue | null | undefined, themeId: string) => {
+  const record = asRecord(value) ?? {};
+
+  return {
+    ...record,
+    theme: resolveFunnelThemeId(themeId),
+  } satisfies Record<string, JsonValue>;
+};
+
 const pickPrimaryCaptureStep = (steps: SystemTenantFunnelStepRecord[]) =>
   steps.find((step) => step.slug === "captura") ??
   steps.find((step) => step.isEntryStep) ??
@@ -111,6 +131,12 @@ export function SystemTenantTemplateFunnelEditor({
   const [uploadingRowIndex, setUploadingRowIndex] = useState<number | null>(null);
   const [name, setName] = useState(funnel.name);
   const [description, setDescription] = useState(funnel.description ?? "");
+  const [funnelSettingsJson, setFunnelSettingsJson] = useState<JsonValue>(
+    funnel.settingsJson,
+  );
+  const [selectedThemeId, setSelectedThemeId] = useState(
+    extractThemeFromSettings(funnel.settingsJson),
+  );
   const [stepRecords, setStepRecords] = useState<SystemTenantFunnelStepRecord[]>(
     normalizedSteps,
   );
@@ -131,6 +157,8 @@ export function SystemTenantTemplateFunnelEditor({
     setStepDrafts(buildStepDraftMap(normalizedSteps));
     setName(funnel.name);
     setDescription(funnel.description ?? "");
+    setFunnelSettingsJson(funnel.settingsJson);
+    setSelectedThemeId(extractThemeFromSettings(funnel.settingsJson));
   }, [funnel, normalizedSteps]);
 
   useEffect(() => {
@@ -176,6 +204,10 @@ export function SystemTenantTemplateFunnelEditor({
   const activeDraft = activeStep
     ? stepDrafts[activeStep.id] ?? buildStepDraft(activeStep)
     : fallbackDrafts[activeStepTab] ?? createEmptyStepDraft();
+  const nextFunnelSettingsJson = mergeThemeIntoSettings(
+    funnelSettingsJson,
+    selectedThemeId,
+  );
   const blocksText = activeDraft.blocksText;
   const mediaRows = activeDraft.mediaRows;
 
@@ -338,6 +370,18 @@ export function SystemTenantTemplateFunnelEditor({
 
     startTransition(async () => {
       try {
+        await authenticatedOperationRequest(
+          `/system/tenants/${encodeURIComponent(tenant.id)}/funnels/${encodeURIComponent(funnel.id)}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              name: name.trim(),
+              description: description.trim() || null,
+              settingsJson: nextFunnelSettingsJson,
+            }),
+          },
+        );
+
         const payload = {
           name: name.trim(),
           description: description.trim() || null,
@@ -364,6 +408,8 @@ export function SystemTenantTemplateFunnelEditor({
           ...current,
           [response.step.id]: buildStepDraft(response.step),
         }));
+        setFunnelSettingsJson(nextFunnelSettingsJson);
+        setSelectedThemeId(extractThemeFromSettings(nextFunnelSettingsJson));
         setSuccessMessage(
           `${stepTabs.find((tab) => tab.key === activeStepTab)?.label ?? "Paso"} actualizado correctamente.`,
         );
@@ -495,6 +541,27 @@ export function SystemTenantTemplateFunnelEditor({
               className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
             />
           </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-semibold text-slate-900">
+              Funnel Theme
+            </span>
+            <select
+              value={selectedThemeId}
+              onChange={(event) => setSelectedThemeId(event.target.value)}
+              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+            >
+              {availableFunnelThemes.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs leading-5 text-slate-500">
+              Se guarda en `funnelInstance.settingsJson.theme` y aplica al funnel
+              completo, no al paso activo.
+            </span>
+          </label>
         </div>
       </details>
 
@@ -521,6 +588,7 @@ export function SystemTenantTemplateFunnelEditor({
             mediaRows: mediaRows.filter((_, rowIndex) => rowIndex !== index),
           })
         }
+        previewTheme={selectedThemeId}
         stepSwitcher={{
           activeKey: activeStepTab,
           badge: activeStep?.slug ?? activeStepTab,

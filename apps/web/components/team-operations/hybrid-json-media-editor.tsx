@@ -165,6 +165,7 @@ type HybridJsonMediaEditorProps = {
   onUploadMediaClick: (index: number) => void;
   onRemoveMediaRow: (index: number) => void;
   previewHref?: string | null;
+  previewTheme?: string;
   availableBlocks?: BuilderBlockDefinition[];
   stepSwitcher?: {
     activeKey: string;
@@ -196,6 +197,7 @@ export function HybridJsonMediaEditor({
   onUploadMediaClick,
   onRemoveMediaRow,
   previewHref = null,
+  previewTheme = "default",
   availableBlocks = defaultBuilderBlockDefinitions,
   stepSwitcher = null,
 }: HybridJsonMediaEditorProps) {
@@ -221,8 +223,9 @@ export function HybridJsonMediaEditor({
     writeHybridJsonPreviewDraft({
       blocks: blocksText,
       media: buildMediaMap(mediaRows),
+      theme: previewTheme,
     });
-  }, [blocksText, mediaRows]);
+  }, [blocksText, mediaRows, previewTheme]);
 
   useEffect(() => {
     if (catalogBlocks.length === 0) {

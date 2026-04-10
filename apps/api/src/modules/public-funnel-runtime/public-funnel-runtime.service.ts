@@ -49,6 +49,11 @@ type RuntimePublicationRecord = Prisma.FunnelPublicationGetPayload<{
   include: typeof publicRuntimeInclude;
 }>;
 
+const asJsonRecord = (value: Prisma.JsonValue | null | undefined) =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, Prisma.JsonValue>)
+    : null;
+
 @Injectable()
 export class PublicFunnelRuntimeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -202,6 +207,9 @@ export class PublicFunnelRuntimeService {
     const effectiveHandoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
     const handoff = resolvePublicHandoffConfig(effectiveHandoffStrategy);
+    const theme = this.extractFunnelTheme(
+      publication.funnelInstance.settingsJson as Prisma.JsonValue,
+    );
 
     return {
       request: {
@@ -226,6 +234,7 @@ export class PublicFunnelRuntimeService {
         trackingProfileId: publication.trackingProfileId,
         handoffStrategyId: publication.handoffStrategyId,
       },
+      theme,
       funnel: {
         id: publication.funnelInstance.id,
         name: publication.funnelInstance.name,
@@ -295,5 +304,17 @@ export class PublicFunnelRuntimeService {
       path: step.path,
       stepType: step.stepType,
     };
+  }
+
+  private extractFunnelTheme(settingsJson: Prisma.JsonValue): string | null {
+    const settings = asJsonRecord(settingsJson);
+    const theme = settings?.theme;
+
+    if (typeof theme !== 'string') {
+      return null;
+    }
+
+    const normalizedTheme = theme.trim();
+    return normalizedTheme || null;
   }
 }

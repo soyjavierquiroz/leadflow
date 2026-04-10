@@ -21,6 +21,13 @@ const asJsonRecord = (value: JsonValue | null | undefined) =>
     ? (value as Record<string, JsonValue>)
     : null;
 
+const funnelThemeIds = ['default', 'expert-secrets'] as const;
+type FunnelThemeId = (typeof funnelThemeIds)[number];
+
+const isFunnelThemeId = (value: unknown): value is FunnelThemeId =>
+  typeof value === 'string' &&
+  (funnelThemeIds as readonly string[]).includes(value);
+
 type TeamScope = {
   workspaceId: string;
   teamId: string;
@@ -53,6 +60,7 @@ type HybridPublicationDetail = {
     name: string;
     code: string;
     status: string;
+    settingsJson: JsonValue;
   };
   step: {
     id: string;
@@ -145,6 +153,7 @@ export class HybridFunnelPublicationsService {
         name: publication.funnelInstance.name,
         code: publication.funnelInstance.code,
         status: publication.funnelInstance.status,
+        settingsJson: publication.funnelInstance.settingsJson as JsonValue,
       },
       step: {
         id: step.id,
@@ -197,6 +206,7 @@ export class HybridFunnelPublicationsService {
               null,
               template.id,
               template.code,
+              normalized.theme,
               this.resolveStructureId(template.settingsJson as JsonValue),
               normalized.blocksJson,
               {
@@ -230,6 +240,7 @@ export class HybridFunnelPublicationsService {
               template.settingsJson as JsonValue,
               template.id,
               template.code,
+              normalized.theme,
               this.resolveStructureId(template.settingsJson as JsonValue),
               normalized.blocksJson,
               {
@@ -341,6 +352,7 @@ export class HybridFunnelPublicationsService {
         name: detail.funnelInstance.name,
         code: detail.funnelInstance.code,
         status: detail.funnelInstance.status,
+        settingsJson: detail.funnelInstance.settingsJson as JsonValue,
       },
       step: {
         id: detail.step.id,
@@ -417,6 +429,10 @@ export class HybridFunnelPublicationsService {
       domainId: dto.domainId ?? existing.domainId,
       pathPrefix: dto.pathPrefix ?? existing.pathPrefix,
       templateId: dto.templateId ?? existing.funnelInstance.templateId,
+      theme:
+        dto.theme ??
+        this.extractFunnelTheme(existing.funnelInstance.settingsJson as JsonValue) ??
+        'default',
       seoTitle:
         dto.seoTitle ??
         this.extractSeo(
@@ -454,6 +470,7 @@ export class HybridFunnelPublicationsService {
               asJsonRecord(existing.funnelInstance.legacyFunnel?.config as JsonValue),
               template.id,
               template.code,
+              normalized.theme,
               this.resolveStructureId(
                 entryStep.settingsJson as JsonValue,
                 existing.funnelInstance.settingsJson as JsonValue,
@@ -486,6 +503,7 @@ export class HybridFunnelPublicationsService {
               template.settingsJson as JsonValue,
               template.id,
               template.code,
+              normalized.theme,
               this.resolveStructureId(
                 entryStep.settingsJson as JsonValue,
                 existing.funnelInstance.settingsJson as JsonValue,
@@ -647,6 +665,7 @@ export class HybridFunnelPublicationsService {
         name: detail.funnelInstance.name,
         code: detail.funnelInstance.code,
         status: detail.funnelInstance.status,
+        settingsJson: detail.funnelInstance.settingsJson as JsonValue,
       },
       step: {
         id: detail.step.id,
@@ -679,6 +698,7 @@ export class HybridFunnelPublicationsService {
     domainId: string;
     pathPrefix: string;
     templateId: string;
+    theme?: string;
     seoTitle?: string;
     metaDescription?: string;
     blocksJson: JsonValue;
@@ -715,6 +735,7 @@ export class HybridFunnelPublicationsService {
       domainId: input.domainId,
       pathPrefix,
       templateId: input.templateId,
+      theme: this.normalizeFunnelTheme(input.theme),
       seoTitle: (input.seoTitle ?? name).trim() || name,
       metaDescription: (input.metaDescription ?? '').trim(),
       blocksJson,
@@ -822,6 +843,7 @@ export class HybridFunnelPublicationsService {
     templateSettings: JsonValue,
     templateId: string,
     templateCode: string,
+    theme: FunnelThemeId,
     structureId: string,
     blocksJson: JsonValue,
     seo: {
@@ -838,7 +860,7 @@ export class HybridFunnelPublicationsService {
 
     return {
       ...safeTemplateSettings,
-      theme: templateCode,
+      theme,
       structureId,
       hybridEditor: {
         mode: 'data-driven-assembly',
@@ -879,6 +901,7 @@ export class HybridFunnelPublicationsService {
     existingConfig: Record<string, JsonValue> | null,
     templateId: string,
     templateCode: string,
+    theme: FunnelThemeId,
     structureId: string,
     blocksJson: JsonValue,
     seo: {
@@ -893,6 +916,7 @@ export class HybridFunnelPublicationsService {
 
     return {
       ...safeConfig,
+      theme,
       templateId,
       templateCode,
       structureId,
@@ -966,6 +990,29 @@ export class HybridFunnelPublicationsService {
           safeSeo.metaDescription.trim()) ||
         '',
     };
+  }
+
+  private normalizeFunnelTheme(value: string | undefined): FunnelThemeId {
+    if (value === undefined) {
+      return 'default';
+    }
+
+    const normalizedValue = value.trim();
+    if (!isFunnelThemeId(normalizedValue)) {
+      throw new BadRequestException({
+        code: 'HYBRID_FUNNEL_THEME_INVALID',
+        message: `theme must be one of: ${funnelThemeIds.join(', ')}.`,
+      });
+    }
+
+    return normalizedValue;
+  }
+
+  private extractFunnelTheme(settingsJson: JsonValue): FunnelThemeId | null {
+    const settings = asJsonRecord(settingsJson);
+    const theme = settings?.theme;
+
+    return isFunnelThemeId(theme) ? theme : null;
   }
 
   private async assertDomain(scope: TeamScope, domainId: string) {

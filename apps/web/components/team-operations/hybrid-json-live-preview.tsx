@@ -18,6 +18,7 @@ const nonInteractivePreviewClassName =
 type HybridJsonLivePreviewProps = {
   blocksText: string;
   mediaMap: Record<string, string>;
+  themeId?: string;
   className?: string;
 };
 
@@ -26,6 +27,7 @@ type PreviewDevice = "desktop" | "mobile";
 export function HybridJsonLivePreview({
   blocksText,
   mediaMap,
+  themeId = "default",
   className,
 }: HybridJsonLivePreviewProps) {
   const [device, setDevice] = useState<PreviewDevice>("desktop");
@@ -167,6 +169,7 @@ export function HybridJsonLivePreview({
                     <BlockRenderer
                       blocks={previewState.blocks as unknown as BlockDefinition[]}
                       mediaMap={deferredMediaMap}
+                      themeId={themeId}
                       template={{
                         id: "jakawi-premium",
                         code: "jakawi-premium",

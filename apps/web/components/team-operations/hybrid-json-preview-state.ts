@@ -3,6 +3,7 @@ export const HYBRID_JSON_PREVIEW_STORAGE_KEY = "leadflow_draft_preview";
 export type HybridJsonPreviewDraft = {
   blocks: string;
   media: Record<string, string>;
+  theme: string;
 };
 
 type MediaRowLike = {
@@ -16,6 +17,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const emptyHybridJsonPreviewDraft: HybridJsonPreviewDraft = {
   blocks: "[]",
   media: {},
+  theme: "default",
 };
 
 export const sanitizeMediaMap = (value: unknown) => {
@@ -88,6 +90,10 @@ export const readHybridJsonPreviewDraft = (): HybridJsonPreviewDraft => {
           ? parsedDraft.blocks
           : emptyHybridJsonPreviewDraft.blocks,
       media: sanitizeMediaMap(parsedDraft.media),
+      theme:
+        typeof parsedDraft.theme === "string" && parsedDraft.theme.trim()
+          ? parsedDraft.theme.trim()
+          : emptyHybridJsonPreviewDraft.theme,
     };
   } catch {
     return emptyHybridJsonPreviewDraft;

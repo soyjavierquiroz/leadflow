@@ -193,6 +193,7 @@ export type SystemTenantFunnelStepRecord = {
 
 export type SystemTenantFunnelDetailRecord = SystemTenantFunnelRecord & {
   funnelInstanceId: string | null;
+  settingsJson: JsonValue;
   steps: SystemTenantFunnelStepRecord[];
 };
 

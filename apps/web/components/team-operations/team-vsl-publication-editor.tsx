@@ -30,6 +30,7 @@ import {
 import type { BuilderBlockDefinition } from "@/lib/blocks/catalog";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
+import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import { teamOperationRequest } from "@/lib/team-operations";
 
@@ -87,6 +88,7 @@ type HybridPublicationDetail = {
     name: string;
     code: string;
     status: string;
+    settingsJson: unknown;
   };
   step: {
     id: string;
@@ -245,6 +247,16 @@ const ensureSelectedTemplateOption = (
   ];
 };
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const extractThemeFromSettings = (value: unknown) => {
+  const record = asRecord(value);
+  return resolveFunnelThemeId(record?.theme);
+};
+
 export function TeamVslPublicationEditor({
   domains,
   templates,
@@ -289,6 +301,7 @@ export function TeamVslPublicationEditor({
   const [selectedTemplateId, setSelectedTemplateId] = useState(
     templateOptions[0]?.id ?? "",
   );
+  const [selectedThemeId, setSelectedThemeId] = useState("default");
   const [seoTitle, setSeoTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [blocksText, setBlocksText] = useState(defaultBlocksSeed);
@@ -336,6 +349,7 @@ export function TeamVslPublicationEditor({
         setSelectedDomainId(payload.publication.domainId);
         setPathPrefix(payload.publication.pathPrefix);
         setSelectedTemplateId(payload.funnelInstance.templateId);
+        setSelectedThemeId(extractThemeFromSettings(payload.funnelInstance.settingsJson));
         setSeoTitle(payload.seo.title);
         setMetaDescription(payload.seo.metaDescription);
         setBlocksText(JSON.stringify(payload.step.blocksJson, null, 2));
@@ -589,6 +603,7 @@ export function TeamVslPublicationEditor({
           domainId: selectedDomainId,
           pathPrefix: pathPrefix.trim(),
           templateId: selectedTemplateId,
+          theme: selectedThemeId,
           seoTitle: seoTitle.trim(),
           metaDescription: metaDescription.trim(),
           stepId: activeStep?.id,
@@ -622,6 +637,9 @@ export function TeamVslPublicationEditor({
 
         setCurrentPublicationId(response.publication.id);
         const nextStepRecords = normalizeStepRecords(response.steps, response.step);
+        setSelectedThemeId(
+          extractThemeFromSettings(response.funnelInstance.settingsJson),
+        );
         setBlocksText(JSON.stringify(response.step.blocksJson, null, 2));
         setMediaRows(toMediaRows(response.step.mediaMap));
         setStepRecords(nextStepRecords);
@@ -814,6 +832,27 @@ export function TeamVslPublicationEditor({
             </select>
           </label>
 
+          <label className="grid gap-2">
+            <span className="text-sm font-semibold text-slate-900">
+              Funnel Theme
+            </span>
+            <select
+              value={selectedThemeId}
+              onChange={(event) => setSelectedThemeId(event.target.value)}
+              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+            >
+              {availableFunnelThemes.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs leading-5 text-slate-500">
+              Este theme se guarda a nivel Funnel y el runtime público lo expone
+              en la raíz del payload.
+            </span>
+          </label>
+
           <label className="grid gap-2 md:col-span-2">
             <span className="text-sm font-semibold text-slate-900">
               SEO Title
@@ -870,6 +909,7 @@ export function TeamVslPublicationEditor({
             mediaRows: editorMediaRows.filter((_, rowIndex) => rowIndex !== index),
           })
         }
+        previewTheme={selectedThemeId}
         availableBlocks={availableBlocks}
         stepSwitcher={
           showStepSwitcher
