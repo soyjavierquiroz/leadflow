@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
+import { RichHeadline } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import { normalizeWhatsappPhone } from "@/lib/public-handoff";
 import { readSubmissionContext } from "@/lib/public-funnel-session";
@@ -388,9 +389,9 @@ export function ConversionPage({
             </span>
 
             <h1 className="mt-4 text-[1.75rem] font-black leading-tight tracking-tight text-slate-950 md:mt-5 md:text-5xl">
-              {resolvedHeadline}
+              <RichHeadline text={resolvedHeadline} className="font-black" />
             </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600 md:mt-4 md:text-lg md:leading-7">
+            <p className="font-subheadline mt-3 text-sm leading-6 text-slate-600 md:mt-4 md:text-lg md:leading-7">
               {resolvedSubheadline}
             </p>
           </div>

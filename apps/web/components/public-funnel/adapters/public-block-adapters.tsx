@@ -6,6 +6,7 @@ import {
   PublicChecklistItem,
   PublicEyebrow,
   PublicQuoteCard,
+  RichHeadline,
   PublicSectionSurface,
   PublicStatCard,
   cx,
@@ -772,7 +773,7 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
       <div className="max-w-3xl">
         <PublicEyebrow tone="neutral">Valor explicado sin ruido</PublicEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-          {title}
+          <RichHeadline text={title} />
         </h2>
         <p className="mt-4 text-base leading-7 text-slate-600">
           {description ||
@@ -853,7 +854,7 @@ function StepByStepBlockAdapter({
                 : "text-3xl font-semibold tracking-tight text-slate-950",
             )}
           >
-            {title}
+            <RichHeadline text={title} />
           </h2>
           {description ? (
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
@@ -1046,7 +1047,7 @@ function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
         <div>
           <PublicEyebrow tone="neutral">{eyebrow}</PublicEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            {title}
+            <RichHeadline text={title} />
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
             {description}
@@ -1221,7 +1222,7 @@ function RiskReversalBlockAdapter({
                 : "text-left text-3xl font-black tracking-tight text-slate-950",
             )}
           >
-            {title}
+            <RichHeadline text={title} className="font-black" />
           </h2>
           <p
             className={cx(
@@ -1286,7 +1287,7 @@ function TestimonialsBlockAdapter({ block }: PublicBlockAdapterProps) {
       <div className="max-w-3xl">
         <PublicEyebrow tone="neutral">Testimonials adapter</PublicEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-          {title}
+          <RichHeadline text={title} />
         </h2>
         <p className="mt-4 text-base leading-7 text-slate-600">{description}</p>
       </div>
@@ -1317,7 +1318,7 @@ function FeatureGridBlockAdapter({ block }: PublicBlockAdapterProps) {
       <div className="max-w-3xl">
         <PublicEyebrow tone="neutral">Feature grid adapter</PublicEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-          {title}
+          <RichHeadline text={title} />
         </h2>
         <p className="mt-4 text-base leading-7 text-slate-600">{description}</p>
       </div>
@@ -1371,7 +1372,7 @@ function MediaBlockAdapter({ block }: PublicBlockAdapterProps) {
         <div>
           <PublicEyebrow tone="neutral">Media adapter</PublicEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            {title}
+            <RichHeadline text={title} />
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600">
             {description}
@@ -1446,7 +1447,7 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
             {asString(block.eyebrow, "Confirmación")}
           </PublicEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-            {title}
+            <RichHeadline text={title} />
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
             {description}
@@ -1654,22 +1655,25 @@ function StickyConversionBarBlockAdapter({
         block.triggerOffsetPixels,
         asNumber(block.trigger_offset_pixels, 320),
       )}
-      bgColor={asString(block.bgColor, asString(block.bg_color, "#0f172a"))}
+      bgColor={asString(
+        block.bgColor,
+        asString(block.bg_color, "var(--funnel-surface-strong)"),
+      )}
       textColor={asString(
         block.textColor,
-        asString(block.text_color, "#f8fafc"),
+        asString(block.text_color, "var(--funnel-surface-contrast)"),
       )}
       buttonBgColor={asString(
         block.buttonBgColor,
-        asString(block.button_bg_color, "#22c55e"),
+        asString(block.button_bg_color, "var(--funnel-cta-positive)"),
       )}
       buttonTextColor={asString(
         block.buttonTextColor,
-        asString(block.button_text_color, "#052e16"),
+        asString(block.button_text_color, "var(--funnel-cta-positive-foreground)"),
       )}
       borderColor={asString(
         block.borderColor,
-        asString(block.border_color, "#1e293b"),
+        asString(block.border_color, "var(--funnel-border-strong)"),
       )}
       actionConfig={
         modalConfig

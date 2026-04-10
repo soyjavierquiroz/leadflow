@@ -4,22 +4,30 @@ const geistSansStack =
   'var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 const geistMonoStack =
   'var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+const interStack =
+  'var(--font-inter), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+const manropeStack =
+  'var(--font-manrope), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 const montserratStack =
-  '"Montserrat", "Arial Narrow", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif';
-const merriweatherStack =
-  '"Merriweather", Georgia, Cambria, "Times New Roman", Times, serif';
+  'var(--font-montserrat), "Arial Narrow", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif';
 
 export const funnelThemeFonts = {
   default: {
     sans: geistSansStack,
     display: geistSansStack,
+    headline: geistSansStack,
     body: geistSansStack,
+    subheadline: geistSansStack,
     mono: geistMonoStack,
+    button: geistSansStack,
   },
   'expert-secrets': {
-    sans: montserratStack,
+    sans: interStack,
     display: montserratStack,
-    body: merriweatherStack,
-    mono: geistMonoStack,
+    headline: montserratStack,
+    body: interStack,
+    subheadline: interStack,
+    mono: manropeStack,
+    button: manropeStack,
   },
 } as const satisfies Record<FunnelThemeId, FunnelThemeFontPairing>;

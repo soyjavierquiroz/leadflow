@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   cx,
   flatBlockTitleClassName,
+  RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
 import { TrustAuthorityBar } from "@/components/public-funnel/trust-authority-bar";
@@ -32,42 +33,6 @@ type JakawiHookAndPromiseSectionProps = {
   cta?: ReactNode;
   hideDesktopMedia?: boolean;
 };
-
-function renderHighlightedText(
-  text: string | undefined,
-  variant: JakawiHookAndPromiseSectionProps["variant"],
-) {
-  if (!text) {
-    return null;
-  }
-
-  const parts = text.split(/(\[\[.*?\]\])/g);
-
-  return parts.map((part, index) => {
-    if (part.startsWith("[[") && part.endsWith("]]")) {
-      const content = part.slice(2, -2).trim();
-      if (!content) {
-        return null;
-      }
-
-      return (
-        <mark
-          key={`${content}-${index}`}
-          className={cx(
-            "rounded-sm px-1 py-0.5",
-            variant === "flat"
-              ? "bg-transparent text-rose-700"
-              : "bg-amber-200/85 text-slate-950",
-          )}
-        >
-          {content}
-        </mark>
-      );
-    }
-
-    return <span key={`${part}-${index}`}>{part}</span>;
-  });
-}
 
 function parseTechnicalBullet(bullet: string) {
   const normalized = bullet.trim();
@@ -191,8 +156,10 @@ export function JakawiHookAndPromiseSection({
         {
           ...jakawiPremiumThemeStyle,
           "--lf-hook-primary": "var(--jakawi-success)",
-          "--lf-hook-text-main": variant === "flat" ? "var(--jakawi-text-main)" : "#f8fafc",
-          "--lf-hook-card-bg": variant === "flat" ? "#ffffff" : "#020617",
+          "--lf-hook-text-main":
+            variant === "flat" ? "var(--jakawi-text-main)" : "var(--jakawi-text-on-dark)",
+          "--lf-hook-card-bg":
+            variant === "flat" ? "var(--jakawi-content-bg)" : "var(--jakawi-surface-dark)",
         } as CSSProperties
       }
     >
@@ -235,7 +202,7 @@ export function JakawiHookAndPromiseSection({
                   : flatBlockTitleClassName,
               )}
             >
-              {renderHighlightedText(headline, variant)}
+              <RichHeadline text={headline} className="font-black" />
             </h2>
 
             {subheadline ? (

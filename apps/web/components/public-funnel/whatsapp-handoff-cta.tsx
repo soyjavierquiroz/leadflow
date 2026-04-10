@@ -5,6 +5,7 @@ import {
   buildCtaClassName,
   PublicEyebrow,
   PublicSectionSurface,
+  RichHeadline,
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
@@ -136,9 +137,9 @@ export function WhatsappHandoffCta({
         <div>
           <PublicEyebrow tone="success">WhatsApp handoff CTA</PublicEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            {headline}
+            <RichHeadline text={headline} />
           </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
+          <p className="font-subheadline mt-4 max-w-2xl text-base leading-7 text-slate-700">
             {subheadline ||
               "Bloque declarativo para continuar el handoff por WhatsApp usando el contexto real de la sesión."}
           </p>

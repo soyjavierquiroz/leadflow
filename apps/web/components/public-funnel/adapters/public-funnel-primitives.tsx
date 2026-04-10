@@ -7,11 +7,124 @@ import {
 
 type SurfaceTone = "brand" | "neutral" | "warm" | "success";
 type SurfaceVariant = "default" | "flat";
+type RichHeadlineSegmentTone = "default" | "accent" | "highlight";
+
+type RichHeadlineSegment = {
+  content: string;
+  tone: RichHeadlineSegmentTone;
+};
 
 export const cx = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
 
 const surfaceToneClasses: Record<SurfaceTone, string> = jakawiPremiumSurfaceToneClasses;
+
+const readUntil = (text: string, startIndex: number, needle: string) => {
+  const endIndex = text.indexOf(needle, startIndex);
+  return endIndex === -1
+    ? null
+    : {
+        content: text.slice(startIndex, endIndex),
+        nextIndex: endIndex + needle.length,
+      };
+};
+
+export function parseRichHeadline(text: string): RichHeadlineSegment[] {
+  const segments: RichHeadlineSegment[] = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    if (text.startsWith("**", cursor)) {
+      const match = readUntil(text, cursor + 2, "**");
+      if (match && match.content.trim()) {
+        segments.push({ content: match.content, tone: "highlight" });
+        cursor = match.nextIndex;
+        continue;
+      }
+    }
+
+    if (text.startsWith("[[", cursor)) {
+      const match = readUntil(text, cursor + 2, "]]");
+      if (match && match.content.trim()) {
+        segments.push({ content: match.content, tone: "highlight" });
+        cursor = match.nextIndex;
+        continue;
+      }
+    }
+
+    if (text.startsWith("*", cursor)) {
+      const match = readUntil(text, cursor + 1, "*");
+      if (match && match.content.trim()) {
+        segments.push({ content: match.content, tone: "accent" });
+        cursor = match.nextIndex;
+        continue;
+      }
+    }
+
+    let nextTokenIndex = text.length;
+
+    for (const token of ["**", "[[", "*"]) {
+      const tokenIndex = text.indexOf(token, cursor + 1);
+      if (tokenIndex !== -1) {
+        nextTokenIndex = Math.min(nextTokenIndex, tokenIndex);
+      }
+    }
+
+    segments.push({
+      content: text.slice(cursor, nextTokenIndex),
+      tone: "default",
+    });
+    cursor = nextTokenIndex;
+  }
+
+  return segments;
+}
+
+export function RichHeadline({
+  text,
+  className,
+}: {
+  text?: string | null;
+  className?: string;
+}) {
+  if (!text) {
+    return null;
+  }
+
+  return (
+    <span className={cx("font-headline", className)}>
+      {parseRichHeadline(text).map((segment, index) => {
+        if (!segment.content) {
+          return null;
+        }
+
+        if (segment.tone === "highlight") {
+          return (
+            <span
+              key={`${segment.tone}-${segment.content}-${index}`}
+              className="rounded-sm bg-vsl-highlight px-1 py-0.5 text-inherit"
+            >
+              {segment.content}
+            </span>
+          );
+        }
+
+        if (segment.tone === "accent") {
+          return (
+            <span
+              key={`${segment.tone}-${segment.content}-${index}`}
+              className="text-vsl-accent"
+            >
+              {segment.content}
+            </span>
+          );
+        }
+
+        return <span key={`${segment.tone}-${segment.content}-${index}`}>{segment.content}</span>;
+      })}
+    </span>
+  );
+}
 
 export const flatBlockTitleClassName = cx("font-headline", jakawiPremiumClassNames.title);
 

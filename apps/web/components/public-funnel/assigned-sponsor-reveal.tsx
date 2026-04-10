@@ -7,6 +7,7 @@ import {
   PublicChecklistItem,
   PublicEyebrow,
   PublicPill,
+  RichHeadline,
   PublicSectionSurface,
   PublicStatCard,
   cx,
@@ -221,9 +222,9 @@ export function AssignedSponsorReveal({
       </div>
 
       <h2 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-        {title}
+        <RichHeadline text={title} />
       </h2>
-      <p className="mt-4 max-w-2xl text-base leading-7 text-slate-700">
+      <p className="font-subheadline mt-4 max-w-2xl text-base leading-7 text-slate-700">
         {description ||
           "Presentamos al sponsor asignado y dejamos evidente cómo continúa la conversación, para que el cierre del funnel no se sienta técnico ni ambiguo."}
       </p>

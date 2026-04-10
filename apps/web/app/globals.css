@@ -3,21 +3,34 @@
 :root {
   --background: #f3f6fb;
   --foreground: #0f172a;
+  --funnel-surface-strong: #0f172a;
+  --funnel-surface-contrast: #f8fafc;
+  --funnel-cta-positive: #22c55e;
+  --funnel-cta-positive-foreground: #052e16;
+  --funnel-border-strong: #1e293b;
   --funnel-font-sans: var(--font-geist-sans);
   --funnel-font-display: var(--font-geist-sans);
   --funnel-font-headline: var(--font-geist-sans);
   --funnel-font-body: var(--font-geist-sans);
+  --funnel-font-subheadline: var(--font-geist-sans);
   --funnel-font-mono: var(--font-geist-mono);
+  --funnel-font-button: var(--font-geist-sans);
+  --funnel-vsl-accent: #dc2626;
+  --funnel-vsl-highlight: #fef08a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-vsl-accent: var(--funnel-vsl-accent);
+  --color-vsl-highlight: var(--funnel-vsl-highlight);
   --font-sans: var(--funnel-font-sans);
   --font-display: var(--funnel-font-display);
   --font-headline: var(--funnel-font-headline);
   --font-body: var(--funnel-font-body);
+  --font-subheadline: var(--funnel-font-subheadline);
   --font-mono: var(--funnel-font-mono);
+  --font-button: var(--funnel-font-button);
 }
 
 body {

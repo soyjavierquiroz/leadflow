@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   cx,
   flatBlockTitleClassName,
+  RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import {
   LeadCaptureModal,
@@ -354,34 +355,6 @@ function deriveTotalValueText(
   return fallbackMoney ? formatMoneyDisplay(fallbackMoney) : fallbackText;
 }
 
-function renderHighlightedText(text?: string) {
-  if (!text) {
-    return null;
-  }
-
-  const parts = text.split(/(\[\[.*?\]\])/g);
-
-  return parts.map((part, index) => {
-    if (part.startsWith("[[") && part.endsWith("]]")) {
-      const content = part.slice(2, -2).trim();
-      if (!content) {
-        return null;
-      }
-
-      return (
-        <mark
-          key={`${content}-${index}`}
-          className="rounded-sm bg-amber-200/85 px-1 py-0.5 text-slate-950"
-        >
-          {content}
-        </mark>
-      );
-    }
-
-    return <span key={`${part}-${index}`}>{part}</span>;
-  });
-}
-
 export function PublicGrandSlamOfferBlock({
   block,
   runtime,
@@ -552,7 +525,7 @@ export function PublicGrandSlamOfferBlock({
       <section
         className={cx("w-full py-6 text-slate-900 md:py-8")}
       >
-        <div className="space-y-8 rounded-[2rem] bg-[#f8fafc] px-6 py-8 md:px-8 md:py-10">
+        <div className="space-y-8 rounded-[2rem] bg-slate-50 px-6 py-8 md:px-8 md:py-10">
           {asString(block.headline) ? (
             <h3
               className={cx(
@@ -562,7 +535,7 @@ export function PublicGrandSlamOfferBlock({
                   : "text-3xl font-black tracking-tight md:text-4xl",
               )}
             >
-              {renderHighlightedText(asString(block.headline))}
+              <RichHeadline text={asString(block.headline)} className="font-black" />
             </h3>
           ) : null}
 

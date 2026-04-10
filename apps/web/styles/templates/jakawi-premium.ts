@@ -5,6 +5,8 @@ export const jakawiPremiumThemeStyle = {
     "var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
   "--jakawi-font-display":
     "var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+  "--jakawi-surface-dark": "#020617",
+  "--jakawi-text-on-dark": "#f8fafc",
   "--jakawi-page-bg": "#f7f8fb",
   "--jakawi-content-bg": "#ffffff",
   "--jakawi-media-bg":
@@ -52,9 +54,9 @@ export const jakawiPremiumClassNames = {
   title:
     "text-left text-4xl font-extrabold uppercase tracking-tighter text-[var(--jakawi-text-main)] lg:text-5xl",
   primaryButton:
-    "inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--jakawi-accent-strong)] px-6 py-4 text-center text-sm font-black uppercase tracking-tight text-white shadow-[var(--jakawi-shadow-button)] transition-all duration-200 hover:scale-[1.01] hover:bg-[var(--jakawi-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
+    "font-button inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--jakawi-accent-strong)] px-6 py-4 text-center text-sm font-black uppercase tracking-tight text-white shadow-[var(--jakawi-shadow-button)] transition-all duration-200 hover:scale-[1.01] hover:bg-[var(--jakawi-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
   secondaryButton:
-    "inline-flex items-center justify-center gap-2 rounded-full border border-[var(--jakawi-border-strong)] bg-white px-5 py-3 text-sm font-semibold text-[var(--jakawi-text-main)] transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400",
+    "font-button inline-flex items-center justify-center gap-2 rounded-full border border-[var(--jakawi-border-strong)] bg-white px-5 py-3 text-sm font-semibold text-[var(--jakawi-text-main)] transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400",
   input:
     "rounded-[1.15rem] border border-[var(--jakawi-input-border)] bg-white px-4 py-3.5 text-sm text-[var(--jakawi-text-main)] outline-none transition placeholder:text-[var(--jakawi-text-muted)] focus:border-[var(--jakawi-input-focus)] focus:ring-4 focus:ring-[var(--jakawi-input-ring)]",
   compactInput:

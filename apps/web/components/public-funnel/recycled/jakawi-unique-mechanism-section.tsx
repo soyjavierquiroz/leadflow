@@ -1,6 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { cx, flatBlockTitleClassName } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import {
+  cx,
+  flatBlockTitleClassName,
+  RichHeadline,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
 import { jakawiPremiumThemeStyle } from "@/styles/templates/jakawi-premium";
 
@@ -25,34 +29,6 @@ type JakawiUniqueMechanismSectionProps = {
   hideDesktopMedia?: boolean;
 };
 
-function renderHighlightedText(text?: string) {
-  if (!text) {
-    return null;
-  }
-
-  const parts = text.split(/(\[\[.*?\]\])/g);
-
-  return parts.map((part, index) => {
-    if (part.startsWith("[[") && part.endsWith("]]")) {
-      const content = part.slice(2, -2).trim();
-      if (!content) {
-        return null;
-      }
-
-      return (
-        <mark
-          key={`${content}-${index}`}
-          className="rounded-sm bg-amber-200/85 px-1 py-0.5 text-slate-950"
-        >
-          {content}
-        </mark>
-      );
-    }
-
-    return <span key={`${part}-${index}`}>{part}</span>;
-  });
-}
-
 export function JakawiUniqueMechanismSection({
   variant = "default",
   headline,
@@ -74,8 +50,10 @@ export function JakawiUniqueMechanismSection({
         {
           ...jakawiPremiumThemeStyle,
           "--lf-unique-primary": "var(--jakawi-success)",
-          "--lf-unique-text-main": variant === "flat" ? "var(--jakawi-text-main)" : "#f8fafc",
-          "--lf-unique-card-bg": variant === "flat" ? "#ffffff" : "#020617",
+          "--lf-unique-text-main":
+            variant === "flat" ? "var(--jakawi-text-main)" : "var(--jakawi-text-on-dark)",
+          "--lf-unique-card-bg":
+            variant === "flat" ? "var(--jakawi-content-bg)" : "var(--jakawi-surface-dark)",
         } as CSSProperties
       }
     >
@@ -89,7 +67,7 @@ export function JakawiUniqueMechanismSection({
                 : "text-3xl font-black tracking-tight text-slate-100 md:text-4xl",
             )}
           >
-            {renderHighlightedText(headline)}
+            <RichHeadline text={headline} className="font-black" />
           </h3>
         ) : null}
 

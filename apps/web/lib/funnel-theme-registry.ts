@@ -14,13 +14,21 @@ export const funnelThemeRegistry = {
     description:
       'Baseline SaaS theme using the current Geist-forward stack and neutral Leadflow presentation defaults.',
     fonts: funnelThemeFonts.default,
+    colors: {
+      vslAccent: '#dc2626',
+      vslHighlight: '#fef08a',
+    },
   },
   'expert-secrets': {
     id: 'expert-secrets',
     name: 'Expert Secrets',
     description:
-      'Direct response pairing with Montserrat headlines and Merriweather reading rhythm for more editorial funnels.',
+      'Direct response pairing with Montserrat headlines, Inter reading rhythm, and Manrope CTA support for editorial VSL funnels.',
     fonts: funnelThemeFonts['expert-secrets'],
+    colors: {
+      vslAccent: '#cc3333',
+      vslHighlight: '#ffea00',
+    },
   },
 } as const satisfies Record<FunnelThemeId, FunnelThemeDefinition>;
 

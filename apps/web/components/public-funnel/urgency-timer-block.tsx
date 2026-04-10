@@ -6,6 +6,7 @@ import {
   PublicEyebrow,
   PublicSectionSurface,
   PublicStatCard,
+  RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 
 type UrgencyTimerBlockProps = {
@@ -114,13 +115,13 @@ export function UrgencyTimerBlock({
                 : "mt-3 text-left text-3xl font-black tracking-tight text-slate-950"
             }
           >
-            {headline}
+            <RichHeadline text={headline} className="font-black" />
           </h2>
           <p
             className={
               variant === "flat"
-                ? "mt-4 max-w-2xl text-left text-base leading-7 text-slate-700"
-                : "mt-4 max-w-2xl text-left text-base leading-7 text-slate-700"
+                ? "font-subheadline mt-4 max-w-2xl text-left text-base leading-7 text-slate-700"
+                : "font-subheadline mt-4 max-w-2xl text-left text-base leading-7 text-slate-700"
             }
           >
             {subheadline ||

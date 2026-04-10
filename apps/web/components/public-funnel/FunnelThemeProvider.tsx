@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 
-import { funnelThemeFonts } from '@/lib/funnel-theme-fonts';
-import { resolveFunnelThemeId } from '@/lib/funnel-theme-registry';
+import { getFunnelThemeDefinition, resolveFunnelThemeId } from '@/lib/funnel-theme-registry';
 import type { PublicFunnelRuntimePayload } from '@/lib/public-funnel-runtime.types';
 
 type FunnelThemeProviderProps = {
@@ -21,15 +20,19 @@ export function FunnelThemeProvider({
   className,
 }: FunnelThemeProviderProps) {
   const themeId = resolveFunnelThemeId(runtime.theme);
-  const fontPairing = funnelThemeFonts[themeId];
+  const theme = getFunnelThemeDefinition(themeId);
   const style: FunnelThemeStyle = {
-    '--funnel-font-sans': fontPairing.sans,
-    '--funnel-font-display': fontPairing.display,
-    '--funnel-font-headline': fontPairing.display,
-    '--funnel-font-body': fontPairing.body,
-    '--funnel-font-mono': fontPairing.mono,
-    '--jakawi-font-sans': fontPairing.body,
-    '--jakawi-font-display': fontPairing.display,
+    '--funnel-font-sans': theme.fonts.sans,
+    '--funnel-font-display': theme.fonts.display,
+    '--funnel-font-headline': theme.fonts.headline,
+    '--funnel-font-body': theme.fonts.body,
+    '--funnel-font-subheadline': theme.fonts.subheadline,
+    '--funnel-font-mono': theme.fonts.mono,
+    '--funnel-font-button': theme.fonts.button,
+    '--funnel-vsl-accent': theme.colors.vslAccent,
+    '--funnel-vsl-highlight': theme.colors.vslHighlight,
+    '--jakawi-font-sans': theme.fonts.body,
+    '--jakawi-font-display': theme.fonts.display,
   };
 
   return (
