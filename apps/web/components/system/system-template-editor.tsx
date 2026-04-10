@@ -13,6 +13,7 @@ import {
   toMediaRows,
 } from "@/components/team-operations/hybrid-json-media-editor";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
+import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import type { SystemTemplateRecord } from "@/lib/system-tenants";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
@@ -161,7 +162,11 @@ export function SystemTemplateEditor({
     setUploadingRowIndex(targetIndex);
 
     try {
-      const publicUrl = await uploadFileWithPresignedUrl(file, "funnels");
+      const optimizedFile = await optimizeFunnelAssetImage(file);
+      const publicUrl = await uploadFileWithPresignedUrl(
+        optimizedFile,
+        "funnels",
+      );
       handleMediaRowChange(targetIndex, { value: publicUrl });
       setSuccessMessage(`Imagen subida al CDN para ${rowKey}.`);
     } catch (error) {

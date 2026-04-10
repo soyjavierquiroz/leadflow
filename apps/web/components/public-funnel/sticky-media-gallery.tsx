@@ -21,6 +21,7 @@ const GALLERY_MAP_KEYS = [
   "gallery_2",
   "gallery_3",
   "gallery_4",
+  "gallery_5",
 ] as const;
 
 function pushUniqueMedia(
@@ -198,7 +199,7 @@ export function StickyMediaGallery({
           </div>
 
           {visibleImages.length > 1 ? (
-            <div className="flex justify-center gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="grid w-full max-w-[28rem] grid-cols-3 gap-3 pb-1 sm:max-w-[34rem] sm:grid-cols-5">
               {visibleImages.map((image, index) => {
                 const isActive = index === selectedIndex;
 
@@ -208,7 +209,7 @@ export function StickyMediaGallery({
                     type="button"
                     onClick={() => setSelectedIndex(index)}
                     className={cx(
-                      "overflow-hidden rounded-xl border bg-slate-950/80 transition",
+                      "aspect-square min-w-0 overflow-hidden rounded-xl border bg-slate-950/80 transition",
                       isActive
                         ? "border-amber-500 shadow-[0_0_0_1px_rgba(245,158,11,0.3)]"
                         : "border-slate-800 hover:border-emerald-500/50",
@@ -222,7 +223,7 @@ export function StickyMediaGallery({
                       alt={image.alt}
                       loading="lazy"
                       onError={() => handleMediaError(image.src)}
-                      className="h-16 w-16 object-cover object-center"
+                      className="h-full w-full object-cover object-center"
                     />
                   </button>
                 );

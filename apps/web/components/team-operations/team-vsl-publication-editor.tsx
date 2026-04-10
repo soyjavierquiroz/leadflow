@@ -1,9 +1,23 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  type ChangeEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, ChevronDown, FileJson, Globe, Save, Sparkles } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  FileJson,
+  Globe,
+  Save,
+  Sparkles,
+} from "lucide-react";
 
 import { SectionHeader } from "@/components/app-shell/section-header";
 import {
@@ -13,6 +27,8 @@ import {
   type MediaRow,
   toMediaRows,
 } from "@/components/team-operations/hybrid-json-media-editor";
+import type { BuilderBlockDefinition } from "@/lib/blocks/catalog";
+import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import { teamOperationRequest } from "@/lib/team-operations";
@@ -30,6 +46,31 @@ const defaultMediaRows = requiredMediaKeys.map((key) => ({
   key,
   value: "",
 }));
+
+const editorStepDefinitions = [
+  {
+    key: "captura",
+    label: "Paso 1: Landing (Captura)",
+  },
+  {
+    key: "confirmado",
+    label: "Paso 2: Handoff (Confirmación)",
+  },
+] as const;
+
+type EditorStepTabKey = (typeof editorStepDefinitions)[number]["key"];
+
+type HybridPublicationStepDetail = {
+  id: string;
+  slug: string;
+  stepType: string;
+  position: number;
+  isEntryStep: boolean;
+  isConversionStep: boolean;
+  blocksJson: unknown;
+  mediaMap: unknown;
+  settingsJson: unknown;
+};
 
 type HybridPublicationDetail = {
   publication: {
@@ -56,11 +97,77 @@ type HybridPublicationDetail = {
     mediaMap: unknown;
     settingsJson: unknown;
   };
+  steps: HybridPublicationStepDetail[];
   seo: {
     title: string;
     metaDescription: string;
   };
 };
+
+type StepDraft = {
+  blocksText: string;
+  mediaRows: MediaRow[];
+  settingsJson: unknown;
+};
+
+const createEmptyStepDraft = (): StepDraft => ({
+  blocksText: JSON.stringify([], null, 2),
+  mediaRows: [...defaultMediaRows],
+  settingsJson: {},
+});
+
+const toBlocksText = (value: unknown) =>
+  Array.isArray(value) ? JSON.stringify(value, null, 2) : JSON.stringify([], null, 2);
+
+const buildStepDraft = (step: HybridPublicationStepDetail): StepDraft => ({
+  blocksText: toBlocksText(step.blocksJson),
+  mediaRows: toMediaRows(step.mediaMap),
+  settingsJson: step.settingsJson,
+});
+
+const buildStepDraftMap = (steps: HybridPublicationStepDetail[]) =>
+  Object.fromEntries(steps.map((step) => [step.id, buildStepDraft(step)]));
+
+const normalizeStepRecords = (
+  steps: HybridPublicationDetail["steps"] | undefined,
+  legacyStep: HybridPublicationDetail["step"] | null,
+) => {
+  if (Array.isArray(steps) && steps.length > 0) {
+    return steps;
+  }
+
+  if (!legacyStep) {
+    return [];
+  }
+
+  return [
+    {
+      ...legacyStep,
+      isEntryStep: true,
+      isConversionStep: false,
+    },
+  ];
+};
+
+const pickPrimaryCaptureStep = (steps: HybridPublicationStepDetail[]) =>
+  steps.find((step) => step.slug === "captura") ??
+  steps.find((step) => step.isEntryStep) ??
+  steps.find((step) => ["landing", "lead_capture"].includes(step.stepType)) ??
+  steps[0] ??
+  null;
+
+const pickPrimaryConfirmStep = (
+  steps: HybridPublicationStepDetail[],
+  captureStepId: string | null,
+) =>
+  steps.find((step) => step.slug === "confirmado") ??
+  steps.find(
+    (step) =>
+      step.id !== captureStepId &&
+      ["handoff", "confirmation", "thank_you", "redirect"].includes(step.stepType),
+  ) ??
+  steps.find((step) => step.id !== captureStepId) ??
+  null;
 
 type PublicationEditorDomainOption = {
   id: string;
@@ -86,6 +193,7 @@ type TeamVslPublicationEditorProps = {
   headerEyebrow?: string;
   headerTitle?: string;
   headerDescription?: string;
+  availableBlocks?: BuilderBlockDefinition[];
 };
 
 const slugify = (value: string) =>
@@ -98,11 +206,13 @@ const slugify = (value: string) =>
 const buildTemplateOptions = (templates: PublicationEditorTemplateOption[]) => {
   return [...templates].sort((left, right) => {
     const leftPriority =
-      left.name === "VexerCore Pro (Split 50/50)" || left.code === "vexercore-pro-split-50-50"
+      left.name === "VexerCore Pro (Split 50/50)" ||
+      left.code === "vexercore-pro-split-50-50"
         ? 0
         : 1;
     const rightPriority =
-      right.name === "VexerCore Pro (Split 50/50)" || right.code === "vexercore-pro-split-50-50"
+      right.name === "VexerCore Pro (Split 50/50)" ||
+      right.code === "vexercore-pro-split-50-50"
         ? 0
         : 1;
 
@@ -112,6 +222,27 @@ const buildTemplateOptions = (templates: PublicationEditorTemplateOption[]) => {
 
     return left.name.localeCompare(right.name);
   });
+};
+
+const ensureSelectedTemplateOption = (
+  templates: PublicationEditorTemplateOption[],
+  selectedTemplateId: string,
+) => {
+  if (
+    !selectedTemplateId ||
+    templates.some((template) => template.id === selectedTemplateId)
+  ) {
+    return templates;
+  }
+
+  return [
+    {
+      id: selectedTemplateId,
+      name: `Template actual (${selectedTemplateId})`,
+      code: selectedTemplateId,
+    },
+    ...templates,
+  ];
 };
 
 export function TeamVslPublicationEditor({
@@ -126,11 +257,16 @@ export function TeamVslPublicationEditor({
   headerEyebrow = "Team Admin / Publicaciones híbridas",
   headerTitle = "Crear o editar funnel VSL/Landing",
   headerDescription = "Gestiona el blocksJson y el mediaMap como dos capas separadas del assembly engine. Guardamos la instancia, el landing step y la publicación activa en una sola transacción.",
+  availableBlocks,
 }: TeamVslPublicationEditorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const publicationId = initialPublicationId ?? searchParams.get("publicationId");
-  const templateOptions = useMemo(() => buildTemplateOptions(templates), [templates]);
+  const publicationId =
+    initialPublicationId ?? searchParams.get("publicationId");
+  const templateOptions = useMemo(
+    () => buildTemplateOptions(templates),
+    [templates],
+  );
   const activeDomains = useMemo(
     () => domains.filter((domain) => domain.status === "active"),
     [domains],
@@ -139,12 +275,16 @@ export function TeamVslPublicationEditor({
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [uploadingRowIndex, setUploadingRowIndex] = useState<number | null>(null);
-  const [currentPublicationId, setCurrentPublicationId] = useState<string | null>(
-    publicationId,
+  const [uploadingRowIndex, setUploadingRowIndex] = useState<number | null>(
+    null,
   );
+  const [currentPublicationId, setCurrentPublicationId] = useState<
+    string | null
+  >(publicationId);
   const [funnelName, setFunnelName] = useState("");
-  const [selectedDomainId, setSelectedDomainId] = useState(activeDomains[0]?.id ?? "");
+  const [selectedDomainId, setSelectedDomainId] = useState(
+    activeDomains[0]?.id ?? "",
+  );
   const [pathPrefix, setPathPrefix] = useState("/");
   const [selectedTemplateId, setSelectedTemplateId] = useState(
     templateOptions[0]?.id ?? "",
@@ -153,8 +293,21 @@ export function TeamVslPublicationEditor({
   const [metaDescription, setMetaDescription] = useState("");
   const [blocksText, setBlocksText] = useState(defaultBlocksSeed);
   const [mediaRows, setMediaRows] = useState<MediaRow[]>([...defaultMediaRows]);
+  const [stepRecords, setStepRecords] = useState<HybridPublicationStepDetail[]>([]);
+  const [stepDrafts, setStepDrafts] = useState<Record<string, StepDraft>>({});
+  const [fallbackDrafts, setFallbackDrafts] = useState<
+    Record<EditorStepTabKey, StepDraft>
+  >({
+    captura: createEmptyStepDraft(),
+    confirmado: createEmptyStepDraft(),
+  });
+  const [activeStepTab, setActiveStepTab] = useState<EditorStepTabKey>("captura");
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
+  const visibleTemplateOptions = useMemo(
+    () => ensureSelectedTemplateOption(templateOptions, selectedTemplateId),
+    [selectedTemplateId, templateOptions],
+  );
 
   const publicationApiBasePath =
     mode === "system" && teamId
@@ -164,6 +317,8 @@ export function TeamVslPublicationEditor({
   useEffect(() => {
     if (!publicationId) {
       setCurrentPublicationId(null);
+      setStepRecords([]);
+      setStepDrafts({});
       return;
     }
 
@@ -175,6 +330,7 @@ export function TeamVslPublicationEditor({
       { method: "GET" },
     )
       .then((payload) => {
+        const nextStepRecords = normalizeStepRecords(payload.steps, payload.step);
         setCurrentPublicationId(payload.publication.id);
         setFunnelName(payload.funnelInstance.name);
         setSelectedDomainId(payload.publication.domainId);
@@ -184,6 +340,8 @@ export function TeamVslPublicationEditor({
         setMetaDescription(payload.seo.metaDescription);
         setBlocksText(JSON.stringify(payload.step.blocksJson, null, 2));
         setMediaRows(toMediaRows(payload.step.mediaMap));
+        setStepRecords(nextStepRecords);
+        setStepDrafts(buildStepDraftMap(nextStepRecords));
       })
       .catch((error) => {
         setErrorMessage(
@@ -195,9 +353,87 @@ export function TeamVslPublicationEditor({
       .finally(() => setIsLoadingExisting(false));
   }, [publicationApiBasePath, publicationId]);
 
+  const showStepSwitcher = mode === "system" && Boolean(currentPublicationId);
+
+  const captureStep = useMemo(
+    () => pickPrimaryCaptureStep(stepRecords),
+    [stepRecords],
+  );
+  const confirmStep = useMemo(
+    () => pickPrimaryConfirmStep(stepRecords, captureStep?.id ?? null),
+    [stepRecords, captureStep?.id],
+  );
+  const stepTabs = useMemo(
+    () =>
+      editorStepDefinitions.map((definition) => ({
+        ...definition,
+        step: definition.key === "captura" ? captureStep : confirmStep,
+      })),
+    [captureStep, confirmStep],
+  );
+  const activeStep = showStepSwitcher
+    ? stepTabs.find((tab) => tab.key === activeStepTab)?.step ?? null
+    : null;
+  const activeDraft = showStepSwitcher
+    ? activeStep
+      ? stepDrafts[activeStep.id] ?? buildStepDraft(activeStep)
+      : fallbackDrafts[activeStepTab] ?? createEmptyStepDraft()
+    : null;
+  const editorBlocksText = activeDraft?.blocksText ?? blocksText;
+  const editorMediaRows = activeDraft?.mediaRows ?? mediaRows;
+
+  const updateEditorDraft = (patch: Partial<StepDraft>) => {
+    if (!showStepSwitcher) {
+      if (patch.blocksText !== undefined) {
+        setBlocksText(patch.blocksText);
+      }
+
+      if (patch.mediaRows !== undefined) {
+        setMediaRows(patch.mediaRows);
+      }
+
+      return;
+    }
+
+    if (activeStep) {
+      setStepDrafts((current) => ({
+        ...current,
+        [activeStep.id]: {
+          ...(current[activeStep.id] ?? buildStepDraft(activeStep)),
+          ...patch,
+        },
+      }));
+      return;
+    }
+
+    setFallbackDrafts((current) => ({
+      ...current,
+      [activeStepTab]: {
+        ...(current[activeStepTab] ?? createEmptyStepDraft()),
+        ...patch,
+      },
+    }));
+  };
+
+  useEffect(() => {
+    if (selectedTemplateId || templateOptions.length === 0) {
+      return;
+    }
+
+    setSelectedTemplateId(templateOptions[0].id);
+  }, [selectedTemplateId, templateOptions]);
+
+  useEffect(() => {
+    if (selectedDomainId || activeDomains.length === 0) {
+      return;
+    }
+
+    setSelectedDomainId(activeDomains[0].id);
+  }, [activeDomains, selectedDomainId]);
+
   const parsedBlocks = useMemo(() => {
     try {
-      const value = JSON.parse(blocksText) as unknown;
+      const value = JSON.parse(editorBlocksText) as unknown;
       if (!Array.isArray(value)) {
         return {
           value: null,
@@ -215,10 +451,10 @@ export function TeamVslPublicationEditor({
         error: error instanceof Error ? error.message : "JSON inválido.",
       };
     }
-  }, [blocksText]);
+  }, [editorBlocksText]);
 
   const mediaMap = useMemo(() => {
-    return mediaRows.reduce<Record<string, string>>((accumulator, row) => {
+    return editorMediaRows.reduce<Record<string, string>>((accumulator, row) => {
       const key = row.key.trim();
       const value = row.value.trim();
       if (!key || !value) {
@@ -228,11 +464,11 @@ export function TeamVslPublicationEditor({
       accumulator[key] = value;
       return accumulator;
     }, {});
-  }, [mediaRows]);
+  }, [editorMediaRows]);
 
   const mediaValidation = useMemo(() => {
     const keySet = new Set<string>();
-    for (const row of mediaRows) {
+    for (const row of editorMediaRows) {
       const key = row.key.trim();
       if (!key) {
         continue;
@@ -246,7 +482,7 @@ export function TeamVslPublicationEditor({
     }
 
     return null;
-  }, [mediaRows]);
+  }, [editorMediaRows]);
 
   const isSaveDisabled =
     isPending ||
@@ -259,17 +495,16 @@ export function TeamVslPublicationEditor({
     Boolean(parsedBlocks.error) ||
     Boolean(mediaValidation);
 
-  const selectedDomain = activeDomains.find((domain) => domain.id === selectedDomainId);
-  const selectedTemplate = templateOptions.find(
+  const selectedDomain = activeDomains.find(
+    (domain) => domain.id === selectedDomainId,
+  );
+  const selectedTemplate = visibleTemplateOptions.find(
     (template) => template.id === selectedTemplateId,
   );
 
-  const handleMediaRowChange = (
-    index: number,
-    patch: Partial<MediaRow>,
-  ) => {
-    setMediaRows((current) =>
-      current.map((row, rowIndex) =>
+  const handleMediaRowChange = (index: number, patch: Partial<MediaRow>) => {
+    updateEditorDraft({
+      mediaRows: editorMediaRows.map((row, rowIndex) =>
         rowIndex === index
           ? {
               ...row,
@@ -277,11 +512,13 @@ export function TeamVslPublicationEditor({
             }
           : row,
       ),
-    );
+    });
   };
 
   const handleAddMediaRow = (key = "") => {
-    setMediaRows((current) => [...current, { key, value: "" }]);
+    updateEditorDraft({
+      mediaRows: [...editorMediaRows, { key, value: "" }],
+    });
   };
 
   const handleUploadMediaClick = (index: number) => {
@@ -289,7 +526,9 @@ export function TeamVslPublicationEditor({
     mediaUploadInputRef.current?.click();
   };
 
-  const handleMediaUploadChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUploadChange = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
     const targetIndex = pendingMediaUploadIndexRef.current;
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -305,16 +544,22 @@ export function TeamVslPublicationEditor({
       return;
     }
 
-    const rowKey = mediaRows[targetIndex]?.key.trim() || `media_${targetIndex + 1}`;
+    const rowKey =
+      editorMediaRows[targetIndex]?.key.trim() || `media_${targetIndex + 1}`;
 
     setErrorMessage(null);
     setSuccessMessage(null);
     setUploadingRowIndex(targetIndex);
 
     try {
-      const publicUrl = await uploadFileWithPresignedUrl(file, "funnels", {
-        teamId: mode === "system" ? teamId : undefined,
-      });
+      const optimizedFile = await optimizeFunnelAssetImage(file);
+      const publicUrl = await uploadFileWithPresignedUrl(
+        optimizedFile,
+        "funnels",
+        {
+          teamId: mode === "system" ? teamId : undefined,
+        },
+      );
       handleMediaRowChange(targetIndex, { value: publicUrl });
       setSuccessMessage(`Imagen subida al CDN para ${rowKey}.`);
     } catch (error) {
@@ -346,6 +591,8 @@ export function TeamVslPublicationEditor({
           templateId: selectedTemplateId,
           seoTitle: seoTitle.trim(),
           metaDescription: metaDescription.trim(),
+          stepId: activeStep?.id,
+          stepKey: showStepSwitcher ? activeStepTab : undefined,
           blocksJson: parsedBlocks.value,
           mediaMap,
         };
@@ -374,9 +621,18 @@ export function TeamVslPublicationEditor({
               );
 
         setCurrentPublicationId(response.publication.id);
+        const nextStepRecords = normalizeStepRecords(response.steps, response.step);
+        setBlocksText(JSON.stringify(response.step.blocksJson, null, 2));
+        setMediaRows(toMediaRows(response.step.mediaMap));
+        setStepRecords(nextStepRecords);
+        setStepDrafts(buildStepDraftMap(nextStepRecords));
         setSuccessMessage(
           currentPublicationId
-            ? "Funnel híbrido actualizado y publicado."
+            ? showStepSwitcher
+              ? `${
+                  stepTabs.find((tab) => tab.key === activeStepTab)?.label ?? "Paso"
+                } actualizado y publicado.`
+              : "Funnel híbrido actualizado y publicado."
             : "Funnel híbrido creado, publicado y listo para edición.",
         );
         if (editorHref) {
@@ -421,7 +677,9 @@ export function TeamVslPublicationEditor({
         }
       />
 
-      {errorMessage ? <OperationBanner tone="error" message={errorMessage} /> : null}
+      {errorMessage ? (
+        <OperationBanner tone="error" message={errorMessage} />
+      ) : null}
       {successMessage ? (
         <OperationBanner tone="success" message={successMessage} />
       ) : null}
@@ -452,7 +710,9 @@ export function TeamVslPublicationEditor({
                 Bloques válidos
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-950">
-                {parsedBlocks.value ? `${parsedBlocks.value.length} bloques listos` : "Corrige el JSON"}
+                {parsedBlocks.value
+                  ? `${parsedBlocks.value.length} bloques listos`
+                  : "Corrige el JSON"}
               </p>
             </div>
           </div>
@@ -464,10 +724,15 @@ export function TeamVslPublicationEditor({
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Publicación
+                {showStepSwitcher ? "Paso activo" : "Publicación"}
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-950">
-                {selectedDomain ? `${selectedDomain.host}${pathPrefix}` : "Selecciona dominio y ruta"}
+                {showStepSwitcher
+                  ? stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
+                    "Paso activo"
+                  : selectedDomain
+                    ? `${selectedDomain.host}${pathPrefix}`
+                    : "Selecciona dominio y ruta"}
               </p>
             </div>
           </div>
@@ -499,7 +764,8 @@ export function TeamVslPublicationEditor({
               className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
             />
             <span className="text-xs leading-5 text-slate-500">
-              Código interno sugerido: {slugify(funnelName || "nuevo-funnel") || "nuevo-funnel"}
+              Código interno sugerido:{" "}
+              {slugify(funnelName || "nuevo-funnel") || "nuevo-funnel"}
             </span>
           </label>
 
@@ -539,7 +805,8 @@ export function TeamVslPublicationEditor({
               onChange={(event) => setSelectedTemplateId(event.target.value)}
               className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
             >
-              {templateOptions.map((template) => (
+              <option value="">Selecciona un template</option>
+              {visibleTemplateOptions.map((template) => (
                 <option key={template.id} value={template.id}>
                   {template.name}
                 </option>
@@ -581,12 +848,13 @@ export function TeamVslPublicationEditor({
       </details>
 
       <HybridJsonMediaEditor
-        blocksText={blocksText}
+        key={activeStep?.id ?? activeStepTab}
+        blocksText={editorBlocksText}
         previewHref={mode === "system" ? "/admin/preview" : null}
-        onBlocksTextChange={setBlocksText}
+        onBlocksTextChange={(value) => updateEditorDraft({ blocksText: value })}
         parsedBlocksError={parsedBlocks.error}
         parsedBlocksCount={parsedBlocks.value?.length ?? 0}
-        mediaRows={mediaRows}
+        mediaRows={editorMediaRows}
         mediaValidation={mediaValidation}
         mediaMapKeys={requiredMediaKeys.filter((key) =>
           Object.prototype.hasOwnProperty.call(mediaMap, key),
@@ -598,9 +866,33 @@ export function TeamVslPublicationEditor({
         onAddMediaRow={handleAddMediaRow}
         onUploadMediaClick={handleUploadMediaClick}
         onRemoveMediaRow={(index) =>
-          setMediaRows((current) =>
-            current.filter((_, rowIndex) => rowIndex !== index),
-          )
+          updateEditorDraft({
+            mediaRows: editorMediaRows.filter((_, rowIndex) => rowIndex !== index),
+          })
+        }
+        availableBlocks={availableBlocks}
+        stepSwitcher={
+          showStepSwitcher
+            ? {
+                activeKey: activeStepTab,
+                badge: activeStep?.slug ?? activeStepTab,
+                disabled: isPending || uploadingRowIndex !== null,
+                helperText:
+                  "Cada pestaña carga y guarda el JSON del FunnelStep activo del builder real.",
+                tabs: stepTabs.map((tab) => ({
+                  key: tab.key,
+                  label: tab.label,
+                })),
+                warningText: !activeStep
+                  ? "Ese paso todavía no existe en la publicación. Puedes prepararlo aquí y al guardar lo crearemos."
+                  : null,
+                onChange: (key) => {
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                  setActiveStepTab(key as EditorStepTabKey);
+                },
+              }
+            : null
         }
       />
 
@@ -614,9 +906,9 @@ export function TeamVslPublicationEditor({
               Guardado atómico listo
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              El submit crea o actualiza la FunnelInstance, el landing step y la
-              FunnelPublication en una transacción, dejando todos los estados en
-              `active`.
+              El submit crea o actualiza la FunnelInstance, el FunnelStep activo
+              y la FunnelPublication en una transacción, dejando todos los
+              estados en `active`.
             </p>
           </div>
           <button

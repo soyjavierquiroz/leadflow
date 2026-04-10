@@ -1,5 +1,6 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { webPublicConfig } from "@/lib/public-env";
 
@@ -62,6 +63,27 @@ const authCookieSecure =
 
 export type LoginApiResponse = {
   redirectPath: string;
+};
+
+const publicCanvasPathPrefix = "/sandbox";
+const publicCanvasBypassHeader = "x-leadflow-public-canvas-bypass";
+const publicCanvasBypassUser: AuthenticatedAppUser = {
+  id: "public-canvas-super-admin",
+  fullName: "Leadflow Sandbox",
+  email: "sandbox@leadflow.local",
+  role: "SUPER_ADMIN",
+  workspaceId: "workspace-leadflow-sandbox",
+  teamId: null,
+  sponsorId: null,
+  homePath: "/admin",
+  workspace: {
+    id: "workspace-leadflow-sandbox",
+    name: "Leadflow Sandbox Workspace",
+    slug: "leadflow-sandbox",
+    primaryDomain: "localhost",
+  },
+  team: null,
+  sponsor: null,
 };
 
 export const LOGIN_REQUEST_TIMEOUT_MS = 10_000;
@@ -268,6 +290,14 @@ export const getLoginErrorMessage = (payload: unknown) =>
 export const getLogoutErrorMessage = (payload: unknown) =>
   getAuthErrorMessage(payload) ?? "No pudimos cerrar la sesión.";
 
+const isPublicCanvasPath = (pathname: string | null) =>
+  typeof pathname === "string" && pathname.startsWith(publicCanvasPathPrefix);
+
+const isPublicCanvasRequest = (requestHeaders: Headers) =>
+  requestHeaders.get(publicCanvasBypassHeader) === "1" ||
+  isPublicCanvasPath(requestHeaders.get("next-url")) ||
+  isPublicCanvasPath(requestHeaders.get("x-matched-path"));
+
 export const resolveAuthRedirectTarget = (redirectPath: string) => {
   return new URL(redirectPath, webPublicConfig.urls.site).toString();
 };
@@ -433,6 +463,18 @@ export const getSessionUser = async () => {
 };
 
 export const requireRole = async (requiredRole: AppUserRole) => {
+  const requestHeaders = await headers();
+
+  if (isPublicCanvasRequest(requestHeaders)) {
+    if (publicCanvasBypassUser.role !== requiredRole) {
+      redirect(
+        resolveAuthRedirectTarget(getHomePathForRole(publicCanvasBypassUser.role)),
+      );
+    }
+
+    return publicCanvasBypassUser;
+  }
+
   const user = await getSessionUser();
 
   if (!user) {

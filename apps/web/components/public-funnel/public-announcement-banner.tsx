@@ -41,15 +41,17 @@ export function PublicAnnouncementBanner({
   const repeatedContent = Array.from({ length: 6 }, (_, index) => (
     <span
       key={`${text}-${index}`}
-      className="inline-flex items-center gap-12 pr-32 md:gap-16 md:pr-40"
+      className="inline-flex items-center gap-12 pr-32 text-white font-bold md:gap-16 md:pr-40"
     >
-      <span className="inline-flex items-center">{text}</span>
+      <span className="inline-flex items-center text-white font-bold">
+        {text}
+      </span>
       <span
         aria-hidden="true"
-        className="inline-block h-2.5 w-2.5 rounded-full bg-white/85"
+        className="inline-block h-2.5 w-2.5 rounded-full bg-white/80"
       />
       <span aria-hidden="true" className="inline-block w-20 md:w-24" />
-      <span aria-hidden="true" className="text-white/85">
+      <span aria-hidden="true" className="font-bold text-white/80">
         —
       </span>
       <span aria-hidden="true" className="inline-block w-20 md:w-24" />
@@ -57,14 +59,14 @@ export function PublicAnnouncementBanner({
   ));
 
   return (
-    <div className="w-full overflow-hidden bg-emerald-600 py-3">
+    <div className="w-full overflow-hidden bg-[#00BC7D] py-3 text-white shadow-[0_18px_40px_rgba(0,188,125,0.22)]">
       <div className="announcement-marquee flex w-max min-w-full items-center whitespace-nowrap">
-        <div className="flex shrink-0 items-center px-6 text-sm font-bold tracking-[0.22em] text-white md:px-8 md:text-base">
+        <div className="flex shrink-0 items-center px-6 text-sm font-extrabold tracking-[0.22em] text-white md:px-8 md:text-base">
           {repeatedContent}
         </div>
         <div
           aria-hidden="true"
-          className="flex shrink-0 items-center px-6 text-sm font-bold tracking-[0.22em] text-white md:px-8 md:text-base"
+          className="flex shrink-0 items-center px-6 text-sm font-extrabold tracking-[0.22em] text-white md:px-8 md:text-base"
         >
           {repeatedContent}
         </div>

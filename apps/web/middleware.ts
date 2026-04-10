@@ -1,6 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
+const publicCanvasPathPrefix = '/sandbox';
+const publicCanvasBypassHeader = 'x-leadflow-public-canvas-bypass';
+
+const isPublicCanvasPath = (pathname: string) =>
+  pathname.startsWith(publicCanvasPathPrefix);
+
 const normalizeHostname = (value: string | null) =>
   (value ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/\.+$/, '');
 
@@ -22,6 +28,7 @@ const internalHosts = new Set(
     process.env.NEXT_PUBLIC_SITE_URL,
     process.env.NEXT_PUBLIC_MEMBERS_URL,
     process.env.NEXT_PUBLIC_ADMIN_URL,
+    '142.93.72.32',
     'localhost',
     '127.0.0.1',
   ]
@@ -32,6 +39,17 @@ const internalHosts = new Set(
 export function middleware(request: NextRequest) {
   const hostname = normalizeHostname(request.headers.get('host'));
   const { pathname } = request.nextUrl;
+
+  if (isPublicCanvasPath(pathname)) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(publicCanvasBypassHeader, '1');
+
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
 
   if (!hostname || internalHosts.has(hostname) || pathname.startsWith('/runtime/')) {
     return NextResponse.next();

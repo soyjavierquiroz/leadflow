@@ -7,14 +7,18 @@ import {
   PublicSectionSurface,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { PublicAnnouncementBanner } from "@/components/public-funnel/public-announcement-banner";
+import {
+  isCenteredPublicStepLayout,
+  resolvePublicStepLayout,
+} from "@/components/public-funnel/runtime-layout";
 import { PublicRuntimeTracker } from "@/components/public-funnel/public-runtime-tracker";
 import { StickyMediaGallery } from "@/components/public-funnel/sticky-media-gallery";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import {
-  normalizeRuntimeBlockType,
   parseRuntimeBlocks,
   toStepLabel,
 } from "@/components/public-funnel/runtime-block-utils";
+import { SplitMediaFocusLayout } from "@/components/structures/SplitMediaFocusLayout";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 
 type FunnelRuntimePageProps = {
@@ -37,9 +41,14 @@ export function FunnelRuntimePage({
   const parsedBlocks = parseRuntimeBlocks(currentStep?.blocksJson ?? []);
   const blocks = parsedBlocks.blocks;
   const hasRenderableBlocks = blocks.length > 0;
-  const isConversionPage = blocks.some(
-    (block) => normalizeRuntimeBlockType(block.type) === "conversion_page_config",
-  );
+  const stepLayout = resolvePublicStepLayout({
+    blocks,
+    settingsJson: currentStep?.settingsJson,
+  });
+  const isSingleColumnLayout = stepLayout === "single_column";
+  const isCenteredStepLayout = isCenteredPublicStepLayout({
+    settingsJson: currentStep?.settingsJson,
+  });
   const entryStepPath =
     steps.find((step) => step.isEntryStep)?.path ?? currentStepPath;
   const progressValue = Math.max(
@@ -62,11 +71,17 @@ export function FunnelRuntimePage({
   }, 0);
 
   if (hasRenderableBlocks) {
-    if (isConversionPage) {
+    if (isSingleColumnLayout) {
       return (
         <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#ecfdf5_100%)]">
           <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
-          <div className="min-h-screen px-4 py-6 md:px-6 md:py-10">
+          <div
+            className={
+              isCenteredStepLayout
+                ? "flex min-h-screen w-full flex-col px-4 py-0 md:px-6 md:py-0"
+                : "min-h-screen px-4 py-6 md:px-6 md:py-10"
+            }
+          >
             {blocks.map((block, index) => (
               <PublicBlockAdapter
                 key={`${block.type}-${index}`}
@@ -87,29 +102,24 @@ export function FunnelRuntimePage({
         <PublicAnnouncementBanner blocks={blocks} />
 
         <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen">
-          <div className="grid min-h-screen lg:grid-cols-2 lg:gap-0">
-            <div className="hidden bg-black overflow-hidden lg:block lg:sticky lg:top-0 lg:h-screen">
+          <SplitMediaFocusLayout
+            mediaSlot={
               <StickyMediaGallery
                 runtime={runtime}
                 blocks={blocks}
-                className="h-full pt-6 pb-48 lg:pt-8 lg:pb-56"
+                className="h-full"
               />
-            </div>
-
-            <div className="min-h-screen bg-white px-6 pb-8 pt-0 text-slate-900 lg:px-20 lg:pb-12 lg:pt-4">
-              <div className="mx-auto w-full max-w-[44rem] space-y-12">
-                {blocks.map((block, index) => (
-                  <PublicBlockAdapter
-                    key={`${block.type}-${index}`}
-                    block={block}
-                    runtime={runtime}
-                    blocks={blocks}
-                    layoutVariant="sticky_media"
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
+            }
+            contentSlot={blocks.map((block, index) => (
+              <PublicBlockAdapter
+                key={`${block.type}-${index}`}
+                block={block}
+                runtime={runtime}
+                blocks={blocks}
+                layoutVariant="sticky_media"
+              />
+            ))}
+          />
         </div>
       </main>
     );

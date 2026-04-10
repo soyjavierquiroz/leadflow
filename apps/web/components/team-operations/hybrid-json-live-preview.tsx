@@ -2,18 +2,9 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import { LayoutTemplate, Monitor, Smartphone } from "lucide-react";
-import { PublicBlockAdapter } from "@/components/public-funnel/adapters/public-block-adapters";
-import { PublicAnnouncementBanner } from "@/components/public-funnel/public-announcement-banner";
-import { StickyMediaGallery } from "@/components/public-funnel/sticky-media-gallery";
-import { PublicRuntimeLeadSubmitProvider } from "@/components/public-runtime/public-runtime-lead-submit-provider";
-import {
-  normalizeRuntimeBlockType,
-  parseRuntimeBlocks,
-} from "@/components/public-funnel/runtime-block-utils";
-import type {
-  JsonValue,
-  PublicFunnelRuntimePayload,
-} from "@/lib/public-funnel-runtime.types";
+import { BlockRenderer } from "@/components/blocks/BlockRenderer";
+import type { BlockDefinition } from "@/components/blocks/BlockRenderer";
+import type { JsonValue } from "@/lib/public-funnel-runtime.types";
 
 const sectionClassName =
   "rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6";
@@ -24,9 +15,6 @@ const deviceButtonClassName =
 const nonInteractivePreviewClassName =
   "[&_a]:pointer-events-none [&_button]:pointer-events-none [&_form]:pointer-events-none [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none";
 
-const previewHost = "preview.leadflow.local";
-const previewPath = "/preview";
-
 type HybridJsonLivePreviewProps = {
   blocksText: string;
   mediaMap: Record<string, string>;
@@ -34,103 +22,6 @@ type HybridJsonLivePreviewProps = {
 };
 
 type PreviewDevice = "desktop" | "mobile";
-
-const inferPreviewStepType = (blocks: JsonValue[]) => {
-  const hasLeadCaptureBlock = blocks.some((block) => {
-    if (!block || typeof block !== "object" || Array.isArray(block)) {
-      return false;
-    }
-
-    const type =
-      "type" in block && typeof block.type === "string" ? block.type : "";
-
-    return normalizeRuntimeBlockType(type) === "lead_capture_form";
-  });
-
-  return hasLeadCaptureBlock ? "capture_step" : "landing_page";
-};
-
-const buildPreviewRuntime = (
-  blocks: JsonValue[],
-  mediaMap: Record<string, string>,
-): PublicFunnelRuntimePayload => {
-  const stepType = inferPreviewStepType(blocks);
-  const currentStep = {
-    id: "preview-step",
-    slug: "preview",
-    path: previewPath,
-    stepType,
-    position: 1,
-    isEntryStep: true,
-    isConversionStep: stepType === "capture_step",
-    blocksJson: blocks,
-    mediaMap,
-    settingsJson: {},
-  };
-
-  return {
-    request: {
-      host: previewHost,
-      path: previewPath,
-      publicationPathPrefix: previewPath,
-      relativeStepPath: previewPath,
-    },
-    domain: {
-      id: "preview-domain",
-      host: previewHost,
-      normalizedHost: previewHost,
-      domainType: "preview",
-      isPrimary: true,
-      canonicalHost: null,
-      redirectToPrimary: false,
-    },
-    publication: {
-      id: "preview-publication",
-      pathPrefix: previewPath,
-      isPrimary: true,
-      trackingProfileId: null,
-      handoffStrategyId: null,
-    },
-    funnel: {
-      id: "preview-funnel",
-      name: "Live Preview Funnel",
-      code: "live-preview-funnel",
-      status: "draft",
-      settingsJson: {},
-      mediaMap,
-      template: {
-        id: "preview-template",
-        code: "live-preview-template",
-        name: "Live Preview Template",
-        version: 1,
-        funnelType: "hybrid",
-        blocksJson: blocks,
-        mediaMap,
-        settingsJson: {},
-        allowedOverridesJson: {},
-      },
-    },
-    trackingProfile: null,
-    handoffStrategy: null,
-    handoff: {
-      mode: null,
-      channel: null,
-      buttonLabel: "Preview no interactivo",
-      autoRedirect: false,
-      autoRedirectDelayMs: null,
-      messageTemplate: null,
-    },
-    currentStep,
-    nextStep: {
-      id: "preview-next-step",
-      slug: "preview-next",
-      path: `${previewPath}/next`,
-      stepType: "thank_you_step",
-    },
-    previousStep: null,
-    steps: [currentStep],
-  };
-};
 
 export function HybridJsonLivePreview({
   blocksText,
@@ -147,32 +38,23 @@ export function HybridJsonLivePreview({
       if (!Array.isArray(parsedValue)) {
         return {
           error: "Esperando JSON válido...",
-          runtime: buildPreviewRuntime([], deferredMediaMap),
           blocks: [],
         };
       }
 
-      const jsonBlocks = parsedValue as JsonValue[];
-      const parsedBlocks = parseRuntimeBlocks(jsonBlocks);
-
       return {
         error: null,
-        runtime: buildPreviewRuntime(jsonBlocks, deferredMediaMap),
-        blocks: parsedBlocks.blocks,
+        blocks: parsedValue as JsonValue[],
       };
     } catch {
       return {
         error: "Esperando JSON válido...",
-        runtime: buildPreviewRuntime([], deferredMediaMap),
         blocks: [],
       };
     }
-  }, [deferredBlocksText, deferredMediaMap]);
+  }, [deferredBlocksText]);
 
   const hasBlocks = previewState.blocks.length > 0;
-  const isConversionPage = previewState.blocks.some(
-    (block) => normalizeRuntimeBlockType(block.type) === "conversion_page_config",
-  );
 
   return (
     <section className={[sectionClassName, className].filter(Boolean).join(" ")}>
@@ -230,7 +112,7 @@ export function HybridJsonLivePreview({
       <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] p-3">
         <div className="flex items-center justify-between rounded-[1.25rem] border border-slate-200 bg-white/80 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
           <span>{device === "desktop" ? "Vista desktop" : "Vista mobile"}</span>
-          <span>{previewHost}</span>
+          <span>preview.leadflow.local</span>
         </div>
 
         <div className="mt-3 overflow-hidden rounded-[1.5rem] border border-slate-300 bg-slate-950 shadow-[0_24px_80px_rgba(15,23,42,0.20)]">
@@ -239,7 +121,7 @@ export function HybridJsonLivePreview({
             <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
             <span className="ml-3 text-xs font-medium text-slate-400">
-              {previewPath}
+              /preview
             </span>
           </div>
 
@@ -281,54 +163,17 @@ export function HybridJsonLivePreview({
                     </div>
                   </div>
                 ) : (
-                  <PublicRuntimeLeadSubmitProvider
-                    hostname={previewHost}
-                    path={previewPath}
-                  >
-                    <div className={nonInteractivePreviewClassName}>
-                      <PublicAnnouncementBanner blocks={previewState.blocks} />
-
-                      {device === "desktop" && !isConversionPage ? (
-                        <div className="grid min-h-[44rem] lg:grid-cols-2 lg:gap-0">
-                          <div className="overflow-hidden bg-black">
-                            <StickyMediaGallery
-                              runtime={previewState.runtime}
-                              blocks={previewState.blocks}
-                              className="h-full pt-6 pb-48 lg:pt-8 lg:pb-56"
-                            />
-                          </div>
-
-                          <div className="bg-white px-6 pb-8 pt-4 text-slate-900 lg:px-12 lg:pb-12">
-                            <div className="mx-auto w-full max-w-[44rem] space-y-12">
-                              {previewState.blocks.map((block, index) => (
-                                <PublicBlockAdapter
-                                  key={`${block.type}-${index}`}
-                                  block={block}
-                                  runtime={previewState.runtime}
-                                  blocks={previewState.blocks}
-                                  layoutVariant="sticky_media"
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-white px-4 py-6 text-slate-900 sm:px-6">
-                          <div className="mx-auto w-full max-w-[44rem] space-y-10">
-                            {previewState.blocks.map((block, index) => (
-                              <PublicBlockAdapter
-                                key={`${block.type}-${index}`}
-                                block={block}
-                                runtime={previewState.runtime}
-                                blocks={previewState.blocks}
-                                layoutVariant="single_column"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </PublicRuntimeLeadSubmitProvider>
+                  <div className={nonInteractivePreviewClassName}>
+                    <BlockRenderer
+                      blocks={previewState.blocks as unknown as BlockDefinition[]}
+                      mediaMap={deferredMediaMap}
+                      template={{
+                        id: "jakawi-premium",
+                        code: "jakawi-premium",
+                        name: "Jakawi Premium",
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             </div>

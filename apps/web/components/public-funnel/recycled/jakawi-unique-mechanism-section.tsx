@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { cx, flatBlockTitleClassName } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
+import { jakawiPremiumThemeStyle } from "@/styles/templates/jakawi-premium";
 
 type UniqueMechanismStepItem = {
   title?: string;
@@ -71,8 +72,9 @@ export function JakawiUniqueMechanismSection({
       }
       style={
         {
-          "--lf-unique-primary": "#10b981",
-          "--lf-unique-text-main": variant === "flat" ? "#0f172a" : "#f8fafc",
+          ...jakawiPremiumThemeStyle,
+          "--lf-unique-primary": "var(--jakawi-success)",
+          "--lf-unique-text-main": variant === "flat" ? "var(--jakawi-text-main)" : "#f8fafc",
           "--lf-unique-card-bg": variant === "flat" ? "#ffffff" : "#020617",
         } as CSSProperties
       }

@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { TeamVslPublicationEditor } from "@/components/team-operations/team-vsl-publication-editor";
+import { getSystemBlockDefinitions } from "@/lib/system-block-definitions";
 import { getSystemPublications } from "@/lib/system-publications";
 import {
-  getSystemFunnelTemplates,
   getSystemTenant,
   getSystemTenantDomains,
+  getWorkspaceFunnelTemplates,
 } from "@/lib/system-tenants";
 
 export const dynamic = "force-dynamic";
@@ -46,16 +47,18 @@ export default async function AdminTenantFunnelBuilderPage({
   params,
 }: AdminTenantFunnelBuilderPageProps) {
   const { teamId, funnelId } = await params;
-  const [tenant, domains, templates, publications] = await Promise.all([
+  const [tenant, domains, publications, blockDefinitions] = await Promise.all([
     getSystemTenant(teamId),
     getSystemTenantDomains(teamId),
-    getSystemFunnelTemplates(),
     getSystemPublications(),
+    getSystemBlockDefinitions(),
   ]);
 
   if (!tenant) {
     notFound();
   }
+
+  const templates = await getWorkspaceFunnelTemplates(tenant.workspaceId);
 
   const publication = pickBuilderPublication(
     publications.filter(
@@ -80,6 +83,7 @@ export default async function AdminTenantFunnelBuilderPage({
       headerDescription="Esta vista reutiliza el builder híbrido real del embudo publicado, incluyendo media dictionary, blocksJson y configuración SEO."
       domains={domains.filter((item) => item.status === "active")}
       templates={templates.filter((item) => item.status !== "archived")}
+      availableBlocks={blockDefinitions}
     />
   );
 }

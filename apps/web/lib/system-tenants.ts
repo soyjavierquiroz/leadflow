@@ -176,6 +176,31 @@ export type SystemTenantFunnelRecord = {
   updatedAt: string;
 };
 
+export type SystemTenantFunnelStepRecord = {
+  id: string;
+  funnelInstanceId: string;
+  slug: string;
+  stepType: string;
+  position: number;
+  isEntryStep: boolean;
+  isConversionStep: boolean;
+  blocksJson: JsonValue;
+  mediaMap: JsonValue;
+  settingsJson: JsonValue;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SystemTenantFunnelDetailRecord = SystemTenantFunnelRecord & {
+  funnelInstanceId: string | null;
+  steps: SystemTenantFunnelStepRecord[];
+};
+
+export type SystemTenantFunnelStepMutationResponse = {
+  funnel: SystemTenantFunnelRecord;
+  step: SystemTenantFunnelStepRecord;
+};
+
 export type SystemTenantDomainRecord = {
   id: string;
   workspaceId: string;
@@ -262,6 +287,32 @@ export const getSystemTenantFunnels = async (teamId: string) => {
   return payload as SystemTenantFunnelRecord[];
 };
 
+export const getSystemTenantFunnel = async (teamId: string, funnelId: string) => {
+  noStore();
+
+  const response = await apiFetchWithSession(
+    `/system/tenants/${encodePathSegment(teamId)}/funnels/${encodePathSegment(funnelId)}`,
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `No pudimos cargar el funnel solicitado del tenant (${response.status}).`,
+    );
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("El API devolvió un payload inválido para el funnel del tenant.");
+  }
+
+  return payload as SystemTenantFunnelDetailRecord;
+};
+
 export const getSystemTenantDomains = async (teamId: string) => {
   noStore();
 
@@ -306,6 +357,30 @@ export const getSystemFunnelTemplates = async () => {
   }
 
   return payload as SystemFunnelTemplateRecord[];
+};
+
+export const getWorkspaceFunnelTemplates = async (workspaceId: string) => {
+  noStore();
+
+  const response = await apiFetchWithSession(
+    `/funnel-templates?workspaceId=${encodeURIComponent(workspaceId)}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `No pudimos cargar los templates del workspace (${response.status}).`,
+    );
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  if (!Array.isArray(payload)) {
+    throw new Error(
+      "El API devolvió un payload inválido para funnel-templates del workspace.",
+    );
+  }
+
+  return payload as SystemTemplateRecord[];
 };
 
 export const getSystemTemplates = async () => {

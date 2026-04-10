@@ -5,17 +5,17 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import {
   usePathname,
-  useRouter,
   useSearchParams,
   type ReadonlyURLSearchParams,
 } from "next/navigation";
 import type { Country } from "react-phone-number-input";
+import { cx } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { SmartPhoneInput } from "@/components/public-funnel/smart-phone-input";
 import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-runtime-lead-submit-provider";
+import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 import {
   getOrCreateAnonymousId,
   persistSubmissionContext,
-  type LeadCaptureSubmissionResponse,
   submitPublicLeadCapture,
 } from "@/lib/public-funnel-session";
 import {
@@ -24,17 +24,19 @@ import {
   getOrCreateRuntimeSessionId,
 } from "@/lib/public-runtime-tracking";
 
-type LeadCaptureModalConfig = {
+export type LeadCaptureModalConfig = {
   title: string;
   description: string;
   defaultCountry: string;
   nameLabel: string;
   namePlaceholder: string;
+  nameErrorMessage?: string;
   phoneLabel: string;
   phonePlaceholder: string;
   phoneErrorMessage: string;
   ctaText: string;
   ctaSubtext?: string;
+  successRedirect?: string;
 };
 
 type LeadCaptureModalProps = {
@@ -46,9 +48,12 @@ type LeadCaptureModalProps = {
   modalConfig: LeadCaptureModalConfig;
   sourceChannel?: string | null;
   tags?: string[];
+  renderTrigger?: boolean;
 };
 
-function readUrlAttribution(searchParams: URLSearchParams | ReadonlyURLSearchParams) {
+function readUrlAttribution(
+  searchParams: URLSearchParams | ReadonlyURLSearchParams,
+) {
   return {
     utmSource: searchParams.get("utm_source"),
     utmCampaign: searchParams.get("utm_campaign"),
@@ -61,69 +66,52 @@ function readUrlAttribution(searchParams: URLSearchParams | ReadonlyURLSearchPar
   };
 }
 
-const resolveAssignedAdvisor = (response: LeadCaptureSubmissionResponse) => {
-  if (response.advisor) {
-    return response.advisor;
+const getNameValidationError = (
+  value: string,
+  customMessage?: string,
+) => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return customMessage?.trim() || "Por favor, ingresa tu nombre.";
   }
 
-  if (response.assigned_advisor) {
-    return {
-      name: response.assigned_advisor.name,
-      phone: response.assigned_advisor.phone,
-      photoUrl: response.assigned_advisor.photo_url,
-      bio: response.assigned_advisor.bio,
-      whatsappUrl: response.handoff.whatsappUrl,
-    };
-  }
-
-  if (response.assignment?.sponsor) {
-    return {
-      name: response.assignment.sponsor.displayName,
-      phone: response.assignment.sponsor.phone,
-      photoUrl: response.assignment.sponsor.avatarUrl,
-      bio: "Especialista en Protocolos de Recuperación",
-      whatsappUrl: response.handoff.whatsappUrl,
-    };
+  if (trimmed.length < 2) {
+    return customMessage?.trim() || "Por favor, ingresa un nombre válido.";
   }
 
   return null;
 };
 
-const appendAdvisorQueryParams = (
-  nextUrl: URL,
-  advisor: NonNullable<ReturnType<typeof resolveAssignedAdvisor>>,
+const getPhoneValidationError = (
+  value: string,
+  isPhoneValid: boolean,
+  customMessage?: string,
 ) => {
-  nextUrl.searchParams.set("advisor", advisor.name);
-  nextUrl.searchParams.set("advisor_name", advisor.name);
-
-  if (advisor.phone) {
-    nextUrl.searchParams.set("advisor_phone", advisor.phone);
+  if (!value.trim() || !isPhoneValid) {
+    return customMessage?.trim() || "Por favor, ingresa un número válido.";
   }
 
-  if (advisor.photoUrl) {
-    nextUrl.searchParams.set("advisor_photo", advisor.photoUrl);
-  }
-
-  if (advisor.bio) {
-    nextUrl.searchParams.set("advisor_bio", advisor.bio);
-  }
-
-  if (advisor.whatsappUrl) {
-    nextUrl.searchParams.set("advisor_whatsapp", advisor.whatsappUrl);
-  }
+  return null;
 };
 
-const appendAssignmentQueryParams = (
-  nextUrl: URL,
-  response: LeadCaptureSubmissionResponse,
-) => {
-  if (response.assignment?.id) {
-    nextUrl.searchParams.set("assignment_id", response.assignment.id);
+const resolveLeadCaptureRedirect = (successRedirect?: string) => {
+  const trimmedRedirect = successRedirect?.trim();
+  if (trimmedRedirect) {
+    return trimmedRedirect;
   }
 
-  if (response.assignment?.sponsor.id) {
-    nextUrl.searchParams.set("sponsor_id", response.assignment.sponsor.id);
+  if (typeof window === "undefined") {
+    return "/gracias";
   }
+
+  const normalizedPath = window.location.pathname.replace(/\/+$/, "");
+  if (!normalizedPath) {
+    return "/gracias";
+  }
+
+  return normalizedPath.endsWith("/gracias")
+    ? normalizedPath
+    : `${normalizedPath}/gracias`;
 };
 
 export function LeadCaptureModal({
@@ -135,8 +123,8 @@ export function LeadCaptureModal({
   modalConfig,
   sourceChannel,
   tags,
+  renderTrigger = true,
 }: LeadCaptureModalProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const nameInputRef = useRef<HTMLInputElement | null>(null);
@@ -145,6 +133,7 @@ export function LeadCaptureModal({
   const [phone, setPhone] = useState("");
   const [isPhoneValid, setIsPhoneValid] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const attribution = useMemo(
@@ -152,7 +141,19 @@ export function LeadCaptureModal({
     [searchParams],
   );
   const runtimeLeadSubmit = usePublicRuntimeLeadSubmit();
-  const isFormReady = fullName.trim().length > 1 && isPhoneValid;
+  const currentNameError = getNameValidationError(
+    fullName,
+    modalConfig.nameErrorMessage,
+  );
+  const currentPhoneError = getPhoneValidationError(
+    phone,
+    isPhoneValid,
+    modalConfig.phoneErrorMessage,
+  );
+  const nameError = hasAttemptedSubmit ? currentNameError : null;
+  const phoneError = hasAttemptedSubmit ? currentPhoneError : null;
+  const isFormReady = !currentNameError && !currentPhoneError;
+  const nameErrorId = "lead-capture-name-error";
 
   useEffect(() => {
     if (!open) {
@@ -167,6 +168,22 @@ export function LeadCaptureModal({
       window.clearTimeout(timer);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncFromHash = () => {
+      if (window.location.hash === "#lead-capture-modal") {
+        setOpen(true);
+      }
+    };
+
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, []);
 
   const handleTriggerClick = () => {
     setOpen(true);
@@ -187,14 +204,41 @@ export function LeadCaptureModal({
     });
   };
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+
+    if (!nextOpen) {
+      setHasAttemptedSubmit(false);
+      setSubmitError(null);
+    }
+
+    if (
+      !nextOpen &&
+      typeof window !== "undefined" &&
+      window.location.hash === "#lead-capture-modal"
+    ) {
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!isFormReady || isSubmitting) {
+    if (isSubmitting) {
+      return;
+    }
+
+    setHasAttemptedSubmit(true);
+    setSubmitError(null);
+
+    if (!isFormReady) {
       return;
     }
 
     setIsSubmitting(true);
-    setSubmitError(null);
 
     const anonymousId = getOrCreateAnonymousId(publicationId);
     const submissionEventId = createRuntimeEventId("form_submitted");
@@ -231,7 +275,9 @@ export function LeadCaptureModal({
         anonymousId,
         submissionEventId,
         sourceUrl:
-          typeof window !== "undefined" ? window.location.href : pathname ?? null,
+          typeof window !== "undefined"
+            ? window.location.href
+            : (pathname ?? null),
         utmSource: attribution.utmSource,
         utmCampaign: attribution.utmCampaign,
         utmMedium: attribution.utmMedium,
@@ -257,27 +303,9 @@ export function LeadCaptureModal({
 
       persistSubmissionContext(publicationId, response);
       setOpen(false);
-
-      if (response.nextStep?.path) {
-        const assignedAdvisor = resolveAssignedAdvisor(response);
-        const nextUrl = new URL(
-          response.nextStep.path,
-          typeof window !== "undefined" ? window.location.origin : "https://leadflow.local",
-        );
-
-        if (assignedAdvisor?.name) {
-          appendAdvisorQueryParams(nextUrl, assignedAdvisor);
-        }
-
-        appendAssignmentQueryParams(nextUrl, response);
-
-        router.push(`${nextUrl.pathname}${nextUrl.search}`);
-        return;
-      }
-
-      if (response.handoff.whatsappUrl) {
-        window.location.href = response.handoff.whatsappUrl;
-      }
+      window.location.assign(
+        resolveLeadCaptureRedirect(modalConfig.successRedirect),
+      );
     } catch (error) {
       setSubmitError(
         error instanceof Error
@@ -290,16 +318,24 @@ export function LeadCaptureModal({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
-        <button type="button" className={triggerClassName} onClick={handleTriggerClick}>
-          {triggerLabel}
-        </button>
-      </Dialog.Trigger>
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
+      {renderTrigger ? (
+        <Dialog.Trigger asChild>
+          <button
+            type="button"
+            className={triggerClassName}
+            onClick={handleTriggerClick}
+          >
+            {triggerLabel}
+          </button>
+        </Dialog.Trigger>
+      ) : null}
 
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[80] bg-slate-950/70 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-[90] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[2rem] border border-white/80 bg-white p-6 shadow-[0_30px_90px_rgba(15,23,42,0.35)] outline-none md:p-7">
+        <Dialog.Content
+          className={`fixed left-1/2 top-1/2 z-[90] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 outline-none ${jakawiPremiumClassNames.modalPanel}`}
+        >
           <div className="flex items-start justify-between gap-4">
             <div className="pr-4">
               <Dialog.Title className="text-2xl font-black tracking-tight text-slate-950">
@@ -321,26 +357,51 @@ export function LeadCaptureModal({
             </Dialog.Close>
           </div>
 
-          <form className="mt-6 flex w-full min-w-0 flex-col gap-4" onSubmit={handleSubmit}>
+          <form
+            className="mt-6 flex w-full min-w-0 flex-col gap-4"
+            onSubmit={handleSubmit}
+            noValidate
+          >
             <label className="grid w-full min-w-0 gap-2 text-sm font-semibold text-slate-800">
               <span>{modalConfig.nameLabel}</span>
               <input
                 ref={nameInputRef}
                 type="text"
                 value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
+                onChange={(event) => {
+                  setFullName(event.target.value);
+                  setSubmitError(null);
+                }}
                 placeholder={modalConfig.namePlaceholder}
                 autoComplete="name"
                 required
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                minLength={2}
+                aria-invalid={Boolean(nameError)}
+                aria-describedby={nameError ? nameErrorId : undefined}
+                className={cx(
+                  jakawiPremiumClassNames.compactInput,
+                  nameError
+                    ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                    : "",
+                )}
               />
             </label>
+
+            {nameError ? (
+              <p id={nameErrorId} className="-mt-2 text-xs text-red-600">
+                {nameError}
+              </p>
+            ) : null}
 
             <SmartPhoneInput
               label={modalConfig.phoneLabel}
               value={phone}
-              onChange={setPhone}
+              onChange={(nextPhone) => {
+                setPhone(nextPhone);
+                setSubmitError(null);
+              }}
               placeholder={modalConfig.phonePlaceholder}
+              error={phoneError ?? undefined}
               invalidMessage={modalConfig.phoneErrorMessage}
               defaultCountry={modalConfig.defaultCountry as Country}
               required
@@ -349,14 +410,19 @@ export function LeadCaptureModal({
 
             <button
               type="submit"
-              disabled={!isFormReady || isSubmitting}
-              className="inline-flex min-h-14 w-full items-center justify-center rounded-2xl bg-emerald-600 px-6 py-4 text-center text-base font-black uppercase tracking-tight text-white shadow-[0_12px_28px_rgba(5,150,105,0.28)] transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isSubmitting}
+              className={cx(
+                "mt-6 mb-2 flex w-full items-center justify-center rounded-md bg-orange-500 py-4 font-black text-white shadow-md transition-colors",
+                isSubmitting
+                  ? "cursor-not-allowed opacity-70"
+                  : "cursor-pointer hover:bg-orange-600",
+              )}
             >
-              {isSubmitting ? "Enviando..." : modalConfig.ctaText}
+              {isSubmitting ? "Procesando..." : modalConfig.ctaText}
             </button>
 
             {modalConfig.ctaSubtext ? (
-              <p className="-mt-1 text-center text-xs text-slate-500">
+              <p className="text-center text-xs text-slate-500">
                 {modalConfig.ctaSubtext}
               </p>
             ) : null}

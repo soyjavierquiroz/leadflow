@@ -6,6 +6,7 @@ import {
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
 import { TrustAuthorityBar } from "@/components/public-funnel/trust-authority-bar";
+import { jakawiPremiumThemeStyle } from "@/styles/templates/jakawi-premium";
 
 type JakawiHookAndPromiseSectionProps = {
   variant?: "default" | "flat";
@@ -182,12 +183,15 @@ export function JakawiHookAndPromiseSection({
     <section
       className={cx(
         "w-full text-[var(--lf-hook-text-main)]",
-        variant === "flat" ? "pb-12 pt-6 md:pb-20 md:pt-10" : "py-2 md:py-3",
+        variant === "flat"
+          ? "pb-12 pt-6 md:pb-20 md:pt-10 lg:pt-0"
+          : "py-2 md:py-3",
       )}
       style={
         {
-          "--lf-hook-primary": "#10b981",
-          "--lf-hook-text-main": variant === "flat" ? "#0f172a" : "#f8fafc",
+          ...jakawiPremiumThemeStyle,
+          "--lf-hook-primary": "var(--jakawi-success)",
+          "--lf-hook-text-main": variant === "flat" ? "var(--jakawi-text-main)" : "#f8fafc",
           "--lf-hook-card-bg": variant === "flat" ? "#ffffff" : "#020617",
         } as CSSProperties
       }
@@ -419,7 +423,7 @@ export function JakawiHookAndPromiseSection({
             transform: scale(1);
           }
           50% {
-            transform: scale(1.03);
+            transform: scale(1.018);
           }
         }
       `}</style>

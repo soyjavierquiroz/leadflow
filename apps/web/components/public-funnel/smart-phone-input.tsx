@@ -20,6 +20,7 @@ import { parsePhoneNumberFromString } from "libphonenumber-js/min";
 import { ChevronDown } from "lucide-react";
 import { cx } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { useVisitorData } from "@/components/public-funnel/use-visitor-data";
+import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 
 const SUPPORTED_COUNTRIES = new Set<Country>(getCountries() as Country[]);
 const FALLBACK_COUNTRY: Country = "US";
@@ -372,15 +373,12 @@ export function SmartPhoneInput({
         disabled={disabled}
         locale={locale}
         className={cx(
-          "flex w-full flex-row items-center overflow-hidden rounded-lg border bg-slate-50 transition-all duration-200",
+          jakawiPremiumClassNames.phoneInputShell,
           showAutoInvalidState || error
-            ? "border-rose-500 focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-200"
-            : "border-slate-200 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-200",
+            ? "border-red-500 focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-200"
+            : jakawiPremiumClassNames.phoneInputValid,
           disabled ? "opacity-70" : "",
-          "[&_.PhoneInputCountry]:bg-transparent",
-          "[&_.PhoneInputCountryIcon]:h-4 [&_.PhoneInputCountryIcon]:w-6 [&_.PhoneInputCountryIcon]:rounded-sm [&_.PhoneInputCountryIcon]:shadow-sm",
-          "[&_.PhoneInputInput]:h-12 [&_.PhoneInputInput]:min-w-0 [&_.PhoneInputInput]:flex-1 [&_.PhoneInputInput]:border-0 [&_.PhoneInputInput]:bg-transparent [&_.PhoneInputInput]:px-4 [&_.PhoneInputInput]:text-base [&_.PhoneInputInput]:text-slate-900 [&_.PhoneInputInput]:outline-none",
-          "[&_.PhoneInputInput]:placeholder:text-slate-400",
+          jakawiPremiumClassNames.phoneInputField,
         )}
       />
 
@@ -389,13 +387,13 @@ export function SmartPhoneInput({
       ) : null}
 
       {error ? (
-        <p id={errorId} className="mt-2 text-xs text-rose-600">
+        <p id={errorId} className="mt-2 text-xs text-red-600">
           {error}
         </p>
       ) : null}
 
       {!error && showAutoInvalidState ? (
-        <p id={errorId} className="mt-2 text-xs text-rose-600">
+        <p id={errorId} className="mt-2 text-xs text-red-600">
           {invalidMessage}
         </p>
       ) : null}

@@ -1,17 +1,15 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 
 import {
-  buildCtaClassName,
   cx,
   flatBlockTitleClassName,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import {
-  ValueStackSummary,
-  type ValueStackItem,
-} from "@/components/public-funnel/value-stack-summary";
+  LeadCaptureModal,
+  type LeadCaptureModalConfig,
+} from "@/components/public-funnel/lead-capture-modal";
 import { resolveLeadflowBlockMedia } from "@/components/public-funnel/leadflow-media-resolver";
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
 import {
@@ -24,6 +22,7 @@ import type {
   PublicFunnelRuntimePayload,
   RuntimeBlock,
 } from "@/lib/public-funnel-runtime.types";
+import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 
 type PublicGrandSlamOfferBlockProps = {
   block: RuntimeBlock;
@@ -37,6 +36,10 @@ type OfferLineItem = {
   name?: string;
   description?: string;
   valueText?: string;
+};
+
+type OfferSectionItem = OfferLineItem & {
+  kind: "included" | "bonus";
 };
 
 const mapIncludedItems = (value: RuntimeBlock["what_is_included"]) => {
@@ -74,66 +77,282 @@ const mapBonusItems = (value: RuntimeBlock["bonus_items"]) => {
   }
 
   const items = value.map((item) => {
-      const record = asRecord(item);
-      if (!record) {
-        return null;
-      }
+    const record = asRecord(item);
+    if (!record) {
+      return null;
+    }
 
-      const nextItem = {
-        name: asString(record.bonus_name, asString(record.title)) || undefined,
-        description:
-          asString(record.bonus_description, asString(record.description)) ||
-          undefined,
-      } satisfies OfferLineItem;
+    const nextItem = {
+      name:
+        asString(
+          record.bonus_name,
+          asString(record.item_name, asString(record.title)),
+        ) || undefined,
+      description:
+        asString(
+          record.bonus_description,
+          asString(record.item_description, asString(record.description)),
+        ) || undefined,
+      valueText:
+        asString(
+          record.bonus_value_text,
+          asString(record.item_value_text, asString(record.value)),
+        ) || undefined,
+    } satisfies OfferLineItem;
 
-      return nextItem.name || nextItem.description ? nextItem : null;
-    });
+    return nextItem.name || nextItem.description || nextItem.valueText
+      ? nextItem
+      : null;
+  });
 
   return items.filter(
     (item): item is NonNullable<(typeof items)[number]> => Boolean(item),
   );
 };
 
-const toValueStackItems = (
-  includedItems: OfferLineItem[],
-  bonusItems: OfferLineItem[],
-) => {
-  const items = [...includedItems, ...bonusItems].reduce<ValueStackItem[]>(
-    (collection, item) => {
-      const title = item.name || item.description;
-      if (!title?.trim()) {
-        return collection;
-      }
+const moneyTokenPattern =
+  /([$€£¥]|[A-Za-z]{1,4}\.?)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?|\d+(?:[.,]\d+)?)(?:\s*([$€£¥]|[A-Za-z]{1,4}\.?))?/u;
 
-      const normalizedTitle = title.trim();
-      const nextItem = {
-        title: normalizedTitle,
-        description:
-          item.name && item.description && item.description !== item.name
-            ? item.description
-            : undefined,
-        valueText: item.valueText || undefined,
-        priceText: "Precio $0",
-      } satisfies ValueStackItem;
+const dedupeOfferItems = (items: OfferSectionItem[]) => {
+  const seen = new Set<string>();
 
-      if (
-        collection.some(
-          (entry) =>
-            entry.title === nextItem.title &&
-            entry.valueText === nextItem.valueText,
-        )
-      ) {
-        return collection;
-      }
+  return items.filter((item) => {
+    const key = [
+      item.kind,
+      item.name?.trim().toLowerCase(),
+      item.description?.trim().toLowerCase(),
+      item.valueText?.trim().toLowerCase(),
+    ].join("::");
 
-      collection.push(nextItem);
-      return collection;
-    },
-    [],
-  );
+    if (seen.has(key)) {
+      return false;
+    }
 
-  return items;
+    seen.add(key);
+    return true;
+  });
 };
+
+function resolveLeadCaptureModalConfig(
+  leadCaptureConfigBlock: RuntimeBlock | null,
+): LeadCaptureModalConfig | null {
+  const modalConfigRecord = leadCaptureConfigBlock
+    ? asRecord(leadCaptureConfigBlock.modal_config)
+    : null;
+  const modalFieldsRecord = modalConfigRecord
+    ? asRecord(modalConfigRecord.fields)
+    : null;
+  const modalNameFieldRecord =
+    (modalFieldsRecord ? asRecord(modalFieldsRecord.name) : null) ??
+    (modalConfigRecord ? asRecord(modalConfigRecord.name_fields) : null);
+  const modalPhoneFieldRecord =
+    (modalFieldsRecord ? asRecord(modalFieldsRecord.phone) : null) ??
+    (modalConfigRecord ? asRecord(modalConfigRecord.phone_fields) : null);
+  const modalCtaButtonRecord = modalConfigRecord
+    ? asRecord(modalConfigRecord.cta_button)
+    : null;
+
+  if (
+    !modalConfigRecord ||
+    (!modalNameFieldRecord && !modalPhoneFieldRecord && !modalCtaButtonRecord)
+  ) {
+    return null;
+  }
+
+  return {
+    title: asString(modalConfigRecord.title, "Casi listo..."),
+    description: asString(
+      modalConfigRecord.description,
+      "Déjanos tus datos para continuar con la siguiente etapa.",
+    ),
+    defaultCountry: asString(modalConfigRecord.default_country, "BO"),
+    nameLabel: asString(modalNameFieldRecord?.label, "Nombre"),
+    namePlaceholder: asString(
+      modalNameFieldRecord?.placeholder,
+      "Escribe tu nombre completo",
+    ),
+    nameErrorMessage: asString(
+      modalNameFieldRecord?.error_msg,
+      "Por favor, ingresa tu nombre.",
+    ),
+    phoneLabel: asString(modalPhoneFieldRecord?.label, "WhatsApp"),
+    phonePlaceholder: asString(
+      modalPhoneFieldRecord?.placeholder,
+      "Tu número de WhatsApp",
+    ),
+    phoneErrorMessage: asString(
+      modalPhoneFieldRecord?.error_msg,
+      "Por favor, ingresa un número válido",
+    ),
+    ctaText: asString(
+      modalCtaButtonRecord?.text,
+      asString(modalConfigRecord.cta_text, "Continuar"),
+    ),
+    ctaSubtext: asString(
+      modalCtaButtonRecord?.subtext,
+      asString(modalConfigRecord.cta_subtext),
+    ),
+    successRedirect: asString(
+      leadCaptureConfigBlock?.success_redirect,
+      asString(modalConfigRecord.success_redirect),
+    ),
+  };
+}
+
+function parseAmount(rawValue: string) {
+  const compactValue = rawValue.replace(/\s+/g, "");
+  const separators = compactValue.match(/[.,]/g) ?? [];
+  const lastComma = compactValue.lastIndexOf(",");
+  const lastDot = compactValue.lastIndexOf(".");
+  let normalizedValue = compactValue;
+  let decimalSeparator = "";
+
+  if (lastComma !== -1 && lastDot !== -1) {
+    decimalSeparator = lastComma > lastDot ? "," : ".";
+    normalizedValue =
+      decimalSeparator === ","
+        ? compactValue.replace(/\./g, "").replace(",", ".")
+        : compactValue.replace(/,/g, "");
+  } else if (separators.length === 1) {
+    const separator = separators[0] ?? "";
+    const separatorIndex = compactValue.indexOf(separator);
+    const decimalDigits = compactValue.length - separatorIndex - 1;
+
+    if (decimalDigits > 0 && decimalDigits !== 3) {
+      decimalSeparator = separator;
+      normalizedValue =
+        separator === "," ? compactValue.replace(",", ".") : compactValue;
+    } else {
+      normalizedValue = compactValue.replace(/[.,]/g, "");
+    }
+  } else if (separators.length > 1) {
+    const separator = lastComma > lastDot ? "," : ".";
+    const separatorIndex = Math.max(lastComma, lastDot);
+    const decimalDigits = compactValue.length - separatorIndex - 1;
+
+    if (decimalDigits > 0 && decimalDigits !== 3) {
+      decimalSeparator = separator;
+      normalizedValue =
+        separator === ","
+          ? compactValue.replace(/\./g, "").replace(",", ".")
+          : compactValue.replace(/,/g, "");
+    } else {
+      normalizedValue = compactValue.replace(/[.,]/g, "");
+    }
+  }
+
+  const amount = Number.parseFloat(normalizedValue);
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+
+  return {
+    amount,
+    decimals:
+      decimalSeparator.length > 0
+        ? normalizedValue.split(".")[1]?.length ?? 0
+        : 0,
+    decimalSeparator,
+  };
+}
+
+function parseMoneyText(text?: string) {
+  if (!text) {
+    return null;
+  }
+
+  const match = moneyTokenPattern.exec(text);
+  if (!match) {
+    return null;
+  }
+
+  const parsedAmount = parseAmount(match[2] ?? "");
+  if (!parsedAmount) {
+    return null;
+  }
+
+  return {
+    amount: parsedAmount.amount,
+    decimals: parsedAmount.decimals,
+    decimalSeparator: parsedAmount.decimalSeparator,
+    prefix: (match[1] ?? "").trim(),
+    suffix: (match[3] ?? "").trim(),
+  };
+}
+
+function formatMoneyDisplay(value: {
+  amount: number;
+  decimals: number;
+  decimalSeparator: string;
+  prefix: string;
+  suffix: string;
+}) {
+  const absoluteAmount = Math.abs(value.amount);
+  const formattedNumber = new Intl.NumberFormat("es-BO", {
+    minimumFractionDigits: value.decimals,
+    maximumFractionDigits: value.decimals,
+  }).format(absoluteAmount);
+  const withPreferredSeparator =
+    value.decimalSeparator === ","
+      ? formattedNumber.replace(/\./g, "_").replace(/,/g, ".").replace(/_/g, ",")
+      : formattedNumber;
+  const signedNumber =
+    value.amount < 0 ? `-${withPreferredSeparator}` : withPreferredSeparator;
+
+  if (value.prefix) {
+    const needsSpace = /[A-Za-z]$/.test(value.prefix);
+    return `${value.prefix}${needsSpace ? " " : ""}${signedNumber}`;
+  }
+
+  if (value.suffix) {
+    const needsSpace = /^[A-Za-z]/.test(value.suffix);
+    return `${signedNumber}${needsSpace ? " " : ""}${value.suffix}`;
+  }
+
+  return signedNumber;
+}
+
+function getDisplayValueText(text?: string) {
+  const parsed = parseMoneyText(text);
+  return parsed ? formatMoneyDisplay(parsed) : text;
+}
+
+function deriveTotalValueText(
+  items: OfferLineItem[],
+  fallbackText?: string,
+) {
+  const parsedItems = items
+    .map((item) => parseMoneyText(item.valueText))
+    .filter(
+      (
+        parsedItem,
+      ): parsedItem is NonNullable<ReturnType<typeof parseMoneyText>> =>
+        Boolean(parsedItem),
+    );
+
+  if (parsedItems.length > 0) {
+    const [firstItem] = parsedItems;
+    const sameCurrency = parsedItems.every(
+      (item) =>
+        item.prefix === firstItem.prefix &&
+        item.suffix === firstItem.suffix &&
+        item.decimals === firstItem.decimals &&
+        item.decimalSeparator === firstItem.decimalSeparator,
+    );
+
+    if (sameCurrency) {
+      const totalAmount = parsedItems.reduce((sum, item) => sum + item.amount, 0);
+
+      return formatMoneyDisplay({
+        ...firstItem,
+        amount: totalAmount,
+      });
+    }
+  }
+
+  const fallbackMoney = parseMoneyText(fallbackText);
+  return fallbackMoney ? formatMoneyDisplay(fallbackMoney) : fallbackText;
+}
 
 function renderHighlightedText(text?: string) {
   if (!text) {
@@ -179,19 +398,32 @@ export function PublicGrandSlamOfferBlock({
     () => mapBonusItems(block.bonus_items),
     [block.bonus_items],
   );
-  const valueStackItems = useMemo(
-    () => toValueStackItems(includedItems, bonusItems),
+  const editorialItems = useMemo(
+    () =>
+      dedupeOfferItems([
+        ...includedItems.map(
+          (item) =>
+            ({
+              ...item,
+              kind: "included",
+            }) satisfies OfferSectionItem,
+        ),
+        ...bonusItems.map(
+          (item) =>
+            ({
+              ...item,
+              kind: "bonus",
+            }) satisfies OfferSectionItem,
+        ),
+      ]),
     [bonusItems, includedItems],
   );
   const priceStack = asRecord(block.price_stack);
   const offerName = asString(block.offer_name);
+  const offerIntroText = asString(block.offer_intro, asString(block.description));
   const finalPriceText = asString(
     priceStack?.final_price_text,
-    asString(block.final_price_text),
-  );
-  const savingsText = asString(
-    priceStack?.savings_text,
-    asString(block.savings_text),
+    asString(block.final_price_text, asString(block.price_sale_text)),
   );
   const anchorPriceText = asString(
     priceStack?.anchor_price_text,
@@ -200,7 +432,24 @@ export function PublicGrandSlamOfferBlock({
       asString(block.price_anchor_text, asString(block.original_price_text)),
     ),
   );
-  const ctaLabel = asString(block.primary_cta_text, "Aprovechar oferta");
+  const anchorValueText = useMemo(
+    () => deriveTotalValueText(editorialItems, anchorPriceText),
+    [anchorPriceText, editorialItems],
+  );
+  const finalPriceDisplay = finalPriceText || "ACCESO 100% GRATIS";
+  const ctaLabel = asString(
+    block.primary_cta_text,
+    asString(block.cta_text, "Aprovechar oferta"),
+  );
+  const ctaAction = asString(block.action);
+  const leadCaptureConfigBlock =
+    blocks.find(
+      (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_config",
+    ) ?? null;
+  const modalConfig = useMemo(
+    () => resolveLeadCaptureModalConfig(leadCaptureConfigBlock),
+    [leadCaptureConfigBlock],
+  );
   const captureBlock =
     blocks.find(
       (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
@@ -213,9 +462,7 @@ export function PublicGrandSlamOfferBlock({
               ...captureBlock,
               variant: "compact_capture",
               eyebrow: offerName || "Formulario de pedido",
-              headline:
-                asString(block.primary_cta_text) ||
-                "Completa tu pedido y activamos la oferta",
+              headline: ctaLabel || "Completa tu pedido y activamos la oferta",
               subheadline:
                 asString(block.headline) ||
                 "Usamos el flujo estándar de captura de Leadflow para reservar tu pedido.",
@@ -225,9 +472,7 @@ export function PublicGrandSlamOfferBlock({
               type: "lead_capture_form",
               variant: "compact_capture",
               eyebrow: offerName || "Formulario de pedido",
-              headline:
-                asString(block.primary_cta_text) ||
-                "Completa tu pedido y activamos la oferta",
+              headline: ctaLabel || "Completa tu pedido y activamos la oferta",
               subheadline:
                 asString(block.headline) ||
                 "Reserva la oferta con el runtime estándar de Leadflow y continúa al siguiente paso cuando corresponda.",
@@ -305,26 +550,16 @@ export function PublicGrandSlamOfferBlock({
   return (
     <>
       <section
-        className={cx(
-          "w-full text-[var(--lf-grand-text-main)]",
-          variant === "flat" ? "py-6 md:py-8" : "py-6 md:py-8",
-        )}
-        style={
-          {
-            "--lf-grand-primary": "#f59e0b",
-            "--lf-grand-text-main": variant === "flat" ? "#0f172a" : "#f8fafc",
-            "--lf-grand-card-bg": variant === "flat" ? "#ffffff" : "#020617",
-          } as CSSProperties
-        }
+        className={cx("w-full py-6 text-slate-900 md:py-8")}
       >
-        <div className="space-y-7">
+        <div className="space-y-8 rounded-[2rem] bg-[#f8fafc] px-6 py-8 md:px-8 md:py-10">
           {asString(block.headline) ? (
             <h3
               className={cx(
-                "max-w-4xl leading-tight",
+                "max-w-4xl leading-tight text-slate-950",
                 variant === "flat"
                   ? flatBlockTitleClassName
-                  : "text-3xl font-black tracking-tight text-slate-100 md:text-4xl",
+                  : "text-3xl font-black tracking-tight md:text-4xl",
               )}
             >
               {renderHighlightedText(asString(block.headline))}
@@ -337,130 +572,150 @@ export function PublicGrandSlamOfferBlock({
             </p>
           ) : null}
 
-          {asString(block.offer_intro) ? (
+          {offerIntroText ? (
             <p className="max-w-3xl text-[15px] leading-relaxed text-slate-700">
-              {asString(block.offer_intro)}
+              {offerIntroText}
             </p>
           ) : null}
 
-          <ValueStackSummary items={valueStackItems} />
-
           {media ? (
-            <div className={hideDesktopMedia ? "overflow-hidden lg:hidden" : "overflow-hidden"}>
+            <div
+              className={hideDesktopMedia ? "overflow-hidden lg:hidden" : "overflow-hidden"}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={media.src}
                 alt={media.alt}
                 loading="lazy"
-                className="h-56 w-full object-cover"
+                className="h-56 w-full rounded-[1.75rem] object-cover md:h-72"
               />
             </div>
           ) : null}
 
-          {includedItems.length > 0 ? (
-            <div className="space-y-5">
-              {includedItems.map((item, index) => (
-                <article
-                  key={`${item.name || item.valueText}-${index}`}
-                  className="space-y-2"
-                >
-                  <div>
-                    {item.name ? (
-                      <h4 className="text-base font-bold leading-snug text-slate-950">
-                        {item.name}
-                      </h4>
-                    ) : null}
-                    {item.description ? (
-                      <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
-                        {item.description}
-                      </p>
-                    ) : null}
-                  </div>
-                  {item.valueText ? (
-                    <p
-                      className="text-xs font-black uppercase tracking-[0.18em]"
-                      style={{ color: "var(--lf-grand-primary)" }}
-                    >
-                      {item.valueText}
-                    </p>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : null}
-
-          {bonusItems.length > 0 ? (
+          {editorialItems.length > 0 ? (
             <div className="space-y-4">
-              {bonusItems.map((item, index) => (
-                <article key={`${item.name}-${index}`} className="space-y-2">
-                  {item.name ? (
-                    <p
-                      className="text-xs font-black uppercase tracking-[0.18em]"
-                      style={{ color: "var(--lf-grand-primary)" }}
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-500">
+                  Lo que incluye esta oferta
+                </p>
+                <p className="hidden text-xs font-black uppercase tracking-[0.24em] text-slate-400 md:block">
+                  Valor desbloqueado hoy
+                </p>
+              </div>
+
+              <div className="divide-y divide-slate-200/80">
+                {editorialItems.map((item, index) => {
+                  const itemTitle = item.name || item.description;
+                  const itemDescription =
+                    item.name && item.description && item.description !== item.name
+                      ? item.description
+                      : undefined;
+                  const itemValue = getDisplayValueText(item.valueText);
+
+                  if (!itemTitle) {
+                    return null;
+                  }
+
+                  return (
+                    <article
+                      key={`${item.kind}-${itemTitle}-${index}`}
+                      className="flex flex-col gap-5 py-5 md:flex-row md:items-start md:justify-between md:gap-8"
                     >
-                      {item.name}
-                    </p>
-                  ) : null}
-                  {item.description ? (
-                    <p className="text-[15px] leading-relaxed text-slate-600">
-                      {item.description}
-                    </p>
-                  ) : null}
-                </article>
-              ))}
+                      <div className="flex min-w-0 gap-4">
+                        <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_10px_24px_rgba(5,150,105,0.18)]">
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 16 16"
+                            className="h-4 w-4"
+                            fill="none"
+                          >
+                            <path
+                              d="M4 8.2L6.7 11l5.3-6"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </span>
+
+                        <div className="min-w-0">
+                          <h4 className="text-lg font-black leading-tight text-slate-950">
+                            {itemTitle}
+                          </h4>
+                          {itemDescription ? (
+                            <p className="mt-2 max-w-2xl text-[15px] leading-7 text-slate-600">
+                              {itemDescription}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 md:min-w-[10rem] md:pt-1 md:text-right">
+                        {itemValue ? (
+                          <p className="text-base font-semibold tracking-tight text-slate-500 line-through decoration-2 decoration-slate-500/90">
+                            {itemValue}
+                          </p>
+                        ) : null}
+                        <p className="text-sm font-black uppercase tracking-[0.2em] text-red-500">
+                          Gratis
+                        </p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
 
-          <div className="space-y-2">
-            <p
-              className="text-xs font-black uppercase tracking-[0.22em]"
-              style={{ color: "var(--lf-grand-primary)" }}
-            >
-              Resumen de la oferta
-            </p>
-            {anchorPriceText ? (
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 line-through">
-                {anchorPriceText}
-              </p>
-            ) : null}
-            {finalPriceText ? (
-              <p className="text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
-                {finalPriceText}
-              </p>
-            ) : null}
-            {savingsText ? (
-              <p className="text-[15px] font-semibold text-slate-700">
-                {savingsText}
-              </p>
-            ) : null}
-            {asString(block.payment_terms_text) ? (
-              <p className="text-[15px] leading-relaxed text-slate-700">
-                {asString(block.payment_terms_text)}
-              </p>
-            ) : null}
-            {asString(block.offer_reason_why) ? (
-              <p className="text-sm leading-6 text-slate-500">
-                {asString(block.offer_reason_why)}
-              </p>
-            ) : null}
-          </div>
+          <div className="border-t border-slate-200/80 pt-7">
+            <div className="flex flex-col items-center gap-6 text-center">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-500">
+                  Resumen de la oferta
+                </p>
+                {anchorValueText ? (
+                  <p className="text-lg font-medium text-slate-500">
+                    {anchorValueText}
+                  </p>
+                ) : null}
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-400">
+                  Precio final
+                </p>
+                <p className="max-w-none whitespace-normal text-4xl font-black leading-tight tracking-tighter text-red-600 [overflow-wrap:normal] [word-break:normal] md:text-6xl">
+                  {finalPriceDisplay}
+                </p>
+              </div>
 
-          <div className="space-y-3 pt-1">
-            <button
-              type="button"
-              onClick={() => setIsDrawerOpen(true)}
-              className={cx(
-                buildCtaClassName("primary"),
-                "w-full bg-amber-500 text-black hover:bg-amber-400 focus-visible:outline-amber-400 sm:w-auto",
-              )}
-            >
-              {ctaLabel}
-            </button>
-
-            <p className="text-sm leading-6 text-slate-500">
-              El CTA abre el formulario de pedido dentro del runtime público
-              para mantener la continuidad del funnel.
-            </p>
+              <div className="w-full max-w-md">
+                {ctaAction === "open_lead_capture_modal" && modalConfig ? (
+                  <LeadCaptureModal
+                    publicationId={runtime.publication.id}
+                    currentStepId={runtime.currentStep.id}
+                    triggerLabel={ctaLabel}
+                    triggerClassName={cx(
+                      jakawiPremiumClassNames.primaryButton,
+                      "w-full py-5 text-base text-white shadow-lg shadow-orange-200 [animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none",
+                    )}
+                    triggerAction={ctaAction}
+                    modalConfig={modalConfig}
+                    sourceChannel={normalizedOrderBlock.settings.sourceChannel}
+                    tags={normalizedOrderBlock.settings.tags}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsDrawerOpen(true)}
+                    className={cx(
+                      jakawiPremiumClassNames.primaryButton,
+                      "w-full py-5 text-base text-white shadow-lg shadow-orange-200 [animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none",
+                    )}
+                  >
+                    {ctaLabel}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -503,6 +758,18 @@ export function PublicGrandSlamOfferBlock({
           </div>
         </div>
       ) : null}
+
+      <style>{`
+        @keyframes lf-cta-pulse-scale {
+          0%,
+          100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.018);
+          }
+        }
+      `}</style>
     </>
   );
 }

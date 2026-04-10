@@ -19,15 +19,20 @@ export const authenticatedOperationRequest = async <T>(
   init: RequestInit,
 ): Promise<T> => {
   let response: Response;
+  const headers = new Headers(init.headers ?? {});
+  const hasBody = init.body !== undefined && init.body !== null;
+  const isFormDataRequest =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+
+  if (hasBody && !isFormDataRequest && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   try {
     response = await fetch(`${webPublicConfig.urls.api}/v1${path}`, {
       ...init,
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
+      headers,
     });
   } catch (error) {
     throw new Error(

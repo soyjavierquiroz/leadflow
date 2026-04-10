@@ -1,8 +1,7 @@
 "use client";
 
-import { type ChangeEvent, useMemo, useRef, useState, useTransition } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Check, FileJson, Save, Sparkles } from "lucide-react";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import {
@@ -13,8 +12,15 @@ import {
   toMediaRows,
 } from "@/components/team-operations/hybrid-json-media-editor";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
+import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
-import type { JsonValue, SystemTenantDetailRecord, SystemTenantFunnelRecord } from "@/lib/system-tenants";
+import type {
+  JsonValue,
+  SystemTenantDetailRecord,
+  SystemTenantFunnelDetailRecord,
+  SystemTenantFunnelStepMutationResponse,
+  SystemTenantFunnelStepRecord,
+} from "@/lib/system-tenants";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 const primaryButtonClassName =
@@ -26,38 +32,173 @@ const secondaryButtonClassName =
 const sectionClassName =
   "rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6";
 
-const isRecord = (value: JsonValue | undefined): value is Record<string, JsonValue> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+const editorStepDefinitions = [
+  {
+    key: "captura",
+    label: "Paso 1: Landing (Captura)",
+  },
+  {
+    key: "confirmado",
+    label: "Paso 2: Handoff (Confirmación)",
+  },
+] as const;
+
+type EditorStepTabKey = (typeof editorStepDefinitions)[number]["key"];
+
+type StepDraft = {
+  blocksText: string;
+  mediaRows: MediaRow[];
+  settingsJson: JsonValue;
+};
+
+const createEmptyStepDraft = (): StepDraft => ({
+  blocksText: defaultBlocksSeed,
+  mediaRows: toMediaRows(undefined),
+  settingsJson: {},
+});
+
+const toBlocksText = (value: JsonValue) =>
+  Array.isArray(value) ? JSON.stringify(value, null, 2) : defaultBlocksSeed;
+
+const buildStepDraft = (step: SystemTenantFunnelStepRecord): StepDraft => ({
+  blocksText: toBlocksText(step.blocksJson),
+  mediaRows: toMediaRows(step.mediaMap),
+  settingsJson: step.settingsJson,
+});
+
+const buildStepDraftMap = (steps: SystemTenantFunnelStepRecord[]) =>
+  Object.fromEntries(steps.map((step) => [step.id, buildStepDraft(step)]));
+
+const normalizeStepRecords = (value: unknown): SystemTenantFunnelStepRecord[] =>
+  Array.isArray(value) ? (value as SystemTenantFunnelStepRecord[]) : [];
+
+const pickPrimaryCaptureStep = (steps: SystemTenantFunnelStepRecord[]) =>
+  steps.find((step) => step.slug === "captura") ??
+  steps.find((step) => step.isEntryStep) ??
+  steps.find((step) => ["landing", "lead_capture"].includes(step.stepType)) ??
+  steps[0] ??
+  null;
+
+const pickPrimaryConfirmStep = (
+  steps: SystemTenantFunnelStepRecord[],
+  captureStepId: string | null,
+) =>
+  steps.find((step) => step.slug === "confirmado") ??
+  steps.find(
+    (step) =>
+      step.id !== captureStepId &&
+      ["handoff", "confirmation", "thank_you", "redirect"].includes(step.stepType),
+  ) ??
+  steps.find((step) => step.id !== captureStepId) ??
+  null;
 
 type SystemTenantTemplateFunnelEditorProps = {
   tenant: SystemTenantDetailRecord;
-  funnel: SystemTenantFunnelRecord;
+  funnel: SystemTenantFunnelDetailRecord;
 };
 
 export function SystemTenantTemplateFunnelEditor({
   tenant,
   funnel,
 }: SystemTenantTemplateFunnelEditorProps) {
-  const router = useRouter();
+  const normalizedSteps = useMemo(
+    () => normalizeStepRecords((funnel as { steps?: unknown }).steps),
+    [funnel],
+  );
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadingRowIndex, setUploadingRowIndex] = useState<number | null>(null);
   const [name, setName] = useState(funnel.name);
   const [description, setDescription] = useState(funnel.description ?? "");
-  const [blocksText, setBlocksText] = useState(() => {
-    const config = isRecord(funnel.config) ? funnel.config : null;
-    const blocks = config?.blocks;
-    return Array.isArray(blocks)
-      ? JSON.stringify(blocks, null, 2)
-      : defaultBlocksSeed;
-  });
-  const [mediaRows, setMediaRows] = useState<MediaRow[]>(() => {
-    const config = isRecord(funnel.config) ? funnel.config : null;
-    return toMediaRows(config?.mediaMap);
+  const [stepRecords, setStepRecords] = useState<SystemTenantFunnelStepRecord[]>(
+    normalizedSteps,
+  );
+  const [stepDrafts, setStepDrafts] = useState<Record<string, StepDraft>>(
+    () => buildStepDraftMap(normalizedSteps),
+  );
+  const [fallbackDrafts, setFallbackDrafts] = useState<
+    Record<EditorStepTabKey, StepDraft>
+  >({
+    captura: createEmptyStepDraft(),
+    confirmado: createEmptyStepDraft(),
   });
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setStepRecords(normalizedSteps);
+    setStepDrafts(buildStepDraftMap(normalizedSteps));
+    setName(funnel.name);
+    setDescription(funnel.description ?? "");
+  }, [funnel, normalizedSteps]);
+
+  useEffect(() => {
+    if (normalizedSteps.length === 0) {
+      console.warn(
+        "[SystemTenantTemplateFunnelEditor] Funnel detail arrived without step records; rendering step switcher in fallback mode.",
+        {
+          funnelId: funnel.id,
+          teamId: tenant.id,
+        },
+      );
+    }
+  }, [funnel.id, normalizedSteps.length, tenant.id]);
+
+  const captureStep = useMemo(
+    () => pickPrimaryCaptureStep(stepRecords),
+    [stepRecords],
+  );
+  const confirmStep = useMemo(
+    () => pickPrimaryConfirmStep(stepRecords, captureStep?.id ?? null),
+    [stepRecords, captureStep?.id],
+  );
+  const stepTabs = useMemo(
+    () =>
+      editorStepDefinitions.map((definition) => ({
+        ...definition,
+        step:
+          definition.key === "captura"
+            ? captureStep
+            : confirmStep,
+      })),
+    [captureStep, confirmStep],
+  );
+  const [activeStepTab, setActiveStepTab] = useState<EditorStepTabKey>("captura");
+
+  useEffect(() => {
+    if (!editorStepDefinitions.some((step) => step.key === activeStepTab)) {
+      setActiveStepTab("captura");
+    }
+  }, [activeStepTab]);
+
+  const activeStep = stepTabs.find((tab) => tab.key === activeStepTab)?.step ?? null;
+  const activeDraft = activeStep
+    ? stepDrafts[activeStep.id] ?? buildStepDraft(activeStep)
+    : fallbackDrafts[activeStepTab] ?? createEmptyStepDraft();
+  const blocksText = activeDraft.blocksText;
+  const mediaRows = activeDraft.mediaRows;
+
+  const updateActiveStepDraft = (patch: Partial<StepDraft>) => {
+    if (activeStep) {
+      setStepDrafts((current) => ({
+        ...current,
+        [activeStep.id]: {
+          ...(current[activeStep.id] ?? buildStepDraft(activeStep)),
+          ...patch,
+        },
+      }));
+      return;
+    }
+
+    setFallbackDrafts((current) => ({
+      ...current,
+      [activeStepTab]: {
+        ...(current[activeStepTab] ?? createEmptyStepDraft()),
+        ...patch,
+      },
+    }));
+  };
 
   const parsedBlocks = useMemo(() => {
     try {
@@ -117,11 +258,12 @@ export function SystemTenantTemplateFunnelEditor({
     uploadingRowIndex !== null ||
     !name.trim() ||
     Boolean(parsedBlocks.error) ||
-    Boolean(mediaValidation);
+    Boolean(mediaValidation) ||
+    !activeStep;
 
   const handleMediaRowChange = (index: number, patch: Partial<MediaRow>) => {
-    setMediaRows((current) =>
-      current.map((row, rowIndex) =>
+    updateActiveStepDraft({
+      mediaRows: mediaRows.map((row, rowIndex) =>
         rowIndex === index
           ? {
               ...row,
@@ -129,11 +271,13 @@ export function SystemTenantTemplateFunnelEditor({
             }
           : row,
       ),
-    );
+    });
   };
 
   const handleAddMediaRow = (key = "") => {
-    setMediaRows((current) => [...current, { key, value: "" }]);
+    updateActiveStepDraft({
+      mediaRows: [...mediaRows, { key, value: "" }],
+    });
   };
 
   const handleUploadMediaClick = (index: number) => {
@@ -164,9 +308,14 @@ export function SystemTenantTemplateFunnelEditor({
     setUploadingRowIndex(targetIndex);
 
     try {
-      const publicUrl = await uploadFileWithPresignedUrl(file, "funnels", {
-        teamId: tenant.id,
-      });
+      const optimizedFile = await optimizeFunnelAssetImage(file);
+      const publicUrl = await uploadFileWithPresignedUrl(
+        optimizedFile,
+        "funnels",
+        {
+          teamId: tenant.id,
+        },
+      );
       handleMediaRowChange(targetIndex, { value: publicUrl });
       setSuccessMessage(`Imagen subida al CDN para ${rowKey}.`);
     } catch (error) {
@@ -180,7 +329,7 @@ export function SystemTenantTemplateFunnelEditor({
   };
 
   const handleSave = () => {
-    if (!parsedBlocks.value) {
+    if (!parsedBlocks.value || !activeStep) {
       return;
     }
 
@@ -189,27 +338,35 @@ export function SystemTenantTemplateFunnelEditor({
 
     startTransition(async () => {
       try {
-        const currentConfig = isRecord(funnel.config) ? funnel.config : {};
         const payload = {
           name: name.trim(),
           description: description.trim() || null,
-          config: {
-            ...currentConfig,
-            blocks: parsedBlocks.value,
-            mediaMap,
-          },
+          blocksJson: parsedBlocks.value,
+          mediaMap,
+          settingsJson: activeDraft?.settingsJson ?? activeStep.settingsJson,
         };
 
-        await authenticatedOperationRequest<SystemTenantFunnelRecord>(
-          `/system/tenants/${encodeURIComponent(tenant.id)}/funnels/${encodeURIComponent(funnel.id)}`,
-          {
-            method: "PATCH",
-            body: JSON.stringify(payload),
-          },
-        );
+        const response =
+          await authenticatedOperationRequest<SystemTenantFunnelStepMutationResponse>(
+            `/system/tenants/${encodeURIComponent(tenant.id)}/funnels/${encodeURIComponent(funnel.id)}/steps/${encodeURIComponent(activeStep.id)}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify(payload),
+            },
+          );
 
-        setSuccessMessage("Funnel del tenant actualizado.");
-        router.refresh();
+        setName(response.funnel.name);
+        setDescription(response.funnel.description ?? "");
+        setStepRecords((current) =>
+          current.map((step) => (step.id === response.step.id ? response.step : step)),
+        );
+        setStepDrafts((current) => ({
+          ...current,
+          [response.step.id]: buildStepDraft(response.step),
+        }));
+        setSuccessMessage(
+          `${stepTabs.find((tab) => tab.key === activeStepTab)?.label ?? "Paso"} actualizado correctamente.`,
+        );
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "No pudimos guardar el funnel del tenant.",
@@ -218,12 +375,15 @@ export function SystemTenantTemplateFunnelEditor({
     });
   };
 
+  const activeStepLabel =
+    stepTabs.find((tab) => tab.key === activeStepTab)?.label ?? "Paso activo";
+
   return (
     <div className="space-y-6">
       <SectionHeader
         eyebrow={`Super Admin / Tenant / ${tenant.code} / Template Funnel`}
-        title={`Editor de ${funnel.name}`}
-        description="Este funnel nació desde el Template Engine global y se edita con el mismo núcleo JSON/media del builder híbrido."
+        title={`Editor de ${name || funnel.name}`}
+        description="Este funnel nació desde el Template Engine global y ahora separa edición por paso entre captura y confirmación."
         actions={
           <>
             <Link
@@ -239,7 +399,7 @@ export function SystemTenantTemplateFunnelEditor({
               className={primaryButtonClassName}
             >
               <Save className="h-4 w-4" />
-              Guardar cambios
+              Guardar embudo
             </button>
           </>
         }
@@ -290,10 +450,10 @@ export function SystemTenantTemplateFunnelEditor({
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Código interno
+                Paso activo
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-950">
-                {funnel.code}
+                {activeStep ? activeStepLabel : "Sin paso disponible"}
               </p>
             </div>
           </div>
@@ -339,9 +499,10 @@ export function SystemTenantTemplateFunnelEditor({
       </details>
 
       <HybridJsonMediaEditor
+        key={activeStep?.id ?? activeStepTab}
         blocksText={blocksText}
         previewHref="/admin/preview"
-        onBlocksTextChange={setBlocksText}
+        onBlocksTextChange={(value) => updateActiveStepDraft({ blocksText: value })}
         parsedBlocksError={parsedBlocks.error}
         parsedBlocksCount={parsedBlocks.value?.length ?? 0}
         mediaRows={mediaRows}
@@ -356,10 +517,29 @@ export function SystemTenantTemplateFunnelEditor({
         onAddMediaRow={handleAddMediaRow}
         onUploadMediaClick={handleUploadMediaClick}
         onRemoveMediaRow={(index) =>
-          setMediaRows((current) =>
-            current.filter((_, rowIndex) => rowIndex !== index),
-          )
+          updateActiveStepDraft({
+            mediaRows: mediaRows.filter((_, rowIndex) => rowIndex !== index),
+          })
         }
+        stepSwitcher={{
+          activeKey: activeStepTab,
+          badge: activeStep?.slug ?? activeStepTab,
+          disabled: isPending || uploadingRowIndex !== null,
+          helperText:
+            "Cada pestaña carga y guarda el JSON del FunnelStep activo.",
+          tabs: stepTabs.map((tab) => ({
+            key: tab.key,
+            label: tab.label,
+          })),
+          warningText: !activeStep
+            ? "El backend todavía no expone los FunnelStep detallados en esta vista. El switcher queda visible en modo fallback y el guardado seguirá bloqueado hasta recibir el step activo."
+            : null,
+          onChange: (key) => {
+            setErrorMessage(null);
+            setSuccessMessage(null);
+            setActiveStepTab(key as EditorStepTabKey);
+          },
+        }}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { SystemTenantTemplateFunnelEditor } from "@/components/system/system-tenant-template-funnel-editor";
-import { getSystemTenant, getSystemTenantFunnels } from "@/lib/system-tenants";
+import { getSystemTenant, getSystemTenantFunnel } from "@/lib/system-tenants";
 
 export const dynamic = "force-dynamic";
 
@@ -15,16 +15,14 @@ export default async function AdminTenantTemplateFunnelEditPage({
   params,
 }: AdminTenantTemplateFunnelEditPageProps) {
   const { teamId, funnelId } = await params;
-  const [tenant, funnels] = await Promise.all([
+  const [tenant, funnel] = await Promise.all([
     getSystemTenant(teamId),
-    getSystemTenantFunnels(teamId),
+    getSystemTenantFunnel(teamId, funnelId),
   ]);
 
   if (!tenant) {
     notFound();
   }
-
-  const funnel = funnels.find((item) => item.id === funnelId) ?? null;
 
   if (!funnel) {
     notFound();

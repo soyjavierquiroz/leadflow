@@ -1,24 +1,19 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
+import {
+  jakawiPremiumClassNames,
+  jakawiPremiumSurfaceToneClasses,
+} from "@/styles/templates/jakawi-premium";
+
 type SurfaceTone = "brand" | "neutral" | "warm" | "success";
 type SurfaceVariant = "default" | "flat";
-
-const surfaceToneClasses: Record<SurfaceTone, string> = {
-  brand:
-    "border-white/15 bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.22),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(250,204,21,0.16),_transparent_28%),linear-gradient(135deg,_rgba(2,6,23,0.98)_0%,_rgba(15,23,42,0.95)_52%,_rgba(30,41,59,0.98)_100%)] text-white shadow-[0_34px_110px_rgba(15,23,42,0.28)]",
-  neutral:
-    "border-slate-200/80 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98)_0%,_rgba(248,250,252,0.96)_100%)] text-slate-950 shadow-[0_22px_70px_rgba(15,23,42,0.08)]",
-  warm:
-    "border-amber-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_32%),linear-gradient(180deg,_rgba(255,251,235,0.98)_0%,_rgba(255,255,255,0.96)_100%)] text-slate-950 shadow-[0_22px_70px_rgba(217,119,6,0.12)]",
-  success:
-    "border-emerald-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_32%),linear-gradient(180deg,_rgba(236,253,245,0.98)_0%,_rgba(255,255,255,0.96)_100%)] text-slate-950 shadow-[0_22px_70px_rgba(5,150,105,0.12)]",
-};
 
 export const cx = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
 
-export const flatBlockTitleClassName =
-  "text-left font-extrabold text-4xl uppercase tracking-tighter text-slate-950 lg:text-5xl";
+const surfaceToneClasses: Record<SurfaceTone, string> = jakawiPremiumSurfaceToneClasses;
+
+export const flatBlockTitleClassName = jakawiPremiumClassNames.title;
 
 export function PublicSectionSurface({
   children,
@@ -277,9 +272,6 @@ export function PublicQuoteCard({
 }
 
 export const buildCtaClassName = (variant: "primary" | "secondary" = "primary") =>
-  cx(
-    "inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
-    variant === "primary"
-      ? "bg-slate-950 text-white hover:bg-slate-800 focus-visible:outline-slate-900"
-      : "border border-slate-300 bg-white text-slate-900 hover:bg-slate-100 focus-visible:outline-slate-400",
-  );
+  variant === "primary"
+    ? jakawiPremiumClassNames.primaryButton
+    : jakawiPremiumClassNames.secondaryButton;

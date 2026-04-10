@@ -16,6 +16,7 @@ import {
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-runtime-lead-submit-provider";
+import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 import {
   getOrCreateAnonymousId,
   readSubmissionContext,
@@ -343,12 +344,12 @@ export function PublicCaptureForm({
             <PublicPill tone="success">
               {variant === "compact_capture"
                 ? "Captura compacta"
-                : "Bloque real del runtime"}
+                : "Captura conectada al runtime"}
             </PublicPill>
             <PublicPill>
               {variant === "compact_capture"
                 ? "Preset opportunity"
-                : "Submit estándar Leadflow"}
+                : "Submit declarativo"}
             </PublicPill>
           </div>
 
@@ -367,9 +368,9 @@ export function PublicCaptureForm({
           ) : (
             <div className="mt-7 grid gap-3">
               {[
-                "Visitor, lead, assignment y nextStep siguen resolviéndose con el motor estándar.",
-                "El bloque captura contexto de URL y valores declarativos sin abrir lógica custom por JSON.",
-                "El reveal y handoff posterior mantienen la misma continuidad del runtime público.",
+                "El submit sigue usando el motor estándar del runtime.",
+                "El bloque absorbe contexto de URL y valores declarativos sin lógica hardcodeada por funnel.",
+                "El reveal y el handoff posterior conservan la continuidad definida en el JSON.",
               ].map((item) => (
                 <PublicChecklistItem key={item} accent="success">
                   {item}
@@ -394,8 +395,7 @@ export function PublicCaptureForm({
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visibleFields.map((field) => {
-              const sharedClassName =
-                "rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100";
+              const sharedClassName = jakawiPremiumClassNames.input;
 
               return (
                 <label

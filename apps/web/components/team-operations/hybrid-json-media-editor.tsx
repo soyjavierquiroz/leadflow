@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, type ChangeEvent, type RefObject } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type RefObject,
+} from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import Link from "next/link";
@@ -16,6 +22,11 @@ import {
   buildMediaMap,
   writeHybridJsonPreviewDraft,
 } from "@/components/team-operations/hybrid-json-preview-state";
+import {
+  defaultBuilderBlockDefinitions,
+  type BuilderBlockDefinition,
+} from "@/lib/blocks/registry";
+import { FUNNEL_ASSET_IMAGE_ACCEPT } from "@/lib/media-optimizer";
 
 const sectionClassName =
   "rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6";
@@ -58,7 +69,8 @@ export const defaultBlocksSeed = JSON.stringify(
       how_it_works_steps: [
         {
           step_title: "define",
-          step_text: "Marca contornos de mejilla, cuello y patillas con máxima visibilidad.",
+          step_text:
+            "Marca contornos de mejilla, cuello y patillas con máxima visibilidad.",
         },
         {
           step_title: "rebaja",
@@ -84,7 +96,8 @@ export const defaultBlocksSeed = JSON.stringify(
       what_is_included: [
         {
           item_name: "rasuradora dragon t9",
-          item_description: "La herramienta principal para perfilar y detallar.",
+          item_description:
+            "La herramienta principal para perfilar y detallar.",
           item_value_text: "valor percibido Bs.150",
         },
       ],
@@ -113,7 +126,8 @@ const defaultMediaRows = requiredMediaKeys.map((key) => ({
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-export const isAbsoluteHttpUrl = (value: string) => /^https?:\/\//i.test(value.trim());
+export const isAbsoluteHttpUrl = (value: string) =>
+  /^https?:\/\//i.test(value.trim());
 
 export const toMediaRows = (value: unknown) => {
   const rows = isRecord(value)
@@ -143,12 +157,27 @@ type HybridJsonMediaEditorProps = {
   mediaMapKeys: string[];
   uploadingRowIndex: number | null;
   mediaUploadInputRef: RefObject<HTMLInputElement | null>;
-  onMediaUploadChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void> | void;
+  onMediaUploadChange: (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => Promise<void> | void;
   onMediaRowChange: (index: number, patch: Partial<MediaRow>) => void;
   onAddMediaRow: (key?: string) => void;
   onUploadMediaClick: (index: number) => void;
   onRemoveMediaRow: (index: number) => void;
   previewHref?: string | null;
+  availableBlocks?: BuilderBlockDefinition[];
+  stepSwitcher?: {
+    activeKey: string;
+    badge?: string | null;
+    disabled?: boolean;
+    helperText?: string | null;
+    tabs: Array<{
+      key: string;
+      label: string;
+    }>;
+    warningText?: string | null;
+    onChange: (key: string) => void;
+  } | null;
 };
 
 export function HybridJsonMediaEditor({
@@ -167,7 +196,27 @@ export function HybridJsonMediaEditor({
   onUploadMediaClick,
   onRemoveMediaRow,
   previewHref = null,
+  availableBlocks = defaultBuilderBlockDefinitions,
+  stepSwitcher = null,
 }: HybridJsonMediaEditorProps) {
+  const catalogBlocks = useMemo(() => {
+    const merged = new Map<string, BuilderBlockDefinition>();
+
+    for (const definition of defaultBuilderBlockDefinitions) {
+      merged.set(definition.key, definition);
+    }
+
+    for (const definition of availableBlocks) {
+      merged.set(definition.key, definition);
+    }
+
+    return Array.from(merged.values());
+  }, [availableBlocks]);
+
+  const [selectedBlockKey, setSelectedBlockKey] = useState(
+    catalogBlocks[0]?.key ?? "",
+  );
+
   useEffect(() => {
     writeHybridJsonPreviewDraft({
       blocks: blocksText,
@@ -175,12 +224,49 @@ export function HybridJsonMediaEditor({
     });
   }, [blocksText, mediaRows]);
 
+  useEffect(() => {
+    if (catalogBlocks.length === 0) {
+      if (selectedBlockKey) {
+        setSelectedBlockKey("");
+      }
+      return;
+    }
+
+    const hasCurrentSelection = catalogBlocks.some(
+      (definition) => definition.key === selectedBlockKey,
+    );
+
+    if (!hasCurrentSelection) {
+      setSelectedBlockKey(catalogBlocks[0]?.key ?? "");
+    }
+  }, [catalogBlocks, selectedBlockKey]);
+
+  const handleInsertBlockExample = (definition: BuilderBlockDefinition) => {
+    const nextArray = (() => {
+      try {
+        const parsed = JSON.parse(blocksText) as unknown;
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })();
+
+    onBlocksTextChange(
+      JSON.stringify([...nextArray, definition.example], null, 2),
+    );
+  };
+
+  const selectedBlockDefinition =
+    catalogBlocks.find((definition) => definition.key === selectedBlockKey) ??
+    catalogBlocks[0] ??
+    null;
+
   return (
     <>
       <input
         ref={mediaUploadInputRef}
         type="file"
-        accept="image/*"
+        accept={FUNNEL_ASSET_IMAGE_ACCEPT}
         className="hidden"
         onChange={(event) => void onMediaUploadChange(event)}
       />
@@ -223,9 +309,9 @@ export function HybridJsonMediaEditor({
                 públicas.
               </p>
               <p>
-                Para VSL híbrido recomendamos arrancar con{" "}
-                <code>hero</code>, <code>product_box</code>,{" "}
-                <code>gallery_1</code> y <code>seo_cover</code>.
+                Para VSL híbrido recomendamos arrancar con <code>hero</code>,{" "}
+                <code>product_box</code>, <code>gallery_1</code> y{" "}
+                <code>seo_cover</code>.
               </p>
             </div>
           </article>
@@ -239,14 +325,64 @@ export function HybridJsonMediaEditor({
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
                 Bloques
               </p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-                JSON engine del funnel
-              </h2>
+              {stepSwitcher ? (
+                <div className="mt-2 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-2">
+                      {stepSwitcher.tabs.map((tab) => {
+                        const isActive = tab.key === stepSwitcher.activeKey;
+
+                        return (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            disabled={stepSwitcher.disabled}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              stepSwitcher.onChange(tab.key);
+                            }}
+                            className={
+                              isActive
+                                ? "inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+                                : "inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            }
+                          >
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {stepSwitcher.badge ? (
+                      <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 ring-1 ring-slate-200">
+                        {stepSwitcher.badge}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {stepSwitcher.helperText ? (
+                    <p className="text-sm text-slate-600">
+                      {stepSwitcher.helperText}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  JSON engine del funnel
+                </h2>
+              )}
             </div>
             <ChevronDown className="h-5 w-5 text-slate-400" />
           </summary>
 
           <div className="mt-6 space-y-4">
+            {stepSwitcher?.warningText ? (
+              <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                {stepSwitcher.warningText}
+              </p>
+            ) : null}
+
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700">
@@ -254,7 +390,8 @@ export function HybridJsonMediaEditor({
                   CodeMirror JSON
                 </span>
                 <span className="text-xs leading-5 text-slate-500">
-                  El guardado solo se habilita si el contenido es un JSON Array válido.
+                  El guardado solo se habilita si el contenido es un JSON Array
+                  válido.
                 </span>
               </div>
 
@@ -296,6 +433,83 @@ export function HybridJsonMediaEditor({
                 <code>blocksJson</code>.
               </p>
             )}
+
+            {selectedBlockDefinition ? (
+              <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      Catálogo / {selectedBlockDefinition.category}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                      {selectedBlockDefinition.name}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {catalogBlocks.length} bloque
+                      {catalogBlocks.length === 1 ? "" : "s"} disponible
+                      {catalogBlocks.length === 1 ? "" : "s"} en el arsenal
+                      JSON.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleInsertBlockExample(selectedBlockDefinition)
+                    }
+                    className={secondaryButtonClassName}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Insertar bloque
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,20rem)_1fr] lg:items-start">
+                  <label className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      Selector de bloque
+                    </span>
+                    <select
+                      value={selectedBlockDefinition.key}
+                      onChange={(event) => setSelectedBlockKey(event.target.value)}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-slate-400"
+                    >
+                      {catalogBlocks.map((definition) => (
+                        <option key={definition.key} value={definition.key}>
+                          {definition.name} ({definition.key})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-600">
+                    <p>{selectedBlockDefinition.description}</p>
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Clave runtime: {selectedBlockDefinition.key}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      Schema
+                    </p>
+                    <pre className="mt-2 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100">
+                      {JSON.stringify(selectedBlockDefinition.schema, null, 2)}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      Ejemplo
+                    </p>
+                    <pre className="mt-2 overflow-x-auto rounded-2xl bg-white p-4 text-xs leading-6 text-slate-700 ring-1 ring-slate-200">
+                      {JSON.stringify(selectedBlockDefinition.example, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </article>
+            ) : null}
           </div>
         </details>
 
@@ -361,7 +575,9 @@ export function HybridJsonMediaEditor({
                         <input
                           value={row.value}
                           onChange={(event) =>
-                            onMediaRowChange(index, { value: event.target.value })
+                            onMediaRowChange(index, {
+                              value: event.target.value,
+                            })
                           }
                           placeholder="https://cdn.kuruk.in/funnels/..."
                           disabled={uploadingRowIndex !== null}
@@ -414,8 +630,9 @@ export function HybridJsonMediaEditor({
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-xs leading-6 text-slate-500">
-                El media dictionary acepta URLs absolutas del CDN de Leadflow/MinIO y
-                mantiene compatibilidad con <code>leadflow-media-resolver.ts</code>.
+                El media dictionary acepta URLs absolutas del CDN de
+                Leadflow/MinIO y mantiene compatibilidad con{" "}
+                <code>leadflow-media-resolver.ts</code>.
               </div>
               <button
                 type="button"

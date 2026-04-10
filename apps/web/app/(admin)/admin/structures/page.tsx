@@ -1,15 +1,15 @@
 import { SectionHeader } from "@/components/app-shell/section-header";
-import { StickySplitStructure } from "@/components/structures/StickySplitStructure";
+import { SplitMediaFocusLayout } from "@/components/structures/SplitMediaFocusLayout";
 import { AVAILABLE_STRUCTURES } from "@/lib/structure-registry";
 
 function StickySplitPreview() {
   return (
-    <StickySplitStructure
+    <SplitMediaFocusLayout
       className="min-h-[18rem]"
-      mediaClassName="bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.22),_transparent_42%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)]"
-      blocksClassName="min-h-[18rem] px-4 pb-4 pt-3 lg:px-6 lg:pb-6 lg:pt-3"
-      blocksInnerClassName="max-w-none space-y-4"
-      media={
+      mediaPanelClassName="lg:h-[18rem]"
+      contentPanelClassName="min-h-[18rem] px-4 pb-4 pt-3 lg:px-6 lg:pb-6 lg:pt-3"
+      contentInnerClassName="max-w-none space-y-4"
+      mediaSlot={
         <div className="flex h-full flex-col justify-between p-5 text-white lg:p-6">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-teal-200">
@@ -25,7 +25,7 @@ function StickySplitPreview() {
           </div>
         </div>
       }
-      blocks={
+      contentSlot={
         <>
           <div className="space-y-2 rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
             <div className="h-2 w-20 rounded-full bg-teal-500/30" />
@@ -52,6 +52,7 @@ function StructureCard({
   name,
   description,
   thumbnailPath,
+  componentImportPath,
 }: (typeof AVAILABLE_STRUCTURES)[number]) {
   return (
     <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
@@ -65,7 +66,11 @@ function StructureCard({
           </span>
         </div>
         <div className="mt-3 overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white">
-          {id === "sticky-split" ? <StickySplitPreview /> : <div className="min-h-[18rem]" />}
+          {id === "split-media-focus" ? (
+            <StickySplitPreview />
+          ) : (
+            <div className="min-h-[18rem]" />
+          )}
         </div>
       </div>
 
@@ -75,6 +80,9 @@ function StructureCard({
             {name}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            {componentImportPath}
+          </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">

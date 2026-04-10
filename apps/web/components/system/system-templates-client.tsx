@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/app-shell/status-badge";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
+import { AVAILABLE_TEMPLATE_STYLES } from "@/lib/template-registry";
 import type {
   SystemTemplateDeploymentResponse,
   SystemTemplateRecord,
@@ -43,6 +44,18 @@ const sortRows = (rows: SystemTemplateRecord[]) =>
       new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
   );
 
+const officialTemplateIds = new Set(
+  AVAILABLE_TEMPLATE_STYLES.map((template) => template.id),
+);
+const officialTemplateNames = new Set(
+  AVAILABLE_TEMPLATE_STYLES.map((template) => template.name.trim().toLowerCase()),
+);
+
+const isOfficialTemplateRow = (row: SystemTemplateRecord) =>
+  officialTemplateIds.has(row.id) ||
+  officialTemplateIds.has(row.code) ||
+  officialTemplateNames.has(row.name.trim().toLowerCase());
+
 const getTemplateEditHref = (templateId: string) =>
   `/admin/templates/${encodeURIComponent(templateId)}/edit`;
 
@@ -52,7 +65,9 @@ export function SystemTemplatesClient({
 }: SystemTemplatesClientProps) {
   const router = useRouter();
   const toastTimeoutRef = useRef<number | null>(null);
-  const [rows, setRows] = useState(() => sortRows(initialRows));
+  const [rows, setRows] = useState(() =>
+    sortRows(initialRows.filter(isOfficialTemplateRow)),
+  );
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     message: string;
@@ -63,7 +78,7 @@ export function SystemTemplatesClient({
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    setRows(sortRows(initialRows));
+    setRows(sortRows(initialRows.filter(isOfficialTemplateRow)));
   }, [initialRows]);
 
   useEffect(() => {
@@ -209,6 +224,63 @@ export function SystemTemplatesClient({
           value={formatCompactNumber(totalBlocks)}
           hint="Inventario agregado de bloques persistidos en el catálogo."
         />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        {AVAILABLE_TEMPLATE_STYLES.map((template) => (
+          <article
+            key={template.id}
+            className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+                  Core Template Asset
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  {template.name}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                  {template.description}
+                </p>
+              </div>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                Oficial
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Template ID
+                </p>
+                <code className="mt-2 block text-sm font-semibold text-slate-950">
+                  {template.id}
+                </code>
+              </div>
+              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Variables
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">
+                  {Object.keys(template.themeStyle).length} tokens CSS
+                </p>
+              </div>
+              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Utilidades
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">
+                  {Object.keys(template.classNames).length} clases compartidas
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              {template.styleModulePath}
+            </p>
+          </article>
+        ))}
       </section>
 
       <DataTable

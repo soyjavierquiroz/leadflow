@@ -1,4 +1,5 @@
 import { AssignedSponsorReveal } from "@/components/public-funnel/assigned-sponsor-reveal";
+import { ParadigmShift } from "@/components/blocks/paradigm-shift";
 import {
   buildCtaClassName,
   flatBlockTitleClassName,
@@ -10,7 +11,10 @@ import {
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { ConversionPage } from "@/components/public-funnel/conversion-page";
-import { LeadCaptureModal } from "@/components/public-funnel/lead-capture-modal";
+import {
+  LeadCaptureModal,
+  type LeadCaptureModalConfig,
+} from "@/components/public-funnel/lead-capture-modal";
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
 import {
   RecycledFaqAccordionSection,
@@ -25,6 +29,7 @@ import { resolveLeadflowBlockMedia } from "@/components/public-funnel/leadflow-m
 import { JakawiHookAndPromiseSection } from "@/components/public-funnel/recycled/jakawi-hook-and-promise-section";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import { UrgencyTimerBlock } from "@/components/public-funnel/urgency-timer-block";
+import { StickyConversionBar } from "@/components/public-funnel/sticky-conversion-bar";
 import { WhatsappHandoffCta } from "@/components/public-funnel/whatsapp-handoff-cta";
 import type {
   PublicFunnelRuntimePayload,
@@ -50,6 +55,7 @@ import {
 } from "@/components/public-funnel/runtime-block-utils";
 import { PublicGrandSlamOfferBlock } from "@/components/public-funnel/public-grand-slam-offer-block";
 import { JakawiUniqueMechanismSection } from "@/components/public-funnel/recycled/jakawi-unique-mechanism-section";
+import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 
 type PublicBlockAdapterProps = {
   block: RuntimeBlock;
@@ -77,11 +83,73 @@ function inferAuthorityItemsFromBlocks(blocks: RuntimeBlock[]) {
     .map(([, item]) => item);
 }
 
-function HeroBlockAdapter({
-  block,
-  runtime,
-  blocks,
-}: PublicBlockAdapterProps) {
+function resolveLeadCaptureModalConfig(
+  leadCaptureConfigBlock: RuntimeBlock | null,
+): LeadCaptureModalConfig | null {
+  const modalConfigRecord = leadCaptureConfigBlock
+    ? asRecord(leadCaptureConfigBlock.modal_config)
+    : null;
+  const modalFieldsRecord = modalConfigRecord
+    ? asRecord(modalConfigRecord.fields)
+    : null;
+  const modalNameFieldRecord =
+    (modalFieldsRecord ? asRecord(modalFieldsRecord.name) : null) ??
+    (modalConfigRecord ? asRecord(modalConfigRecord.name_fields) : null);
+  const modalPhoneFieldRecord =
+    (modalFieldsRecord ? asRecord(modalFieldsRecord.phone) : null) ??
+    (modalConfigRecord ? asRecord(modalConfigRecord.phone_fields) : null);
+  const modalCtaButtonRecord = modalConfigRecord
+    ? asRecord(modalConfigRecord.cta_button)
+    : null;
+
+  if (
+    !modalConfigRecord ||
+    (!modalNameFieldRecord && !modalPhoneFieldRecord && !modalCtaButtonRecord)
+  ) {
+    return null;
+  }
+
+  return {
+    title: asString(modalConfigRecord.title, "Casi listo..."),
+    description: asString(
+      modalConfigRecord.description,
+      "Déjanos tus datos para continuar con la siguiente etapa.",
+    ),
+    defaultCountry: asString(modalConfigRecord.default_country, "BO"),
+    nameLabel: asString(modalNameFieldRecord?.label, "Nombre"),
+    namePlaceholder: asString(
+      modalNameFieldRecord?.placeholder,
+      "Escribe tu nombre completo",
+    ),
+    nameErrorMessage: asString(
+      modalNameFieldRecord?.error_msg,
+      "Por favor, ingresa tu nombre.",
+    ),
+    phoneLabel: asString(modalPhoneFieldRecord?.label, "WhatsApp"),
+    phonePlaceholder: asString(
+      modalPhoneFieldRecord?.placeholder,
+      "Tu número de WhatsApp",
+    ),
+    phoneErrorMessage: asString(
+      modalPhoneFieldRecord?.error_msg,
+      "Por favor, ingresa un número válido",
+    ),
+    ctaText: asString(
+      modalCtaButtonRecord?.text,
+      asString(modalConfigRecord.cta_text, "Continuar"),
+    ),
+    ctaSubtext: asString(
+      modalCtaButtonRecord?.subtext,
+      asString(modalConfigRecord.cta_subtext),
+    ),
+    successRedirect: asString(
+      leadCaptureConfigBlock?.success_redirect,
+      asString(modalConfigRecord.success_redirect),
+    ),
+  };
+}
+
+function HeroBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
   const variant = asString(block.variant, "leadflow_signal");
   const title = asString(block.title, runtime.funnel.name);
   const description = asString(
@@ -145,7 +213,9 @@ function HeroBlockAdapter({
     runtime.currentStep.path;
   const secondaryCtaLabel = asString(
     block.secondaryCtaLabel,
-    runtime.currentStep.isEntryStep ? "Ver detalles del funnel" : "Volver al inicio",
+    runtime.currentStep.isEntryStep
+      ? "Ver detalles del funnel"
+      : "Volver al inicio",
   );
 
   return (
@@ -249,7 +319,7 @@ function HookAndPromiseBlockAdapter({
   const proofPoints = asStringArray(
     (content?.proof_points as never) ?? block.proof_points ?? block.proofPoints,
   ).filter(Boolean);
-  const proofPointsHeader = proofHeader ? "" : proofPoints[0] ?? "";
+  const proofPointsHeader = proofHeader ? "" : (proofPoints[0] ?? "");
   const proofPointsBullets = proofHeader ? proofPoints : proofPoints.slice(1);
   const bullets = (
     proofPointsBullets.length > 0
@@ -285,10 +355,13 @@ function HookAndPromiseBlockAdapter({
   ].filter(
     (item, index, collection) =>
       item.label.trim() &&
-      collection.findIndex((candidate) => candidate.label === item.label) === index,
+      collection.findIndex((candidate) => candidate.label === item.label) ===
+        index,
   );
   const inferredAuthorityItems =
-    authorityItems.length > 0 ? authorityItems : inferAuthorityItemsFromBlocks(blocks);
+    authorityItems.length > 0
+      ? authorityItems
+      : inferAuthorityItemsFromBlocks(blocks);
   const hasCaptureBlock = blocks.some(
     (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
   );
@@ -337,6 +410,7 @@ function HookAndPromiseBlockAdapter({
       ? (block.cta_animation as Record<string, unknown>)
       : null;
   const hasPulseScaleCta =
+    layoutVariant === "sticky_media" ||
     asString(ctaAnimation?.type as never) === "pulse-scale";
   const bodyCopy =
     asString(content?.body_copy as never) ||
@@ -390,60 +464,15 @@ function HookAndPromiseBlockAdapter({
     leadflowMetadata:
       block.leadflow_metadata ?? block.metadata ?? runtime.funnel.settingsJson,
   });
-  const modalConfigRecord = leadCaptureConfigBlock
-    ? asRecord(leadCaptureConfigBlock.modal_config)
-    : null;
-  const modalFieldsRecord = modalConfigRecord
-    ? asRecord(modalConfigRecord.fields)
-    : null;
-  const modalNameFieldRecord =
-    (modalFieldsRecord ? asRecord(modalFieldsRecord.name) : null) ??
-    (modalConfigRecord ? asRecord(modalConfigRecord.name_fields) : null);
-  const modalPhoneFieldRecord =
-    (modalFieldsRecord ? asRecord(modalFieldsRecord.phone) : null) ??
-    (modalConfigRecord ? asRecord(modalConfigRecord.phone_fields) : null);
-  const modalCtaButtonRecord = modalConfigRecord
-    ? asRecord(modalConfigRecord.cta_button)
-    : null;
-  const modalConfig =
-    modalConfigRecord &&
-    (modalNameFieldRecord || modalPhoneFieldRecord || modalCtaButtonRecord)
-      ? {
-          title: asString(modalConfigRecord.title, "Casi listo..."),
-          description: asString(
-            modalConfigRecord.description,
-            "¿A dónde enviamos tu diagnóstico personalizado?",
-          ),
-          defaultCountry: asString(modalConfigRecord.default_country, "BO"),
-          nameLabel: asString(modalNameFieldRecord?.label, "Nombre"),
-          namePlaceholder: asString(
-            modalNameFieldRecord?.placeholder,
-            "Escribe tu nombre completo",
-          ),
-          phoneLabel: asString(modalPhoneFieldRecord?.label, "WhatsApp"),
-          phonePlaceholder: asString(
-            modalPhoneFieldRecord?.placeholder,
-            "Tu número de WhatsApp",
-          ),
-          phoneErrorMessage: asString(
-            modalPhoneFieldRecord?.error_msg,
-            "Por favor, ingresa un número válido",
-          ),
-          ctaText: asString(
-            modalCtaButtonRecord?.text,
-            asString(modalConfigRecord.cta_text, "Ver mi diagnóstico"),
-          ),
-          ctaSubtext: asString(
-            modalCtaButtonRecord?.subtext,
-            asString(modalConfigRecord.cta_subtext),
-          ),
-        }
-      : null;
+  const modalConfig = resolveLeadCaptureModalConfig(leadCaptureConfigBlock);
 
   return (
     <JakawiHookAndPromiseSection
       variant={layoutVariant === "sticky_media" ? "flat" : "default"}
-      eyebrow={asString(block.top_bar, asString(content?.top_bar as never, eyebrow))}
+      eyebrow={asString(
+        block.top_bar,
+        asString(content?.top_bar as never, eyebrow),
+      )}
       hookLeadIn={hookLeadIn || undefined}
       headline={headline}
       authorityText={authorityText || undefined}
@@ -461,7 +490,7 @@ function HookAndPromiseBlockAdapter({
       media={media}
       hideDesktopMedia={layoutVariant === "sticky_media"}
       cta={
-        <div>
+        <div className="mx-auto flex w-full max-w-md flex-col items-center text-center">
           {layoutVariant === "sticky_media" && ctaLeadIn ? (
             <span className="mb-3 block text-sm font-bold text-slate-700">
               {ctaLeadIn}
@@ -475,7 +504,8 @@ function HookAndPromiseBlockAdapter({
               triggerClassName={
                 layoutVariant === "sticky_media"
                   ? cx(
-                      "inline-flex h-16 w-full items-center justify-center rounded-2xl bg-orange-500 px-10 text-center text-xl font-black uppercase leading-5 tracking-tight text-white shadow-[0_8px_20px_rgba(255,115,0,0.25)] transition-all duration-200 hover:scale-105 hover:bg-orange-400 hover:shadow-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
+                      jakawiPremiumClassNames.primaryButton,
+                      "mx-auto flex min-h-16 w-full items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
                       hasPulseScaleCta
                         ? "[animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none"
                         : "",
@@ -484,7 +514,9 @@ function HookAndPromiseBlockAdapter({
               }
               triggerAction={asString(block.action) || "hook_primary"}
               modalConfig={modalConfig}
-              sourceChannel={normalizedLeadCaptureFormBlock?.settings.sourceChannel}
+              sourceChannel={
+                normalizedLeadCaptureFormBlock?.settings.sourceChannel
+              }
               tags={normalizedLeadCaptureFormBlock?.settings.tags}
             />
           ) : (
@@ -497,7 +529,8 @@ function HookAndPromiseBlockAdapter({
               className={
                 layoutVariant === "sticky_media"
                   ? cx(
-                      "inline-flex h-16 w-full items-center justify-center rounded-2xl bg-orange-500 px-10 text-center text-xl font-black uppercase leading-5 tracking-tight text-white shadow-[0_8px_20px_rgba(255,115,0,0.25)] transition-all duration-200 hover:scale-105 hover:bg-orange-400 hover:shadow-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
+                      jakawiPremiumClassNames.primaryButton,
+                      "mx-auto flex min-h-16 w-full items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
                       hasPulseScaleCta
                         ? "[animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none"
                         : "",
@@ -510,12 +543,52 @@ function HookAndPromiseBlockAdapter({
           {layoutVariant === "sticky_media" ? (
             <p className="mb-10 mt-2 text-center text-xs text-slate-500">
               {ctaHelperText ||
-                "Consulta gratuita con un especialista para evaluar tu caso."}
+                "Te contactaremos con la siguiente etapa disponible para tu caso."}
             </p>
           ) : null}
         </div>
       }
     />
+  );
+}
+
+function normalizeStepByStepItems(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as Array<{ title?: string; description?: string }>;
+  }
+
+  const items = value.map((item) => {
+    if (typeof item === "string") {
+      return { description: item.trim() || undefined };
+    }
+
+    const record = asRecord(item);
+    if (!record) {
+      return null;
+    }
+
+    const title = asString(
+      record.step_title,
+      asString(record.title, asString(record.label)),
+    );
+    const description = asString(
+      record.step_text,
+      asString(
+        record.description,
+        asString(record.text, asString(record.content, asString(record.body))),
+      ),
+    );
+
+    return title || description
+      ? {
+          title: title || undefined,
+          description: description || undefined,
+        }
+      : null;
+  });
+
+  return items.filter((item): item is NonNullable<(typeof items)[number]> =>
+    Boolean(item),
   );
 }
 
@@ -538,8 +611,8 @@ function toUniqueMechanismSteps(value: RuntimeBlock["how_it_works_steps"]) {
       : null;
   });
 
-  return items.filter(
-    (item): item is NonNullable<(typeof items)[number]> => Boolean(item),
+  return items.filter((item): item is NonNullable<(typeof items)[number]> =>
+    Boolean(item),
   );
 }
 
@@ -549,21 +622,21 @@ function toUniqueMechanismPairs(value: RuntimeBlock["feature_benefit_pairs"]) {
   }
 
   const items = value.map((item) => {
-      const record = asRecord(item);
-      if (!record) {
-        return null;
-      }
+    const record = asRecord(item);
+    if (!record) {
+      return null;
+    }
 
-      const feature = asString(record.feature);
-      const benefit = asString(record.benefit);
+    const feature = asString(record.feature);
+    const benefit = asString(record.benefit);
 
-      return feature || benefit
-        ? { feature: feature || undefined, benefit: benefit || undefined }
-        : null;
-    });
+    return feature || benefit
+      ? { feature: feature || undefined, benefit: benefit || undefined }
+      : null;
+  });
 
-  return items.filter(
-    (item): item is NonNullable<(typeof items)[number]> => Boolean(item),
+  return items.filter((item): item is NonNullable<(typeof items)[number]> =>
+    Boolean(item),
   );
 }
 
@@ -674,13 +747,21 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
 
   if (variant === "social_proof") {
     return (
-      <SocialProofBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+      <SocialProofBlockAdapter
+        block={block}
+        runtime={runtime}
+        blocks={blocks}
+      />
     );
   }
 
   if (variant === "feature_grid") {
     return (
-      <FeatureGridBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+      <FeatureGridBlockAdapter
+        block={block}
+        runtime={runtime}
+        blocks={blocks}
+      />
     );
   }
 
@@ -729,6 +810,107 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
   );
 }
 
+function StepByStepBlockAdapter({
+  block,
+  layoutVariant = "single_column",
+}: PublicBlockAdapterProps) {
+  const title = asString(block.headline, asString(block.title, "Paso a paso"));
+  const eyebrow = asString(block.eyebrow, asString(block.badge));
+  const description = asString(
+    block.description,
+    asString(block.subheadline, asString(block.body)),
+  );
+  const items = normalizeStepByStepItems(
+    block.steps ?? block.items ?? block.sequence ?? block.cards,
+  );
+
+  if (items.length === 0 && !title && !description) {
+    return null;
+  }
+
+  return (
+    <PublicSectionSurface
+      variant={layoutVariant === "sticky_media" ? "flat" : "default"}
+      className={layoutVariant === "sticky_media" ? "py-6 md:py-8" : ""}
+    >
+      <div className="space-y-6">
+        <div className="max-w-3xl">
+          {eyebrow ? (
+            <PublicEyebrow
+              tone="neutral"
+              className={
+                layoutVariant === "sticky_media" ? "text-slate-500" : ""
+              }
+            >
+              {eyebrow}
+            </PublicEyebrow>
+          ) : null}
+          <h2
+            className={cx(
+              "mt-3",
+              layoutVariant === "sticky_media"
+                ? flatBlockTitleClassName
+                : "text-3xl font-semibold tracking-tight text-slate-950",
+            )}
+          >
+            {title}
+          </h2>
+          {description ? (
+            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+              {description}
+            </p>
+          ) : null}
+        </div>
+
+        {items.length > 0 ? (
+          <div className="grid gap-4">
+            {items.map((item, index) => (
+              <article
+                key={`${item.title || item.description}-${index}`}
+                className={cx(
+                  "rounded-[1.6rem] border px-5 py-5",
+                  layoutVariant === "sticky_media"
+                    ? "border-slate-200/80 bg-white shadow-[var(--jakawi-shadow-card)]"
+                    : "border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)]",
+                )}
+              >
+                <div className="flex items-start gap-4">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-black text-amber-700">
+                    {index + 1}
+                  </span>
+                  <div>
+                    {item.title ? (
+                      <h3 className="text-base font-bold leading-snug text-slate-950">
+                        {item.title}
+                      </h3>
+                    ) : null}
+                    {item.description ? (
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        {item.description}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </PublicSectionSurface>
+  );
+}
+
+function ParadigmShiftBlockAdapter({ block }: PublicBlockAdapterProps) {
+  return (
+    <ParadigmShift
+      problemStatement={asString(block.problemStatement)}
+      transitionMarker={asString(block.transitionMarker)}
+      solutionText={asString(block.solutionText)}
+      variant={asString(block.variant) || undefined}
+    />
+  );
+}
+
 function UrgencyTimerBlockAdapter({
   block,
   layoutVariant = "single_column",
@@ -755,7 +937,8 @@ function UrgencyTimerBlockAdapter({
         ) || undefined
       }
       durationMinutes={
-        asNumber(block.duration_minutes, asNumber(block.durationMinutes, 0)) || undefined
+        asNumber(block.duration_minutes, asNumber(block.durationMinutes, 0)) ||
+        undefined
       }
       variant={layoutVariant === "sticky_media" ? "flat" : "default"}
     />
@@ -926,7 +1109,9 @@ function FaqBlockAdapter({
 
   return (
     <RecycledFaqAccordionSection
-      eyebrow={variant === "accordion" ? "FAQ accordion" : "Confianza y objeciones"}
+      eyebrow={
+        variant === "accordion" ? "FAQ accordion" : "Confianza y objeciones"
+      }
       title={title}
       items={items}
       variant={layoutVariant === "sticky_media" ? "flat" : "default"}
@@ -1005,9 +1190,9 @@ function RiskReversalBlockAdapter({
       "Reduce el riesgo percibido y deja claro que la compra está respaldada.",
     ),
   );
-  const bullets = asStringArray(
-    block.guarantee_bullets ?? block.items,
-  ).filter(Boolean);
+  const bullets = asStringArray(block.guarantee_bullets ?? block.items).filter(
+    Boolean,
+  );
   const ctaLabel = asString(
     block.section_cta_text,
     runtime.handoff.buttonLabel || "Continuar",
@@ -1016,7 +1201,9 @@ function RiskReversalBlockAdapter({
   return (
     <PublicSectionSurface
       variant={layoutVariant === "sticky_media" ? "flat" : "default"}
-      className={layoutVariant === "sticky_media" ? "py-6 text-left md:py-8" : ""}
+      className={
+        layoutVariant === "sticky_media" ? "py-6 text-left md:py-8" : ""
+      }
     >
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div>
@@ -1039,7 +1226,9 @@ function RiskReversalBlockAdapter({
           <p
             className={cx(
               "mt-4 max-w-2xl text-left text-base leading-7",
-              layoutVariant === "sticky_media" ? "text-slate-600" : "text-slate-600",
+              layoutVariant === "sticky_media"
+                ? "text-slate-600"
+                : "text-slate-600",
             )}
           >
             {description}
@@ -1184,7 +1373,9 @@ function MediaBlockAdapter({ block }: PublicBlockAdapterProps) {
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
             {title}
           </h2>
-          <p className="mt-4 text-base leading-7 text-slate-600">{description}</p>
+          <p className="mt-4 text-base leading-7 text-slate-600">
+            {description}
+          </p>
           {media.caption ? (
             <p className="mt-4 text-sm leading-6 text-slate-500">
               {media.caption}
@@ -1324,7 +1515,9 @@ function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
   );
 
   return (
-    <div className={cx("grid gap-6", variant === "confirmation_reveal" ? "" : "")}>
+    <div
+      className={cx("grid gap-6", variant === "confirmation_reveal" ? "" : "")}
+    >
       <ThankYouBlockAdapter
         block={{
           ...props.block,
@@ -1350,7 +1543,10 @@ function WhatsappHandoffCtaBlockAdapter({
   return (
     <WhatsappHandoffCta
       runtime={runtime}
-      headline={asString(block.headline, asString(block.title, "Continuar por WhatsApp"))}
+      headline={asString(
+        block.headline,
+        asString(block.title, "Continuar por WhatsApp"),
+      )}
       subheadline={
         asString(block.subheadline, asString(block.description)) || undefined
       }
@@ -1371,6 +1567,7 @@ function ConversionPageBlockAdapter({
 }: PublicBlockAdapterProps) {
   const content = asRecord(block.content) ?? block;
   const fallbackAdvisor = asRecord(content.fallback_advisor);
+  const redirectDelayValue = content.redirect_delay ?? content.redirectDelay;
 
   return (
     <ConversionPage
@@ -1381,16 +1578,115 @@ function ConversionPageBlockAdapter({
       )}
       subheadline={asString(content.subheadline) || undefined}
       ctaText={asString(content.cta_text) || undefined}
-      redirectDelay={asNumber(content.redirect_delay, 5000)}
+      whatsappMessage={asString(content.whatsapp_message) || undefined}
+      redirectDelay={
+        typeof redirectDelayValue === "number" ? redirectDelayValue : null
+      }
       fallbackAdvisor={{
         name: asString(fallbackAdvisor?.name, "Equipo Leadflow"),
         phone: asString(fallbackAdvisor?.phone) || null,
         photoUrl: asString(fallbackAdvisor?.photo_url) || null,
         bio:
-          asString(fallbackAdvisor?.bio, "Especialista en Protocolos de Recuperación") ||
-          null,
+          asString(
+            fallbackAdvisor?.bio,
+            "Especialista en Protocolos de Recuperación",
+          ) || null,
         whatsappUrl: null,
       }}
+    />
+  );
+}
+
+function StickyConversionBarBlockAdapter({
+  block,
+  runtime,
+  blocks,
+}: PublicBlockAdapterProps) {
+  const hasCaptureBlock = blocks.some(
+    (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
+  );
+  const leadCaptureConfigBlock =
+    blocks.find(
+      (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_config",
+    ) ?? null;
+  const leadCaptureFormBlock =
+    blocks.find(
+      (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
+    ) ?? null;
+  const normalizedLeadCaptureFormBlock = leadCaptureFormBlock
+    ? normalizeLeadCaptureFormBlock(leadCaptureFormBlock)
+    : null;
+  const modalConfig = resolveLeadCaptureModalConfig(leadCaptureConfigBlock);
+  const action = asString(
+    block.action,
+    modalConfig
+      ? "open_lead_capture_modal"
+      : hasCaptureBlock
+        ? "scroll_to_capture"
+        : "sticky_conversion_bar",
+  );
+  const href =
+    asString(block.href) ||
+    (hasCaptureBlock ? "#public-capture-form" : runtime.nextStep?.path) ||
+    runtime.currentStep.path;
+
+  return (
+    <StickyConversionBar
+      publicationId={runtime.publication.id}
+      currentStepId={runtime.currentStep.id}
+      currentPath={runtime.request.path}
+      desktopText={asString(
+        block.desktopText,
+        asString(
+          block.desktop_text,
+          "Activa tu siguiente paso antes de salir de esta página.",
+        ),
+      )}
+      desktopButtonText={asString(
+        block.desktopButtonText,
+        asString(block.desktop_button_text, "Continuar ahora"),
+      )}
+      mobileButtonText={asString(
+        block.mobileButtonText,
+        asString(block.mobile_button_text, "Continuar ahora"),
+      )}
+      triggerOffsetPixels={asNumber(
+        block.triggerOffsetPixels,
+        asNumber(block.trigger_offset_pixels, 320),
+      )}
+      bgColor={asString(block.bgColor, asString(block.bg_color, "#0f172a"))}
+      textColor={asString(
+        block.textColor,
+        asString(block.text_color, "#f8fafc"),
+      )}
+      buttonBgColor={asString(
+        block.buttonBgColor,
+        asString(block.button_bg_color, "#22c55e"),
+      )}
+      buttonTextColor={asString(
+        block.buttonTextColor,
+        asString(block.button_text_color, "#052e16"),
+      )}
+      borderColor={asString(
+        block.borderColor,
+        asString(block.border_color, "#1e293b"),
+      )}
+      actionConfig={
+        modalConfig
+          ? {
+              kind: "modal",
+              modalConfig,
+              action,
+              sourceChannel:
+                normalizedLeadCaptureFormBlock?.settings.sourceChannel,
+              tags: normalizedLeadCaptureFormBlock?.settings.tags,
+            }
+          : {
+              kind: "link",
+              href,
+              action,
+            }
+      }
     />
   );
 }
@@ -1443,11 +1739,35 @@ export function PublicBlockAdapter({
           />
         );
       case "text":
-        return <TextBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+        return (
+          <TextBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+        );
+      case "step_by_step":
+        return (
+          <StepByStepBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "paradigm_shift":
+        return (
+          <ParadigmShiftBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
       case "video":
-        return <VideoBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+        return (
+          <VideoBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+        );
       case "cta":
-        return <CtaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+        return (
+          <CtaBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+        );
       case "faq":
       case "faq_social_proof":
         return (
@@ -1468,7 +1788,11 @@ export function PublicBlockAdapter({
         );
       case "thank_you":
         return (
-          <ThankYouBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+          <ThankYouBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+          />
         );
       case "thank_you_reveal":
         return (
@@ -1531,9 +1855,13 @@ export function PublicBlockAdapter({
         );
       case "media":
       case "image":
-        return <MediaBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+        return (
+          <MediaBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+        );
       case "offer_pricing":
-        return <OfferBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
+        return (
+          <OfferBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+        );
       case "grand_slam_offer":
         return (
           <PublicGrandSlamOfferBlock
@@ -1552,6 +1880,14 @@ export function PublicBlockAdapter({
             blocks={blocks}
           />
         );
+      case "sticky_conversion_bar":
+        return (
+          <StickyConversionBarBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+          />
+        );
       default:
         return null;
     }
@@ -1562,6 +1898,6 @@ export function PublicBlockAdapter({
       error,
     });
 
-      return null;
+    return null;
   }
 }
