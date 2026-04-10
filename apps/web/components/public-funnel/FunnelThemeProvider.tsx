@@ -11,6 +11,12 @@ type FunnelThemeProviderProps = {
 
 type FunnelThemeStyle = CSSProperties & Record<string, string>;
 
+const eyebrowJustifyContentMap = {
+  left: 'flex-start',
+  center: 'center',
+  right: 'flex-end',
+} as const;
+
 const cx = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(' ');
 
@@ -31,6 +37,11 @@ export function FunnelThemeProvider({
     '--funnel-font-button': theme.fonts.button,
     '--funnel-vsl-accent': theme.colors.vslAccent,
     '--funnel-vsl-highlight': theme.colors.vslHighlight,
+    '--funnel-eyebrow-background': theme.eyebrow.backgroundColor,
+    '--funnel-eyebrow-text': theme.eyebrow.textColor,
+    '--funnel-eyebrow-alignment': theme.eyebrow.alignment,
+    '--funnel-eyebrow-justify':
+      eyebrowJustifyContentMap[theme.eyebrow.alignment],
     '--jakawi-font-sans': theme.fonts.body,
     '--jakawi-font-display': theme.fonts.display,
   };

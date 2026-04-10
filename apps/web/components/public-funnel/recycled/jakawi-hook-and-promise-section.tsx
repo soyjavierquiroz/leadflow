@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   cx,
   flatBlockTitleClassName,
+  FunnelEyebrow,
   RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
@@ -172,15 +173,12 @@ export function JakawiHookAndPromiseSection({
         <div className="mx-auto flex w-full max-w-[640px] flex-col space-y-2.5 lg:space-y-4">
           <div className="space-y-0.5">
             {eyebrow ? (
-              <span
-                className={cx(
-                  variant === "flat"
-                    ? "mb-2 flex w-full items-center justify-center rounded-b-lg bg-emerald-50 px-3 py-1.5 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-800"
-                    : "inline-flex w-fit rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400",
-                )}
+              <FunnelEyebrow
+                className={variant === "flat" ? "mb-2" : "mb-3"}
+                variant={variant === "flat" ? "attached" : "pill"}
               >
                 {eyebrow}
-              </span>
+              </FunnelEyebrow>
             ) : null}
 
             {hookLeadIn ? (

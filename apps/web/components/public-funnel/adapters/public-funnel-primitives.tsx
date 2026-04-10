@@ -7,7 +7,8 @@ import {
 
 type SurfaceTone = "brand" | "neutral" | "warm" | "success";
 type SurfaceVariant = "default" | "flat";
-type RichHeadlineSegmentTone = "default" | "accent" | "highlight";
+type RichHeadlineSegmentTone = "default" | "accent" | "highlight" | "underline";
+type FunnelEyebrowVariant = "pill" | "attached";
 
 type RichHeadlineSegment = {
   content: string;
@@ -61,9 +62,18 @@ export function parseRichHeadline(text: string): RichHeadlineSegment[] {
       }
     }
 
+    if (text.startsWith("_", cursor)) {
+      const match = readUntil(text, cursor + 1, "_");
+      if (match && match.content.trim()) {
+        segments.push({ content: match.content, tone: "underline" });
+        cursor = match.nextIndex;
+        continue;
+      }
+    }
+
     let nextTokenIndex = text.length;
 
-    for (const token of ["**", "[[", "*"]) {
+    for (const token of ["**", "[[", "*", "_"]) {
       const tokenIndex = text.indexOf(token, cursor + 1);
       if (tokenIndex !== -1) {
         nextTokenIndex = Math.min(nextTokenIndex, tokenIndex);
@@ -120,6 +130,17 @@ export function RichHeadline({
           );
         }
 
+        if (segment.tone === "underline") {
+          return (
+            <span
+              key={`${segment.tone}-${segment.content}-${index}`}
+              className="underline decoration-2 underline-offset-[0.18em]"
+            >
+              {segment.content}
+            </span>
+          );
+        }
+
         return <span key={`${segment.tone}-${segment.content}-${index}`}>{segment.content}</span>;
       })}
     </span>
@@ -127,6 +148,29 @@ export function RichHeadline({
 }
 
 export const flatBlockTitleClassName = cx("font-headline", jakawiPremiumClassNames.title);
+
+export function FunnelEyebrow({
+  children,
+  className,
+  variant = "pill",
+}: {
+  children: ReactNode;
+  className?: string;
+  variant?: FunnelEyebrowVariant;
+}) {
+  return (
+    <div className={cx("funnel-eyebrow-shell", className)}>
+      <span
+        className={cx(
+          "funnel-eyebrow-align bg-funnel-eyebrow-bg text-funnel-eyebrow-text font-body inline-block max-w-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em]",
+          variant === "attached" ? "rounded-b-lg" : "rounded-full",
+        )}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
 
 export function PublicSectionSurface({
   children,

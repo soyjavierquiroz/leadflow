@@ -18,6 +18,11 @@ export const funnelThemeRegistry = {
       vslAccent: '#dc2626',
       vslHighlight: '#fef08a',
     },
+    eyebrow: {
+      backgroundColor: '#f1f5f9',
+      textColor: '#047857',
+      alignment: 'left',
+    },
   },
   'expert-secrets': {
     id: 'expert-secrets',
@@ -28,6 +33,11 @@ export const funnelThemeRegistry = {
     colors: {
       vslAccent: '#cc3333',
       vslHighlight: '#ffea00',
+    },
+    eyebrow: {
+      backgroundColor: '#e6f7ff',
+      textColor: '#000000',
+      alignment: 'center',
     },
   },
 } as const satisfies Record<FunnelThemeId, FunnelThemeDefinition>;

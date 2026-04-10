@@ -17,12 +17,21 @@ export type FunnelThemeColorTokens = {
   vslHighlight: string;
 };
 
+export type FunnelThemeEyebrowAlignment = 'left' | 'center' | 'right';
+
+export type FunnelThemeEyebrowTokens = {
+  backgroundColor: string;
+  textColor: string;
+  alignment: FunnelThemeEyebrowAlignment;
+};
+
 export type FunnelThemeDefinition = {
   id: FunnelThemeId;
   name: string;
   description: string;
   fonts: FunnelThemeFontPairing;
   colors: FunnelThemeColorTokens;
+  eyebrow: FunnelThemeEyebrowTokens;
 };
 
 export type FunnelThemeResolutionSource = 'runtime' | 'template' | 'fallback';

@@ -1,3 +1,8 @@
+import {
+  FunnelEyebrow,
+  RichHeadline,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
+
 type HookAndPromiseBlockProps = {
   headline?: string;
   title?: string;
@@ -64,13 +69,11 @@ export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
     <section className="py-12 px-4">
       <div className="mx-auto max-w-4xl">
         {eyebrow ? (
-          <p className="mb-4 text-sm font-semibold tracking-[0.24em] text-slate-500 uppercase">
-            {eyebrow}
-          </p>
+          <FunnelEyebrow className="mb-4">{eyebrow}</FunnelEyebrow>
         ) : null}
 
         <h1 className="mb-6 text-4xl font-extrabold text-slate-900 md:text-5xl">
-          {headline}
+          <RichHeadline text={headline} className="font-black" />
         </h1>
 
         {supportingText ? (

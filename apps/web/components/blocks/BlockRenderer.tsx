@@ -1,4 +1,5 @@
 import { PublicRuntimeLeadSubmitProvider } from "@/components/public-runtime/public-runtime-lead-submit-provider";
+import { FunnelThemeProvider } from "@/components/public-funnel/FunnelThemeProvider";
 import { resolvePublicStepLayout } from "@/components/public-funnel/runtime-layout";
 import {
   normalizeRuntimeBlockType,
@@ -194,32 +195,34 @@ export function BlockRenderer({
 
   return (
     <PublicRuntimeLeadSubmitProvider hostname={previewHost} path={previewPath}>
-      <div className="pb-12">
-        {isSingleColumnLayout ? (
-          <>
-            {announcementBlock ? renderBlock(announcementBlock, -1) : null}
-            <div className="bg-white px-4 py-6 md:px-6 md:py-10">
-              {visibleBlocks.map((block, index) => renderBlock(block, index))}
-            </div>
-          </>
-        ) : (
-          <SplitMediaFocusLayout
-            announcementSlot={
-              announcementBlock ? renderBlock(announcementBlock, -1) : null
-            }
-            mediaSlot={
-              <StickyMediaGallery
-                runtime={runtime}
-                blocks={parsedBlocks}
-                className="h-full"
-              />
-            }
-            contentSlot={visibleBlocks.map((block, index) => renderBlock(block, index))}
-          />
-        )}
-        {/* El modal se resuelve desde los CTAs reales, no como caja inline. */}
-        {modalConfigBlock ? renderBlock(modalConfigBlock, -2) : null}
-      </div>
+      <FunnelThemeProvider runtime={runtime}>
+        <div className="pb-12">
+          {isSingleColumnLayout ? (
+            <>
+              {announcementBlock ? renderBlock(announcementBlock, -1) : null}
+              <div className="bg-white px-4 py-6 md:px-6 md:py-10">
+                {visibleBlocks.map((block, index) => renderBlock(block, index))}
+              </div>
+            </>
+          ) : (
+            <SplitMediaFocusLayout
+              announcementSlot={
+                announcementBlock ? renderBlock(announcementBlock, -1) : null
+              }
+              mediaSlot={
+                <StickyMediaGallery
+                  runtime={runtime}
+                  blocks={parsedBlocks}
+                  className="h-full"
+                />
+              }
+              contentSlot={visibleBlocks.map((block, index) => renderBlock(block, index))}
+            />
+          )}
+          {/* El modal se resuelve desde los CTAs reales, no como caja inline. */}
+          {modalConfigBlock ? renderBlock(modalConfigBlock, -2) : null}
+        </div>
+      </FunnelThemeProvider>
     </PublicRuntimeLeadSubmitProvider>
   );
 }

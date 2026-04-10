@@ -17,6 +17,10 @@
   --funnel-font-button: var(--font-geist-sans);
   --funnel-vsl-accent: #dc2626;
   --funnel-vsl-highlight: #fef08a;
+  --funnel-eyebrow-background: #f1f5f9;
+  --funnel-eyebrow-text: #047857;
+  --funnel-eyebrow-alignment: left;
+  --funnel-eyebrow-justify: flex-start;
 }
 
 @theme inline {
@@ -24,6 +28,8 @@
   --color-foreground: var(--foreground);
   --color-vsl-accent: var(--funnel-vsl-accent);
   --color-vsl-highlight: var(--funnel-vsl-highlight);
+  --color-funnel-eyebrow-bg: var(--funnel-eyebrow-background);
+  --color-funnel-eyebrow-text: var(--funnel-eyebrow-text);
   --font-sans: var(--funnel-font-sans);
   --font-display: var(--funnel-font-display);
   --font-headline: var(--funnel-font-headline);
@@ -47,4 +53,14 @@ body {
 
 a {
   text-decoration: none;
+}
+
+.funnel-eyebrow-shell {
+  display: flex;
+  width: 100%;
+  justify-content: var(--funnel-eyebrow-justify);
+}
+
+.funnel-eyebrow-align {
+  text-align: var(--funnel-eyebrow-alignment);
 }
