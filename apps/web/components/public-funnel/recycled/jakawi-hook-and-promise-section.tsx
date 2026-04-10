@@ -182,14 +182,18 @@ export function JakawiHookAndPromiseSection({
             ) : null}
 
             {hookLeadIn ? (
-              <span
+              <div
                 className={cx(
-                  "mb-1 block italic",
-                  variant === "flat" ? "text-xs leading-5 text-slate-500" : "text-sm text-slate-300",
+                  "mx-auto mb-8 max-w-4xl text-center text-xl leading-[1.4] md:text-2xl",
+                  variant === "flat" ? "text-slate-700" : "text-slate-100",
                 )}
               >
-                {hookLeadIn}
-              </span>
+                <RichHeadline
+                  text={hookLeadIn}
+                  fontClassName="font-subheadline"
+                  className="font-medium not-italic"
+                />
+              </div>
             ) : null}
 
             <h2

@@ -4,8 +4,6 @@ const geistSansStack =
   'var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 const geistMonoStack =
   'var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
-const interStack =
-  'var(--font-inter), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 const manropeStack =
   'var(--font-manrope), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
 const montserratStack =
@@ -22,12 +20,12 @@ export const funnelThemeFonts = {
     button: geistSansStack,
   },
   'expert-secrets': {
-    sans: interStack,
+    sans: montserratStack,
     display: montserratStack,
     headline: montserratStack,
-    body: interStack,
-    subheadline: interStack,
+    body: montserratStack,
+    subheadline: montserratStack,
     mono: manropeStack,
-    button: manropeStack,
+    button: montserratStack,
   },
 } as const satisfies Record<FunnelThemeId, FunnelThemeFontPairing>;

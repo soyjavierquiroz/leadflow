@@ -93,16 +93,18 @@ export function parseRichHeadline(text: string): RichHeadlineSegment[] {
 export function RichHeadline({
   text,
   className,
+  fontClassName = "font-headline",
 }: {
   text?: string | null;
   className?: string;
+  fontClassName?: string;
 }) {
   if (!text) {
     return null;
   }
 
   return (
-    <span className={cx("font-headline", className)}>
+    <span className={cx(fontClassName, className)}>
       {parseRichHeadline(text).map((segment, index) => {
         if (!segment.content) {
           return null;

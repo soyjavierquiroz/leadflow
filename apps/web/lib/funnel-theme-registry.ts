@@ -28,7 +28,7 @@ export const funnelThemeRegistry = {
     id: 'expert-secrets',
     name: 'Expert Secrets',
     description:
-      'Direct response pairing with Montserrat headlines, Inter reading rhythm, and Manrope CTA support for editorial VSL funnels.',
+      'Direct response theme with a fully unified Montserrat stack across headlines, bridge copy, body text, and CTA treatments for editorial VSL funnels.',
     fonts: funnelThemeFonts['expert-secrets'],
     colors: {
       vslAccent: '#cc3333',

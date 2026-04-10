@@ -6,6 +6,8 @@ import {
 type HookAndPromiseBlockProps = {
   headline?: string;
   title?: string;
+  hook_text?: string;
+  hookText?: string;
   eyebrow?: string;
   top_bar?: string;
   subheadline?: string;
@@ -49,6 +51,10 @@ function getStringArray(values: unknown): string[] {
 
 export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
   const headline = props.headline || props.title || "Hook & Promise";
+  const hookLeadIn =
+    (typeof props.hook_text === "string" && props.hook_text) ||
+    (typeof props.hookText === "string" && props.hookText) ||
+    null;
   const eyebrow =
     (typeof props.top_bar === "string" && props.top_bar) ||
     (typeof props.eyebrow === "string" && props.eyebrow) ||
@@ -76,8 +82,18 @@ export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
           <RichHeadline text={headline} className="font-black" />
         </h1>
 
+        {hookLeadIn ? (
+          <div className="mx-auto mb-8 max-w-4xl text-center text-xl leading-[1.4] text-slate-700 md:text-2xl">
+            <RichHeadline
+              text={hookLeadIn}
+              fontClassName="font-subheadline"
+              className="font-medium"
+            />
+          </div>
+        ) : null}
+
         {supportingText ? (
-          <p className="max-w-3xl text-lg leading-8 text-slate-700">
+          <p className="font-subheadline max-w-3xl text-lg leading-8 text-slate-700">
             {supportingText}
           </p>
         ) : null}

@@ -655,12 +655,14 @@ export function TeamVslPublicationEditor({
         );
         if (editorHref) {
           router.replace(editorHref);
+          router.refresh();
           return;
         }
 
         router.replace(
           `/team/publications/new-vsl?publicationId=${response.publication.id}`,
         );
+        router.refresh();
       } catch (error) {
         setErrorMessage(
           error instanceof Error
