@@ -500,16 +500,27 @@ export class TeamsService {
       dto.config === undefined
         ? this.cloneJsonValue(existing.config as JsonValue)
         : this.cloneJsonValue(dto.config);
-    const funnelInstance = await this.findPrimarySystemTenantFunnelInstance(
-      tenantId,
-      normalizedFunnelId,
-    );
+    const funnelInstance = dto.funnelInstanceId
+      ? await this.findSystemTenantFunnelInstanceById(
+          tenantId,
+          normalizedFunnelId,
+          dto.funnelInstanceId,
+        )
+      : await this.findPrimarySystemTenantFunnelInstance(
+          tenantId,
+          normalizedFunnelId,
+        );
     const settingsJson = this.mergeFunnelSettingsJson(
       (funnelInstance?.settingsJson as JsonValue) ?? {},
       dto.settingsJson,
       existing.config as JsonValue,
     );
     const config = this.mergeThemeIntoFunnelConfig(nextConfig, settingsJson);
+    this.logger.log(
+      `[theme-persist] updateSystemTenantFunnel funnel=${existing.id} instance=${
+        funnelInstance?.id ?? 'none'
+      } theme=${this.extractFunnelThemeFromRecord(settingsJson) ?? 'missing'}`,
+    );
 
     const record = await this.prisma.$transaction(async (tx) => {
       const updatedFunnel = await tx.funnel.update({
@@ -1352,6 +1363,39 @@ export class TeamsService {
 
       return right.updatedAt.getTime() - left.updatedAt.getTime();
     })[0] ?? null;
+  }
+
+  private async findSystemTenantFunnelInstanceById(
+    tenantId: string,
+    funnelId: string,
+    funnelInstanceId: string,
+  ) {
+    const normalizedFunnelInstanceId = sanitizeRequiredText(
+      funnelInstanceId,
+      'funnelInstanceId',
+    );
+    const funnelInstance = await this.prisma.funnelInstance.findFirst({
+      where: {
+        id: normalizedFunnelInstanceId,
+        teamId: tenantId,
+        legacyFunnelId: funnelId,
+      },
+      include: {
+        steps: {
+          orderBy: { position: 'asc' },
+        },
+      },
+    });
+
+    if (!funnelInstance) {
+      throw new NotFoundException({
+        code: 'TENANT_FUNNEL_INSTANCE_NOT_FOUND',
+        message:
+          'The requested funnel instance was not found for the selected tenant funnel.',
+      });
+    }
+
+    return funnelInstance;
   }
 
   private async assertSystemTenantExists(id: string) {

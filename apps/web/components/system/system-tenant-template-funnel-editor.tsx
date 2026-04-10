@@ -381,6 +381,7 @@ export function SystemTenantTemplateFunnelEditor({
           {
             method: "PATCH",
             body: JSON.stringify({
+              funnelInstanceId: funnel.funnelInstanceId,
               name: name.trim(),
               description: description.trim() || null,
               settingsJson: funnelSettingsPayload,
