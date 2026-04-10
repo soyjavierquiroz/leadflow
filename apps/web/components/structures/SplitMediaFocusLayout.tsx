@@ -35,6 +35,7 @@ export function SplitMediaFocusLayout({
     <div
       className={joinClasses(
         jakawiPremiumClassNames.scope,
+        "font-body",
         jakawiPremiumClassNames.splitFrame,
         className,
       )}

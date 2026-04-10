@@ -556,7 +556,7 @@ export function PublicGrandSlamOfferBlock({
           {asString(block.headline) ? (
             <h3
               className={cx(
-                "max-w-4xl leading-tight text-slate-950",
+                "font-headline max-w-4xl leading-tight text-slate-950",
                 variant === "flat"
                   ? flatBlockTitleClassName
                   : "text-3xl font-black tracking-tight md:text-4xl",
@@ -567,13 +567,13 @@ export function PublicGrandSlamOfferBlock({
           ) : null}
 
           {offerName ? (
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <p className="font-headline text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
               {offerName}
             </p>
           ) : null}
 
           {offerIntroText ? (
-            <p className="max-w-3xl text-[15px] leading-relaxed text-slate-700">
+            <p className="font-body max-w-3xl text-[15px] leading-relaxed text-slate-700">
               {offerIntroText}
             </p>
           ) : null}
@@ -595,10 +595,10 @@ export function PublicGrandSlamOfferBlock({
           {editorialItems.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-500">
+                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] text-slate-500">
                   Lo que incluye esta oferta
                 </p>
-                <p className="hidden text-xs font-black uppercase tracking-[0.24em] text-slate-400 md:block">
+                <p className="font-headline hidden text-xs font-black uppercase tracking-[0.24em] text-slate-400 md:block">
                   Valor desbloqueado hoy
                 </p>
               </div>
@@ -640,11 +640,11 @@ export function PublicGrandSlamOfferBlock({
                         </span>
 
                         <div className="min-w-0">
-                          <h4 className="text-lg font-black leading-tight text-slate-950">
+                          <h4 className="font-headline text-lg font-black leading-tight text-slate-950">
                             {itemTitle}
                           </h4>
                           {itemDescription ? (
-                            <p className="mt-2 max-w-2xl text-[15px] leading-7 text-slate-600">
+                            <p className="font-body mt-2 max-w-2xl text-[15px] leading-7 text-slate-600">
                               {itemDescription}
                             </p>
                           ) : null}
@@ -653,11 +653,11 @@ export function PublicGrandSlamOfferBlock({
 
                       <div className="shrink-0 md:min-w-[10rem] md:pt-1 md:text-right">
                         {itemValue ? (
-                          <p className="text-base font-semibold tracking-tight text-slate-500 line-through decoration-2 decoration-slate-500/90">
+                          <p className="font-headline text-base font-semibold tracking-tight text-slate-500 line-through decoration-2 decoration-slate-500/90">
                             {itemValue}
                           </p>
                         ) : null}
-                        <p className="text-sm font-black uppercase tracking-[0.2em] text-red-500">
+                        <p className="font-headline text-sm font-black uppercase tracking-[0.2em] text-red-500">
                           Gratis
                         </p>
                       </div>
@@ -671,18 +671,18 @@ export function PublicGrandSlamOfferBlock({
           <div className="border-t border-slate-200/80 pt-7">
             <div className="flex flex-col items-center gap-6 text-center">
               <div className="flex flex-col items-center gap-3 text-center">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-500">
+                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] text-slate-500">
                   Resumen de la oferta
                 </p>
                 {anchorValueText ? (
-                  <p className="text-lg font-medium text-slate-500">
+                  <p className="font-body text-lg font-medium text-slate-500">
                     {anchorValueText}
                   </p>
                 ) : null}
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-400">
+                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] text-slate-400">
                   Precio final
                 </p>
-                <p className="max-w-none whitespace-normal text-4xl font-black leading-tight tracking-tighter text-red-600 [overflow-wrap:normal] [word-break:normal] md:text-6xl">
+                <p className="font-headline max-w-none whitespace-normal text-4xl font-black leading-tight tracking-tighter text-red-600 [overflow-wrap:normal] [word-break:normal] md:text-6xl">
                   {finalPriceDisplay}
                 </p>
               </div>
@@ -726,13 +726,13 @@ export function PublicGrandSlamOfferBlock({
             <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  <p className="font-headline text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
                     Checkout Drawer
                   </p>
-                  <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  <h2 className="font-headline mt-2 text-2xl font-semibold text-slate-950">
                     {ctaLabel}
                   </h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="font-body mt-2 text-sm leading-6 text-slate-600">
                     Reserva la oferta sin salir del funnel. El submit sigue
                     usando el flujo estándar de Leadflow.
                   </p>
@@ -740,7 +740,7 @@ export function PublicGrandSlamOfferBlock({
                 <button
                   type="button"
                   onClick={() => setIsDrawerOpen(false)}
-                  className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                  className="font-headline rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
                   Cerrar
                 </button>

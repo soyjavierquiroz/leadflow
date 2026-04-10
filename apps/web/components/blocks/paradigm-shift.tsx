@@ -48,7 +48,7 @@ export function ParadigmShift({
       <div className="mx-auto max-w-3xl">
         {/* Bloque del Problema */}
         {problemStatement?.trim() ? (
-          <p className="mb-6 text-3xl font-bold text-slate-900 md:text-4xl">
+          <p className="font-headline mb-6 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
             {problemStatement}
           </p>
         ) : null}
@@ -56,19 +56,19 @@ export function ParadigmShift({
         {/* Bloque de Transición y Solución con el margen de separación */}
         <div className="mt-12">
           {transitionMarker?.trim() ? (
-            <span className="block mb-4 text-lg leading-8 text-slate-700 italic">
+            <span className="font-body block mb-4 text-lg leading-8 text-slate-700 italic">
               {transitionMarker}
             </span>
           ) : null}
 
           {solutionHeadline ? (
-            <p className="mb-6 text-3xl font-bold text-slate-900 md:text-4xl">
+            <p className="font-headline mb-6 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
               {solutionHeadline}
             </p>
           ) : null}
 
           {solutionBody ? (
-            <p className="text-lg leading-8 text-slate-700">
+            <p className="font-body text-lg leading-8 text-slate-700">
               {solutionBody}
             </p>
           ) : null}

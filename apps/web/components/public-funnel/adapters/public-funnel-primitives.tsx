@@ -13,7 +13,7 @@ export const cx = (...classes: Array<string | false | null | undefined>) =>
 
 const surfaceToneClasses: Record<SurfaceTone, string> = jakawiPremiumSurfaceToneClasses;
 
-export const flatBlockTitleClassName = jakawiPremiumClassNames.title;
+export const flatBlockTitleClassName = cx("font-headline", jakawiPremiumClassNames.title);
 
 export function PublicSectionSurface({
   children,
@@ -64,7 +64,7 @@ export function PublicEyebrow({
   return (
     <p
       className={cx(
-        "text-xs font-semibold uppercase tracking-[0.28em]",
+        "font-headline text-xs font-semibold uppercase tracking-[0.28em]",
         toneClass,
         className,
       )}
@@ -95,7 +95,7 @@ export function PublicPill({
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em]",
+        "font-headline inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em]",
         toneClass,
         className,
       )}
@@ -140,7 +140,7 @@ export function PublicChecklistItem({
       </div>
       <p
         className={cx(
-          "text-sm leading-6",
+          "font-body text-sm leading-6",
           variant === "flat" ? "text-slate-700" : "text-slate-700",
         )}
       >
@@ -202,17 +202,22 @@ export function PublicStatCard({
     >
       <p
         className={cx(
-          "text-[11px] font-semibold uppercase tracking-[0.24em]",
+          "font-headline text-[11px] font-semibold uppercase tracking-[0.24em]",
           labelTone,
         )}
       >
         {label}
       </p>
-      <p className={cx("mt-3 text-2xl font-semibold tracking-tight", valueTone)}>
+      <p
+        className={cx(
+          "font-headline mt-3 text-2xl font-semibold tracking-tight",
+          valueTone,
+        )}
+      >
         {value}
       </p>
       {description ? (
-        <p className={cx("mt-2 text-sm leading-6", descriptionTone)}>
+        <p className={cx("font-body mt-2 text-sm leading-6", descriptionTone)}>
           {description}
         </p>
       ) : null}
@@ -241,7 +246,7 @@ export function PublicQuoteCard({
     >
       <p
         className={cx(
-          "text-base leading-7",
+          "font-body text-base leading-7",
           variant === "flat" ? "text-slate-700" : "text-slate-700",
         )}
       >
@@ -250,7 +255,7 @@ export function PublicQuoteCard({
       <div className="mt-5">
         <p
           className={cx(
-            "text-sm font-semibold",
+            "font-headline text-sm font-semibold",
             variant === "flat" ? "text-slate-950" : "text-slate-950",
           )}
         >
@@ -259,7 +264,7 @@ export function PublicQuoteCard({
         {detail ? (
           <p
             className={cx(
-              "mt-1 text-sm",
+              "font-body mt-1 text-sm",
               variant === "flat" ? "text-slate-500" : "text-slate-500",
             )}
           >
