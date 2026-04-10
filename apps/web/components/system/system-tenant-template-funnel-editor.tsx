@@ -13,6 +13,7 @@ import {
 } from "@/components/team-operations/hybrid-json-media-editor";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
+import type { FunnelThemeId } from "@/lib/funnel-theme.types";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import type {
@@ -548,7 +549,9 @@ export function SystemTenantTemplateFunnelEditor({
             </span>
             <select
               value={selectedThemeId}
-              onChange={(event) => setSelectedThemeId(event.target.value)}
+              onChange={(event) =>
+                setSelectedThemeId(event.target.value as FunnelThemeId)
+              }
               className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
             >
               {availableFunnelThemes.map((theme) => (
