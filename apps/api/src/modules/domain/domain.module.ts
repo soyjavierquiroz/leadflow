@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdWheelsModule } from '../ad-wheels/ad-wheels.module';
+import { BlockDefinitionsModule } from '../block-definitions/block-definitions.module';
 import { AssignmentsModule } from '../assignments/assignments.module';
 import { ConversionEventMappingsModule } from '../conversion-event-mappings/conversion-event-mappings.module';
 import { DomainsModule } from '../domains/domains.module';
@@ -30,6 +31,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
 @Module({
   imports: [
     AdWheelsModule,
+    BlockDefinitionsModule,
     WorkspacesModule,
     TeamsModule,
     SponsorsModule,
@@ -59,6 +61,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
   ],
   exports: [
     AdWheelsModule,
+    BlockDefinitionsModule,
     WorkspacesModule,
     TeamsModule,
     SponsorsModule,

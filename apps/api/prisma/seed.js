@@ -1,13 +1,52 @@
 const { PrismaClient } = require('@prisma/client');
 const { randomBytes, scryptSync } = require('crypto');
-const salesAuditLandingIntakePack = require('../../web/lib/public-funnel/intake-examples/sales-audit-landing.json');
 
 const prisma = new PrismaClient();
 const DEFAULT_KEY_LENGTH = 64;
 
-function cloneJson(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+const IMMUNOTEC_HOST = 'immunotec.leadflow.local';
+const IMMUNOTEC_TEAM_CODE = 'immunotec';
+const IMMUNOTEC_FUNNEL_CODE = 'immunotec-recuperacion';
+const IMMUNOTEC_TEMPLATE_ID = 'jakawi-premium';
+const IMMUNOTEC_STRUCTURE_ID = 'split-media-focus';
+const IMMUNOTEC_FUNNEL_NAME = 'Immunotec - Recuperación';
+const STICKY_CONVERSION_BAR_DEFINITION = {
+  key: 'sticky_conversion_bar',
+  name: 'Barra Sticky de Conversión',
+  description:
+    'Barra fija superior en desktop y CTA fijo inferior en mobile, activados por scroll.',
+  category: 'conversion',
+  schemaJson: {
+    type: 'sticky_conversion_bar',
+    key: 'string',
+    desktopText: 'string',
+    desktopButtonText: 'string',
+    mobileButtonText: 'string',
+    triggerOffsetPixels: 320,
+    bgColor: '#0f172a',
+    textColor: '#f8fafc',
+    buttonBgColor: '#22c55e',
+    buttonTextColor: '#052e16',
+    borderColor: '#1e293b',
+    href: '#public-capture-form',
+    action: 'scroll_to_capture | open_lead_capture_modal',
+  },
+  exampleJson: {
+    type: 'sticky_conversion_bar',
+    key: 'sticky-conversion-main',
+    desktopText:
+      'Activa tu evaluación personalizada antes de salir de esta página.',
+    desktopButtonText: 'Quiero mi evaluación',
+    mobileButtonText: 'Quiero mi evaluación',
+    triggerOffsetPixels: 320,
+    bgColor: '#0f172a',
+    textColor: '#f8fafc',
+    buttonBgColor: '#22c55e',
+    buttonTextColor: '#052e16',
+    borderColor: '#1e293b',
+    action: 'scroll_to_capture',
+  },
+};
 
 function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
@@ -30,7 +69,224 @@ function normalizeHost(value) {
     .replace(/\.+$/, '');
 }
 
+const jakawiPremiumTemplateData = {
+  name: 'Jakawi Premium',
+  description: 'Template visual premium oficial para funnels editoriales.',
+  code: IMMUNOTEC_TEMPLATE_ID,
+  status: 'active',
+  version: 1,
+  funnelType: 'hybrid',
+  blocksJson: [
+    {
+      type: 'hero',
+      key: 'hero-main',
+      eyebrow: 'Jakawi Premium',
+      title:
+        'Funnel editorial premium listo para captar y convertir con una capa visual unificada',
+      description:
+        'Plantilla oficial del sistema para experiencias premium con layout sticky, narrativa comercial y captura integrada.',
+    },
+    {
+      type: 'hook_and_promise',
+      key: 'hook-main',
+      eyebrow: 'Premium Funnel Engine',
+      hook: 'Convierte tráfico frío en sesiones editoriales con estructura premium, media fija y una propuesta de valor más clara.',
+      promise:
+        'Jakawi Premium unifica identidad visual, bloques comerciales y captura en un runtime consistente para iterar sin deuda visual.',
+    },
+    {
+      type: 'lead_capture_form',
+      key: 'template-capture-form',
+      eyebrow: 'Premium Capture Block',
+      headline: 'Solicita acceso a la experiencia premium',
+      subheadline:
+        'Bloque oficial para capturar contexto comercial dentro del sistema premium sin romper el runtime compartido.',
+      button_text: 'Quiero continuar',
+      helper_text:
+        'Completa tu información para activar el siguiente paso del funnel premium.',
+      privacy_note:
+        'Usamos esta información para procesar tu solicitud y continuar la conversación comercial dentro del funnel premium.',
+      success_mode: 'next_step',
+      fields: [
+        {
+          name: 'fullName',
+          label: 'Nombre completo',
+          type: 'text',
+          required: true,
+          placeholder: 'Tu nombre completo',
+          autocomplete: 'name',
+          width: 'full',
+        },
+        {
+          name: 'phone',
+          label: 'WhatsApp',
+          type: 'tel',
+          required: false,
+          placeholder: '+52 55 0000 0000',
+          autocomplete: 'tel',
+          width: 'half',
+        },
+        {
+          name: 'email',
+          label: 'Email',
+          type: 'email',
+          required: false,
+          placeholder: 'tu@email.com',
+          autocomplete: 'email',
+          width: 'half',
+        },
+        {
+          name: 'utm_source',
+          label: 'UTM Source',
+          type: 'hidden',
+          hidden: true,
+        },
+      ],
+      settings: {
+        capture_url_context: true,
+        source_channel: 'form',
+        tags: ['jakawi-premium', 'lead-capture-form-v1'],
+      },
+    },
+  ],
+  mediaMap: {
+    heroImage:
+      'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80',
+  },
+  settingsJson: {
+    theme: 'jakawi-premium',
+    locale: 'es',
+    structureId: IMMUNOTEC_STRUCTURE_ID,
+  },
+  allowedOverridesJson: {
+    editableFields: [
+      'hero',
+      'hook_and_promise',
+      'social_proof',
+      'feature_grid',
+      'lead_capture_form',
+      'offer_pricing',
+      'faq',
+      'media',
+    ],
+  },
+};
+
+const immunotecBlocks = [
+  {
+    type: 'hero',
+    key: 'immunotec-recuperacion-hero',
+    eyebrow: 'Immunotec',
+    title: 'Recupera tu energía y vuelve a enfocarte en tu bienestar',
+    description:
+      'Publicación ancla de Immunotec para la etapa de recuperación con narrativa clara y captura integrada.',
+  },
+  {
+    type: 'lead_capture_form',
+    key: 'immunotec-recuperacion-form',
+    eyebrow: 'Quiero más información',
+    headline: 'Solicita acompañamiento para tu proceso de recuperación',
+    subheadline:
+      'Déjanos tus datos y te contactaremos con la siguiente recomendación.',
+    button_text: 'Quiero empezar',
+    helper_text:
+      'Usaremos esta información para continuar tu proceso dentro de Leadflow.',
+    success_mode: 'next_step',
+    fields: [
+      {
+        name: 'fullName',
+        label: 'Nombre completo',
+        type: 'text',
+        required: true,
+        placeholder: 'Tu nombre completo',
+        autocomplete: 'name',
+        width: 'full',
+      },
+      {
+        name: 'phone',
+        label: 'WhatsApp',
+        type: 'tel',
+        required: false,
+        placeholder: '+52 55 0000 0000',
+        autocomplete: 'tel',
+        width: 'half',
+      },
+      {
+        name: 'email',
+        label: 'Email',
+        type: 'email',
+        required: false,
+        placeholder: 'tu@email.com',
+        autocomplete: 'email',
+        width: 'half',
+      },
+    ],
+  },
+];
+
+async function purgeWorkspaceSeedData(workspaceId) {
+  await prisma.authSession.deleteMany();
+  await prisma.leadNote.deleteMany({ where: { workspaceId } });
+  await prisma.automationDispatch.deleteMany({ where: { workspaceId } });
+  await prisma.domainEvent.deleteMany({ where: { workspaceId } });
+  await prisma.assignment.deleteMany({ where: { workspaceId } });
+  await prisma.lead.deleteMany({ where: { workspaceId } });
+  await prisma.visitor.deleteMany({ where: { workspaceId } });
+  await prisma.funnelPublication.deleteMany({ where: { workspaceId } });
+  await prisma.funnelStep.deleteMany({ where: { workspaceId } });
+  await prisma.funnelInstance.deleteMany({ where: { workspaceId } });
+  await prisma.domain.deleteMany({ where: { workspaceId } });
+  await prisma.funnel.deleteMany({ where: { workspaceId } });
+  await prisma.messagingConnection.deleteMany({ where: { workspaceId } });
+  await prisma.rotationMember.deleteMany();
+  await prisma.rotationPool.deleteMany({ where: { workspaceId } });
+  await prisma.conversionEventMapping.deleteMany({
+    where: {
+      trackingProfile: {
+        workspaceId,
+      },
+    },
+  });
+  await prisma.trackingProfile.deleteMany({ where: { workspaceId } });
+  await prisma.sponsor.deleteMany({ where: { workspaceId } });
+  await prisma.handoffStrategy.deleteMany({ where: { workspaceId } });
+  await prisma.user.deleteMany({
+    where: {
+      workspaceId,
+      role: {
+        not: 'SUPER_ADMIN',
+      },
+    },
+  });
+  await prisma.team.deleteMany({ where: { workspaceId } });
+
+  await prisma.funnelTemplate.deleteMany({
+    where: {
+      workspaceId: null,
+      code: {
+        in: ['lf-simple-capture-v1', 'lf-vsl-qualification-v1'],
+      },
+    },
+  });
+}
+
 async function main() {
+  await prisma.blockDefinition.upsert({
+    where: { key: STICKY_CONVERSION_BAR_DEFINITION.key },
+    update: {
+      name: STICKY_CONVERSION_BAR_DEFINITION.name,
+      description: STICKY_CONVERSION_BAR_DEFINITION.description,
+      category: STICKY_CONVERSION_BAR_DEFINITION.category,
+      schemaJson: STICKY_CONVERSION_BAR_DEFINITION.schemaJson,
+      exampleJson: STICKY_CONVERSION_BAR_DEFINITION.exampleJson,
+      isActive: true,
+    },
+    create: {
+      ...STICKY_CONVERSION_BAR_DEFINITION,
+      isActive: true,
+    },
+  });
+
   const workspace = await prisma.workspace.upsert({
     where: { slug: 'leadflow-dev' },
     update: {
@@ -39,7 +295,7 @@ async function main() {
       timezone: 'UTC',
       defaultCurrency: 'USD',
       primaryLocale: 'es',
-      primaryDomain: 'localhost',
+      primaryDomain: IMMUNOTEC_HOST,
     },
     create: {
       name: 'Leadflow Dev Workspace',
@@ -48,147 +304,11 @@ async function main() {
       timezone: 'UTC',
       defaultCurrency: 'USD',
       primaryLocale: 'es',
-      primaryDomain: 'localhost',
+      primaryDomain: IMMUNOTEC_HOST,
     },
   });
 
-  const team = await prisma.team.upsert({
-    where: {
-      workspaceId_code: {
-        workspaceId: workspace.id,
-        code: 'sales-core',
-      },
-    },
-    update: {
-      name: 'Sales Core',
-      status: 'active',
-      description: 'Equipo comercial base para desarrollo.',
-    },
-    create: {
-      workspaceId: workspace.id,
-      name: 'Sales Core',
-      code: 'sales-core',
-      status: 'active',
-      description: 'Equipo comercial base para desarrollo.',
-    },
-  });
-
-  const sponsorA = await prisma.sponsor.upsert({
-    where: { id: '3be5f7f2-c6ae-47cb-a2bb-e1c869f7db11' },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      displayName: 'Ana Sponsor',
-      status: 'active',
-      email: 'ana@leadflow.local',
-      phone: '+52 55 5000 0099',
-      availabilityStatus: 'available',
-      routingWeight: 1,
-      memberPortalEnabled: true,
-    },
-    create: {
-      id: '3be5f7f2-c6ae-47cb-a2bb-e1c869f7db11',
-      workspaceId: workspace.id,
-      teamId: team.id,
-      displayName: 'Ana Sponsor',
-      status: 'active',
-      email: 'ana@leadflow.local',
-      phone: '+52 55 5000 0099',
-      availabilityStatus: 'available',
-      routingWeight: 1,
-      memberPortalEnabled: true,
-    },
-  });
-
-  const sponsorB = await prisma.sponsor.upsert({
-    where: { id: '88623ff4-fb9c-4040-b737-fca5ae259c79' },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      displayName: 'Bruno Sponsor',
-      status: 'active',
-      email: 'bruno@leadflow.local',
-      phone: '+52 55 5000 0199',
-      availabilityStatus: 'available',
-      routingWeight: 1,
-      memberPortalEnabled: true,
-    },
-    create: {
-      id: '88623ff4-fb9c-4040-b737-fca5ae259c79',
-      workspaceId: workspace.id,
-      teamId: team.id,
-      displayName: 'Bruno Sponsor',
-      status: 'active',
-      email: 'bruno@leadflow.local',
-      phone: '+52 55 5000 0199',
-      availabilityStatus: 'available',
-      routingWeight: 1,
-      memberPortalEnabled: true,
-    },
-  });
-
-  await prisma.messagingConnection.upsert({
-    where: { sponsorId: sponsorA.id },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      provider: 'EVOLUTION',
-      status: 'connected',
-      externalInstanceId: 'leadflow-sales-core-ana-sponsor-3be5f7f2',
-      phone: sponsorA.phone,
-      normalizedPhone: '525550000099',
-      qrCodeData: null,
-      pairingCode: null,
-      pairingExpiresAt: null,
-      automationWebhookUrl:
-        'https://n8n.leadflow.kuruk.in/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
-      automationEnabled: true,
-      metadataJson: {
-        seeded: true,
-        providerState: 'open',
-        note: 'Demo channel connection for Messaging Integrations v1.',
-      },
-      lastSyncedAt: new Date(),
-      lastConnectedAt: new Date(),
-      lastDisconnectedAt: null,
-      lastErrorAt: null,
-      lastErrorMessage: null,
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      sponsorId: sponsorA.id,
-      provider: 'EVOLUTION',
-      status: 'connected',
-      externalInstanceId: 'leadflow-sales-core-ana-sponsor-3be5f7f2',
-      phone: sponsorA.phone,
-      normalizedPhone: '525550000099',
-      qrCodeData: null,
-      pairingCode: null,
-      pairingExpiresAt: null,
-      automationWebhookUrl:
-        'https://n8n.leadflow.kuruk.in/webhook/leadflow/leadflow-sales-core-ana-sponsor-3be5f7f2',
-      automationEnabled: true,
-      metadataJson: {
-        seeded: true,
-        providerState: 'open',
-        note: 'Demo channel connection for Messaging Integrations v1.',
-      },
-      lastSyncedAt: new Date(),
-      lastConnectedAt: new Date(),
-      lastDisconnectedAt: null,
-      lastErrorAt: null,
-      lastErrorMessage: null,
-    },
-  });
-
-  await prisma.authSession.deleteMany();
-  await prisma.leadNote.deleteMany();
-  await prisma.automationDispatch.deleteMany();
-  await prisma.domainEvent.deleteMany();
-  await prisma.assignment.deleteMany();
-  await prisma.lead.deleteMany();
-  await prisma.visitor.deleteMany();
+  await purgeWorkspaceSeedData(workspace.id);
 
   await prisma.user.upsert({
     where: { email: 'admin@leadflow.local' },
@@ -211,136 +331,37 @@ async function main() {
     },
   });
 
-  const teamAdminUser = await prisma.user.upsert({
-    where: { email: 'team@leadflow.local' },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      fullName: 'Leadflow Team Admin',
-      passwordHash: hashPassword('Team123!'),
-      role: 'TEAM_ADMIN',
-      status: 'active',
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      fullName: 'Leadflow Team Admin',
-      email: 'team@leadflow.local',
-      passwordHash: hashPassword('Team123!'),
-      role: 'TEAM_ADMIN',
-      status: 'active',
-    },
-  });
-
-  const teamAdminSponsor = await prisma.sponsor.upsert({
-    where: { id: 'c1f18c79-6504-4427-a74d-f10be0a84501' },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      displayName: 'Leadflow Team Admin',
-      status: 'active',
-      isActive: true,
-      email: 'team@leadflow.local',
-      phone: '+57 300 555 0199',
-      availabilityStatus: 'available',
-      routingWeight: 1,
-      memberPortalEnabled: true,
-    },
-    create: {
-      id: 'c1f18c79-6504-4427-a74d-f10be0a84501',
-      workspaceId: workspace.id,
-      teamId: team.id,
-      displayName: 'Leadflow Team Admin',
-      status: 'active',
-      isActive: true,
-      email: 'team@leadflow.local',
-      phone: '+57 300 555 0199',
-      availabilityStatus: 'available',
-      routingWeight: 1,
-      memberPortalEnabled: true,
-    },
-  });
-
-  await prisma.user.update({
-    where: { id: teamAdminUser.id },
-    data: {
-      sponsorId: teamAdminSponsor.id,
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { email: 'ana.member@leadflow.local' },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      sponsorId: sponsorA.id,
-      fullName: 'Ana Member',
-      passwordHash: hashPassword('Member123!'),
-      role: 'MEMBER',
-      status: 'active',
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      sponsorId: sponsorA.id,
-      fullName: 'Ana Member',
-      email: 'ana.member@leadflow.local',
-      passwordHash: hashPassword('Member123!'),
-      role: 'MEMBER',
-      status: 'active',
-    },
-  });
-
-  await prisma.user.upsert({
-    where: { email: 'bruno.member@leadflow.local' },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      sponsorId: sponsorB.id,
-      fullName: 'Bruno Member',
-      passwordHash: hashPassword('Member456!'),
-      role: 'MEMBER',
-      status: 'active',
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      sponsorId: sponsorB.id,
-      fullName: 'Bruno Member',
-      email: 'bruno.member@leadflow.local',
-      passwordHash: hashPassword('Member456!'),
-      role: 'MEMBER',
-      status: 'active',
-    },
-  });
-
-  await prisma.team.update({
-    where: { id: team.id },
-    data: {
-      managerUserId: teamAdminUser.id,
-    },
-  });
-
-  const rotationPool = await prisma.rotationPool.upsert({
+  const team = await prisma.team.upsert({
     where: {
-      workspaceId_name: {
+      workspaceId_code: {
         workspaceId: workspace.id,
-        name: 'Primary Sales Pool',
+        code: IMMUNOTEC_TEAM_CODE,
       },
     },
     update: {
-      teamId: team.id,
+      name: 'Immunotec',
       status: 'active',
-      strategy: 'round_robin',
-      isFallbackPool: false,
+      description: 'Tenant oficial para la publicación ancla de Immunotec.',
     },
     create: {
       workspaceId: workspace.id,
-      teamId: team.id,
-      name: 'Primary Sales Pool',
+      name: 'Immunotec',
+      code: IMMUNOTEC_TEAM_CODE,
       status: 'active',
-      strategy: 'round_robin',
-      isFallbackPool: false,
+      description: 'Tenant oficial para la publicación ancla de Immunotec.',
+    },
+  });
+
+  const funnelTemplate = await prisma.funnelTemplate.upsert({
+    where: { code: IMMUNOTEC_TEMPLATE_ID },
+    update: {
+      ...jakawiPremiumTemplateData,
+      defaultHandoffStrategyId: null,
+    },
+    create: {
+      id: IMMUNOTEC_TEMPLATE_ID,
+      ...jakawiPremiumTemplateData,
+      defaultHandoffStrategyId: null,
     },
   });
 
@@ -348,41 +369,50 @@ async function main() {
     where: {
       workspaceId_code: {
         workspaceId: workspace.id,
-        code: 'core-acquisition',
+        code: IMMUNOTEC_FUNNEL_CODE,
       },
     },
     update: {
-      name: 'Core Acquisition Legacy',
+      name: IMMUNOTEC_FUNNEL_NAME,
       status: 'active',
+      config: {
+        structureId: IMMUNOTEC_STRUCTURE_ID,
+        templateId: IMMUNOTEC_TEMPLATE_ID,
+      },
       stages: ['captured', 'qualified', 'assigned'],
       entrySources: ['manual', 'form', 'landing_page', 'api'],
       defaultTeamId: team.id,
-      defaultRotationPoolId: rotationPool.id,
+      defaultRotationPoolId: null,
     },
     create: {
       workspaceId: workspace.id,
-      name: 'Core Acquisition Legacy',
-      code: 'core-acquisition',
+      name: IMMUNOTEC_FUNNEL_NAME,
+      code: IMMUNOTEC_FUNNEL_CODE,
+      config: {
+        structureId: IMMUNOTEC_STRUCTURE_ID,
+        templateId: IMMUNOTEC_TEMPLATE_ID,
+      },
       status: 'active',
       stages: ['captured', 'qualified', 'assigned'],
       entrySources: ['manual', 'form', 'landing_page', 'api'],
       defaultTeamId: team.id,
-      defaultRotationPoolId: rotationPool.id,
+      defaultRotationPoolId: null,
     },
   });
 
   const domain = await prisma.domain.upsert({
-    where: { normalizedHost: 'localhost' },
+    where: { normalizedHost: normalizeHost(IMMUNOTEC_HOST) },
     update: {
       workspaceId: workspace.id,
       teamId: team.id,
-      host: 'localhost',
-      normalizedHost: 'localhost',
+      linkedFunnelId: legacyFunnel.id,
+      host: IMMUNOTEC_HOST,
+      normalizedHost: normalizeHost(IMMUNOTEC_HOST),
       status: 'active',
       onboardingStatus: 'active',
       domainType: 'system_subdomain',
       isPrimary: true,
-      canonicalHost: 'localhost',
+      canonicalHost: IMMUNOTEC_HOST,
       redirectToPrimary: false,
       verificationStatus: 'verified',
       sslStatus: 'active',
@@ -396,13 +426,14 @@ async function main() {
     create: {
       workspaceId: workspace.id,
       teamId: team.id,
-      host: 'localhost',
-      normalizedHost: 'localhost',
+      linkedFunnelId: legacyFunnel.id,
+      host: IMMUNOTEC_HOST,
+      normalizedHost: normalizeHost(IMMUNOTEC_HOST),
       status: 'active',
       onboardingStatus: 'active',
       domainType: 'system_subdomain',
       isPrimary: true,
-      canonicalHost: 'localhost',
+      canonicalHost: IMMUNOTEC_HOST,
       redirectToPrimary: false,
       verificationStatus: 'verified',
       sslStatus: 'active',
@@ -412,469 +443,6 @@ async function main() {
       dnsTarget: null,
       lastCloudflareSyncAt: null,
       activatedAt: new Date(),
-    },
-  });
-
-  const secondaryDomainHost = 'promo.acme.test';
-  const secondaryDomain = await prisma.domain.upsert({
-    where: { normalizedHost: normalizeHost(secondaryDomainHost) },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      host: secondaryDomainHost,
-      normalizedHost: normalizeHost(secondaryDomainHost),
-      status: 'active',
-      onboardingStatus: 'active',
-      domainType: 'custom_subdomain',
-      isPrimary: false,
-      canonicalHost: secondaryDomainHost,
-      redirectToPrimary: false,
-      verificationStatus: 'verified',
-      sslStatus: 'active',
-      verificationMethod: 'cname',
-      cloudflareCustomHostnameId: 'cf-custom-hostname-promo-acme-test',
-      cloudflareStatusJson: {
-        id: 'cf-custom-hostname-promo-acme-test',
-        hostname: secondaryDomainHost,
-        status: 'active',
-        customOriginServer: 'proxy-fallback.leadflow.kuruk.in',
-        verificationErrors: [],
-        ownershipVerification: null,
-        ssl: {
-          status: 'active',
-          method: 'http',
-          type: 'dv',
-          validationErrors: [],
-          validationRecords: [],
-        },
-        error: null,
-        raw: null,
-      },
-      dnsTarget: 'customers.leadflow.kuruk.in',
-      lastCloudflareSyncAt: new Date(),
-      activatedAt: new Date(),
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      host: secondaryDomainHost,
-      normalizedHost: normalizeHost(secondaryDomainHost),
-      status: 'active',
-      onboardingStatus: 'active',
-      domainType: 'custom_subdomain',
-      isPrimary: false,
-      canonicalHost: secondaryDomainHost,
-      redirectToPrimary: false,
-      verificationStatus: 'verified',
-      sslStatus: 'active',
-      verificationMethod: 'cname',
-      cloudflareCustomHostnameId: 'cf-custom-hostname-promo-acme-test',
-      cloudflareStatusJson: {
-        id: 'cf-custom-hostname-promo-acme-test',
-        hostname: secondaryDomainHost,
-        status: 'active',
-        customOriginServer: 'proxy-fallback.leadflow.kuruk.in',
-        verificationErrors: [],
-        ownershipVerification: null,
-        ssl: {
-          status: 'active',
-          method: 'http',
-          type: 'dv',
-          validationErrors: [],
-          validationRecords: [],
-        },
-        error: null,
-        raw: null,
-      },
-      dnsTarget: 'customers.leadflow.kuruk.in',
-      lastCloudflareSyncAt: new Date(),
-      activatedAt: new Date(),
-    },
-  });
-
-  const pendingDomainHost = 'cliente-demo.acme.test';
-  await prisma.domain.upsert({
-    where: { normalizedHost: normalizeHost(pendingDomainHost) },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      host: pendingDomainHost,
-      normalizedHost: normalizeHost(pendingDomainHost),
-      status: 'draft',
-      onboardingStatus: 'pending_dns',
-      domainType: 'custom_subdomain',
-      isPrimary: false,
-      canonicalHost: pendingDomainHost,
-      redirectToPrimary: false,
-      verificationStatus: 'pending',
-      sslStatus: 'pending',
-      verificationMethod: 'cname',
-      cloudflareCustomHostnameId: null,
-      cloudflareStatusJson: null,
-      dnsTarget: 'customers.leadflow.kuruk.in',
-      lastCloudflareSyncAt: null,
-      activatedAt: null,
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      host: pendingDomainHost,
-      normalizedHost: normalizeHost(pendingDomainHost),
-      status: 'draft',
-      onboardingStatus: 'pending_dns',
-      domainType: 'custom_subdomain',
-      isPrimary: false,
-      canonicalHost: pendingDomainHost,
-      redirectToPrimary: false,
-      verificationStatus: 'pending',
-      sslStatus: 'pending',
-      verificationMethod: 'cname',
-      cloudflareCustomHostnameId: null,
-      cloudflareStatusJson: null,
-      dnsTarget: 'customers.leadflow.kuruk.in',
-      lastCloudflareSyncAt: null,
-      activatedAt: null,
-    },
-  });
-
-  const thankYouHandoffStrategy = await prisma.handoffStrategy.upsert({
-    where: {
-      workspaceId_teamId_name: {
-        workspaceId: workspace.id,
-        teamId: team.id,
-        name: 'Thank You WhatsApp Handoff',
-      },
-    },
-    update: {
-      type: 'content_continuation',
-      status: 'active',
-      settingsJson: {
-        mode: 'thank_you_then_whatsapp',
-        channel: 'whatsapp',
-        buttonLabel: 'Hablar por WhatsApp',
-        autoRedirect: false,
-        messageTemplate:
-          'Hola {{sponsorName}}, soy {{leadName}}. Acabo de completar {{funnelName}} y quiero continuar por WhatsApp.',
-      },
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      name: 'Thank You WhatsApp Handoff',
-      type: 'content_continuation',
-      status: 'active',
-      settingsJson: {
-        mode: 'thank_you_then_whatsapp',
-        channel: 'whatsapp',
-        buttonLabel: 'Hablar por WhatsApp',
-        autoRedirect: false,
-        messageTemplate:
-          'Hola {{sponsorName}}, soy {{leadName}}. Acabo de completar {{funnelName}} y quiero continuar por WhatsApp.',
-      },
-    },
-  });
-
-  const immediateWhatsappHandoffStrategy = await prisma.handoffStrategy.upsert({
-    where: {
-      workspaceId_teamId_name: {
-        workspaceId: workspace.id,
-        teamId: team.id,
-        name: 'Immediate WhatsApp Handoff',
-      },
-    },
-    update: {
-      type: 'immediate_whatsapp',
-      status: 'active',
-      settingsJson: {
-        mode: 'immediate_whatsapp',
-        channel: 'whatsapp',
-        buttonLabel: 'Abrir WhatsApp ahora',
-        autoRedirect: true,
-        autoRedirectDelayMs: 1200,
-        messageTemplate:
-          'Hola {{sponsorName}}, soy {{leadName}}. Acabo de enviar mis datos en {{funnelName}} ({{publicationPath}}) y quiero continuar.',
-      },
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      name: 'Immediate WhatsApp Handoff',
-      type: 'immediate_whatsapp',
-      status: 'active',
-      settingsJson: {
-        mode: 'immediate_whatsapp',
-        channel: 'whatsapp',
-        buttonLabel: 'Abrir WhatsApp ahora',
-        autoRedirect: true,
-        autoRedirectDelayMs: 1200,
-        messageTemplate:
-          'Hola {{sponsorName}}, soy {{leadName}}. Acabo de enviar mis datos en {{funnelName}} ({{publicationPath}}) y quiero continuar.',
-      },
-    },
-  });
-
-  const trackingProfile = await prisma.trackingProfile.upsert({
-    where: {
-      teamId_name: {
-        teamId: team.id,
-        name: 'Meta Core Tracking',
-      },
-    },
-    update: {
-      workspaceId: workspace.id,
-      provider: 'meta',
-      status: 'active',
-      deduplicationMode: 'browser_server',
-      configJson: {
-        pixelId: 'META-DEV-PIXEL',
-        conversionsApiEnabled: false,
-      },
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      name: 'Meta Core Tracking',
-      provider: 'meta',
-      status: 'active',
-      deduplicationMode: 'browser_server',
-      configJson: {
-        pixelId: 'META-DEV-PIXEL',
-        conversionsApiEnabled: false,
-      },
-    },
-  });
-
-  await prisma.conversionEventMapping.deleteMany({
-    where: { trackingProfileId: trackingProfile.id },
-  });
-
-  await prisma.conversionEventMapping.createMany({
-    data: [
-      {
-        trackingProfileId: trackingProfile.id,
-        internalEventName: 'lead_created',
-        providerEventName: 'Lead',
-        isBrowserSide: true,
-        isServerSide: true,
-        isCriticalConversion: true,
-      },
-      {
-        trackingProfileId: trackingProfile.id,
-        internalEventName: 'handoff_started',
-        providerEventName: 'Contact',
-        isBrowserSide: true,
-        isServerSide: false,
-        isCriticalConversion: false,
-      },
-    ],
-  });
-
-  const funnelTemplate = await prisma.funnelTemplate.upsert({
-    where: { code: 'lf-simple-capture-v1' },
-    update: {
-      name: 'Leadflow Simple Capture v1',
-      status: 'active',
-      version: 1,
-      funnelType: 'simple_capture',
-      blocksJson: {
-        blocks: [
-          {
-            type: 'hero',
-            key: 'hero-main',
-            eyebrow: 'Leadflow Revenue Engine',
-            title:
-              'Funnels públicos listos para capturar y derivar oportunidades reales',
-            description:
-              'Este template base publica funnels por host + path y compone bloques comerciales reutilizables sin romper el runtime estándar.',
-          },
-          {
-            type: 'hook_and_promise',
-            key: 'hook-main',
-            eyebrow: 'Captación declarativa',
-            hook: 'Convierte tráfico frío en conversaciones listas para handoff sin depender de páginas hechas a mano.',
-            promise:
-              'Leadflow deja el funnel, la captura, el assignment, el reveal y el handoff en un runtime JSON-driven listo para iterar.',
-          },
-          {
-            type: 'lead_capture_form',
-            key: 'template-capture-form',
-            eyebrow: 'Lead Capture Form Block v1',
-            headline: 'Solicita una demo del flujo comercial',
-            subheadline:
-              'Bloque real del runtime para capturar contacto, contexto y continuidad usando el motor estándar de Leadflow.',
-            button_text: 'Quiero mi demo',
-            helper_text:
-              'Completa nombre y un medio de contacto para continuar al siguiente step.',
-            privacy_note:
-              'Usamos esta información para procesar tu solicitud y continuar la conversación comercial dentro del funnel.',
-            success_mode: 'next_step',
-            fields: [
-              {
-                name: 'fullName',
-                label: 'Nombre completo',
-                type: 'text',
-                required: true,
-                placeholder: 'Tu nombre completo',
-                autocomplete: 'name',
-                width: 'full',
-              },
-              {
-                name: 'phone',
-                label: 'WhatsApp',
-                type: 'tel',
-                required: false,
-                placeholder: '+52 55 0000 0000',
-                autocomplete: 'tel',
-                width: 'half',
-              },
-              {
-                name: 'email',
-                label: 'Email',
-                type: 'email',
-                required: false,
-                placeholder: 'tu@email.com',
-                autocomplete: 'email',
-                width: 'half',
-              },
-              {
-                name: 'utm_source',
-                label: 'UTM Source',
-                type: 'hidden',
-                hidden: true,
-              },
-            ],
-            settings: {
-              capture_url_context: true,
-              source_channel: 'form',
-              tags: ['runtime-v1', 'lead-capture-form-v1'],
-            },
-          },
-        ],
-      },
-      mediaMap: {
-        heroImage:
-          'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80',
-      },
-      settingsJson: {
-        theme: 'runtime-v1',
-        locale: 'es',
-      },
-      allowedOverridesJson: {
-        editableFields: [
-          'hero',
-          'hook_and_promise',
-          'social_proof',
-          'feature_grid',
-          'lead_capture_form',
-          'offer_pricing',
-          'faq',
-          'media',
-        ],
-      },
-      defaultHandoffStrategyId: thankYouHandoffStrategy.id,
-    },
-    create: {
-      name: 'Leadflow Simple Capture v1',
-      code: 'lf-simple-capture-v1',
-      status: 'active',
-      version: 1,
-      funnelType: 'simple_capture',
-      blocksJson: {
-        blocks: [
-          {
-            type: 'hero',
-            key: 'hero-main',
-            eyebrow: 'Leadflow Revenue Engine',
-            title:
-              'Funnels públicos listos para capturar y derivar oportunidades reales',
-            description:
-              'Este template base publica funnels por host + path y compone bloques comerciales reutilizables sin romper el runtime estándar.',
-          },
-          {
-            type: 'hook_and_promise',
-            key: 'hook-main',
-            eyebrow: 'Captación declarativa',
-            hook: 'Convierte tráfico frío en conversaciones listas para handoff sin depender de páginas hechas a mano.',
-            promise:
-              'Leadflow deja el funnel, la captura, el assignment, el reveal y el handoff en un runtime JSON-driven listo para iterar.',
-          },
-          {
-            type: 'lead_capture_form',
-            key: 'template-capture-form',
-            eyebrow: 'Lead Capture Form Block v1',
-            headline: 'Solicita una demo del flujo comercial',
-            subheadline:
-              'Bloque real del runtime para capturar contacto, contexto y continuidad usando el motor estándar de Leadflow.',
-            button_text: 'Quiero mi demo',
-            helper_text:
-              'Completa nombre y un medio de contacto para continuar al siguiente step.',
-            privacy_note:
-              'Usamos esta información para procesar tu solicitud y continuar la conversación comercial dentro del funnel.',
-            success_mode: 'next_step',
-            fields: [
-              {
-                name: 'fullName',
-                label: 'Nombre completo',
-                type: 'text',
-                required: true,
-                placeholder: 'Tu nombre completo',
-                autocomplete: 'name',
-                width: 'full',
-              },
-              {
-                name: 'phone',
-                label: 'WhatsApp',
-                type: 'tel',
-                required: false,
-                placeholder: '+52 55 0000 0000',
-                autocomplete: 'tel',
-                width: 'half',
-              },
-              {
-                name: 'email',
-                label: 'Email',
-                type: 'email',
-                required: false,
-                placeholder: 'tu@email.com',
-                autocomplete: 'email',
-                width: 'half',
-              },
-              {
-                name: 'utm_source',
-                label: 'UTM Source',
-                type: 'hidden',
-                hidden: true,
-              },
-            ],
-            settings: {
-              capture_url_context: true,
-              source_channel: 'form',
-              tags: ['runtime-v1', 'lead-capture-form-v1'],
-            },
-          },
-        ],
-      },
-      mediaMap: {
-        heroImage:
-          'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80',
-      },
-      settingsJson: {
-        theme: 'runtime-v1',
-        locale: 'es',
-      },
-      allowedOverridesJson: {
-        editableFields: [
-          'hero',
-          'hook_and_promise',
-          'social_proof',
-          'feature_grid',
-          'lead_capture_form',
-          'offer_pricing',
-          'faq',
-          'media',
-        ],
-      },
-      defaultHandoffStrategyId: thankYouHandoffStrategy.id,
     },
   });
 
@@ -882,28 +450,37 @@ async function main() {
     where: {
       teamId_code: {
         teamId: team.id,
-        code: 'sales-core-capture',
+        code: IMMUNOTEC_FUNNEL_CODE,
       },
     },
     update: {
       workspaceId: workspace.id,
       templateId: funnelTemplate.id,
       legacyFunnelId: legacyFunnel.id,
-      name: 'Sales Core Capture',
+      name: IMMUNOTEC_FUNNEL_NAME,
       status: 'active',
-      rotationPoolId: rotationPool.id,
-      trackingProfileId: trackingProfile.id,
-      handoffStrategyId: thankYouHandoffStrategy.id,
+      rotationPoolId: null,
+      trackingProfileId: null,
+      handoffStrategyId: null,
       settingsJson: {
-        theme: 'signal',
+        theme: 'jakawi-premium',
         locale: 'es',
-        badge: 'Equipo Sales Core',
+        structureId: IMMUNOTEC_STRUCTURE_ID,
+        hybridEditor: {
+          mode: 'data-driven-assembly',
+          structureId: IMMUNOTEC_STRUCTURE_ID,
+          templateId: IMMUNOTEC_TEMPLATE_ID,
+          blocksJson: immunotecBlocks,
+        },
+        seo: {
+          title: IMMUNOTEC_FUNNEL_NAME,
+          metaDescription:
+            'Publicación ancla de recuperación para Immunotec dentro de Leadflow.',
+        },
       },
       mediaMap: {
         heroImage:
-          'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
-        introVideo:
-          'https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-runtime-v1',
+          'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1200&q=80',
       },
     },
     create: {
@@ -911,22 +488,31 @@ async function main() {
       teamId: team.id,
       templateId: funnelTemplate.id,
       legacyFunnelId: legacyFunnel.id,
-      name: 'Sales Core Capture',
-      code: 'sales-core-capture',
+      name: IMMUNOTEC_FUNNEL_NAME,
+      code: IMMUNOTEC_FUNNEL_CODE,
       status: 'active',
-      rotationPoolId: rotationPool.id,
-      trackingProfileId: trackingProfile.id,
-      handoffStrategyId: thankYouHandoffStrategy.id,
+      rotationPoolId: null,
+      trackingProfileId: null,
+      handoffStrategyId: null,
       settingsJson: {
-        theme: 'signal',
+        theme: 'jakawi-premium',
         locale: 'es',
-        badge: 'Equipo Sales Core',
+        structureId: IMMUNOTEC_STRUCTURE_ID,
+        hybridEditor: {
+          mode: 'data-driven-assembly',
+          structureId: IMMUNOTEC_STRUCTURE_ID,
+          templateId: IMMUNOTEC_TEMPLATE_ID,
+          blocksJson: immunotecBlocks,
+        },
+        seo: {
+          title: IMMUNOTEC_FUNNEL_NAME,
+          metaDescription:
+            'Publicación ancla de recuperación para Immunotec dentro de Leadflow.',
+        },
       },
       mediaMap: {
         heroImage:
-          'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
-        introVideo:
-          'https://www.youtube.com/embed/dQw4w9WgXcQ?si=leadflow-runtime-v1',
+          'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1200&q=80',
       },
     },
   });
@@ -935,143 +521,40 @@ async function main() {
     where: { funnelInstanceId: funnelInstance.id },
   });
 
-  await prisma.funnelStep.createMany({
-    data: [
-      {
-        workspaceId: workspace.id,
-        teamId: team.id,
-        funnelInstanceId: funnelInstance.id,
-        stepType: 'landing',
-        slug: 'landing',
-        position: 1,
-        isEntryStep: true,
-        isConversionStep: false,
-        blocksJson: cloneJson(salesAuditLandingIntakePack),
-        mediaMap: {
-          heroImage:
-            'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
-        },
-        settingsJson: {
-          title: 'Landing principal',
-          summary:
-            'Entrada del funnel publicado usando intake pack compatible.',
-        },
-      },
-      {
-        workspaceId: workspace.id,
-        teamId: team.id,
-        funnelInstanceId: funnelInstance.id,
-        stepType: 'thank_you',
-        slug: 'gracias',
-        position: 2,
-        isEntryStep: false,
-        isConversionStep: true,
-        blocksJson: {
-          blocks: [
-            {
-              type: 'thank_you_reveal',
-              key: 'thank-you-reveal-main',
-              eyebrow: 'Lead capturado',
-              headline: 'Tu solicitud ya quedó registrada y asignada',
-              subheadline:
-                'Este step combina confirmación visible con reveal usando el contexto real de la sesión.',
-              reveal_headline: 'Sponsor asignado para continuar contigo',
-              reveal_subheadline:
-                'Mostramos al sponsor real y mantenemos la continuidad del handoff sin salirnos del runtime público.',
-            },
-            {
-              type: 'whatsapp_handoff_cta',
-              key: 'whatsapp-handoff-main',
-              headline: 'Continúa por WhatsApp',
-              subheadline:
-                'Cuando el sponsor ya está resuelto, este bloque usa el contexto del runtime para disparar la continuidad comercial.',
-              button_text: 'Abrir WhatsApp ahora',
-              helper_text:
-                'Si el handoff no se abre automáticamente, este CTA mantiene el siguiente paso visible.',
-            },
-            {
-              type: 'cta',
-              key: 'cta-back-home',
-              label: 'Volver al inicio del funnel',
-              action: 'entry_step',
-              variant: 'secondary',
-            },
-          ],
-        },
-        mediaMap: {
-          confirmationIllustration:
-            'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1200&q=80',
-        },
-        settingsJson: {
-          title: 'Gracias por visitar el funnel',
-          nextAction: 'whatsapp_handoff',
-        },
-      },
-    ],
-  });
-
-  const rootPublication = await prisma.funnelPublication.upsert({
-    where: {
-      domainId_pathPrefix: {
-        domainId: domain.id,
-        pathPrefix: '/',
-      },
-    },
-    update: {
+  await prisma.funnelStep.create({
+    data: {
       workspaceId: workspace.id,
       teamId: team.id,
       funnelInstanceId: funnelInstance.id,
-      trackingProfileId: trackingProfile.id,
-      handoffStrategyId: thankYouHandoffStrategy.id,
-      status: 'active',
-      isPrimary: true,
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      domainId: domain.id,
-      funnelInstanceId: funnelInstance.id,
-      trackingProfileId: trackingProfile.id,
-      handoffStrategyId: thankYouHandoffStrategy.id,
-      pathPrefix: '/',
-      status: 'active',
-      isPrimary: true,
-    },
-  });
-
-  const opportunityPublication = await prisma.funnelPublication.upsert({
-    where: {
-      domainId_pathPrefix: {
-        domainId: domain.id,
-        pathPrefix: '/oportunidad',
+      stepType: 'landing',
+      slug: 'landing',
+      position: 1,
+      isEntryStep: true,
+      isConversionStep: false,
+      blocksJson: immunotecBlocks,
+      mediaMap: {
+        heroImage:
+          'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1200&q=80',
       },
-    },
-    update: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      funnelInstanceId: funnelInstance.id,
-      trackingProfileId: trackingProfile.id,
-      handoffStrategyId: immediateWhatsappHandoffStrategy.id,
-      status: 'active',
-      isPrimary: false,
-    },
-    create: {
-      workspaceId: workspace.id,
-      teamId: team.id,
-      domainId: domain.id,
-      funnelInstanceId: funnelInstance.id,
-      trackingProfileId: trackingProfile.id,
-      handoffStrategyId: immediateWhatsappHandoffStrategy.id,
-      pathPrefix: '/oportunidad',
-      status: 'active',
-      isPrimary: false,
+      settingsJson: {
+        editorSource: 'team-publications-new-vsl',
+        templateCode: IMMUNOTEC_TEMPLATE_ID,
+        hybridRenderer: 'jakawi-bridge',
+        structureId: IMMUNOTEC_STRUCTURE_ID,
+        blocksJson: immunotecBlocks,
+        seo: {
+          title: IMMUNOTEC_FUNNEL_NAME,
+          metaDescription:
+            'Publicación ancla de recuperación para Immunotec dentro de Leadflow.',
+        },
+      },
     },
   });
 
   await prisma.funnelPublication.upsert({
     where: {
       domainId_pathPrefix: {
-        domainId: secondaryDomain.id,
+        domainId: domain.id,
         pathPrefix: '/',
       },
     },
@@ -1079,316 +562,24 @@ async function main() {
       workspaceId: workspace.id,
       teamId: team.id,
       funnelInstanceId: funnelInstance.id,
-      trackingProfileId: trackingProfile.id,
-      handoffStrategyId: thankYouHandoffStrategy.id,
+      trackingProfileId: null,
+      handoffStrategyId: null,
       status: 'active',
       isPrimary: true,
+      isActive: true,
     },
     create: {
       workspaceId: workspace.id,
       teamId: team.id,
-      domainId: secondaryDomain.id,
+      domainId: domain.id,
       funnelInstanceId: funnelInstance.id,
-      trackingProfileId: trackingProfile.id,
-      handoffStrategyId: thankYouHandoffStrategy.id,
+      trackingProfileId: null,
+      handoffStrategyId: null,
       pathPrefix: '/',
       status: 'active',
       isPrimary: true,
+      isActive: true,
     },
-  });
-
-  await prisma.rotationMember.deleteMany({
-    where: { rotationPoolId: rotationPool.id },
-  });
-
-  await prisma.rotationMember.createMany({
-    data: [
-      {
-        rotationPoolId: rotationPool.id,
-        sponsorId: sponsorA.id,
-        position: 1,
-        weight: 1,
-        isActive: true,
-      },
-      {
-        rotationPoolId: rotationPool.id,
-        sponsorId: sponsorB.id,
-        position: 2,
-        weight: 1,
-        isActive: true,
-      },
-    ],
-  });
-
-  const seededVisitors = [
-    {
-      id: 'visitor-maria-santos',
-      anonymousId: 'anon-maria-santos',
-      sourceChannel: 'form',
-      firstSeenAt: new Date('2026-03-24T14:00:00.000Z'),
-      lastSeenAt: new Date('2026-03-24T14:01:00.000Z'),
-      utmSource: 'meta',
-      utmCampaign: 'warm-remarketing',
-    },
-    {
-      id: 'visitor-carlos-rivera',
-      anonymousId: 'anon-carlos-rivera',
-      sourceChannel: 'form',
-      firstSeenAt: new Date('2026-03-25T09:00:00.000Z'),
-      lastSeenAt: new Date('2026-03-25T09:02:00.000Z'),
-      utmSource: 'google',
-      utmCampaign: 'intent-search',
-    },
-    {
-      id: 'visitor-andrea-lopez',
-      anonymousId: 'anon-andrea-lopez',
-      sourceChannel: 'landing_page',
-      firstSeenAt: new Date('2026-03-25T10:30:00.000Z'),
-      lastSeenAt: new Date('2026-03-25T10:32:00.000Z'),
-      utmSource: 'organic',
-      utmCampaign: 'content-cold',
-    },
-    {
-      id: 'visitor-lucia-mendez',
-      anonymousId: 'anon-lucia-mendez',
-      sourceChannel: 'form',
-      firstSeenAt: new Date('2026-03-25T11:00:00.000Z'),
-      lastSeenAt: new Date('2026-03-25T11:01:00.000Z'),
-      utmSource: 'meta',
-      utmCampaign: 'new-leads',
-    },
-  ];
-
-  await prisma.visitor.createMany({
-    data: seededVisitors.map((visitor) => ({
-      id: visitor.id,
-      workspaceId: workspace.id,
-      anonymousId: visitor.anonymousId,
-      kind: 'identified',
-      status: 'converted',
-      sourceChannel: visitor.sourceChannel,
-      firstSeenAt: visitor.firstSeenAt,
-      lastSeenAt: visitor.lastSeenAt,
-      utmSource: visitor.utmSource,
-      utmCampaign: visitor.utmCampaign,
-    })),
-  });
-
-  const seededLeads = [
-    {
-      id: 'lead-maria-santos',
-      visitorId: seededVisitors[0].id,
-      sponsorId: sponsorA.id,
-      assignmentId: 'assignment-maria-ana',
-      publicationId: rootPublication.id,
-      sourceChannel: 'form',
-      fullName: 'Maria Santos',
-      email: 'maria@empresa.co',
-      phone: '+57 310 222 3000',
-      companyName: 'Santos Growth',
-      status: 'nurturing',
-      qualificationGrade: 'warm',
-      summaryText:
-        'Lead con conversacion abierta. Pidio retomar cuando vuelva de una reunion interna.',
-      nextActionLabel: 'Retomar WhatsApp con contexto comercial',
-      followUpAt: new Date('2026-03-24T16:30:00.000Z'),
-      lastContactedAt: new Date('2026-03-24T12:00:00.000Z'),
-      lastQualifiedAt: new Date('2026-03-24T12:05:00.000Z'),
-      tags: ['remarketing', 'follow-up'],
-      createdAt: new Date('2026-03-24T11:55:00.000Z'),
-      updatedAt: new Date('2026-03-24T12:05:00.000Z'),
-    },
-    {
-      id: 'lead-carlos-rivera',
-      visitorId: seededVisitors[1].id,
-      sponsorId: sponsorB.id,
-      assignmentId: 'assignment-carlos-bruno',
-      publicationId: opportunityPublication.id,
-      sourceChannel: 'form',
-      fullName: 'Carlos Rivera',
-      email: 'carlos@rivera.io',
-      phone: '+57 300 443 9010',
-      companyName: 'Rivera Studio',
-      status: 'qualified',
-      qualificationGrade: 'hot',
-      summaryText:
-        'Lead con alta intencion. Quiere propuesta y disponibilidad para demo hoy mismo.',
-      nextActionLabel: 'Enviar propuesta corta y confirmar demo',
-      followUpAt: new Date('2026-03-25T17:00:00.000Z'),
-      lastContactedAt: new Date('2026-03-25T09:45:00.000Z'),
-      lastQualifiedAt: new Date('2026-03-25T09:50:00.000Z'),
-      tags: ['high-intent', 'demo'],
-      createdAt: new Date('2026-03-25T09:02:00.000Z'),
-      updatedAt: new Date('2026-03-25T09:50:00.000Z'),
-    },
-    {
-      id: 'lead-andrea-lopez',
-      visitorId: seededVisitors[2].id,
-      sponsorId: sponsorA.id,
-      assignmentId: 'assignment-andrea-ana',
-      publicationId: rootPublication.id,
-      sourceChannel: 'landing_page',
-      fullName: 'Andrea Lopez',
-      email: 'andrea@north.dev',
-      phone: '+57 321 555 2200',
-      companyName: 'North Dev',
-      status: 'captured',
-      qualificationGrade: 'cold',
-      summaryText:
-        'Aun no responde. Conviene reintentar con mensaje breve y validar timing.',
-      nextActionLabel: 'Reintentar con mensaje corto manana',
-      followUpAt: new Date('2026-03-27T15:00:00.000Z'),
-      lastContactedAt: null,
-      lastQualifiedAt: null,
-      tags: ['cold', 'reactivation'],
-      createdAt: new Date('2026-03-25T10:32:00.000Z'),
-      updatedAt: new Date('2026-03-25T10:35:00.000Z'),
-    },
-    {
-      id: 'lead-lucia-mendez',
-      visitorId: seededVisitors[3].id,
-      sponsorId: sponsorB.id,
-      assignmentId: 'assignment-lucia-bruno',
-      publicationId: rootPublication.id,
-      sourceChannel: 'form',
-      fullName: 'Lucia Mendez',
-      email: 'lucia@mendez.mx',
-      phone: '+52 55 9000 7788',
-      companyName: 'Mendez Retail',
-      status: 'assigned',
-      qualificationGrade: null,
-      summaryText:
-        'Lead nuevo recien capturado. Todavia no hay contacto ni seguimiento agendado.',
-      nextActionLabel: null,
-      followUpAt: null,
-      lastContactedAt: null,
-      lastQualifiedAt: null,
-      tags: ['new', 'unscheduled'],
-      createdAt: new Date('2026-03-25T11:01:00.000Z'),
-      updatedAt: new Date('2026-03-25T11:01:00.000Z'),
-    },
-  ];
-
-  await prisma.lead.createMany({
-    data: seededLeads.map((lead) => ({
-      id: lead.id,
-      workspaceId: workspace.id,
-      funnelId: legacyFunnel.id,
-      funnelInstanceId: funnelInstance.id,
-      funnelPublicationId: lead.publicationId,
-      visitorId: lead.visitorId,
-      sourceChannel: lead.sourceChannel,
-      fullName: lead.fullName,
-      email: lead.email,
-      phone: lead.phone,
-      companyName: lead.companyName,
-      status: lead.status,
-      qualificationGrade: lead.qualificationGrade,
-      summaryText: lead.summaryText,
-      nextActionLabel: lead.nextActionLabel,
-      followUpAt: lead.followUpAt,
-      lastContactedAt: lead.lastContactedAt,
-      lastQualifiedAt: lead.lastQualifiedAt,
-      currentAssignmentId: null,
-      tags: lead.tags,
-      createdAt: lead.createdAt,
-      updatedAt: lead.updatedAt,
-    })),
-  });
-
-  await prisma.assignment.createMany({
-    data: seededLeads.map((lead) => ({
-      id: lead.assignmentId,
-      workspaceId: workspace.id,
-      leadId: lead.id,
-      sponsorId: lead.sponsorId,
-      teamId: team.id,
-      funnelId: legacyFunnel.id,
-      funnelInstanceId: funnelInstance.id,
-      funnelPublicationId: lead.publicationId,
-      rotationPoolId: rotationPool.id,
-      status: lead.id === 'lead-lucia-mendez' ? 'assigned' : 'accepted',
-      reason: 'rotation',
-      assignedAt: lead.createdAt,
-      resolvedAt: null,
-      createdAt: lead.createdAt,
-      updatedAt: lead.updatedAt,
-    })),
-  });
-
-  for (const lead of seededLeads) {
-    await prisma.lead.update({
-      where: { id: lead.id },
-      data: {
-        currentAssignmentId: lead.assignmentId,
-      },
-    });
-  }
-
-  await prisma.leadNote.createMany({
-    data: [
-      {
-        id: 'note-maria-context',
-        workspaceId: workspace.id,
-        teamId: team.id,
-        leadId: 'lead-maria-santos',
-        sponsorId: sponsorA.id,
-        authorUserId: teamAdminUser.id,
-        authorRole: 'TEAM_ADMIN',
-        authorName: 'Leadflow Team Admin',
-        body: 'Conviene retomar con contexto de ROI y no con pitch largo.',
-      },
-      {
-        id: 'note-lucia-first-touch',
-        workspaceId: workspace.id,
-        teamId: team.id,
-        leadId: 'lead-lucia-mendez',
-        sponsorId: sponsorB.id,
-        authorUserId: teamAdminUser.id,
-        authorRole: 'TEAM_ADMIN',
-        authorName: 'Leadflow Team Admin',
-        body: 'Lead nuevo. Priorizar primer contacto antes del cierre del día.',
-      },
-    ],
-  });
-
-  await prisma.domainEvent.createMany({
-    data: [
-      {
-        id: 'event-lead-maria-created',
-        workspaceId: workspace.id,
-        eventId: 'event-lead-maria-created',
-        aggregateType: 'lead',
-        aggregateId: 'lead-maria-santos',
-        eventName: 'lead_created',
-        actorType: 'visitor',
-        payload: { source: 'seed' },
-        occurredAt: new Date('2026-03-24T11:55:00.000Z'),
-        funnelInstanceId: funnelInstance.id,
-        funnelPublicationId: rootPublication.id,
-        funnelStepId: null,
-        visitorId: 'visitor-maria-santos',
-        leadId: 'lead-maria-santos',
-        assignmentId: null,
-      },
-      {
-        id: 'event-assignment-carlos-created',
-        workspaceId: workspace.id,
-        eventId: 'event-assignment-carlos-created',
-        aggregateType: 'assignment',
-        aggregateId: 'assignment-carlos-bruno',
-        eventName: 'assignment_created',
-        actorType: 'system',
-        payload: { source: 'seed' },
-        occurredAt: new Date('2026-03-25T09:02:00.000Z'),
-        funnelInstanceId: funnelInstance.id,
-        funnelPublicationId: opportunityPublication.id,
-        funnelStepId: null,
-        visitorId: null,
-        leadId: 'lead-carlos-rivera',
-        assignmentId: 'assignment-carlos-bruno',
-      },
-    ],
   });
 }
 

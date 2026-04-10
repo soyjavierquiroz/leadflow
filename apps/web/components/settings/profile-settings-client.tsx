@@ -1,12 +1,25 @@
 "use client";
 
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, ShieldCheck, UserRound } from "lucide-react";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { buildInitials } from "@/lib/app-shell/utils";
+import {
+  UI_IDENTITY_AVATAR_ACCEPT,
+  UI_IDENTITY_UPLOAD_HINT,
+  optimizeUiIdentityImage,
+} from "@/lib/media-optimizer";
 import type { MyProfileSnapshot } from "@/lib/profile-settings";
+import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 type ProfileSettingsClientProps = {
@@ -42,8 +55,10 @@ export function ProfileSettingsClient({
     tone: "success" | "error";
     message: string;
   } | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingProfile, startSavingProfile] = useTransition();
   const [isSavingPassword, startSavingPassword] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const eyebrow =
     scope === "team" ? "Team Admin / Perfil" : "Member / Perfil";
@@ -55,6 +70,78 @@ export function ProfileSettingsClient({
       : "Mantén tu nombre, contacto y credenciales al día para trabajar sin fricción.";
 
   const initials = useMemo(() => buildInitials(profile.fullName), [profile.fullName]);
+  const hasOperationalSponsor = Boolean(profile.sponsorDisplayName);
+
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!hasOperationalSponsor) {
+      setFeedback({
+        tone: "error",
+        message:
+          "Tu usuario no tiene sponsor operativo vinculado, así que no hay avatar para publicar en handoff.",
+      });
+      event.target.value = "";
+      return;
+    }
+
+    let previewUrl: string | null = null;
+    const previousAvatarUrl = profile.avatarUrl;
+
+    setIsUploadingAvatar(true);
+    setFeedback(null);
+
+    try {
+      const optimizedFile = await optimizeUiIdentityImage(file);
+      previewUrl = URL.createObjectURL(optimizedFile);
+
+      setProfile((current) => ({
+        ...current,
+        avatarUrl: previewUrl,
+      }));
+
+      const publicUrl = await uploadFileWithPresignedUrl(optimizedFile, "avatars");
+
+      await authenticatedOperationRequest("/sponsors/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          avatarUrl: publicUrl,
+        }),
+      });
+
+      setProfile((current) => ({
+        ...current,
+        avatarUrl: publicUrl,
+      }));
+      setFeedback({
+        tone: "success",
+        message: "Tu foto operativa ya quedó optimizada y publicada.",
+      });
+    } catch (error) {
+      setProfile((current) => ({
+        ...current,
+        avatarUrl: previousAvatarUrl,
+      }));
+      setFeedback({
+        tone: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No pudimos actualizar la foto operativa.",
+      });
+    } finally {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
+      event.target.value = "";
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleProfileSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -203,6 +290,49 @@ export function ProfileSettingsClient({
                     ? `Perfil operativo: ${profile.sponsorDisplayName}`
                     : "Sin sponsor operativo vinculado"}
                 </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white/85 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  Avatar del asesor
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Esta foto alimenta el advisor del handoff y el bloque
+                  conversion_page_config, así que la optimizamos antes de
+                  subirla.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={UI_IDENTITY_AVATAR_ACCEPT}
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+                <button
+                  type="button"
+                  disabled={
+                    isUploadingAvatar ||
+                    isSavingProfile ||
+                    isSavingPassword ||
+                    !hasOperationalSponsor
+                  }
+                  onClick={() => fileInputRef.current?.click()}
+                  className={primaryButtonClassName}
+                >
+                  {isUploadingAvatar
+                    ? "Optimizando y subiendo..."
+                    : "Cambiar foto operativa"}
+                </button>
+                <span className="text-xs text-slate-500">
+                  {UI_IDENTITY_UPLOAD_HINT}
+                </span>
               </div>
             </div>
           </div>

@@ -3,6 +3,8 @@ version: "3.9"
 services:
   web:
     image: leadflow-web:latest
+    env_file:
+      - .env
     environment:
       NEXT_PUBLIC_APP_NAME: "Leadflow"
       NEXT_PUBLIC_APP_ENV: "${APP_ENV:-staging}"
@@ -13,6 +15,8 @@ services:
       NEXT_PUBLIC_API_URL: "${API_URL:-https://api.leadflow.kuruk.in}"
       NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET: "${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.leadflow.kuruk.in}"
       NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN: "${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kuruk.in}"
+      DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-leadflow}:${POSTGRES_PASSWORD}@postgres_postgres:5432/${POSTGRES_DB:-leadflow}?schema=public}"
+      PORT: "3000"
     networks:
       - traefik_public
       - general_network

@@ -7,6 +7,8 @@ export class UpdateTeamHybridFunnelPublicationDto {
   readonly templateId?: string;
   readonly seoTitle?: string;
   readonly metaDescription?: string;
+  readonly stepId?: string;
+  readonly stepKey?: 'captura' | 'confirmado';
   readonly blocksJson?: JsonValue;
   readonly mediaMap?: JsonValue;
 }

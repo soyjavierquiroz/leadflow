@@ -9,6 +9,15 @@ import type { SubmitRuntimeLeadDto } from './dto/submit-runtime-lead.dto';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
 
+type JsonRecord = Record<string, unknown>;
+
+const DEFAULT_STRUCTURE_ID = 'split-media-focus';
+
+const asRecord = (value: unknown): JsonRecord | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : null;
+
 @Injectable()
 export class PublicRuntimeService {
   constructor(
@@ -102,7 +111,7 @@ export class PublicRuntimeService {
         id: funnel.id,
         name: funnel.name,
         description: funnel.description,
-        config: funnel.config,
+        config: this.buildLegacyRuntimeConfig(runtime, funnel.config),
       },
     };
   }
@@ -149,5 +158,78 @@ export class PublicRuntimeService {
       fieldValues: dto.fieldValues ?? {},
       tags: dto.tags ?? ['runtime-public-submit'],
     });
+  }
+
+  private buildLegacyRuntimeConfig(runtime: Awaited<ReturnType<PublicFunnelRuntimeService['resolveByHostAndPath']>>, existingConfig: unknown) {
+    const safeConfig = asRecord(existingConfig) ?? {};
+    const safeHybridEditor = asRecord(safeConfig.hybridEditor) ?? {};
+    const safeContent = asRecord(safeConfig.content) ?? {};
+    const safeSeo = asRecord(safeConfig.seo) ?? {};
+    const stepSettings = asRecord(runtime.currentStep.settingsJson) ?? {};
+    const funnelSettings = asRecord(runtime.funnel.settingsJson) ?? {};
+    const stepSeo = asRecord(stepSettings.seo) ?? {};
+    const funnelSeo = asRecord(funnelSettings.seo) ?? {};
+    const structureId = this.resolveStructureId(stepSettings, funnelSettings);
+    const templateId = runtime.funnel.template.id;
+    const templateCode = runtime.funnel.template.code;
+
+    return {
+      ...safeConfig,
+      templateId,
+      templateCode,
+      structureId,
+      blocksJson: runtime.currentStep.blocksJson,
+      hybridEditor: {
+        ...safeHybridEditor,
+        mode: 'data-driven-assembly',
+        templateId,
+        templateCode,
+        structureId,
+        blocksJson: runtime.currentStep.blocksJson,
+      },
+      content: {
+        ...safeContent,
+        templateId,
+        templateCode,
+        structureId,
+        blocksJson: runtime.currentStep.blocksJson,
+      },
+      seo: {
+        ...safeSeo,
+        title:
+          (typeof stepSeo.title === 'string' && stepSeo.title.trim()) ||
+          (typeof funnelSeo.title === 'string' && funnelSeo.title.trim()) ||
+          runtime.funnel.name,
+        metaDescription:
+          (typeof stepSeo.metaDescription === 'string' &&
+            stepSeo.metaDescription.trim()) ||
+          (typeof funnelSeo.metaDescription === 'string' &&
+            funnelSeo.metaDescription.trim()) ||
+          null,
+      },
+    };
+  }
+
+  private resolveStructureId(...sources: JsonRecord[]) {
+    for (const source of sources) {
+      const directStructureId = source.structureId;
+      if (
+        typeof directStructureId === 'string' &&
+        directStructureId.trim().length > 0
+      ) {
+        return directStructureId.trim();
+      }
+
+      const hybridEditor = asRecord(source.hybridEditor);
+      const nestedStructureId = hybridEditor?.structureId;
+      if (
+        typeof nestedStructureId === 'string' &&
+        nestedStructureId.trim().length > 0
+      ) {
+        return nestedStructureId.trim();
+      }
+    }
+
+    return DEFAULT_STRUCTURE_ID;
   }
 }

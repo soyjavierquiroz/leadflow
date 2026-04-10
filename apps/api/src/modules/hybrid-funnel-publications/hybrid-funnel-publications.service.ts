@@ -14,9 +14,28 @@ import type { UpdateTeamHybridFunnelPublicationDto } from './dto/update-team-hyb
 const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
 
+const DEFAULT_STRUCTURE_ID = 'split-media-focus';
+
+const asJsonRecord = (value: JsonValue | null | undefined) =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, JsonValue>)
+    : null;
+
 type TeamScope = {
   workspaceId: string;
   teamId: string;
+};
+
+type HybridPublicationStepDetail = {
+  id: string;
+  slug: string;
+  stepType: string;
+  position: number;
+  isEntryStep: boolean;
+  isConversionStep: boolean;
+  blocksJson: JsonValue;
+  mediaMap: JsonValue;
+  settingsJson: JsonValue;
 };
 
 type HybridPublicationDetail = {
@@ -44,6 +63,7 @@ type HybridPublicationDetail = {
     mediaMap: JsonValue;
     settingsJson: JsonValue;
   };
+  steps: HybridPublicationStepDetail[];
   seo: {
     title: string;
     metaDescription: string;
@@ -75,6 +95,11 @@ export class HybridFunnelPublicationsService {
       include: {
         funnelInstance: {
           include: {
+            legacyFunnel: {
+              select: {
+                config: true,
+              },
+            },
             steps: {
               orderBy: { position: 'asc' },
             },
@@ -101,6 +126,10 @@ export class HybridFunnelPublicationsService {
       });
     }
 
+    const steps = publication.funnelInstance.steps.map((item) =>
+      this.mapPublicationStepDetail(item),
+    );
+
     return {
       publication: {
         id: publication.id,
@@ -126,6 +155,7 @@ export class HybridFunnelPublicationsService {
         mediaMap: step.mediaMap as JsonValue,
         settingsJson: step.settingsJson as JsonValue,
       },
+      steps,
       seo: this.extractSeo(
         step.settingsJson as JsonValue,
         publication.funnelInstance.name,
@@ -162,6 +192,19 @@ export class HybridFunnelPublicationsService {
           workspaceId: scope.workspaceId,
           name: normalized.name,
           code,
+          config: toInputJson(
+            this.buildLegacyFunnelConfig(
+              null,
+              template.id,
+              template.code,
+              this.resolveStructureId(template.settingsJson as JsonValue),
+              normalized.blocksJson,
+              {
+                title: normalized.seoTitle,
+                metaDescription: normalized.metaDescription,
+              },
+            ),
+          ),
           status: 'active',
           stages: ['captured', 'qualified', 'assigned'],
           entrySources: ['manual', 'form', 'landing_page', 'api'],
@@ -185,6 +228,9 @@ export class HybridFunnelPublicationsService {
           settingsJson: toInputJson(
             this.buildInstanceSettings(
               template.settingsJson as JsonValue,
+              template.id,
+              template.code,
+              this.resolveStructureId(template.settingsJson as JsonValue),
               normalized.blocksJson,
               {
                 title: normalized.seoTitle,
@@ -210,6 +256,10 @@ export class HybridFunnelPublicationsService {
           mediaMap: toInputJson(normalized.mediaMap),
           settingsJson: toInputJson(
             this.buildStepSettings(template.code, normalized.blocksJson, {
+              templateId: template.id,
+              structureId: this.resolveStructureId(
+                template.settingsJson as JsonValue,
+              ),
               title: normalized.seoTitle,
               metaDescription: normalized.metaDescription,
             }),
@@ -243,10 +293,36 @@ export class HybridFunnelPublicationsService {
         },
       });
 
+      const confirmationStep = await tx.funnelStep.create({
+        data: {
+          workspaceId: scope.workspaceId,
+          teamId: scope.teamId,
+          funnelInstanceId: funnelInstance.id,
+          stepType: 'thank_you',
+          slug: 'confirmado',
+          position: 2,
+          isEntryStep: false,
+          isConversionStep: true,
+          blocksJson: toInputJson([]),
+          mediaMap: toInputJson({}),
+          settingsJson: toInputJson(
+            this.buildStepSettings(template.code, [], {
+              templateId: template.id,
+              structureId: this.resolveStructureId(
+                template.settingsJson as JsonValue,
+              ),
+              title: normalized.seoTitle,
+              metaDescription: normalized.metaDescription,
+            }),
+          ),
+        },
+      });
+
       return {
         publication,
         funnelInstance,
         step,
+        steps: [step, confirmationStep],
       };
     });
 
@@ -275,6 +351,7 @@ export class HybridFunnelPublicationsService {
         mediaMap: detail.step.mediaMap as JsonValue,
         settingsJson: detail.step.settingsJson as JsonValue,
       },
+      steps: detail.steps.map((item) => this.mapPublicationStepDetail(item)),
       seo: {
         title: normalized.seoTitle,
         metaDescription: normalized.metaDescription,
@@ -296,6 +373,11 @@ export class HybridFunnelPublicationsService {
       include: {
         funnelInstance: {
           include: {
+            legacyFunnel: {
+              select: {
+                config: true,
+              },
+            },
             steps: {
               orderBy: { position: 'asc' },
             },
@@ -311,16 +393,24 @@ export class HybridFunnelPublicationsService {
       });
     }
 
-    const currentStep =
+    const entryStep =
       existing.funnelInstance.steps.find((item) => item.isEntryStep) ??
       existing.funnelInstance.steps[0];
 
-    if (!currentStep) {
+    if (!entryStep) {
       throw new NotFoundException({
         code: 'HYBRID_PUBLICATION_STEP_NOT_FOUND',
         message: 'The selected funnel instance does not have a landing step.',
       });
     }
+
+    const targetStep =
+      this.resolveRequestedStep(
+        existing.funnelInstance.steps,
+        dto.stepId,
+        dto.stepKey,
+        entryStep.id,
+      ) ?? entryStep;
 
     const normalized = this.normalizeEditorInput({
       name: dto.name ?? existing.funnelInstance.name,
@@ -330,17 +420,17 @@ export class HybridFunnelPublicationsService {
       seoTitle:
         dto.seoTitle ??
         this.extractSeo(
-          currentStep.settingsJson as JsonValue,
+          entryStep.settingsJson as JsonValue,
           existing.funnelInstance.name,
         ).title,
       metaDescription:
         dto.metaDescription ??
         this.extractSeo(
-          currentStep.settingsJson as JsonValue,
+          entryStep.settingsJson as JsonValue,
           existing.funnelInstance.name,
         ).metaDescription,
-      blocksJson: (dto.blocksJson ?? currentStep.blocksJson) as JsonValue,
-      mediaMap: (dto.mediaMap ?? currentStep.mediaMap) as JsonValue,
+      blocksJson: (dto.blocksJson ?? targetStep.blocksJson) as JsonValue,
+      mediaMap: (dto.mediaMap ?? targetStep.mediaMap) as JsonValue,
     });
 
     await this.assertDomain(scope, normalized.domainId);
@@ -359,6 +449,25 @@ export class HybridFunnelPublicationsService {
         where: { id: existing.funnelInstance.legacyFunnelId ?? '__missing__' },
         data: {
           name: normalized.name,
+          config: toInputJson(
+            this.buildLegacyFunnelConfig(
+              asJsonRecord(existing.funnelInstance.legacyFunnel?.config as JsonValue),
+              template.id,
+              template.code,
+              this.resolveStructureId(
+                entryStep.settingsJson as JsonValue,
+                existing.funnelInstance.settingsJson as JsonValue,
+                template.settingsJson as JsonValue,
+              ),
+              targetStep.id === entryStep.id
+                ? normalized.blocksJson
+                : (entryStep.blocksJson as JsonValue),
+              {
+                title: normalized.seoTitle,
+                metaDescription: normalized.metaDescription,
+              },
+            ),
+          ),
           status: 'active',
         },
       });
@@ -375,30 +484,107 @@ export class HybridFunnelPublicationsService {
           settingsJson: toInputJson(
             this.buildInstanceSettings(
               template.settingsJson as JsonValue,
-              normalized.blocksJson,
+              template.id,
+              template.code,
+              this.resolveStructureId(
+                entryStep.settingsJson as JsonValue,
+                existing.funnelInstance.settingsJson as JsonValue,
+                template.settingsJson as JsonValue,
+              ),
+              targetStep.id === entryStep.id
+                ? normalized.blocksJson
+                : (entryStep.blocksJson as JsonValue),
               {
                 title: normalized.seoTitle,
                 metaDescription: normalized.metaDescription,
               },
             ),
           ),
-          mediaMap: toInputJson(normalized.mediaMap),
-        },
-      });
-
-      const step = await tx.funnelStep.update({
-        where: { id: currentStep.id },
-        data: {
-          blocksJson: toInputJson(normalized.blocksJson),
-          mediaMap: toInputJson(normalized.mediaMap),
-          settingsJson: toInputJson(
-            this.buildStepSettings(template.code, normalized.blocksJson, {
-              title: normalized.seoTitle,
-              metaDescription: normalized.metaDescription,
-            }),
+          mediaMap: toInputJson(
+            targetStep.id === entryStep.id
+              ? normalized.mediaMap
+              : (entryStep.mediaMap as JsonValue),
           ),
         },
       });
+
+      let ensuredTargetStep = targetStep;
+
+      if (dto.stepKey === 'confirmado' && targetStep.id === entryStep.id) {
+        const createdConfirmationStep = await tx.funnelStep.create({
+          data: {
+            workspaceId: scope.workspaceId,
+            teamId: scope.teamId,
+            funnelInstanceId: existing.funnelInstance.id,
+            stepType: 'thank_you',
+            slug: 'confirmado',
+            position:
+              Math.max(...existing.funnelInstance.steps.map((item) => item.position)) + 1,
+            isEntryStep: false,
+            isConversionStep: true,
+            blocksJson: toInputJson(normalized.blocksJson),
+            mediaMap: toInputJson(normalized.mediaMap),
+            settingsJson: toInputJson(
+              this.buildStepSettings(template.code, normalized.blocksJson, {
+                templateId: template.id,
+                structureId: this.resolveStructureId(
+                  entryStep.settingsJson as JsonValue,
+                  existing.funnelInstance.settingsJson as JsonValue,
+                  template.settingsJson as JsonValue,
+                ),
+                title: normalized.seoTitle,
+                metaDescription: normalized.metaDescription,
+              }),
+            ),
+          },
+        });
+
+        ensuredTargetStep = createdConfirmationStep;
+      } else {
+        ensuredTargetStep = await tx.funnelStep.update({
+          where: { id: targetStep.id },
+          data: {
+            blocksJson: toInputJson(normalized.blocksJson),
+            mediaMap: toInputJson(normalized.mediaMap),
+            settingsJson: toInputJson(
+              this.buildStepSettings(template.code, normalized.blocksJson, {
+                templateId: template.id,
+                structureId: this.resolveStructureId(
+                  targetStep.settingsJson as JsonValue,
+                  existing.funnelInstance.settingsJson as JsonValue,
+                  template.settingsJson as JsonValue,
+                ),
+                title: normalized.seoTitle,
+                metaDescription: normalized.metaDescription,
+              }),
+            ),
+          },
+        });
+      }
+
+      if (targetStep.id !== entryStep.id && (dto.seoTitle !== undefined || dto.metaDescription !== undefined)) {
+        await tx.funnelStep.update({
+          where: { id: entryStep.id },
+          data: {
+            settingsJson: toInputJson(
+              this.buildStepSettings(
+                template.code,
+                entryStep.blocksJson as JsonValue,
+                {
+                  templateId: template.id,
+                  structureId: this.resolveStructureId(
+                    entryStep.settingsJson as JsonValue,
+                    existing.funnelInstance.settingsJson as JsonValue,
+                    template.settingsJson as JsonValue,
+                  ),
+                  title: normalized.seoTitle,
+                  metaDescription: normalized.metaDescription,
+                },
+              ),
+            ),
+          },
+        });
+      }
 
       const shouldBePrimary =
         normalized.pathPrefix === '/' || existing.isPrimary;
@@ -429,10 +615,20 @@ export class HybridFunnelPublicationsService {
         },
       });
 
+      const steps = await tx.funnelStep.findMany({
+        where: {
+          funnelInstanceId: existing.funnelInstance.id,
+          workspaceId: scope.workspaceId,
+          teamId: scope.teamId,
+        },
+        orderBy: { position: 'asc' },
+      });
+
       return {
         publication,
         funnelInstance,
-        step,
+        step: ensuredTargetStep,
+        steps,
       };
     });
 
@@ -461,6 +657,7 @@ export class HybridFunnelPublicationsService {
         mediaMap: detail.step.mediaMap as JsonValue,
         settingsJson: detail.step.settingsJson as JsonValue,
       },
+      steps: detail.steps.map((item) => this.mapPublicationStepDetail(item)),
       seo: {
         title: normalized.seoTitle,
         metaDescription: normalized.metaDescription,
@@ -547,8 +744,85 @@ export class HybridFunnelPublicationsService {
     return value;
   }
 
+  private mapPublicationStepDetail(step: {
+    id: string;
+    slug: string;
+    stepType: string;
+    position: number;
+    isEntryStep: boolean;
+    isConversionStep: boolean;
+    blocksJson: unknown;
+    mediaMap: unknown;
+    settingsJson: unknown;
+  }): HybridPublicationStepDetail {
+    return {
+      id: step.id,
+      slug: step.slug,
+      stepType: step.stepType,
+      position: step.position,
+      isEntryStep: step.isEntryStep,
+      isConversionStep: step.isConversionStep,
+      blocksJson: step.blocksJson as JsonValue,
+      mediaMap: step.mediaMap as JsonValue,
+      settingsJson: step.settingsJson as JsonValue,
+    };
+  }
+
+  private resolveRequestedStep<
+    T extends {
+      id: string;
+      slug: string;
+      stepType: string;
+      position: number;
+      isEntryStep: boolean;
+      isConversionStep: boolean;
+      blocksJson: unknown;
+      mediaMap: unknown;
+      settingsJson: unknown;
+    },
+  >(
+    steps: T[],
+    stepId: string | undefined,
+    stepKey: 'captura' | 'confirmado' | undefined,
+    entryStepId: string,
+  ): T | undefined {
+    if (stepId) {
+      const directMatch = steps.find((item) => item.id === stepId);
+      if (directMatch) {
+        return directMatch;
+      }
+    }
+
+    if (stepKey === 'captura') {
+      return (
+        steps.find((item) => item.slug === 'captura') ??
+        steps.find((item) => item.id === entryStepId) ??
+        steps[0]
+      );
+    }
+
+    if (stepKey === 'confirmado') {
+      return (
+        steps.find((item) => item.slug === 'confirmado') ??
+        steps.find((item) =>
+          ['handoff', 'confirmation', 'thank_you', 'redirect'].includes(
+            item.stepType,
+          ),
+        ) ??
+        steps.find((item) => item.id !== entryStepId) ??
+        steps.find((item) => item.id === entryStepId) ??
+        steps[0]
+      );
+    }
+
+    return steps.find((item) => item.id === entryStepId) ?? steps[0];
+  }
+
   private buildInstanceSettings(
     templateSettings: JsonValue,
+    templateId: string,
+    templateCode: string,
+    structureId: string,
     blocksJson: JsonValue,
     seo: {
       title: string;
@@ -564,8 +838,13 @@ export class HybridFunnelPublicationsService {
 
     return {
       ...safeTemplateSettings,
+      theme: templateCode,
+      structureId,
       hybridEditor: {
         mode: 'data-driven-assembly',
+        templateId,
+        templateCode,
+        structureId,
         blocksJson,
       },
       seo,
@@ -575,18 +854,94 @@ export class HybridFunnelPublicationsService {
   private buildStepSettings(
     templateCode: string,
     blocksJson: JsonValue,
-    seo: {
+    input: {
+      templateId: string;
+      structureId: string;
       title: string;
       metaDescription: string;
     },
   ): JsonValue {
     return {
       editorSource: 'team-publications-new-vsl',
+      templateId: input.templateId,
       templateCode,
+      structureId: input.structureId,
       hybridRenderer: 'jakawi-bridge',
       blocksJson,
-      seo,
+      seo: {
+        title: input.title,
+        metaDescription: input.metaDescription,
+      },
     };
+  }
+
+  private buildLegacyFunnelConfig(
+    existingConfig: Record<string, JsonValue> | null,
+    templateId: string,
+    templateCode: string,
+    structureId: string,
+    blocksJson: JsonValue,
+    seo: {
+      title: string;
+      metaDescription: string;
+    },
+  ): JsonValue {
+    const safeConfig = existingConfig ?? {};
+    const safeHybridEditor = asJsonRecord(safeConfig.hybridEditor) ?? {};
+    const safeContent = asJsonRecord(safeConfig.content) ?? {};
+    const safeSeo = asJsonRecord(safeConfig.seo) ?? {};
+
+    return {
+      ...safeConfig,
+      templateId,
+      templateCode,
+      structureId,
+      blocksJson,
+      hybridEditor: {
+        ...safeHybridEditor,
+        mode: 'data-driven-assembly',
+        templateId,
+        templateCode,
+        structureId,
+        blocksJson,
+      },
+      content: {
+        ...safeContent,
+        templateId,
+        templateCode,
+        structureId,
+        blocksJson,
+      },
+      seo: {
+        ...safeSeo,
+        title: seo.title,
+        metaDescription: seo.metaDescription,
+      },
+    };
+  }
+
+  private resolveStructureId(...sources: (JsonValue | null | undefined)[]) {
+    for (const source of sources) {
+      const safeSource = asJsonRecord(source);
+      const directStructureId = safeSource?.structureId;
+      if (
+        typeof directStructureId === 'string' &&
+        directStructureId.trim().length > 0
+      ) {
+        return directStructureId.trim();
+      }
+
+      const hybridEditor = asJsonRecord(safeSource?.hybridEditor);
+      const nestedStructureId = hybridEditor?.structureId;
+      if (
+        typeof nestedStructureId === 'string' &&
+        nestedStructureId.trim().length > 0
+      ) {
+        return nestedStructureId.trim();
+      }
+    }
+
+    return DEFAULT_STRUCTURE_ID;
   }
 
   private extractSeo(stepSettings: JsonValue, fallbackTitle: string) {

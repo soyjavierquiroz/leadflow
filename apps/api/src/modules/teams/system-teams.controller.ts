@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
+import type { UpdateSystemTenantFunnelStepDto } from './dto/update-system-tenant-funnel-step.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
 import { SystemTenantAccessGuard } from './system-tenant-access.guard';
 import { TeamsService } from './teams.service';
@@ -33,6 +34,14 @@ export class SystemTeamsController {
     return this.teamsService.listSystemTenantFunnels(id);
   }
 
+  @Get('tenants/:id/funnels/:funnelId')
+  getTenantFunnel(
+    @Param('id') id: string,
+    @Param('funnelId') funnelId: string,
+  ) {
+    return this.teamsService.getSystemTenantFunnel(id, funnelId);
+  }
+
   @Patch('tenants/:id/funnels/:funnelId')
   updateTenantFunnel(
     @Param('id') id: string,
@@ -40,6 +49,21 @@ export class SystemTeamsController {
     @Body() dto: UpdateSystemTenantFunnelDto,
   ) {
     return this.teamsService.updateSystemTenantFunnel(id, funnelId, dto);
+  }
+
+  @Patch('tenants/:id/funnels/:funnelId/steps/:stepId')
+  updateTenantFunnelStep(
+    @Param('id') id: string,
+    @Param('funnelId') funnelId: string,
+    @Param('stepId') stepId: string,
+    @Body() dto: UpdateSystemTenantFunnelStepDto,
+  ) {
+    return this.teamsService.updateSystemTenantFunnelStep(
+      id,
+      funnelId,
+      stepId,
+      dto,
+    );
   }
 
   @Post('tenants')

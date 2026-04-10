@@ -77,7 +77,7 @@ export class SponsorsController {
   }
 
   @Patch('me')
-  @RequireRoles(UserRole.MEMBER)
+  @RequireRoles(UserRole.MEMBER, UserRole.TEAM_ADMIN)
   updateMe(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Body() dto: UpdateMemberSponsorDto,

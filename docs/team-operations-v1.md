@@ -1,9 +1,11 @@
 # Team Operations v1
 
 ## Objetivo
+
 Habilitar operaciones reales para `Team Admin` sobre los activos operativos del team sin abrir edición estructural de templates ni del JSON libre de funnels.
 
 Esta fase convierte la superficie `/team/*` en una capa utilizable para la operación diaria:
+
 - crear funnel instances desde templates aprobados
 - crear y activar publicaciones por `host + path`
 - pausar o reactivar sponsors
@@ -14,7 +16,9 @@ Esta fase convierte la superficie `/team/*` en una capa utilizable para la opera
 ## Operaciones implementadas
 
 ### Funnel Instance
+
 El team admin puede:
+
 - listar funnels del team
 - crear una nueva instancia desde un `FunnelTemplate` aprobado
 - editar metadatos operativos:
@@ -26,10 +30,13 @@ El team admin puede:
 - activar o devolver a draft operativo
 
 Decision importante:
+
 - al crear una `FunnelInstance` nueva, el sistema crea tambien el `Funnel` legacy puente para no romper `Lead Capture & Assignment Flows v1` ni el runtime publico actual.
 
 ### Funnel Publication
+
 El team admin puede:
+
 - listar publicaciones del team
 - crear una nueva publicacion
 - editar:
@@ -42,6 +49,7 @@ El team admin puede:
 - activar o devolver a draft
 
 Validaciones implementadas:
+
 - conflicto de `host + path`
 - el dominio debe pertenecer al team
 - el funnel instance debe pertenecer al team
@@ -50,7 +58,9 @@ Validaciones implementadas:
   - funnel instance activo
 
 ### Domain
+
 El team admin puede:
+
 - listar dominios del team
 - crear dominios nuevos
 - editar metadata operativa segura
@@ -59,12 +69,15 @@ El team admin puede:
 - eliminar dominios y sus publicaciones asociadas por cascada
 
 Nota de UX operativa:
+
 - la mutacion de crear dominio en `/team/domains` se ejecuta desde cliente con `fetch` directo al API y loading state explicito del modal
 - no usa `startTransition` para envolver el request async de creacion
 - esto evita congelar la UI antes de que salga la peticion HTTP
 
 ### Sponsor
+
 El team admin puede:
+
 - listar sponsors del team
 - activar o pausar sponsors
 - actualizar `availabilityStatus`:
@@ -73,18 +86,23 @@ El team admin puede:
   - `offline`
 
 ### Rotation Pool / Rotation Member
+
 El team admin puede:
+
 - listar pools del team
 - listar miembros de pool
 - activar o pausar miembros de pool
 - reordenar posiciones simples dentro del pool
 
 ### Lead
+
 El team admin puede:
+
 - listar leads scopeados al team
 - usar filtros básicos en UI por texto y estado
 
 ## Que puede editar el team admin
+
 - `FunnelInstance` operativa del team
 - `FunnelPublication`
 - `RotationPool` a nivel de miembros y orden
@@ -97,6 +115,7 @@ El team admin puede:
   - dominio y path de publicacion
 
 ## Que no puede editar el team admin
+
 - `FunnelTemplate`
 - `blocks_json`
 - `FunnelStep` estructural
@@ -110,6 +129,7 @@ El team admin puede:
 ## Endpoints relevantes
 
 ### Nuevos o ampliados para Team Operations
+
 - `POST /v1/domains`
 - `PATCH /v1/domains/:id`
 - `DELETE /v1/domains/:id`
@@ -126,6 +146,7 @@ El team admin puede:
 - `PATCH /v1/rotation-pools/members/:memberId`
 
 ### Lecturas ya usadas por la superficie
+
 - `GET /v1/funnel-instances`
 - `GET /v1/funnel-publications`
 - `GET /v1/domains`
@@ -134,7 +155,9 @@ El team admin puede:
 - `GET /v1/leads`
 
 ## UI conectada
+
 La superficie `Team Admin` queda operativa en:
+
 - `/team/funnels`
 - `/team/publications`
 - `/team/sponsors`
@@ -142,15 +165,18 @@ La superficie `Team Admin` queda operativa en:
 - `/team/leads`
 
 Patrones UI usados:
+
 - modales simples
 - formularios mínimos
 - feedback de success/error
 - acciones inline para activar, pausar o editar
 
 ## Persistencia
+
 En esta fase no fue necesaria una migracion nueva.
 
 El modelo actual ya soportaba la operacion requerida gracias a:
+
 - `FunnelInstance`
 - `FunnelPublication`
 - `Sponsor`
@@ -160,9 +186,11 @@ El modelo actual ya soportaba la operacion requerida gracias a:
 - `HandoffStrategy`
 
 ## Seed
+
 No fue necesario ampliar el seed para cerrar esta fase.
 
 El seed actual ya deja disponible:
+
 - 1 team admin autenticable
 - 1 template activo
 - 1 funnel instance operativa
@@ -171,7 +199,18 @@ El seed actual ya deja disponible:
 - 1 rotation pool con miembros
 - leads y assignments para validar la operacion basica
 
+## Incidente resuelto 2026-04-09
+
+Se corrigio una divergencia entre el Funnel Builder del Super Admin y la persistencia hibrida real:
+
+- el builder de `/admin/tenants/[teamId]/funnels/[funnelId]/builder` estaba cargando el catalogo legado `system/funnels/templates`
+- el guardado del builder siempre persiste contra `FunnelTemplate` y valida `templateId` en `HybridFunnelPublicationsService`
+- esa mezcla de modelos dejaba el selector de `Template activo` sin una opcion valida para `jakawi-premium` y podia terminar enviando `templateId` vacio o inconsistente
+- el builder ahora consulta `funnel-templates?workspaceId=<tenant.workspaceId>` para recibir templates globales + del workspace real del tenant
+- tambien se agrego un doctor idempotente en `apps/api/scripts/immunotec-template-doctor.js` para diagnosticar y reparar `jakawi-premium`, `split-media-focus` y las publicaciones activas de Immunotec
+
 ## Fuera de alcance intencional
+
 - invites
 - gestion avanzada de usuarios
 - permisos finos por recurso

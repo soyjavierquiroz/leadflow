@@ -23,6 +23,7 @@ import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { CreateTeamDto } from './dto/create-team.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
 import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
+import type { UpdateSystemTenantFunnelStepDto } from './dto/update-system-tenant-funnel-step.dto';
 import type { Team, TeamRepository } from './interfaces/team.interface';
 
 const slugify = (value: string) =>
@@ -117,6 +118,31 @@ export type TeamSettingsSnapshot = {
   logoUrl: string | null;
   baseDomain: string | null;
   updatedAt: string;
+};
+
+export type SystemTenantFunnelStepSnapshot = {
+  id: string;
+  funnelInstanceId: string;
+  slug: string;
+  stepType: string;
+  position: number;
+  isEntryStep: boolean;
+  isConversionStep: boolean;
+  blocksJson: JsonValue;
+  mediaMap: JsonValue;
+  settingsJson: JsonValue;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SystemTenantFunnelDetail = ReturnType<typeof mapFunnelRecord> & {
+  funnelInstanceId: string | null;
+  steps: SystemTenantFunnelStepSnapshot[];
+};
+
+export type SystemTenantFunnelStepMutationResult = {
+  funnel: ReturnType<typeof mapFunnelRecord>;
+  step: SystemTenantFunnelStepSnapshot;
 };
 
 type TeamScope = {
@@ -393,6 +419,33 @@ export class TeamsService {
     return records.map(mapFunnelRecord);
   }
 
+  async getSystemTenantFunnel(
+    id: string,
+    funnelId: string,
+  ): Promise<SystemTenantFunnelDetail> {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const normalizedFunnelId = sanitizeRequiredText(funnelId, 'funnelId');
+
+    await this.assertSystemTenantExists(tenantId);
+
+    const existing = await this.requireSystemTenantFunnelRecord(
+      tenantId,
+      normalizedFunnelId,
+    );
+    const funnelInstance = await this.findPrimarySystemTenantFunnelInstance(
+      tenantId,
+      normalizedFunnelId,
+    );
+
+    return {
+      ...mapFunnelRecord(existing),
+      funnelInstanceId: funnelInstance?.id ?? null,
+      steps:
+        funnelInstance?.steps.map((step) => this.mapSystemTenantFunnelStep(step)) ??
+        [],
+    };
+  }
+
   async updateSystemTenantFunnel(
     id: string,
     funnelId: string,
@@ -444,6 +497,94 @@ export class TeamsService {
     });
 
     return mapFunnelRecord(record);
+  }
+
+  async updateSystemTenantFunnelStep(
+    id: string,
+    funnelId: string,
+    stepId: string,
+    dto: UpdateSystemTenantFunnelStepDto,
+  ): Promise<SystemTenantFunnelStepMutationResult> {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const normalizedFunnelId = sanitizeRequiredText(funnelId, 'funnelId');
+    const normalizedStepId = sanitizeRequiredText(stepId, 'stepId');
+
+    await this.assertSystemTenantExists(tenantId);
+
+    const existingFunnel = await this.requireSystemTenantFunnelRecord(
+      tenantId,
+      normalizedFunnelId,
+    );
+    const existingStep = await this.prisma.funnelStep.findFirst({
+      where: {
+        id: normalizedStepId,
+        teamId: tenantId,
+        funnelInstance: {
+          is: {
+            teamId: tenantId,
+            legacyFunnelId: normalizedFunnelId,
+          },
+        },
+      },
+    });
+
+    if (!existingStep) {
+      throw new NotFoundException({
+        code: 'TENANT_FUNNEL_STEP_NOT_FOUND',
+        message:
+          'The requested funnel step was not found for the selected tenant funnel.',
+      });
+    }
+
+    const name =
+      dto.name === undefined
+        ? existingFunnel.name
+        : sanitizeRequiredText(dto.name, 'name');
+    const description =
+      dto.description === undefined
+        ? existingFunnel.description
+        : sanitizeOptionalText(dto.description);
+    const blocksJson =
+      dto.blocksJson === undefined
+        ? this.cloneJsonValue(existingStep.blocksJson as JsonValue)
+        : this.cloneJsonValue(dto.blocksJson);
+    const mediaMap =
+      dto.mediaMap === undefined
+        ? this.cloneJsonValue(existingStep.mediaMap as JsonValue)
+        : this.cloneJsonValue(dto.mediaMap);
+    const settingsJson =
+      dto.settingsJson === undefined
+        ? this.cloneJsonValue(existingStep.settingsJson as JsonValue)
+        : this.cloneJsonValue(dto.settingsJson);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const funnel = await tx.funnel.update({
+        where: {
+          id: existingFunnel.id,
+        },
+        data: {
+          name,
+          description,
+        },
+      });
+      const step = await tx.funnelStep.update({
+        where: {
+          id: existingStep.id,
+        },
+        data: {
+          blocksJson: toInputJson(blocksJson),
+          mediaMap: toInputJson(mediaMap),
+          settingsJson: toInputJson(settingsJson),
+        },
+      });
+
+      return { funnel, step };
+    });
+
+    return {
+      funnel: mapFunnelRecord(result.funnel),
+      step: this.mapSystemTenantFunnelStep(result.step),
+    };
   }
 
   async createSystemTenant(dto: CreateSystemTenantDto) {
@@ -1007,6 +1148,82 @@ export class TeamsService {
 
   private cloneJsonValue(value: JsonValue): JsonValue {
     return JSON.parse(JSON.stringify(value)) as JsonValue;
+  }
+
+  private mapSystemTenantFunnelStep(step: {
+    id: string;
+    funnelInstanceId: string;
+    slug: string;
+    stepType: string;
+    position: number;
+    isEntryStep: boolean;
+    isConversionStep: boolean;
+    blocksJson: unknown;
+    mediaMap: unknown;
+    settingsJson: unknown;
+    createdAt: Date;
+    updatedAt: Date;
+  }): SystemTenantFunnelStepSnapshot {
+    return {
+      id: step.id,
+      funnelInstanceId: step.funnelInstanceId,
+      slug: step.slug,
+      stepType: step.stepType,
+      position: step.position,
+      isEntryStep: step.isEntryStep,
+      isConversionStep: step.isConversionStep,
+      blocksJson: this.cloneJsonValue(step.blocksJson as JsonValue),
+      mediaMap: this.cloneJsonValue(step.mediaMap as JsonValue),
+      settingsJson: this.cloneJsonValue(step.settingsJson as JsonValue),
+      createdAt: toIso(step.createdAt),
+      updatedAt: toIso(step.updatedAt),
+    };
+  }
+
+  private async requireSystemTenantFunnelRecord(tenantId: string, funnelId: string) {
+    const existing = await this.prisma.funnel.findFirst({
+      where: {
+        id: funnelId,
+        defaultTeamId: tenantId,
+        isTemplate: false,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'TENANT_FUNNEL_NOT_FOUND',
+        message:
+          'The requested funnel was not found for the selected tenant.',
+      });
+    }
+
+    return existing;
+  }
+
+  private async findPrimarySystemTenantFunnelInstance(
+    tenantId: string,
+    funnelId: string,
+  ) {
+    const instances = await this.prisma.funnelInstance.findMany({
+      where: {
+        teamId: tenantId,
+        legacyFunnelId: funnelId,
+      },
+      include: {
+        steps: {
+          orderBy: { position: 'asc' },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+    });
+
+    return [...instances].sort((left, right) => {
+      if ((left.status === 'active') !== (right.status === 'active')) {
+        return left.status === 'active' ? -1 : 1;
+      }
+
+      return right.updatedAt.getTime() - left.updatedAt.getTime();
+    })[0] ?? null;
   }
 
   private async assertSystemTenantExists(id: string) {

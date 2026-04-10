@@ -12,6 +12,11 @@ import { Building2, Globe, UploadCloud } from "lucide-react";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { buildInitials, formatDateTime } from "@/lib/app-shell/utils";
+import {
+  UI_IDENTITY_BRANDING_ACCEPT,
+  UI_IDENTITY_UPLOAD_HINT,
+  optimizeUiIdentityImage,
+} from "@/lib/media-optimizer";
 import type { TeamSettingsSnapshot } from "@/lib/team-settings";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
@@ -95,18 +100,22 @@ export function TeamSettingsClient({
       return;
     }
 
-    const previousLogoUrl = settings.logoUrl;
-    const previewUrl = URL.createObjectURL(file);
-
-    setSettings((current) => ({
-      ...current,
-      logoUrl: previewUrl,
-    }));
     setIsUploadingLogo(true);
     setFeedback(null);
 
+    const previousLogoUrl = settings.logoUrl;
+    let previewUrl: string | null = null;
+
     try {
-      const publicUrl = await uploadFileWithPresignedUrl(file, "branding", {
+      const optimizedFile = await optimizeUiIdentityImage(file);
+      previewUrl = URL.createObjectURL(optimizedFile);
+
+      setSettings((current) => ({
+        ...current,
+        logoUrl: previewUrl,
+      }));
+
+      const publicUrl = await uploadFileWithPresignedUrl(optimizedFile, "branding", {
         teamId: settings.teamId,
       });
       const nextSettings = await authenticatedOperationRequest<TeamSettingsSnapshot>(
@@ -138,7 +147,10 @@ export function TeamSettingsClient({
             : "No pudimos actualizar el logo del equipo.",
       });
     } finally {
-      URL.revokeObjectURL(previewUrl);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
       event.target.value = "";
       setIsUploadingLogo(false);
     }
@@ -247,7 +259,7 @@ export function TeamSettingsClient({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                accept={UI_IDENTITY_BRANDING_ACCEPT}
                 className="hidden"
                 onChange={handleLogoChange}
               />
@@ -258,7 +270,7 @@ export function TeamSettingsClient({
                 className={primaryButtonClassName}
               >
                 <UploadCloud className="mr-2 h-4 w-4" />
-                {isUploadingLogo ? "Subiendo logo..." : "Subir logo"}
+                {isUploadingLogo ? "Optimizando y subiendo..." : "Subir logo"}
               </button>
               <button
                 type="button"
@@ -268,6 +280,9 @@ export function TeamSettingsClient({
               >
                 Quitar logo
               </button>
+              <span className="text-xs text-slate-500">
+                {UI_IDENTITY_UPLOAD_HINT}
+              </span>
             </div>
           </div>
 
@@ -341,8 +356,9 @@ export function TeamSettingsClient({
           </label>
 
           <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
-            El logo se publica directo en el bridge de storage y se guarda al
-            terminar la subida, sin esperar al submit del formulario.
+            El logo se optimiza primero a WebP para mantener identidad visual
+            consistente y luego se publica en storage sin esperar al submit del
+            formulario.
           </div>
 
           <div className="flex flex-wrap gap-3">

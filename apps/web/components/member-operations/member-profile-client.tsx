@@ -7,6 +7,11 @@ import { SectionHeader } from "@/components/app-shell/section-header";
 import { SponsorCard } from "@/components/app-shell/sponsor-card";
 import { StatusBadge } from "@/components/app-shell/status-badge";
 import { buildInitials } from "@/lib/app-shell/utils";
+import {
+  UI_IDENTITY_AVATAR_ACCEPT,
+  UI_IDENTITY_UPLOAD_HINT,
+  optimizeUiIdentityImage,
+} from "@/lib/media-optimizer";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type { MemberDashboardKpis } from "@/lib/member-dashboard";
 import type { MemberProfileSponsor } from "@/lib/member-profile";
@@ -99,17 +104,24 @@ export function MemberProfileClient({
     }
 
     const previousAvatarUrl = currentSponsor.avatarUrl;
-    const previewUrl = URL.createObjectURL(file);
+    let previewUrl: string | null = null;
 
     setIsUploadingAvatar(true);
     setFeedback(null);
-    setCurrentSponsor((current) => ({
-      ...current,
-      avatarUrl: previewUrl,
-    }));
 
     try {
-      const publicUrl = await uploadFileWithPresignedUrl(file, "avatars");
+      const optimizedFile = await optimizeUiIdentityImage(file);
+      previewUrl = URL.createObjectURL(optimizedFile);
+
+      setCurrentSponsor((current) => ({
+        ...current,
+        avatarUrl: previewUrl,
+      }));
+
+      const publicUrl = await uploadFileWithPresignedUrl(
+        optimizedFile,
+        "avatars",
+      );
       const updatedSponsor = await memberOperationRequest<MemberProfileSponsor>(
         "/sponsors/me",
         {
@@ -136,7 +148,10 @@ export function MemberProfileClient({
             : "No pudimos actualizar tu avatar.",
       });
     } finally {
-      URL.revokeObjectURL(previewUrl);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
       event.target.value = "";
       setIsUploadingAvatar(false);
     }
@@ -227,7 +242,7 @@ export function MemberProfileClient({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  accept={UI_IDENTITY_AVATAR_ACCEPT}
                   className="hidden"
                   onChange={handleAvatarChange}
                 />
@@ -237,10 +252,12 @@ export function MemberProfileClient({
                   disabled={isUploadingAvatar}
                   className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isUploadingAvatar ? "Subiendo avatar..." : "Cambiar foto"}
+                  {isUploadingAvatar
+                    ? "Optimizando y subiendo..."
+                    : "Cambiar foto"}
                 </button>
                 <span className="text-xs text-slate-500">
-                  PNG, JPG, WEBP o GIF
+                  {UI_IDENTITY_UPLOAD_HINT}
                 </span>
               </div>
             </div>
