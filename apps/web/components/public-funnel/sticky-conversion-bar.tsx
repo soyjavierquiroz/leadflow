@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -112,11 +112,16 @@ export function StickyConversionBar({
   triggerOffsetPixels,
   actionConfig,
 }: StickyConversionBarProps) {
+  const anchorRef = useRef<HTMLDivElement | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const isVisible = useStickyVisibility(triggerOffsetPixels);
 
   useEffect(() => {
     setIsMounted(true);
+    setPortalHost(
+      anchorRef.current?.closest<HTMLElement>("[data-funnel-theme]") ?? document.body,
+    );
   }, []);
 
   const renderActionButton = (label: string, className: string) => {
@@ -148,12 +153,15 @@ export function StickyConversionBar({
     );
   };
 
-  if (!isMounted) {
-    return null;
+  if (!isMounted || !portalHost) {
+    return <div ref={anchorRef} aria-hidden="true" className="hidden" />;
   }
 
-  return createPortal(
+  return (
     <>
+      <div ref={anchorRef} aria-hidden="true" className="hidden" />
+      {createPortal(
+        <>
       <div
         aria-hidden={!isVisible}
         className={cx(
@@ -189,6 +197,8 @@ export function StickyConversionBar({
         </div>
       </div>
     </>,
-    document.body,
+    portalHost,
+      )}
+    </>
   );
 }
