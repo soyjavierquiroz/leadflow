@@ -548,7 +548,8 @@ export const funnelBaseTheme = {
       headline: "headline",
       body: "body",
       primaryCta: "primary",
-      overlay: "rgba(0, 0, 0, 0.8)",
+      overlayBackground: "rgba(2, 6, 23, 0.82)",
+      overlayBackdropBlur: "14px",
     },
     authorityBioSlot: {
       bg: "#eff6ff",

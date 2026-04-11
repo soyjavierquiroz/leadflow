@@ -216,7 +216,8 @@ export type ThemeCaptureModalSlot = {
   headline: FunnelThemeTextVariant;
   body: FunnelThemeTextVariant;
   primaryCta: FunnelThemeButtonVariant;
-  overlay: string;
+  overlayBackground: string;
+  overlayBackdropBlur: string;
 };
 
 export type ThemeAuthorityBioSlot = {

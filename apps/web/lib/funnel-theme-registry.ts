@@ -278,11 +278,12 @@ export const funnelThemeRegistry = {
         primaryCta: "primary",
       },
       captureModalSlot: {
-        surface: "section",
+        surface: "guaranteeCoupon",
         headline: "headline",
         body: "body",
         primaryCta: "primary",
-        overlay: "rgba(0, 0, 0, 0.8)",
+        overlayBackground: "rgba(0, 0, 0, 0.8)",
+        overlayBackdropBlur: "18px",
       },
       authorityBioSlot: {
         bg: "#edf6ff",

@@ -244,7 +244,10 @@ export function FunnelThemeProvider({
   style["--theme-section-capture-modal-surface"] = theme.sections.captureModalSlot.surface;
   style["--theme-section-capture-modal-primary-cta"] =
     theme.sections.captureModalSlot.primaryCta;
-  style["--theme-section-capture-modal-overlay"] = theme.sections.captureModalSlot.overlay;
+  style["--theme-section-capture-modal-overlay-bg"] =
+    theme.sections.captureModalSlot.overlayBackground;
+  style["--theme-section-capture-modal-overlay-blur"] =
+    theme.sections.captureModalSlot.overlayBackdropBlur;
   applySlotSurfaceVariables(
     style,
     "--theme-section-authority-bio",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import {
@@ -120,6 +120,15 @@ const resolveLeadCaptureRedirect = (successRedirect?: string) => {
     : `${normalizedPath}/gracias`;
 };
 
+const captureModalScopeStyle = {
+  "--jakawi-text-main": "var(--theme-section-capture-modal-text-color)",
+  "--jakawi-text-muted": "var(--theme-text-caption-color)",
+  "--jakawi-input-border": "var(--theme-base-divider)",
+  "--jakawi-input-focus": "var(--theme-brand-trust)",
+  "--jakawi-input-ring":
+    "color-mix(in srgb, var(--theme-brand-trust) 18%, transparent)",
+} as CSSProperties & Record<string, string>;
+
 export function LeadCaptureModal({
   publicationId,
   currentStepId,
@@ -135,6 +144,7 @@ export function LeadCaptureModal({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const portalContainerRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -341,13 +351,19 @@ export function LeadCaptureModal({
         </Dialog.Trigger>
       ) : null}
 
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[80] bg-[var(--theme-section-capture-modal-overlay)] backdrop-blur-md" />
+      <div ref={portalContainerRef} />
+
+      <Dialog.Portal container={portalContainerRef.current ?? undefined}>
+        <Dialog.Overlay
+          className="fixed inset-0 z-[80]"
+          style={{
+            background: "var(--theme-section-capture-modal-overlay-bg)",
+            backdropFilter: "blur(var(--theme-section-capture-modal-overlay-blur))",
+          }}
+        />
         <Dialog.Content
-          className={cx(
-            "fixed left-1/2 top-1/2 z-[90] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-hidden border outline-none [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]",
-            "[&_.PhoneInput:focus-within]:border-[var(--theme-brand-trust)] [&_.PhoneInput:focus-within]:ring-4 [&_.PhoneInput:focus-within]:ring-[var(--theme-brand-trust)]",
-          )}
+          className="fixed left-1/2 top-1/2 z-[90] max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto border outline-none [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]"
+          style={captureModalScopeStyle}
         >
           <div className="relative px-6 pb-6 pt-5 md:px-7 md:pb-7">
             <div className="absolute inset-x-0 top-0 h-1.5 bg-slate-100">
@@ -361,7 +377,7 @@ export function LeadCaptureModal({
               <Dialog.Close asChild>
                 <button
                   type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border transition hover:bg-slate-100/80 [border-color:var(--theme-section-capture-modal-border)] [color:var(--theme-text-subtle)]"
                   aria-label="Cerrar"
                 >
                   <X className="h-4 w-4" />
@@ -411,7 +427,6 @@ export function LeadCaptureModal({
                   aria-describedby={nameError ? nameErrorId : undefined}
                   className={cx(
                     jakawiPremiumClassNames.compactInput,
-                    "focus:border-[var(--theme-brand-trust)] focus:ring-4 focus:ring-[var(--theme-brand-trust)]",
                     nameError
                       ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200"
                       : "",
@@ -458,13 +473,13 @@ export function LeadCaptureModal({
                 />
               </button>
 
-              {submitError ? (
-                <p className="text-sm text-rose-600">{submitError}</p>
-              ) : null}
-
-              <p className="mt-4 text-center text-xs opacity-60">
+              <p className="mt-4 text-center text-xs [color:var(--theme-section-capture-modal-text-color)] opacity-60">
                 🔒 Tu información está 100% segura y libre de spam.
               </p>
+
+              {submitError ? (
+                <p className="text-center text-sm text-rose-600">{submitError}</p>
+              ) : null}
             </form>
           </div>
         </Dialog.Content>
