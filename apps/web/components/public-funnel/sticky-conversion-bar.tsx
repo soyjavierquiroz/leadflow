@@ -35,6 +35,7 @@ type StickyConversionBarProps = {
   desktopButtonText: string;
   mobileButtonText: string;
   triggerOffsetPixels: number;
+  isInverted?: boolean;
   /** @deprecated Theme tokens are now the source of truth for bar colors. */
   bgColor?: string;
   /** @deprecated Theme tokens are now the source of truth for bar colors. */
@@ -49,10 +50,16 @@ type StickyConversionBarProps = {
 };
 
 const desktopShellClassName =
-  "fixed bottom-0 left-0 z-[99999] hidden w-full border-t [background:var(--theme-section-sticky-bar-bg)] [border-color:var(--theme-section-sticky-bar-border)] py-3 text-[color:var(--theme-section-sticky-bar-text-color)] shadow-[var(--theme-section-sticky-bar-shadow)] transition duration-300 md:flex md:items-center md:justify-center";
+  "fixed bottom-0 left-0 z-[99999] hidden w-full py-3 shadow-[var(--theme-section-sticky-bar-shadow)] transition duration-300 md:flex md:items-center md:justify-center";
 
 const mobileShellClassName =
-  "fixed bottom-0 left-0 z-[99999] w-full border-t [background:var(--theme-section-sticky-bar-bg)] [border-color:var(--theme-section-sticky-bar-border)] p-4 text-[color:var(--theme-section-sticky-bar-text-color)] shadow-[var(--theme-section-sticky-bar-shadow)] transition duration-300 md:hidden";
+  "fixed bottom-0 left-0 z-[99999] w-full p-4 shadow-[var(--theme-section-sticky-bar-shadow)] transition duration-300 md:hidden";
+
+const defaultShellToneClassName =
+  "border-t [background:var(--theme-section-sticky-bar-bg)] [border-color:var(--theme-section-sticky-bar-border)] text-[color:var(--theme-section-sticky-bar-text-color)]";
+
+const invertedShellToneClassName =
+  "border-none [background:var(--theme-text-headline-color)] [color:var(--theme-base-canvas)]";
 
 const desktopButtonClassName =
   `${stickyBarPrimaryButtonClassName} w-full animate-pulse cursor-pointer md:w-auto`;
@@ -110,12 +117,16 @@ export function StickyConversionBar({
   desktopButtonText,
   mobileButtonText,
   triggerOffsetPixels,
+  isInverted = false,
   actionConfig,
 }: StickyConversionBarProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const isVisible = useStickyVisibility(triggerOffsetPixels);
+  const shellToneClassName = isInverted
+    ? invertedShellToneClassName
+    : defaultShellToneClassName;
 
   useEffect(() => {
     setIsMounted(true);
@@ -162,42 +173,44 @@ export function StickyConversionBar({
       <div ref={anchorRef} aria-hidden="true" className="hidden" />
       {createPortal(
         <>
-      <div
-        aria-hidden={!isVisible}
-        className={cx(
-          desktopShellClassName,
-          isVisible
-            ? "translate-y-0 opacity-100"
-            : "-translate-y-full opacity-0 pointer-events-none",
-        )}
-      >
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6">
-          <p className="max-w-3xl text-sm font-semibold leading-6 [color:var(--theme-section-sticky-bar-text-color)] md:text-base">
-            {desktopText}
-          </p>
-          <div className="shrink-0">
-            {renderActionButton(desktopButtonText, desktopButtonClassName)}
+          <div
+            aria-hidden={!isVisible}
+            className={cx(
+              desktopShellClassName,
+              shellToneClassName,
+              isVisible
+                ? "translate-y-0 opacity-100"
+                : "-translate-y-full opacity-0 pointer-events-none",
+            )}
+          >
+            <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6">
+              <p className="max-w-3xl text-sm font-semibold leading-6 text-inherit md:text-base">
+                {desktopText}
+              </p>
+              <div className="shrink-0">
+                {renderActionButton(desktopButtonText, desktopButtonClassName)}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div
-        aria-hidden={!isVisible}
-        className={cx(
-          mobileShellClassName,
-          isVisible
-            ? "translate-y-0 opacity-100"
-            : "translate-y-full opacity-0 pointer-events-none",
-        )}
-      >
-        <div className="mx-auto w-full max-w-xl pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)]">
-          <div className="w-full">
-            {renderActionButton(mobileButtonText, mobileButtonClassName)}
+          <div
+            aria-hidden={!isVisible}
+            className={cx(
+              mobileShellClassName,
+              shellToneClassName,
+              isVisible
+                ? "translate-y-0 opacity-100"
+                : "translate-y-full opacity-0 pointer-events-none",
+            )}
+          >
+            <div className="mx-auto w-full max-w-xl pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)]">
+              <div className="w-full">
+                {renderActionButton(mobileButtonText, mobileButtonClassName)}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </>,
-    portalHost,
+        </>,
+        portalHost,
       )}
     </>
   );

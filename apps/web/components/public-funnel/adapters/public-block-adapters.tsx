@@ -49,6 +49,7 @@ import type {
   RuntimeBlock,
 } from "@/lib/public-funnel-runtime.types";
 import {
+  asBoolean,
   asFaqItems,
   asFeatureItems,
   asMediaItem,
@@ -2096,6 +2097,10 @@ function StickyConversionBarBlockAdapter({
       triggerOffsetPixels={asNumber(
         block.triggerOffsetPixels,
         asNumber(block.trigger_offset_pixels, 320),
+      )}
+      isInverted={asBoolean(
+        block.isInverted,
+        asBoolean(block.is_inverted, false),
       )}
       actionConfig={
         modalConfig
