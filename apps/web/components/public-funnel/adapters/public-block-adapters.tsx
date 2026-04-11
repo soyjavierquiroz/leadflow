@@ -1365,10 +1365,18 @@ function VideoPlayerBlockAdapter({
   runtime,
   surfaceProps,
 }: PublicBlockAdapterProps) {
+  if (!surfaceProps?.isBoxed) {
+    return (
+      <div id={asString(block.key) || undefined}>
+        <PublicVideoBlock block={block} runtime={runtime} />
+      </div>
+    );
+  }
+
   return (
     <PublicSectionSurface
       id={asString(block.key) || undefined}
-      isBoxed
+      isBoxed={surfaceProps.isBoxed}
       surfaceSlot={surfaceProps?.surfaceSlot ?? "video"}
       variant="flat"
     >

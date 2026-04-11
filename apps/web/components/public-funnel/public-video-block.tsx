@@ -83,6 +83,7 @@ export function PublicVideoBlock({
   const ratio = isMobile ? mobileRatio || "9/16" : desktopRatio || "16/9";
   const resolvedBannerText =
     isMobile && topBannerTextMobile ? topBannerTextMobile : topBannerText;
+  const hasBanner = Boolean(fallbackBannerText);
   const posterMedia = resolveLeadflowBlockMedia({
     runtime,
     block,
@@ -98,50 +99,56 @@ export function PublicVideoBlock({
   }
 
   return (
-    <div className="w-full">
-      <div className="relative w-full" style={{ aspectRatio: mounted ? ratio : baseRatio }}>
-        {fallbackBannerText ? (
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-20 flex min-h-11 items-center justify-center px-4 py-3 text-center text-sm font-semibold tracking-[0.02em] md:text-base"
-            style={{
-              backgroundColor: "var(--theme-section-video-banner-bg)",
-              color: "var(--theme-section-video-banner-text)",
-              fontFamily: "var(--theme-text-subheadline-font-family)",
-              fontWeight: "var(--theme-text-subheadline-font-weight)",
-            }}
-          >
-            {mounted ? resolvedBannerText || fallbackBannerText : fallbackBannerText}
-          </div>
-        ) : null}
+    <div
+      className="flex w-full flex-col"
+      style={{
+        boxShadow: "var(--theme-section-video-shadow)",
+      }}
+    >
+      {hasBanner ? (
+        <div
+          className="flex min-h-11 items-center justify-center px-4 py-3 text-center text-sm font-semibold tracking-[0.02em] rounded-t-xl md:text-base"
+          style={{
+            backgroundColor: "var(--theme-section-video-banner-bg)",
+            color: "var(--theme-section-video-banner-text)",
+            fontFamily: "var(--theme-text-subheadline-font-family)",
+            fontWeight: "var(--theme-text-subheadline-font-weight)",
+          }}
+        >
+          {mounted ? resolvedBannerText || fallbackBannerText : fallbackBannerText}
+        </div>
+      ) : null}
 
+      <div
+        className={hasBanner ? "overflow-hidden rounded-b-xl" : "overflow-hidden rounded-xl"}
+        style={{ aspectRatio: mounted ? ratio : baseRatio }}
+      >
         {!mounted ? (
-          <div className="absolute inset-0 animate-pulse bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(30,41,59,0.88))]">
+          <div className="relative h-full w-full animate-pulse bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(30,41,59,0.88))]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_38%)]" />
           </div>
         ) : (
-          <div className="absolute inset-0">
-            <KurukinPlayer
-              provider={provider}
-              videoId={activeVideoId}
-              vslMode={vslMode}
-              vslProgressBarColor="var(--theme-section-video-progress-bar, var(--theme-button-primary-rest-bg))"
-              lazyLoadYoutube={provider === "youtube" && !vslMode}
-              hideYoutubeUi={provider === "youtube"}
-              smartPoster={
-                posterMedia
-                  ? {
-                      imageUrl: posterMedia.src,
-                      eyebrow: "VSL",
-                      title,
-                      description:
-                        "Activa el audio para iniciar la presentacion desde el comienzo.",
-                      buttonText: "Ver ahora",
-                    }
-                  : undefined
-              }
-              className="h-full !aspect-auto !rounded-none"
-            />
-          </div>
+          <KurukinPlayer
+            provider={provider}
+            videoId={activeVideoId}
+            vslMode={vslMode}
+            vslProgressBarColor="var(--theme-section-video-progress-bar, var(--theme-button-primary-rest-bg))"
+            lazyLoadYoutube={provider === "youtube" && !vslMode}
+            hideYoutubeUi={provider === "youtube"}
+            smartPoster={
+              posterMedia
+                ? {
+                    imageUrl: posterMedia.src,
+                    eyebrow: "VSL",
+                    title,
+                    description:
+                      "Activa el audio para iniciar la presentacion desde el comienzo.",
+                    buttonText: "Ver ahora",
+                  }
+                : undefined
+            }
+            className="h-full !aspect-auto !rounded-none"
+          />
         )}
       </div>
     </div>
