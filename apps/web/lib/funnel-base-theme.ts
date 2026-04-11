@@ -543,5 +543,32 @@ export const funnelBaseTheme = {
       body: "body",
       primaryCta: "primary",
     },
+    authorityBioSlot: {
+      bg: "#eff6ff",
+      text: "#1e293b",
+      expertName: "#2563eb",
+      primaryCta: "primary",
+    },
+    qualificationSlot: {
+      bg: "#ffffff",
+      text: "#1e293b",
+      checkColor: "#059669",
+      crossColor: "#dc2626",
+      primaryCta: "primary",
+    },
+    socialProofSlot: {
+      bg: "#f8fafc",
+      text: "#1e293b",
+      testimonialBg: "#ffffff",
+      testimonialBorder: "#e2e8f0",
+      primaryCta: "secondary",
+    },
+    faqAccordionSlot: {
+      bg: "#f8fafc",
+      textHeadline: "#0f172a",
+      textBody: "#475569",
+      accordionDivider: "#e2e8f0",
+      primaryCta: "secondary",
+    },
   },
 } as const satisfies Omit<ResolvedFunnelTheme, "id" | "name" | "description">;

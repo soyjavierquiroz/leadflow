@@ -277,6 +277,33 @@ export const funnelThemeRegistry = {
         text: "body",
         primaryCta: "primary",
       },
+      authorityBioSlot: {
+        bg: "#edf6ff",
+        text: "#24303f",
+        expertName: "#1e73be",
+        primaryCta: "primary",
+      },
+      qualificationSlot: {
+        bg: "#ffffff",
+        text: "#24303f",
+        checkColor: "#1f9d55",
+        crossColor: "#cc3333",
+        primaryCta: "primary",
+      },
+      socialProofSlot: {
+        bg: "#f8f8f8",
+        text: "#2d2d2d",
+        testimonialBg: "#ffffff",
+        testimonialBorder: "#d9dee7",
+        primaryCta: "secondary",
+      },
+      faqAccordionSlot: {
+        bg: "#fafafa",
+        textHeadline: "#1f2937",
+        textBody: "#4b5563",
+        accordionDivider: "#e5e7eb",
+        primaryCta: "secondary",
+      },
     },
   },
 } as const satisfies Record<FunnelThemeId, FunnelThemeDefinition>;

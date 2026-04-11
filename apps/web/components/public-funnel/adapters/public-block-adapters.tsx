@@ -32,6 +32,15 @@ import { resolveLeadflowBlockMedia } from "@/components/public-funnel/leadflow-m
 import { JakawiHookAndPromiseSection } from "@/components/public-funnel/recycled/jakawi-hook-and-promise-section";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import { UrgencyTimerBlock } from "@/components/public-funnel/urgency-timer-block";
+import {
+  VslAuthorityBioSection,
+  VslFaqAccordionSection,
+  VslQualificationChecklistSection,
+  VslSocialProofGridSection,
+  type VslChecklistItem,
+  type VslFaqAccordionItem,
+  type VslSocialProofGridItem,
+} from "@/components/public-funnel/vsl-core-sections";
 import { StickyConversionBar } from "@/components/public-funnel/sticky-conversion-bar";
 import { WhatsappHandoffCta } from "@/components/public-funnel/whatsapp-handoff-cta";
 import type {
@@ -644,6 +653,169 @@ function toUniqueMechanismPairs(value: RuntimeBlock["feature_benefit_pairs"]) {
   );
 }
 
+function normalizeChecklistItems(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as VslChecklistItem[];
+  }
+
+  const items = value.map((item) => {
+    if (typeof item === "string") {
+      return item.trim() ? { text: item.trim() } : null;
+    }
+
+    const record = asRecord(item);
+    if (!record) {
+      return null;
+    }
+
+    const text = asString(
+      record.text,
+      asString(
+        record.label,
+        asString(
+          record.title,
+          asString(record.description, asString(record.body)),
+        ),
+      ),
+    );
+    const itemIconType = asString(
+      record.item_icon_type,
+      asString(record.itemIconType),
+    );
+
+    if (!text.trim()) {
+      return null;
+    }
+
+    return {
+      text,
+      itemIconType:
+        itemIconType === "check" || itemIconType === "cross"
+          ? itemIconType
+          : undefined,
+    } satisfies VslChecklistItem;
+  });
+
+  return items.filter((item): item is NonNullable<(typeof items)[number]> =>
+    Boolean(item),
+  );
+}
+
+function normalizeSocialProofGridItems(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as VslSocialProofGridItem[];
+  }
+
+  const items = value.map((item) => {
+    const record = asRecord(item);
+    if (!record) {
+      return null;
+    }
+
+    const quote = asString(
+      record.quote,
+      asString(
+        record.testimonial,
+        asString(
+          record.comment,
+          asString(record.review, asString(record.text, asString(record.body))),
+        ),
+      ),
+    );
+    const author = asString(
+      record.author,
+      asString(record.name, asString(record.person, asString(record.client))),
+    );
+    const role = asString(
+      record.role,
+      asString(record.title, asString(record.position)),
+    );
+    const company = asString(
+      record.company,
+      asString(record.organization, asString(record.business)),
+    );
+    const headshotKey = asString(
+      record.headshot_key,
+      asString(record.headshotKey),
+    );
+    const screenshotKey = asString(
+      record.screenshot_key,
+      asString(record.screenshotKey),
+    );
+
+    if (
+      !quote.trim() &&
+      !author.trim() &&
+      !headshotKey.trim() &&
+      !screenshotKey.trim()
+    ) {
+      return null;
+    }
+
+    return {
+      quote: quote || undefined,
+      author: author || undefined,
+      role: role || undefined,
+      company: company || undefined,
+      headshotKey: headshotKey || undefined,
+      screenshotKey: screenshotKey || undefined,
+    } satisfies VslSocialProofGridItem;
+  });
+
+  return items.filter((item): item is NonNullable<(typeof items)[number]> =>
+    Boolean(item),
+  );
+}
+
+function normalizeFaqAccordionItems(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] as VslFaqAccordionItem[];
+  }
+
+  const items = value.map((item, index) => {
+    const record = asRecord(item);
+    if (!record) {
+      return null;
+    }
+
+    const question = asString(
+      record.question,
+      asString(record.q, asString(record.title, asString(record.headline))),
+    );
+    const answer = asString(
+      record.answer,
+      asString(
+        record.a,
+        asString(record.body, asString(record.content, asString(record.text))),
+      ),
+    );
+    const defaultOpen =
+      typeof record.default_open === "boolean"
+        ? record.default_open
+        : typeof record.defaultOpen === "boolean"
+          ? record.defaultOpen
+          : typeof record.is_open === "boolean"
+            ? record.is_open
+            : typeof record.isOpen === "boolean"
+              ? record.isOpen
+              : index === 0;
+
+    if (!question.trim() || !answer.trim()) {
+      return null;
+    }
+
+    return {
+      question,
+      answer,
+      defaultOpen,
+    } satisfies VslFaqAccordionItem;
+  });
+
+  return items.filter((item): item is NonNullable<(typeof items)[number]> =>
+    Boolean(item),
+  );
+}
+
 function toEmbedUrl(rawUrl: string) {
   const trimmed = rawUrl.trim();
   if (!trimmed) {
@@ -740,6 +912,114 @@ function UniqueMechanismBlockAdapter({
       media={media}
       mediaNode={mediaNode}
       hideDesktopMedia={layoutVariant === "sticky_media"}
+    />
+  );
+}
+
+function WhoAmIBlockAdapter({
+  block,
+  runtime,
+}: PublicBlockAdapterProps) {
+  const bioParagraphs = asStringArray(
+    block.bio_paragraphs ?? block.paragraphs ?? block.story_paragraphs,
+  );
+  const headline = asString(
+    block.headline,
+    asString(block.title, "Hola, soy Russell Brunson..."),
+  );
+
+  return (
+    <VslAuthorityBioSection
+      runtime={runtime}
+      block={block}
+      leadflowMetadata={
+        block.leadflow_metadata ?? block.metadata ?? runtime.funnel.settingsJson
+      }
+      eyebrow={asString(
+        block.eyebrow,
+        "Quien soy yo para ayudarte con esto",
+      )}
+      headline={headline}
+      expertName={asString(block.expert_name, "Russell Brunson")}
+      expertTitle={asString(
+        block.expert_title,
+        "Emprendedor, autor y constructor de funnels",
+      )}
+      expertCredentials={asString(
+        block.expert_credentials,
+        asString(block.expert_credential),
+      )}
+      bioParagraphs={bioParagraphs.length > 0 ? bioParagraphs : undefined}
+      signatureCaption={asString(block.signature_caption, "Con aprecio,")}
+      expertHeadshotKey={asString(block.expert_headshot_key)}
+      signatureKey={asString(block.signature_key)}
+      mediaPosition={
+        asString(block.media_position) === "right" ? "right" : "left"
+      }
+    />
+  );
+}
+
+function QualificationChecklistBlockAdapter({
+  block,
+}: PublicBlockAdapterProps) {
+  const goodFitItems = normalizeChecklistItems(
+    block.good_fit_items ?? block.for_who_items ?? block.qualifies_items,
+  );
+  const badFitItems = normalizeChecklistItems(
+    block.bad_fit_items ?? block.not_for_who_items ?? block.disqualifies_items,
+  );
+
+  return (
+    <VslQualificationChecklistSection
+      eyebrow={asString(block.eyebrow, "Filtro de audiencia")}
+      headline={asString(
+        block.headline,
+        asString(
+          block.title,
+          "Esta presentacion esta disenada para un perfil muy especifico",
+        ),
+      )}
+      subheadline={asString(
+        block.subheadline,
+        asString(block.description),
+      )}
+      goodFitTitle={asString(block.good_fit_title, "PARA QUIEN ES")}
+      badFitTitle={asString(block.bad_fit_title, "PARA QUIEN NO ES")}
+      goodFitItems={goodFitItems}
+      badFitItems={badFitItems}
+    />
+  );
+}
+
+function SocialProofGridBlockAdapter({
+  block,
+  runtime,
+}: PublicBlockAdapterProps) {
+  const testimonials = normalizeSocialProofGridItems(
+    block.testimonials ?? block.items ?? block.reviews,
+  );
+
+  return (
+    <VslSocialProofGridSection
+      runtime={runtime}
+      block={block}
+      leadflowMetadata={
+        block.leadflow_metadata ?? block.metadata ?? runtime.funnel.settingsJson
+      }
+      eyebrow={asString(block.eyebrow, "Prueba social")}
+      headline={asString(
+        block.headline,
+        asString(
+          block.title,
+          "Lo que pasa cuando el mensaje correcto encuentra al prospecto correcto",
+        ),
+      )}
+      subheadline={asString(
+        block.subheadline,
+        asString(block.description),
+      )}
+      testimonials={testimonials}
     />
   );
 }
@@ -1118,6 +1398,16 @@ function FaqBlockAdapter({
         title={title}
         items={items.length > 0 ? items : undefined}
         variant={layoutVariant === "sticky_media" ? "flat" : "default"}
+      />
+    );
+  }
+
+  if (block.type === "faq_accordion") {
+    return (
+      <VslFaqAccordionSection
+        eyebrow={asString(block.eyebrow, "Preguntas frecuentes")}
+        headline={title}
+        items={normalizeFaqAccordionItems(block.items ?? block.faqs)}
       />
     );
   }
@@ -1727,6 +2017,24 @@ export function PublicBlockAdapter({
             layoutVariant={layoutVariant}
           />
         );
+      case "who_am_i":
+        return (
+          <WhoAmIBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "qualification_checklist":
+        return (
+          <QualificationChecklistBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
       case "unique_mechanism":
         return (
           <UniqueMechanismBlockAdapter
@@ -1828,6 +2136,15 @@ export function PublicBlockAdapter({
       case "social_proof":
         return (
           <SocialProofBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            layoutVariant={layoutVariant}
+          />
+        );
+      case "social_proof_grid":
+        return (
+          <SocialProofGridBlockAdapter
             block={block}
             runtime={runtime}
             blocks={blocks}

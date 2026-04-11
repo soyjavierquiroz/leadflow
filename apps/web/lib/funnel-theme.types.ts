@@ -211,6 +211,37 @@ export type ThemeCaptureFormSection = {
   primaryCta: FunnelThemeButtonVariant;
 };
 
+export type ThemeAuthorityBioSlot = {
+  bg: string;
+  text: string;
+  expertName: string;
+  primaryCta: FunnelThemeButtonVariant;
+};
+
+export type ThemeQualificationSlot = {
+  bg: string;
+  text: string;
+  checkColor: string;
+  crossColor: string;
+  primaryCta: FunnelThemeButtonVariant;
+};
+
+export type ThemeSocialProofSlot = {
+  bg: string;
+  text: string;
+  testimonialBg: string;
+  testimonialBorder: string;
+  primaryCta: FunnelThemeButtonVariant;
+};
+
+export type ThemeFaqAccordionSlot = {
+  bg: string;
+  textHeadline: string;
+  textBody: string;
+  accordionDivider: string;
+  primaryCta: FunnelThemeButtonVariant;
+};
+
 export type ThemeSections = {
   heroHook: ThemeContentSection;
   guarantee: ThemeContentSection;
@@ -222,6 +253,10 @@ export type ThemeSections = {
   stickyConversionBar: ThemeStickyConversionBarSection;
   announcementBar: ThemeAnnouncementBarSection;
   captureForm: ThemeCaptureFormSection;
+  authorityBioSlot: ThemeAuthorityBioSlot;
+  qualificationSlot: ThemeQualificationSlot;
+  socialProofSlot: ThemeSocialProofSlot;
+  faqAccordionSlot: ThemeFaqAccordionSlot;
 };
 
 export type FunnelThemeDefinition = {

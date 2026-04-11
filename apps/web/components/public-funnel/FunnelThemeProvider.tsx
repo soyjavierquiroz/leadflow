@@ -228,6 +228,29 @@ export function FunnelThemeProvider({
   style["--theme-section-capture-form-surface"] = theme.sections.captureForm.surface;
   style["--theme-section-capture-form-primary-cta"] =
     theme.sections.captureForm.primaryCta;
+  style["--theme-section-authority-bio-bg"] = theme.sections.authorityBioSlot.bg;
+  style["--theme-section-authority-bio-text"] = theme.sections.authorityBioSlot.text;
+  style["--theme-section-authority-bio-expert-name"] =
+    theme.sections.authorityBioSlot.expertName;
+  style["--theme-section-qualification-bg"] = theme.sections.qualificationSlot.bg;
+  style["--theme-section-qualification-text"] = theme.sections.qualificationSlot.text;
+  style["--theme-section-qualification-check-color"] =
+    theme.sections.qualificationSlot.checkColor;
+  style["--theme-section-qualification-cross-color"] =
+    theme.sections.qualificationSlot.crossColor;
+  style["--theme-section-social-proof-grid-bg"] = theme.sections.socialProofSlot.bg;
+  style["--theme-section-social-proof-grid-text"] = theme.sections.socialProofSlot.text;
+  style["--theme-section-social-proof-grid-testimonial-bg"] =
+    theme.sections.socialProofSlot.testimonialBg;
+  style["--theme-section-social-proof-grid-testimonial-border"] =
+    theme.sections.socialProofSlot.testimonialBorder;
+  style["--theme-section-faq-accordion-bg"] = theme.sections.faqAccordionSlot.bg;
+  style["--theme-section-faq-accordion-text-headline"] =
+    theme.sections.faqAccordionSlot.textHeadline;
+  style["--theme-section-faq-accordion-text-body"] =
+    theme.sections.faqAccordionSlot.textBody;
+  style["--theme-section-faq-accordion-divider"] =
+    theme.sections.faqAccordionSlot.accordionDivider;
 
   applyResolvedSectionSurfaceVariables(
     style,
@@ -367,6 +390,30 @@ export function FunnelThemeProvider({
     "--theme-section-offer-stack-primary-cta",
     theme,
     theme.sections.offerStack.primaryCta,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-authority-bio-primary-cta",
+    theme,
+    theme.sections.authorityBioSlot.primaryCta,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-qualification-primary-cta",
+    theme,
+    theme.sections.qualificationSlot.primaryCta,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-social-proof-grid-primary-cta",
+    theme,
+    theme.sections.socialProofSlot.primaryCta,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-faq-accordion-primary-cta",
+    theme,
+    theme.sections.faqAccordionSlot.primaryCta,
   );
 
   return (

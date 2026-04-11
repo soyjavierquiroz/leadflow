@@ -193,6 +193,106 @@ export const builderBlockDefinitionsByKey: Record<
       media_key: "hero",
     },
   }),
+  who_am_i: defineBlock({
+    key: "who_am_i",
+    name: "Who Am I / Biografía de Autoridad",
+    description:
+      "Bloque VSL de autoridad con headshot, narrativa del experto y firma final resuelta por media slots.",
+    category: "narrative",
+    schema: {
+      type: "who_am_i",
+      key: "string",
+      eyebrow: "string",
+      headline: "string",
+      expert_name: "string",
+      expert_title: "string",
+      expert_credentials: "string",
+      bio_paragraphs: ["string"],
+      expert_headshot_key: "expert_headshot",
+      signature_key: "expert_signature",
+      media_position: "left | right",
+    },
+    example: {
+      type: "who_am_i",
+      key: "who-am-i-main",
+      eyebrow: "quien soy yo para ayudarte con esto",
+      headline: "Hola, soy Russell Brunson...",
+      expert_name: "Russell Brunson",
+      expert_title: "Emprendedor, autor y constructor de funnels",
+      expert_credentials:
+        "Creador de campañas, libros y entrenamientos usados por miles de negocios para vender con claridad.",
+      bio_paragraphs: [
+        "Hola, soy Russell Brunson. Durante años estuve obsesionado con una sola pregunta: ¿por qué algunas ofertas convierten casi de inmediato mientras otras, incluso siendo buenas, se quedan ignoradas?",
+        "Después de gastar millones de dólares comprando tráfico, construyendo funnels y estudiando campañas ganadoras, descubrí que la diferencia casi nunca está en tener más información. Está en contar la historia correcta, en el orden correcto, de una forma que haga que la gente se vea a sí misma dentro del resultado.",
+        "Eso es lo que vas a ver en esta VSL: un proceso claro para mover a la persona desde la curiosidad, a la creencia, y de la creencia a la acción. No necesitas más ruido; necesitas el mensaje que haga clic.",
+      ],
+      expert_headshot_key: "russell_brunson_headshot",
+      signature_key: "russell_brunson_signature",
+      media_position: "left",
+    },
+  }),
+  qualification_checklist: defineBlock({
+    key: "qualification_checklist",
+    name: "Qualification Checklist",
+    description:
+      "Filtro de audiencia en dos columnas para calificar al prospecto correcto y descalificar al incorrecto con checks y cruces semánticas.",
+    category: "narrative",
+    schema: {
+      type: "qualification_checklist",
+      key: "string",
+      eyebrow: "string",
+      headline: "string",
+      subheadline: "string",
+      good_fit_title: "PARA QUIEN ES",
+      bad_fit_title: "PARA QUIEN NO ES",
+      good_fit_items: [
+        {
+          text: "string",
+          item_icon_type: "check | cross",
+        },
+      ],
+      bad_fit_items: [
+        {
+          text: "string",
+          item_icon_type: "cross | check",
+        },
+      ],
+    },
+    example: {
+      type: "qualification_checklist",
+      key: "qualification-main",
+      eyebrow: "filtro de audiencia",
+      headline: "Esta presentacion esta disenada para un perfil muy especifico",
+      subheadline:
+        "Cuanto mejor encajes con este marco, mas rapido entenderas por que funciona y si deberias avanzar ahora.",
+      good_fit_title: "PARA QUIEN ES",
+      bad_fit_title: "PARA QUIEN NO ES",
+      good_fit_items: [
+        {
+          text: "Quieres una explicacion clara antes de tomar una decision.",
+          item_icon_type: "check",
+        },
+        {
+          text: "Valoras frameworks probados en campanas reales.",
+        },
+        {
+          text: "Buscas avanzar rapido, pero con contexto y criterio.",
+        },
+      ],
+      bad_fit_items: [
+        {
+          text: "Solo quieres tacticas aisladas sin entender la estrategia.",
+          item_icon_type: "cross",
+        },
+        {
+          text: "Esperas resultados sin implementar ni medir.",
+        },
+        {
+          text: "Prefieres seguir improvisando en lugar de ordenar tu mensaje.",
+        },
+      ],
+    },
+  }),
   lead_capture_config: defineBlock({
     key: "lead_capture_config",
     name: "Lead Capture Config",
@@ -757,6 +857,102 @@ export const builderBlockDefinitionsByKey: Record<
       ],
     },
   }),
+  social_proof_grid: defineBlock({
+    key: "social_proof_grid",
+    name: "Social Proof Grid",
+    description:
+      "Muro de prueba social en mosaico que mezcla testimonios narrativos con capturas resueltas desde media slots.",
+    category: "proof",
+    schema: {
+      type: "social_proof_grid",
+      key: "string",
+      eyebrow: "string",
+      headline: "string",
+      subheadline: "string",
+      testimonials: [
+        {
+          quote: "string",
+          author: "string",
+          role: "string",
+          company: "string",
+          headshot_key: "testimonial_headshot",
+          screenshot_key: "testimonial_screenshot",
+        },
+      ],
+    },
+    example: {
+      type: "social_proof_grid",
+      key: "social-proof-grid-main",
+      eyebrow: "prueba social",
+      headline:
+        "Lo que pasa cuando el mensaje correcto encuentra al prospecto correcto",
+      subheadline:
+        "Un muro de validacion visual y narrativa para reducir escepticismo sin interrumpir la historia principal.",
+      testimonials: [
+        {
+          quote:
+            "La narrativa dejo de sentirse generica. La VSL empezo a filtrar mejor y llegaban leads mucho mas conscientes.",
+          author: "Mariana P.",
+          role: "Consultora de crecimiento",
+          company: "Scale Operators",
+          headshot_key: "testimonial_mariana",
+        },
+        {
+          quote:
+            "Lo que mas cambio fue la claridad. El prospecto ya entendia por que debia actuar antes de hablar con nosotros.",
+          author: "Javier R.",
+          role: "Founder",
+          company: "Pipeline Crew",
+          headshot_key: "testimonial_javier",
+        },
+        {
+          author: "Captura de resultados",
+          company: "WhatsApp",
+          screenshot_key: "testimonial_whatsapp_wall",
+        },
+      ],
+    },
+  }),
+  faq_accordion: defineBlock({
+    key: "faq_accordion",
+    name: "FAQ Accordion",
+    description:
+      "Lista expandible de preguntas frecuentes para resolver objeciones sin competir visualmente con el CTA principal.",
+    category: "proof",
+    schema: {
+      type: "faq_accordion",
+      key: "string",
+      eyebrow: "string",
+      headline: "string",
+      items: [
+        {
+          question: "string",
+          answer: "string",
+          default_open: true,
+        },
+      ],
+    },
+    example: {
+      type: "faq_accordion",
+      key: "faq-accordion-main",
+      eyebrow: "preguntas frecuentes",
+      headline:
+        "Resolvamos las objeciones antes de que se conviertan en friccion",
+      items: [
+        {
+          question: "¿Necesito experiencia previa con funnels o VSLs?",
+          answer:
+            "No. La estructura esta disenada para que entiendas el porque detras de cada bloque y puedas adaptarlo sin depender de tecnicismos.",
+          default_open: true,
+        },
+        {
+          question: "¿Esto sirve si ya tengo trafico pero convierto poco?",
+          answer:
+            "Si. De hecho, suele ser el caso ideal: no necesitas mas visitas, sino una historia mas creible y una secuencia que elimine objeciones antes del CTA.",
+        },
+      ],
+    },
+  }),
   risk_reversal: defineBlock({
     key: "risk_reversal",
     name: "Risk Reversal",
@@ -1134,6 +1330,8 @@ export const defaultBuilderBlockDefinitions = [
   builderBlockDefinitionsByKey.announcement,
   builderBlockDefinitionsByKey.hero,
   builderBlockDefinitionsByKey.hook_and_promise,
+  builderBlockDefinitionsByKey.who_am_i,
+  builderBlockDefinitionsByKey.qualification_checklist,
   builderBlockDefinitionsByKey.lead_capture_config,
   builderBlockDefinitionsByKey.lead_capture_form,
   builderBlockDefinitionsByKey.unique_mechanism,
@@ -1141,9 +1339,11 @@ export const defaultBuilderBlockDefinitions = [
   builderBlockDefinitionsByKey.text,
   builderBlockDefinitionsByKey.video,
   builderBlockDefinitionsByKey.cta,
+  builderBlockDefinitionsByKey.faq_accordion,
   builderBlockDefinitionsByKey.faq,
   builderBlockDefinitionsByKey.faq_social_proof,
   builderBlockDefinitionsByKey.social_proof,
+  builderBlockDefinitionsByKey.social_proof_grid,
   builderBlockDefinitionsByKey.testimonials,
   builderBlockDefinitionsByKey.feature_grid,
   builderBlockDefinitionsByKey.media,
@@ -1167,6 +1367,8 @@ export const BlockRegistry: Record<string, FC<any>> = {
   announcement: PublicAnnouncementBlockBridge,
   hero: PublicStickyRuntimeBlockBridge,
   hook_and_promise: PublicHookAndPromiseBlockBridge,
+  who_am_i: PublicStickyRuntimeBlockBridge,
+  qualification_checklist: PublicStickyRuntimeBlockBridge,
   lead_capture_config: PublicLeadCaptureConfigBridge,
   lead_capture_form: PublicStickyRuntimeBlockBridge,
   unique_mechanism: PublicUniqueMechanismBlockBridge,
@@ -1174,6 +1376,7 @@ export const BlockRegistry: Record<string, FC<any>> = {
   text: PublicStickyRuntimeBlockBridge,
   video: PublicStickyRuntimeBlockBridge,
   cta: PublicStickyRuntimeBlockBridge,
+  faq_accordion: PublicStickyRuntimeBlockBridge,
   faq: PublicStickyRuntimeBlockBridge,
   faq_social_proof: PublicStickyRuntimeBlockBridge,
   thank_you: PublicStickyRuntimeBlockBridge,
@@ -1181,6 +1384,7 @@ export const BlockRegistry: Record<string, FC<any>> = {
   conversion_page_config: PublicStickyRuntimeBlockBridge,
   sponsor_reveal_placeholder: PublicStickyRuntimeBlockBridge,
   social_proof: PublicStickyRuntimeBlockBridge,
+  social_proof_grid: PublicStickyRuntimeBlockBridge,
   risk_reversal: PublicStickyRuntimeBlockBridge,
   testimonials: PublicStickyRuntimeBlockBridge,
   feature_grid: PublicStickyRuntimeBlockBridge,
