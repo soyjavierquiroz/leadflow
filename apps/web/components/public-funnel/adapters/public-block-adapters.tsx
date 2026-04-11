@@ -1195,23 +1195,31 @@ function RiskReversalBlockAdapter({
   const bullets = asStringArray(block.guarantee_bullets ?? block.items).filter(
     Boolean,
   );
-  const ctaTarget =
-    resolveCtaHref(block, {
-      containerKeys: ["cta_button", "cta"],
-      labelKeys: ["section_cta_text", "cta_text", "primary_cta_text"],
-    }) ?? null;
+  const ctaButton = asRecord(block.cta_button);
+  const ctaBlock = asRecord(block.cta);
+  const ctaTarget = resolveCtaHref(block, runtime);
   const sectionCtaText = asString(
     block.section_cta_text,
-    asString(ctaTarget?.label),
+    asString(
+      ctaButton?.text,
+      asString(
+        ctaBlock?.text,
+        asString(block.cta_text, asString(block.primary_cta_text)),
+      ),
+    ),
   );
   const subtext = asString(
     block.section_cta_subtext,
     asString(
-      asRecord(block.cta_button)?.subtext,
+      ctaButton?.subtext,
       asString(block.cta_subtext),
     ),
   );
-  const ctaHref = ctaTarget?.href || runtime.nextStep?.path || runtime.currentStep.path;
+  const ctaAction = asString(
+    ctaButton?.action,
+    asString(ctaBlock?.action, asString(block.action, "risk_reversal_cta")),
+  );
+  const ctaHref = ctaTarget || runtime.nextStep?.path || runtime.currentStep.path;
   const resolvedBullets =
     bullets.length > 0
       ? bullets
@@ -1266,7 +1274,7 @@ function RiskReversalBlockAdapter({
                 buildCtaClassName("primary"),
                 "mx-auto flex w-full min-h-16 items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
               )}
-              action={ctaTarget?.action || "risk_reversal_cta"}
+              action={ctaAction}
             />
           </div>
         )}
