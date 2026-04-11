@@ -10,6 +10,7 @@ import {
   PublicSectionSurface,
   PublicStatCard,
   cx,
+  heroHookPrimaryButtonClassName,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { ConversionPage } from "@/components/public-funnel/conversion-page";
 import {
@@ -56,7 +57,6 @@ import {
 } from "@/components/public-funnel/runtime-block-utils";
 import { PublicGrandSlamOfferBlock } from "@/components/public-funnel/public-grand-slam-offer-block";
 import { JakawiUniqueMechanismSection } from "@/components/public-funnel/recycled/jakawi-unique-mechanism-section";
-import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 
 type PublicBlockAdapterProps = {
   block: RuntimeBlock;
@@ -505,7 +505,7 @@ function HookAndPromiseBlockAdapter({
               triggerClassName={
                 layoutVariant === "sticky_media"
                   ? cx(
-                      jakawiPremiumClassNames.primaryButton,
+                      heroHookPrimaryButtonClassName,
                       "mx-auto flex min-h-16 w-full items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
                       hasPulseScaleCta
                         ? "[animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none"
@@ -530,7 +530,7 @@ function HookAndPromiseBlockAdapter({
               className={
                 layoutVariant === "sticky_media"
                   ? cx(
-                      jakawiPremiumClassNames.primaryButton,
+                      heroHookPrimaryButtonClassName,
                       "mx-auto flex min-h-16 w-full items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
                       hasPulseScaleCta
                         ? "[animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none"

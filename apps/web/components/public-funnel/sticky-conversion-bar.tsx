@@ -8,7 +8,10 @@ import {
   type LeadCaptureModalConfig,
 } from "@/components/public-funnel/lead-capture-modal";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
-import { cx } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import {
+  cx,
+  stickyBarPrimaryButtonClassName,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
 
 type StickyConversionBarLinkAction = {
   kind: "link";
@@ -32,25 +35,30 @@ type StickyConversionBarProps = {
   desktopButtonText: string;
   mobileButtonText: string;
   triggerOffsetPixels: number;
+  /** @deprecated Theme tokens are now the source of truth for bar colors. */
   bgColor: string;
+  /** @deprecated Theme tokens are now the source of truth for bar colors. */
   textColor: string;
+  /** @deprecated Theme tokens are now the source of truth for button colors. */
   buttonBgColor: string;
+  /** @deprecated Theme tokens are now the source of truth for button colors. */
   buttonTextColor: string;
+  /** @deprecated Theme tokens are now the source of truth for border colors. */
   borderColor: string;
   actionConfig: StickyConversionBarLinkAction | StickyConversionBarModalAction;
 };
 
 const desktopShellClassName =
-  "fixed bottom-0 left-0 z-[99999] hidden w-full bg-gray-900 py-3 shadow-[0_-10px_20px_rgba(0,0,0,0.2)] transition duration-300 md:flex md:justify-center md:items-center";
+  "fixed bottom-0 left-0 z-[99999] hidden w-full border-t [background:var(--theme-section-sticky-bar-bg)] [border-color:var(--theme-section-sticky-bar-border)] py-3 text-[color:var(--theme-section-sticky-bar-text-color)] shadow-[var(--theme-section-sticky-bar-shadow)] transition duration-300 md:flex md:items-center md:justify-center";
 
 const mobileShellClassName =
-  "fixed bottom-0 left-0 z-[99999] w-full bg-white p-4 shadow-[0_-10px_20px_rgba(0,0,0,0.15)] transition duration-300 md:hidden";
+  "fixed bottom-0 left-0 z-[99999] w-full border-t [background:var(--theme-section-sticky-bar-bg)] [border-color:var(--theme-section-sticky-bar-border)] p-4 text-[color:var(--theme-section-sticky-bar-text-color)] shadow-[var(--theme-section-sticky-bar-shadow)] transition duration-300 md:hidden";
 
 const desktopButtonClassName =
-  "inline-flex w-full items-center justify-center text-center no-underline md:w-auto bg-orange-500 text-white font-black py-4 md:py-2 md:px-8 rounded-full md:rounded-md shadow-md animate-pulse cursor-pointer transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40";
+  `${stickyBarPrimaryButtonClassName} w-full animate-pulse cursor-pointer md:w-auto`;
 
 const mobileButtonClassName =
-  "inline-flex w-full items-center justify-center text-center no-underline md:w-auto bg-orange-500 text-white font-black py-4 md:py-2 md:px-8 rounded-full md:rounded-md shadow-md animate-pulse cursor-pointer transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300";
+  `${stickyBarPrimaryButtonClassName} w-full animate-pulse cursor-pointer md:w-auto`;
 
 function useStickyVisibility(triggerOffsetPixels: number) {
   const [isVisible, setIsVisible] = useState(false);
@@ -155,8 +163,8 @@ export function StickyConversionBar({
             : "-translate-y-full opacity-0 pointer-events-none",
         )}
       >
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 text-white">
-          <p className="max-w-3xl text-sm font-semibold leading-6 text-white md:text-base">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6">
+          <p className="max-w-3xl text-sm font-semibold leading-6 [color:var(--theme-section-sticky-bar-text-color)] md:text-base">
             {desktopText}
           </p>
           <div className="shrink-0">

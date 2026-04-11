@@ -72,18 +72,18 @@ export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
   ].filter((value, index, array) => array.indexOf(value) === index);
 
   return (
-    <section className="py-12 px-4">
+    <section className="bg-[var(--theme-section-hero-hook-bg)] px-4 py-12 text-[color:var(--theme-section-hero-hook-text-color)] shadow-[var(--theme-section-hero-hook-shadow)]">
       <div className="mx-auto max-w-4xl">
         {eyebrow ? (
           <FunnelEyebrow className="mb-4">{eyebrow}</FunnelEyebrow>
         ) : null}
 
-        <h1 className="mb-6 text-4xl font-extrabold text-slate-900 md:text-5xl">
+        <h1 className="mb-6 text-4xl font-extrabold [color:var(--theme-section-hero-hook-headline-color)] md:text-5xl">
           <RichHeadline text={headline} className="font-black" />
         </h1>
 
         {hookLeadIn ? (
-          <div className="mx-auto mb-8 max-w-4xl text-center text-xl leading-[1.4] text-slate-700 md:text-2xl">
+          <div className="mx-auto mb-8 max-w-4xl text-center text-xl leading-[1.4] [color:var(--theme-section-hero-hook-text-color)] md:text-2xl">
             <RichHeadline
               text={hookLeadIn}
               fontClassName="font-subheadline"
@@ -93,7 +93,7 @@ export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
         ) : null}
 
         {supportingText ? (
-          <p className="font-subheadline max-w-3xl text-lg leading-8 text-slate-700">
+          <p className="font-subheadline max-w-3xl text-lg leading-8 [color:var(--theme-section-hero-hook-supporting-text-color)]">
             {supportingText}
           </p>
         ) : null}
@@ -103,7 +103,7 @@ export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
             {bullets.map((bullet, index) => (
               <li
                 key={`${bullet}-${index}`}
-                className="flex items-start gap-3 text-lg text-slate-700"
+                className="flex items-start gap-3 text-lg [color:var(--theme-section-hero-hook-text-color)]"
               >
                 <span aria-hidden="true" className="mt-1 shrink-0">
                   ✅

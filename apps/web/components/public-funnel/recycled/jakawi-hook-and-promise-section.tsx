@@ -119,7 +119,9 @@ function renderSubheadline(
   return (
     <>
       {prefix ? <span>{prefix}</span> : null}
-      <span className="mt-2 block font-semibold text-slate-900">{emphasis}</span>
+      <span className="mt-2 block font-semibold [color:var(--theme-section-hero-hook-headline-color)]">
+        {emphasis}
+      </span>
     </>
   );
 }
@@ -148,7 +150,7 @@ export function JakawiHookAndPromiseSection({
   return (
     <section
       className={cx(
-        "w-full text-[var(--lf-hook-text-main)]",
+        "w-full [background:var(--theme-section-hero-hook-bg)] text-[color:var(--theme-section-hero-hook-text-color)] shadow-[var(--theme-section-hero-hook-shadow)]",
         variant === "flat"
           ? "pb-12 pt-6 md:pb-20 md:pt-10 lg:pt-0"
           : "py-2 md:py-3",
@@ -157,10 +159,8 @@ export function JakawiHookAndPromiseSection({
         {
           ...jakawiPremiumThemeStyle,
           "--lf-hook-primary": "var(--jakawi-success)",
-          "--lf-hook-text-main":
-            variant === "flat" ? "var(--jakawi-text-main)" : "var(--jakawi-text-on-dark)",
-          "--lf-hook-card-bg":
-            variant === "flat" ? "var(--jakawi-content-bg)" : "var(--jakawi-surface-dark)",
+          "--lf-hook-text-main": "var(--theme-section-hero-hook-text-color)",
+          "--lf-hook-card-bg": "var(--theme-section-hero-hook-bg)",
         } as CSSProperties
       }
     >
@@ -185,7 +185,7 @@ export function JakawiHookAndPromiseSection({
               <div
                 className={cx(
                   "mx-auto mb-8 max-w-4xl text-center text-xl leading-[1.4] md:text-2xl",
-                  variant === "flat" ? "text-slate-700" : "text-slate-100",
+                  "[color:var(--theme-section-hero-hook-text-color)]",
                 )}
               >
                 <RichHeadline
@@ -200,8 +200,11 @@ export function JakawiHookAndPromiseSection({
               className={cx(
                 "max-w-5xl text-balance",
                 variant === "flat"
-                  ? "text-left text-[1.8rem] font-black leading-[1.02] tracking-[-0.04em] text-slate-950 lg:text-5xl"
-                  : flatBlockTitleClassName,
+                  ? "text-left text-[1.8rem] font-black leading-[1.02] tracking-[-0.04em] [color:var(--theme-section-hero-hook-headline-color)] lg:text-5xl"
+                  : cx(
+                      flatBlockTitleClassName,
+                      "[color:var(--theme-section-hero-hook-headline-color)]",
+                    ),
               )}
             >
               <RichHeadline text={headline} className="font-black" />
@@ -212,8 +215,8 @@ export function JakawiHookAndPromiseSection({
                 className={cx(
                   "max-w-3xl",
                   variant === "flat"
-                    ? "mt-6 text-[14px] leading-5 text-slate-600"
-                    : "mb-2 text-base leading-7 text-slate-400",
+                    ? "mt-6 text-[14px] leading-5 [color:var(--theme-section-hero-hook-supporting-text-color)]"
+                    : "mb-2 text-base leading-7 [color:var(--theme-section-hero-hook-supporting-text-color)]",
                 )}
               >
                 {renderSubheadline(subheadline, variant)}
@@ -256,7 +259,7 @@ export function JakawiHookAndPromiseSection({
             <p
               className={cx(
                 "max-w-3xl text-sm leading-6",
-                variant === "flat" ? "text-slate-600" : "text-slate-300",
+                "[color:var(--theme-section-hero-hook-supporting-text-color)]",
               )}
             >
               {bodyCopy}

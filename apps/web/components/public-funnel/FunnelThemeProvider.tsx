@@ -96,6 +96,33 @@ const applyButtonVariables = (
   style[`${prefix}-motion-transform`] = button.motion.transform;
 };
 
+const applyResolvedSectionSurfaceVariables = (
+  style: FunnelThemeStyle,
+  prefix: string,
+  theme: ResolvedFunnelTheme,
+  surfaceVariant: FunnelThemeSurfaceVariant,
+) => {
+  applySurfaceVariables(style, prefix, theme.primitives.surface[surfaceVariant].surface);
+};
+
+const applyResolvedSectionTextVariables = (
+  style: FunnelThemeStyle,
+  prefix: string,
+  theme: ResolvedFunnelTheme,
+  textVariant: FunnelThemeTextVariant,
+) => {
+  applyTextVariables(style, prefix, theme.primitives.text[textVariant]);
+};
+
+const applyResolvedSectionButtonVariables = (
+  style: FunnelThemeStyle,
+  prefix: string,
+  theme: ResolvedFunnelTheme,
+  buttonVariant: FunnelThemeButtonVariant,
+) => {
+  applyButtonVariables(style, prefix, theme.primitives.button[buttonVariant]);
+};
+
 export function FunnelThemeProvider({
   runtime,
   children,
@@ -172,6 +199,56 @@ export function FunnelThemeProvider({
   style["--theme-section-capture-form-surface"] = theme.sections.captureForm.surface;
   style["--theme-section-capture-form-primary-cta"] =
     theme.sections.captureForm.primaryCta;
+
+  applyResolvedSectionSurfaceVariables(
+    style,
+    "--theme-section-hero-hook",
+    theme,
+    theme.sections.heroHook.surface,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-hero-hook-headline",
+    theme,
+    theme.sections.heroHook.headline,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-hero-hook-text",
+    theme,
+    theme.sections.heroHook.body,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-hero-hook-supporting-text",
+    theme,
+    theme.sections.heroHook.supportingText,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-hero-hook-primary-cta",
+    theme,
+    theme.sections.heroHook.primaryCta,
+  );
+
+  applyResolvedSectionSurfaceVariables(
+    style,
+    "--theme-section-sticky-bar",
+    theme,
+    theme.sections.stickyConversionBar.surface,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-sticky-bar-text",
+    theme,
+    theme.sections.stickyConversionBar.text,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-sticky-bar-primary-cta",
+    theme,
+    theme.sections.stickyConversionBar.primaryCta,
+  );
 
   return (
     <div
