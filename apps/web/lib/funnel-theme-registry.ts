@@ -194,6 +194,7 @@ export const funnelThemeRegistry = {
         },
         body: {
           fontFamily: funnelThemeFonts["expert-secrets"].body,
+          color: "#2d2d2d",
         },
         subheadline: {
           fontFamily: funnelThemeFonts["expert-secrets"].subheadline,
@@ -206,6 +207,16 @@ export const funnelThemeRegistry = {
         price: {
           fontFamily: funnelThemeFonts["expert-secrets"].headline,
           fontWeight: 900,
+        },
+      },
+      surface: {
+        overlay: {
+          surface: {
+            backgroundColor: "#ffffff",
+            borderColor: "#eaeaea",
+            shadow: "none",
+            radius: "0",
+          },
         },
       },
     },
@@ -221,6 +232,11 @@ export const funnelThemeRegistry = {
         primaryCta: "urgency",
       },
       offerStack: {
+        primaryCta: "primary",
+      },
+      stickyConversionBar: {
+        surface: "overlay",
+        text: "body",
         primaryCta: "primary",
       },
     },

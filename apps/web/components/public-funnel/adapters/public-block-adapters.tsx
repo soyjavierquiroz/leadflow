@@ -1657,26 +1657,6 @@ function StickyConversionBarBlockAdapter({
         block.triggerOffsetPixels,
         asNumber(block.trigger_offset_pixels, 320),
       )}
-      bgColor={asString(
-        block.bgColor,
-        asString(block.bg_color, "var(--funnel-surface-strong)"),
-      )}
-      textColor={asString(
-        block.textColor,
-        asString(block.text_color, "var(--funnel-surface-contrast)"),
-      )}
-      buttonBgColor={asString(
-        block.buttonBgColor,
-        asString(block.button_bg_color, "var(--funnel-cta-positive)"),
-      )}
-      buttonTextColor={asString(
-        block.buttonTextColor,
-        asString(block.button_text_color, "var(--funnel-cta-positive-foreground)"),
-      )}
-      borderColor={asString(
-        block.borderColor,
-        asString(block.border_color, "var(--funnel-border-strong)"),
-      )}
       actionConfig={
         modalConfig
           ? {

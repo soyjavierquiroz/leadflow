@@ -36,15 +36,15 @@ type StickyConversionBarProps = {
   mobileButtonText: string;
   triggerOffsetPixels: number;
   /** @deprecated Theme tokens are now the source of truth for bar colors. */
-  bgColor: string;
+  bgColor?: string;
   /** @deprecated Theme tokens are now the source of truth for bar colors. */
-  textColor: string;
+  textColor?: string;
   /** @deprecated Theme tokens are now the source of truth for button colors. */
-  buttonBgColor: string;
+  buttonBgColor?: string;
   /** @deprecated Theme tokens are now the source of truth for button colors. */
-  buttonTextColor: string;
+  buttonTextColor?: string;
   /** @deprecated Theme tokens are now the source of truth for border colors. */
-  borderColor: string;
+  borderColor?: string;
   actionConfig: StickyConversionBarLinkAction | StickyConversionBarModalAction;
 };
 
