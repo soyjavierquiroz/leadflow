@@ -221,6 +221,14 @@ export const funnelThemeRegistry = {
             radius: "0",
           },
         },
+        guaranteeCoupon: {
+          surface: {
+            backgroundColor: "#fafafa",
+            borderColor: "#0ea5e9",
+            shadow: "0 18px 45px rgba(15, 23, 42, 0.06)",
+            radius: "2rem",
+          },
+        },
       },
     },
     sections: {
@@ -229,6 +237,13 @@ export const funnelThemeRegistry = {
         primaryCta: "primary",
       },
       guarantee: {
+        primaryCta: "primary",
+      },
+      guaranteeSection: {
+        surface: "guaranteeCoupon",
+        headline: "headline",
+        body: "body",
+        supportingText: "caption",
         primaryCta: "primary",
       },
       finalCta: {

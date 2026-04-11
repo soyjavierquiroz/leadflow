@@ -155,6 +155,7 @@ export function FunnelThemeProvider({
     '--theme-text-body': theme.tokens.text.body,
     '--theme-text-muted': theme.tokens.text.muted,
     '--theme-text-subtle': theme.tokens.text.subtle,
+    '--theme-brand-trust': theme.tokens.brand.trust,
     '--theme-action-cta': theme.tokens.action.primary,
     '--theme-action-urgency': theme.tokens.action.urgency,
     '--theme-support-validation': theme.tokens.brand.success,
@@ -179,6 +180,11 @@ export function FunnelThemeProvider({
     "--theme-surface-section-emphasis",
     theme.primitives.surface.sectionEmphasis.surface,
   );
+  applySurfaceVariables(
+    style,
+    "--theme-surface-guarantee-coupon",
+    theme.primitives.surface.guaranteeCoupon.surface,
+  );
   applySurfaceVariables(style, "--theme-surface-overlay", theme.primitives.surface.overlay.surface);
 
   applyEyebrowVariables(style, "--theme-eyebrow-pill", theme.primitives.eyebrow.pill);
@@ -198,6 +204,9 @@ export function FunnelThemeProvider({
   style["--theme-section-hero-primary-cta"] = theme.sections.heroHook.primaryCta;
   style["--theme-section-guarantee-surface"] = theme.sections.guarantee.surface;
   style["--theme-section-guarantee-primary-cta"] = theme.sections.guarantee.primaryCta;
+  style["--theme-section-guarantee-section-surface"] = theme.sections.guaranteeSection.surface;
+  style["--theme-section-guarantee-section-primary-cta"] =
+    theme.sections.guaranteeSection.primaryCta;
   style["--theme-section-final-cta-surface"] = theme.sections.finalCta.surface;
   style["--theme-section-final-cta-primary-cta"] = theme.sections.finalCta.primaryCta;
   style["--theme-section-offer-surface"] = theme.sections.offerStack.surface;
@@ -261,6 +270,36 @@ export function FunnelThemeProvider({
     "--theme-section-sticky-bar-primary-cta",
     theme,
     theme.sections.stickyConversionBar.primaryCta,
+  );
+  applyResolvedSectionSurfaceVariables(
+    style,
+    "--theme-section-guarantee-section",
+    theme,
+    theme.sections.guaranteeSection.surface,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-guarantee-section-headline",
+    theme,
+    theme.sections.guaranteeSection.headline,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-guarantee-section-text",
+    theme,
+    theme.sections.guaranteeSection.body,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-guarantee-section-supporting-text",
+    theme,
+    theme.sections.guaranteeSection.supportingText,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-guarantee-section-primary-cta",
+    theme,
+    theme.sections.guaranteeSection.primaryCta,
   );
   applyResolvedSectionSurfaceVariables(
     style,

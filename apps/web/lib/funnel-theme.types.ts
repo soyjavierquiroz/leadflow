@@ -43,6 +43,7 @@ export type FunnelThemeSurfaceVariant =
   | "section"
   | "sectionMuted"
   | "sectionEmphasis"
+  | "guaranteeCoupon"
   | "overlay";
 
 export type FunnelThemeFontPairing = {
@@ -212,6 +213,7 @@ export type ThemeCaptureFormSection = {
 export type ThemeSections = {
   heroHook: ThemeContentSection;
   guarantee: ThemeContentSection;
+  guaranteeSection: ThemeContentSection;
   finalCta: ThemeContentSection;
   offerStack: ThemeContentSection;
   handoff: ThemeContentSection;

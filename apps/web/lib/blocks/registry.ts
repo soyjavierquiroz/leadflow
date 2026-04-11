@@ -766,6 +766,7 @@ export const builderBlockDefinitionsByKey: Record<
       guarantee_duration_text: "string",
       guarantee_bullets: ["string"],
       section_cta_text: "string",
+      section_cta_subtext: "string",
     },
     example: {
       type: "risk_reversal",
@@ -780,6 +781,7 @@ export const builderBlockDefinitionsByKey: Record<
         "Menos friccion al tomar la decision",
       ],
       section_cta_text: "Quiero continuar",
+      section_cta_subtext: "Tomas accion hoy, sin riesgo extra.",
     },
   }),
   testimonials: defineBlock({

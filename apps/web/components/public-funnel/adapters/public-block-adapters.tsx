@@ -1,10 +1,10 @@
 import { AssignedSponsorReveal } from "@/components/public-funnel/assigned-sponsor-reveal";
 import { ParadigmShift } from "@/components/blocks/paradigm-shift";
+import { X } from "lucide-react";
 import {
   buildCtaClassName,
   flatBlockTitleClassName,
   PublicChecklistItem,
-  PublicEyebrow,
   PublicQuoteCard,
   RichHeadline,
   PublicSectionSurface,
@@ -1182,7 +1182,6 @@ function SocialProofBlockAdapter({
 function RiskReversalBlockAdapter({
   block,
   runtime,
-  layoutVariant = "single_column",
 }: PublicBlockAdapterProps) {
   const title = asString(
     block.headline,
@@ -1198,81 +1197,81 @@ function RiskReversalBlockAdapter({
   const bullets = asStringArray(block.guarantee_bullets ?? block.items).filter(
     Boolean,
   );
-  const ctaLabel = asString(
+  const ctaTarget =
+    resolveCtaHref(block, {
+      containerKeys: ["cta_button", "cta"],
+      labelKeys: ["section_cta_text", "cta_text", "primary_cta_text"],
+    }) ?? null;
+  const sectionCtaText = asString(
     block.section_cta_text,
-    runtime.handoff.buttonLabel || "Continuar",
+    asString(ctaTarget?.label),
   );
+  const subtext = asString(
+    block.section_cta_subtext,
+    asString(
+      asRecord(block.cta_button)?.subtext,
+      asString(block.cta_subtext),
+    ),
+  );
+  const ctaHref = ctaTarget?.href || runtime.nextStep?.path || runtime.currentStep.path;
+  const resolvedBullets =
+    bullets.length > 0
+      ? bullets
+      : [
+          "No necesitas ser experto para dar el siguiente paso.",
+          "No necesitas tener todo resuelto antes de avanzar.",
+          "No necesitas asumir un riesgo extra para probarlo.",
+        ];
 
   return (
     <PublicSectionSurface
-      variant={layoutVariant === "sticky_media" ? "flat" : "default"}
-      className={
-        layoutVariant === "sticky_media" ? "py-6 text-left md:py-8" : ""
-      }
+      className="border-2 border-dashed px-6 py-10 text-center [background:var(--theme-section-guarantee-section-bg)] [border-color:var(--theme-brand-trust)] [border-radius:var(--theme-section-guarantee-section-radius)] [box-shadow:var(--theme-section-guarantee-section-shadow)] md:px-10 md:py-12"
     >
-      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-        <div>
-          <PublicEyebrow
-            tone="neutral"
-            className={layoutVariant === "sticky_media" ? "text-slate-500" : ""}
-          >
-            {asString(block.guarantee_duration_text, "Garantía activa")}
-          </PublicEyebrow>
-          <h2
-            className={cx(
-              "mt-3",
-              layoutVariant === "sticky_media"
-                ? flatBlockTitleClassName
-                : "text-left text-3xl font-black tracking-tight text-slate-950",
-            )}
-          >
-            <RichHeadline text={title} className="font-black" />
-          </h2>
-          <p
-            className={cx(
-              "mt-4 max-w-2xl text-left text-base leading-7",
-              layoutVariant === "sticky_media"
-                ? "text-slate-600"
-                : "text-slate-600",
-            )}
-          >
-            {description}
+      <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+        <h2 className="text-4xl font-black leading-tight tracking-tight [color:var(--theme-section-guarantee-section-headline-color)] md:text-5xl">
+          <RichHeadline text={title} className="font-black" />
+        </h2>
+        <div className="mt-4 text-lg leading-8 opacity-90 [color:var(--theme-section-guarantee-section-text-color)] md:text-xl">
+          <RichHeadline
+            text={description}
+            className="font-body"
+            fontClassName="font-body"
+          />
+        </div>
+        <div className="mt-8 inline-flex flex-col items-start text-left">
+          <p className="text-lg font-bold [color:var(--theme-section-guarantee-section-headline-color)]">
+            {asString(block.guarantee_duration_text, "No necesitas:")}
           </p>
-          <div className="mt-7">
+          <ul className="mt-4 flex flex-col items-start gap-4">
+            {resolvedBullets.map((item) => (
+              <li key={item} className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border [background:color-mix(in_srgb,var(--theme-action-urgency)_10%,white)] [border-color:color-mix(in_srgb,var(--theme-action-urgency)_26%,white)] [color:var(--theme-action-urgency)]">
+                  <X className="h-4 w-4" />
+                </span>
+                <span className="font-body text-base leading-7 [color:var(--theme-section-guarantee-section-text-color)]">
+                  {item}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        {sectionCtaText && (
+          <div className="mt-10">
             <TrackedCta
               publicationId={runtime.publication.id}
               currentStepId={runtime.currentStep.id}
               currentPath={runtime.request.path}
-              href={runtime.currentStep.path}
-              label={ctaLabel}
+              href={ctaHref}
+              label={sectionCtaText}
+              subtext={subtext}
               className={cx(
                 buildCtaClassName("primary"),
-                layoutVariant === "sticky_media"
-                  ? "bg-amber-500 text-black hover:bg-amber-400 focus-visible:outline-amber-400"
-                  : "",
+                "mx-auto flex w-full min-h-16 items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
               )}
-              action="risk_reversal_cta"
+              action={ctaTarget?.action || "risk_reversal_cta"}
             />
           </div>
-        </div>
-
-        <div className="grid gap-3">
-          {(bullets.length > 0
-            ? bullets
-            : [
-                "Respaldo visible para reducir fricción de compra.",
-                "Lenguaje simple y claro sobre el proceso.",
-                "Continuidad comercial sin romper el runtime.",
-              ]
-          ).map((item) => (
-            <PublicChecklistItem
-              key={item}
-              variant={layoutVariant === "sticky_media" ? "flat" : "default"}
-            >
-              {item}
-            </PublicChecklistItem>
-          ))}
-        </div>
+        )}
       </div>
     </PublicSectionSurface>
   );

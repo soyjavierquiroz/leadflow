@@ -436,6 +436,14 @@ export const funnelBaseTheme = {
           radius: "2rem",
         },
       },
+      guaranteeCoupon: {
+        surface: {
+          backgroundColor: "#ffffff",
+          borderColor: "#2563eb",
+          shadow: "0 20px 60px rgba(15, 23, 42, 0.06)",
+          radius: "2rem",
+        },
+      },
       overlay: {
         surface: {
           backgroundColor: "rgba(15, 23, 42, 0.92)",
@@ -464,6 +472,15 @@ export const funnelBaseTheme = {
       body: "body",
       supportingText: "caption",
       primaryCta: "urgency",
+      secondaryCta: "secondary",
+    },
+    guaranteeSection: {
+      surface: "guaranteeCoupon",
+      eyebrow: "pill",
+      headline: "headline",
+      body: "body",
+      supportingText: "caption",
+      primaryCta: "primary",
       secondaryCta: "secondary",
     },
     finalCta: {
