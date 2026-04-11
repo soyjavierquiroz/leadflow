@@ -235,7 +235,12 @@ export const funnelThemeRegistry = {
         primaryCta: "urgency",
       },
       offerStack: {
+        surface: "sectionMuted",
+        headline: "headline",
+        body: "body",
+        supportingText: "caption",
         primaryCta: "primary",
+        secondaryCta: "secondary",
       },
       stickyConversionBar: {
         surface: "overlay",

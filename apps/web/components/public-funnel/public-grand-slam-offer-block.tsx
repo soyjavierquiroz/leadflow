@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   cx,
   flatBlockTitleClassName,
+  offerStackPrimaryButtonClassName,
   RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import {
@@ -23,7 +24,6 @@ import type {
   PublicFunnelRuntimePayload,
   RuntimeBlock,
 } from "@/lib/public-funnel-runtime.types";
-import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 
 type PublicGrandSlamOfferBlockProps = {
   block: RuntimeBlock;
@@ -409,10 +409,10 @@ export function PublicGrandSlamOfferBlock({
     () => deriveTotalValueText(editorialItems, anchorPriceText),
     [anchorPriceText, editorialItems],
   );
-  const finalPriceDisplay = finalPriceText || "ACCESO 100% GRATIS";
+  const finalPriceDisplay = finalPriceText || "¡100% GRATIS!";
   const ctaLabel = asString(
     block.primary_cta_text,
-    asString(block.cta_text, "Aprovechar oferta"),
+    asString(block.cta_text, "QUIERO VER EL SISTEMA"),
   );
   const ctaAction = asString(block.action);
   const leadCaptureConfigBlock =
@@ -522,17 +522,16 @@ export function PublicGrandSlamOfferBlock({
 
   return (
     <>
-      <section
-        className={cx("w-full py-6 text-slate-900 md:py-8")}
-      >
-        <div className="space-y-8 rounded-[2rem] bg-slate-50 px-6 py-8 md:px-8 md:py-10">
+      <section className="w-full py-6 md:py-8">
+        <div className="space-y-8 border px-6 py-8 [background:var(--theme-section-offer-stack-bg)] [border-color:var(--theme-section-offer-stack-border)] [border-radius:var(--theme-section-offer-stack-radius)] [box-shadow:var(--theme-section-offer-stack-shadow)] [color:var(--theme-section-offer-stack-text-color)] md:px-8 md:py-10">
           {asString(block.headline) ? (
             <h3
               className={cx(
-                "font-headline max-w-4xl leading-tight text-slate-950",
+                "font-headline max-w-4xl leading-tight",
                 variant === "flat"
                   ? flatBlockTitleClassName
                   : "text-3xl font-black tracking-tight md:text-4xl",
+                "[color:var(--theme-section-offer-stack-headline-color)]",
               )}
             >
               <RichHeadline text={asString(block.headline)} className="font-black" />
@@ -540,14 +539,14 @@ export function PublicGrandSlamOfferBlock({
           ) : null}
 
           {offerName ? (
-            <p className="font-headline text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <p className="font-headline text-sm font-semibold uppercase tracking-[0.22em] [color:var(--theme-section-offer-stack-supporting-text-color)]">
               {offerName}
             </p>
           ) : null}
 
           {offerIntroText ? (
-            <p className="font-body max-w-3xl text-[15px] leading-relaxed text-slate-700">
-              {offerIntroText}
+            <p className="font-body max-w-3xl text-[15px] leading-relaxed [color:var(--theme-section-offer-stack-text-color)]">
+              <RichHeadline text={offerIntroText} fontClassName="" />
             </p>
           ) : null}
 
@@ -568,15 +567,15 @@ export function PublicGrandSlamOfferBlock({
           {editorialItems.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4">
-                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] text-slate-500">
+                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] [color:var(--theme-section-offer-stack-supporting-text-color)]">
                   Lo que incluye esta oferta
                 </p>
-                <p className="font-headline hidden text-xs font-black uppercase tracking-[0.24em] text-slate-400 md:block">
+                <p className="font-headline hidden text-xs font-black uppercase tracking-[0.24em] [color:var(--theme-text-subtle)] md:block">
                   Valor desbloqueado hoy
                 </p>
               </div>
 
-              <div className="divide-y divide-slate-200/80">
+              <div className="divide-y divide-[var(--theme-base-divider)]">
                 {editorialItems.map((item, index) => {
                   const itemTitle = item.name || item.description;
                   const itemDescription =
@@ -595,7 +594,7 @@ export function PublicGrandSlamOfferBlock({
                       className="flex flex-col gap-5 py-5 md:flex-row md:items-start md:justify-between md:gap-8"
                     >
                       <div className="flex min-w-0 gap-4">
-                        <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-[0_10px_24px_rgba(5,150,105,0.18)]">
+                        <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border [background:color-mix(in_srgb,var(--theme-support-validation)_14%,white)] [border-color:color-mix(in_srgb,var(--theme-support-validation)_30%,white)] [color:var(--theme-support-validation)]">
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 16 16"
@@ -613,11 +612,11 @@ export function PublicGrandSlamOfferBlock({
                         </span>
 
                         <div className="min-w-0">
-                          <h4 className="font-headline text-lg font-black leading-tight text-slate-950">
-                            {itemTitle}
+                          <h4 className="font-headline text-lg font-black leading-tight [color:var(--theme-section-offer-stack-headline-color)]">
+                            <RichHeadline text={itemTitle} className="font-black" />
                           </h4>
                           {itemDescription ? (
-                            <p className="font-body mt-2 max-w-2xl text-[15px] leading-7 text-slate-600">
+                            <p className="font-body mt-2 max-w-2xl text-[15px] leading-7 [color:var(--theme-text-muted)]">
                               {itemDescription}
                             </p>
                           ) : null}
@@ -626,11 +625,11 @@ export function PublicGrandSlamOfferBlock({
 
                       <div className="shrink-0 md:min-w-[10rem] md:pt-1 md:text-right">
                         {itemValue ? (
-                          <p className="font-headline text-base font-semibold tracking-tight text-slate-500 line-through decoration-2 decoration-slate-500/90">
+                          <p className="font-body text-sm line-through opacity-70 [color:var(--theme-text-body)]">
                             {itemValue}
                           </p>
                         ) : null}
-                        <p className="font-headline text-sm font-black uppercase tracking-[0.2em] text-red-500">
+                        <p className="font-headline text-sm font-black uppercase tracking-[0.2em] [color:var(--theme-action-urgency)]">
                           Gratis
                         </p>
                       </div>
@@ -641,21 +640,21 @@ export function PublicGrandSlamOfferBlock({
             </div>
           ) : null}
 
-          <div className="border-t border-slate-200/80 pt-7">
+          <div className="border-t pt-7 [border-color:var(--theme-base-divider)]">
             <div className="flex flex-col items-center gap-6 text-center">
               <div className="flex flex-col items-center gap-3 text-center">
-                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] text-slate-500">
+                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] [color:var(--theme-section-offer-stack-supporting-text-color)]">
                   Resumen de la oferta
                 </p>
                 {anchorValueText ? (
-                  <p className="font-body text-lg font-medium text-slate-500">
+                  <p className="font-body text-sm line-through opacity-70 [color:var(--theme-text-body)]">
                     {anchorValueText}
                   </p>
                 ) : null}
-                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] text-slate-400">
+                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] [color:var(--theme-text-subtle)]">
                   Precio final
                 </p>
-                <p className="font-headline max-w-none whitespace-normal text-4xl font-black leading-tight tracking-tighter text-red-600 [overflow-wrap:normal] [word-break:normal] md:text-6xl">
+                <p className="font-headline max-w-none whitespace-normal text-4xl font-black leading-tight tracking-tighter [color:var(--theme-action-cta)] [overflow-wrap:normal] [word-break:normal] md:text-5xl">
                   {finalPriceDisplay}
                 </p>
               </div>
@@ -667,8 +666,8 @@ export function PublicGrandSlamOfferBlock({
                     currentStepId={runtime.currentStep.id}
                     triggerLabel={ctaLabel}
                     triggerClassName={cx(
-                      jakawiPremiumClassNames.primaryButton,
-                      "w-full py-5 text-base text-white shadow-lg shadow-orange-200 [animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none",
+                      offerStackPrimaryButtonClassName,
+                      "w-full text-base [animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none",
                     )}
                     triggerAction={ctaAction}
                     modalConfig={modalConfig}
@@ -680,8 +679,8 @@ export function PublicGrandSlamOfferBlock({
                     type="button"
                     onClick={() => setIsDrawerOpen(true)}
                     className={cx(
-                      jakawiPremiumClassNames.primaryButton,
-                      "w-full py-5 text-base text-white shadow-lg shadow-orange-200 [animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none",
+                      offerStackPrimaryButtonClassName,
+                      "w-full text-base [animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none",
                     )}
                   >
                     {ctaLabel}

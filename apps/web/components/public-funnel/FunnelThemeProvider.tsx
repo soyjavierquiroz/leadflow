@@ -147,6 +147,17 @@ export function FunnelThemeProvider({
     '--funnel-eyebrow-justify': eyebrowJustifyContentMap[eyebrowPill.alignment],
     '--jakawi-font-sans': theme.tokens.fonts.body,
     '--jakawi-font-display': theme.tokens.fonts.display,
+    '--theme-base-canvas': theme.tokens.base.canvas,
+    '--theme-base-surface': theme.tokens.base.surface,
+    '--theme-base-divider': theme.tokens.base.borderSubtle,
+    '--theme-base-divider-strong': theme.tokens.base.borderStrong,
+    '--theme-text-strong': theme.tokens.text.strong,
+    '--theme-text-body': theme.tokens.text.body,
+    '--theme-text-muted': theme.tokens.text.muted,
+    '--theme-text-subtle': theme.tokens.text.subtle,
+    '--theme-action-cta': theme.tokens.action.primary,
+    '--theme-action-urgency': theme.tokens.action.urgency,
+    '--theme-support-validation': theme.tokens.brand.success,
   };
 
   applyTextVariables(style, "--theme-text-headline", theme.primitives.text.headline);
@@ -191,6 +202,8 @@ export function FunnelThemeProvider({
   style["--theme-section-final-cta-primary-cta"] = theme.sections.finalCta.primaryCta;
   style["--theme-section-offer-surface"] = theme.sections.offerStack.surface;
   style["--theme-section-offer-primary-cta"] = theme.sections.offerStack.primaryCta;
+  style["--theme-section-offer-stack-surface"] = theme.sections.offerStack.surface;
+  style["--theme-section-offer-stack-primary-cta"] = theme.sections.offerStack.primaryCta;
   style["--theme-section-handoff-surface"] = theme.sections.handoff.surface;
   style["--theme-section-handoff-primary-cta"] = theme.sections.handoff.primaryCta;
   style["--theme-section-sticky-bar-surface"] = theme.sections.stickyConversionBar.surface;
@@ -248,6 +261,36 @@ export function FunnelThemeProvider({
     "--theme-section-sticky-bar-primary-cta",
     theme,
     theme.sections.stickyConversionBar.primaryCta,
+  );
+  applyResolvedSectionSurfaceVariables(
+    style,
+    "--theme-section-offer-stack",
+    theme,
+    theme.sections.offerStack.surface,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-offer-stack-headline",
+    theme,
+    theme.sections.offerStack.headline,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-offer-stack-text",
+    theme,
+    theme.sections.offerStack.body,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-offer-stack-supporting-text",
+    theme,
+    theme.sections.offerStack.supportingText,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-offer-stack-primary-cta",
+    theme,
+    theme.sections.offerStack.primaryCta,
   );
 
   return (
