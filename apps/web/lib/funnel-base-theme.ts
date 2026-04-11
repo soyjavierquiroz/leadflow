@@ -578,5 +578,15 @@ export const funnelBaseTheme = {
       accordionDivider: "#e2e8f0",
       primaryCta: "secondary",
     },
+    videoSlot: {
+      bg: "#ffffff",
+      border: "#e2e8f0",
+      shadow: "0 25px 50px -12px rgba(0, 0, 0, 0.2)",
+      radius: "0.75rem",
+      bannerBackground: "#2563eb",
+      bannerText: "#ffffff",
+      progressBarColor: "#2563eb",
+      primaryCta: "primary",
+    },
   },
 } as const satisfies Omit<ResolvedFunnelTheme, "id" | "name" | "description">;

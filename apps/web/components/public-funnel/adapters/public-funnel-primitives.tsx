@@ -16,7 +16,8 @@ export type PublicSectionSurfaceSlot =
   | "authority-bio"
   | "qualification"
   | "social-proof-grid"
-  | "faq-accordion";
+  | "faq-accordion"
+  | "video";
 type RichHeadlineSegmentTone =
   | "default"
   | "accent"
@@ -53,6 +54,8 @@ const surfaceSlotClasses: Record<PublicSectionSurfaceSlot, string> = {
     "border [background:var(--theme-section-social-proof-grid-bg)] [border-color:var(--theme-section-social-proof-grid-border)] [border-radius:var(--theme-section-social-proof-grid-radius)] [box-shadow:var(--theme-section-social-proof-grid-shadow)]",
   "faq-accordion":
     "border [background:var(--theme-section-faq-accordion-bg)] [border-color:var(--theme-section-faq-accordion-border)] [border-radius:var(--theme-section-faq-accordion-radius)] [box-shadow:var(--theme-section-faq-accordion-shadow)]",
+  video:
+    "border [background:var(--theme-section-video-bg)] [border-color:var(--theme-section-video-border)] [border-radius:var(--theme-section-video-radius)] [box-shadow:var(--theme-section-video-shadow)]",
 };
 
 const readUntil = (text: string, startIndex: number, needle: string) => {

@@ -21,6 +21,25 @@ export type BuilderBlockDefinition = {
   example: Record<string, JsonValue>;
 };
 
+export interface BaseFunnelBlock {
+  type: string;
+  key?: string;
+  is_boxed?: boolean;
+}
+
+export interface VideoPlayerBlock extends BaseFunnelBlock {
+  type: "video_player";
+  provider: "bunnynet" | "youtube" | "html5";
+  video_id: string;
+  video_id_mobile?: string;
+  aspect_ratio_desktop?: string;
+  aspect_ratio_mobile?: string;
+  vsl_mode?: boolean;
+  top_banner_text?: string;
+  top_banner_text_mobile?: string;
+  poster_image_key?: string;
+}
+
 const baseFunnelBlockSchema: Record<string, JsonValue> = {
   key: "string",
   is_boxed: false,
@@ -602,6 +621,40 @@ export const builderBlockDefinitionsByKey: Record<
         "Introduce el siguiente paso con contexto",
         "Ayuda a mantener atencion en mobile",
       ],
+    },
+  }),
+  video_player: defineBlock({
+    key: "video_player",
+    name: "Kurukin Video Player",
+    description:
+      "Bloque VSL nativo con motor Kurukin, soporte dual-video, control de aspecto por dispositivo y soporte tematico.",
+    category: "media",
+    schema: {
+      type: "video_player",
+      key: "string",
+      provider: "bunnynet | youtube | html5",
+      video_id: "string",
+      video_id_mobile: "string",
+      aspect_ratio_desktop: "16/9",
+      aspect_ratio_mobile: "9/16",
+      vsl_mode: true,
+      top_banner_text: "string",
+      top_banner_text_mobile: "string",
+      poster_image_key: "string",
+    },
+    example: {
+      type: "video_player",
+      key: "video-player-main",
+      is_boxed: true,
+      provider: "bunnynet",
+      video_id: "https://vz-xxxxxxxx.b-cdn.net/playlist.m3u8",
+      video_id_mobile: "https://vz-mobile-xxxxxxxx.b-cdn.net/playlist.m3u8",
+      aspect_ratio_desktop: "16/9",
+      aspect_ratio_mobile: "9/16",
+      vsl_mode: true,
+      top_banner_text: "Mira esta breve presentacion y activa el audio",
+      top_banner_text_mobile: "Activa el audio y mira esto ahora",
+      poster_image_key: "vsl_poster_main",
     },
   }),
   cta: defineBlock({
@@ -1362,7 +1415,7 @@ export const defaultBuilderBlockDefinitions = [
   builderBlockDefinitionsByKey.unique_mechanism,
   builderBlockDefinitionsByKey.urgency_timer,
   builderBlockDefinitionsByKey.text,
-  builderBlockDefinitionsByKey.video,
+  builderBlockDefinitionsByKey.video_player,
   builderBlockDefinitionsByKey.cta,
   builderBlockDefinitionsByKey.faq_accordion,
   builderBlockDefinitionsByKey.faq,
@@ -1400,6 +1453,7 @@ export const BlockRegistry: Record<string, FC<any>> = {
   urgency_timer: PublicStickyRuntimeBlockBridge,
   text: PublicStickyRuntimeBlockBridge,
   video: PublicStickyRuntimeBlockBridge,
+  video_player: PublicStickyRuntimeBlockBridge,
   cta: PublicStickyRuntimeBlockBridge,
   faq_accordion: PublicStickyRuntimeBlockBridge,
   faq: PublicStickyRuntimeBlockBridge,

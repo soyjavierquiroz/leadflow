@@ -20,6 +20,7 @@ import {
   type LeadCaptureModalConfig,
 } from "@/components/public-funnel/lead-capture-modal";
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
+import { PublicVideoBlock } from "@/components/public-funnel/public-video-block";
 import {
   RecycledFaqAccordionSection,
   RecycledFinalCtaSection,
@@ -109,6 +110,8 @@ function resolveBlockSurfaceProps(
       return { isBoxed, surfaceSlot: "authority-bio" };
     case "qualification_checklist":
       return { isBoxed, surfaceSlot: "qualification" };
+    case "video_player":
+      return { isBoxed, surfaceSlot: "video" };
     case "lead_capture_form":
       return { isBoxed, surfaceSlot: "capture-form", tone: "success" };
     case "urgency_timer":
@@ -1357,6 +1360,23 @@ function VideoBlockAdapter({
   );
 }
 
+function VideoPlayerBlockAdapter({
+  block,
+  runtime,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
+  return (
+    <PublicSectionSurface
+      id={asString(block.key) || undefined}
+      isBoxed
+      surfaceSlot={surfaceProps?.surfaceSlot ?? "video"}
+      variant="flat"
+    >
+      <PublicVideoBlock block={block} runtime={runtime} />
+    </PublicSectionSurface>
+  );
+}
+
 function CtaBlockAdapter({
   block,
   runtime,
@@ -2228,6 +2248,15 @@ export function PublicBlockAdapter({
       case "video":
         return (
           <VideoBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            surfaceProps={surfaceProps}
+          />
+        );
+      case "video_player":
+        return (
+          <VideoPlayerBlockAdapter
             block={block}
             runtime={runtime}
             blocks={blocks}

@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import 'plyr/dist/plyr.css';
+
+@layer base {
+  .plyr {
+    --plyr-control-spacing: 6px;
+    --plyr-control-icon-size: 14px;
+    --plyr-range-track-height: 4px;
+    --plyr-control-radius: 9999px;
+    --plyr-video-control-background-hover: rgba(255, 255, 255, 0.16);
+    --plyr-video-control-color-hover: #fff;
+  }
+
+  .plyr--video .plyr__controls {
+    padding: 4px 8px 8px;
+    padding-top: 16px;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+
+  @media (min-width: 480px) {
+    .plyr--video .plyr__controls {
+      padding: 6px 10px 10px;
+      padding-top: 18px;
+    }
+  }
+
+  .plyr__control svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .plyr__control--overlaid {
+    padding: 10px;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+
+  .plyr__control--overlaid svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .plyr__progress input[type='range'] {
+    --plyr-range-track-height: 3px;
+  }
+
+  .plyr__progress__buffer,
+  .plyr__progress input[type='range']::-webkit-slider-runnable-track,
+  .plyr__progress input[type='range']::-moz-range-track,
+  .plyr__progress input[type='range']::-ms-track {
+    height: 3px;
+  }
+
+  .plyr--video.plyr--hide-controls .plyr__controls {
+    transition-delay: 0.08s;
+  }
+
+  [data-vsl-mode='true'] .plyr {
+    --plyr-control-spacing: 4px;
+    --plyr-control-icon-size: 13px;
+  }
+
+  [data-vsl-mode='true'] .plyr__controls {
+    opacity: 0 !important;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+
+  [data-vsl-mode='true'] .plyr__control--overlaid {
+    display: none !important;
+  }
+
+  [data-vsl-mode='true'] .plyr__progress,
+  [data-vsl-mode='true'] .plyr__time--current {
+    display: none !important;
+  }
+
+  [data-vsl-mode='true'] .kurukin-vsl-controls {
+    display: none !important;
+  }
+}

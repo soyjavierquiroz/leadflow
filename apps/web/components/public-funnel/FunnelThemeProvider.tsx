@@ -291,6 +291,16 @@ export function FunnelThemeProvider({
     theme.sections.faqAccordionSlot.textBody;
   style["--theme-section-faq-accordion-divider"] =
     theme.sections.faqAccordionSlot.accordionDivider;
+  style["--theme-section-video-bg"] = theme.sections.videoSlot.bg;
+  style["--theme-section-video-border"] = theme.sections.videoSlot.border;
+  style["--theme-section-video-shadow"] = theme.sections.videoSlot.shadow;
+  style["--theme-section-video-radius"] = theme.sections.videoSlot.radius;
+  style["--theme-section-video-banner-bg"] =
+    theme.sections.videoSlot.bannerBackground;
+  style["--theme-section-video-banner-text"] =
+    theme.sections.videoSlot.bannerText;
+  style["--theme-section-video-progress-bar"] =
+    theme.sections.videoSlot.progressBarColor;
 
   applyResolvedSectionSurfaceVariables(
     style,
@@ -478,6 +488,12 @@ export function FunnelThemeProvider({
     "--theme-section-faq-accordion-primary-cta",
     theme,
     theme.sections.faqAccordionSlot.primaryCta,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-video-primary-cta",
+    theme,
+    theme.sections.videoSlot.primaryCta,
   );
 
   return (

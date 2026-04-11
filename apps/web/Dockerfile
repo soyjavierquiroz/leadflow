@@ -13,7 +13,8 @@ COPY apps/api/package.json apps/api/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/types/package.json packages/types/package.json
-RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY packages/kurukin-video-player-pkg/package.json packages/kurukin-video-player-pkg/package.json
+RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 FROM deps AS builder
 ARG NEXT_PUBLIC_APP_BASE_DOMAIN=leadflow.kuruk.in

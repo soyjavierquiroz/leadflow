@@ -1,0 +1,55 @@
+{
+  "name": "kurukin-video-player-pkg",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/kurukin-video-player.umd.js",
+  "module": "./dist/kurukin-video-player.es.js",
+  "style": "./dist/style.css",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/kurukin-video-player.es.js",
+      "require": "./dist/kurukin-video-player.umd.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "hls.js": "^1.6.2",
+    "lucide-react": "^0.475.0",
+    "plyr": "^3.7.8",
+    "zustand": "^5.0.3"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0 || ^19.0.0",
+    "react-dom": "^18.2.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.19.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.18",
+    "globals": "^15.14.0",
+    "postcss": "^8.5.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.22.0",
+    "vite": "^6.1.0",
+    "vite-plugin-dts": "^4.5.0"
+  }
+}

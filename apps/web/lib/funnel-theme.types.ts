@@ -251,6 +251,17 @@ export type ThemeFaqAccordionSlot = {
   primaryCta: FunnelThemeButtonVariant;
 };
 
+export type ThemeVideoSlot = {
+  bg: string;
+  border: string;
+  shadow: string;
+  radius: string;
+  bannerBackground: string;
+  bannerText: string;
+  progressBarColor: string;
+  primaryCta: FunnelThemeButtonVariant;
+};
+
 export type ThemeSections = {
   heroHook: ThemeContentSection;
   guarantee: ThemeContentSection;
@@ -267,6 +278,7 @@ export type ThemeSections = {
   qualificationSlot: ThemeQualificationSlot;
   socialProofSlot: ThemeSocialProofSlot;
   faqAccordionSlot: ThemeFaqAccordionSlot;
+  videoSlot: ThemeVideoSlot;
 };
 
 export type FunnelThemeDefinition = {

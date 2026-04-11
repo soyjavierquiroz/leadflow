@@ -25,7 +25,7 @@ services:
       target: dev
     container_name: leadflow-api-dev
     command: >
-      sh -c "pnpm install --frozen-lockfile && pnpm --filter @leadflow/api dev"
+      sh -c "pnpm install --no-frozen-lockfile && pnpm --filter @leadflow/api dev"
     env_file:
       - ../../apps/api/.env.example
     environment:
@@ -60,7 +60,7 @@ services:
       target: dev
     container_name: leadflow-web-dev
     command: >
-      sh -c "pnpm install --frozen-lockfile && pnpm --filter @leadflow/web dev"
+      sh -c "pnpm install --no-frozen-lockfile && pnpm --filter @leadflow/web dev"
     env_file:
       - ../../apps/web/.env.example
     environment:

@@ -312,6 +312,16 @@ export const funnelThemeRegistry = {
         accordionDivider: "#e5e7eb",
         primaryCta: "secondary",
       },
+      videoSlot: {
+        bg: "#ffffff",
+        border: "#d8e6f3",
+        shadow: "0 25px 50px -12px rgba(0, 0, 0, 0.2)",
+        radius: "0.75rem",
+        bannerBackground: "#1e73be",
+        bannerText: "#ffffff",
+        progressBarColor: "#1e73be",
+        primaryCta: "primary",
+      },
     },
   },
 } as const satisfies Record<FunnelThemeId, FunnelThemeDefinition>;
