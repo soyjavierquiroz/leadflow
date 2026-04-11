@@ -93,6 +93,25 @@ const authorityReferenceCatalog = {
   },
 } as const;
 
+function resolveModalAwareCtaHref(
+  action: string | null,
+  fallbackHref: string,
+  blocks: RuntimeBlock[],
+) {
+  if (action !== "open_lead_capture_modal") {
+    return fallbackHref;
+  }
+
+  const leadCaptureConfigBlock =
+    blocks.find(
+      (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_config",
+    ) ?? null;
+
+  return resolveLeadCaptureModalConfig(leadCaptureConfigBlock)
+    ? "#lead-capture-modal"
+    : fallbackHref;
+}
+
 function resolveBlockSurfaceProps(
   block: RuntimeBlock,
   blockType: string,
@@ -1304,6 +1323,7 @@ function VideoPlayerBlockAdapter({
 function CtaBlockAdapter({
   block,
   runtime,
+  blocks,
   surfaceProps,
 }: PublicBlockAdapterProps) {
   const title = asString(block.title, "Continuar en el funnel");
@@ -1311,7 +1331,12 @@ function CtaBlockAdapter({
     block.description,
     "Un CTA claro para empujar el siguiente movimiento sin romper el tracking ni la navegación actual.",
   );
-  const href = resolveCtaHref(block, runtime);
+  const ctaAction = asString(block.action) || null;
+  const href = resolveModalAwareCtaHref(
+    ctaAction,
+    resolveCtaHref(block, runtime),
+    blocks,
+  );
   const label = asString(block.label, "Continuar");
   const variant =
     asString(block.variant) === "secondary" ? "secondary" : "primary";
@@ -1345,7 +1370,7 @@ function CtaBlockAdapter({
             href={href}
             label={label}
             className={buildCtaClassName("primary")}
-            action={asString(block.action) || null}
+            action={ctaAction}
           />
         }
         secondaryCta={
@@ -1392,7 +1417,7 @@ function CtaBlockAdapter({
               href={href}
               label={label}
               className={buildCtaClassName(variant)}
-              action={asString(block.action) || null}
+              action={ctaAction}
             />
             {runtime.previousStep ? (
               <TrackedCta
@@ -1526,6 +1551,7 @@ function SocialProofBlockAdapter({
 function RiskReversalBlockAdapter({
   block,
   runtime,
+  blocks,
   surfaceProps,
 }: PublicBlockAdapterProps) {
   const title = asString(
@@ -1566,7 +1592,11 @@ function RiskReversalBlockAdapter({
     ctaButton?.action,
     asString(ctaBlock?.action, asString(block.action, "risk_reversal_cta")),
   );
-  const ctaHref = ctaTarget || runtime.nextStep?.path || runtime.currentStep.path;
+  const ctaHref = resolveModalAwareCtaHref(
+    ctaAction,
+    ctaTarget || runtime.nextStep?.path || runtime.currentStep.path,
+    blocks,
+  );
   const resolvedBullets =
     bullets.length > 0
       ? bullets
@@ -1775,6 +1805,7 @@ function MediaBlockAdapter({
 function OfferBlockAdapter({
   block,
   runtime,
+  blocks,
   surfaceProps,
 }: PublicBlockAdapterProps) {
   const variant = asString(block.variant, "offer_stack");
@@ -1786,7 +1817,12 @@ function OfferBlockAdapter({
   const price = asString(block.price, asString(block.value));
   const note = asString(block.priceNote, asString(block.note));
   const items = asOfferItems(block.items);
-  const ctaHref = asString(block.href) || runtime.currentStep.path;
+  const ctaAction = asString(block.action) || "offer_cta";
+  const ctaHref = resolveModalAwareCtaHref(
+    ctaAction,
+    asString(block.href) || runtime.currentStep.path,
+    blocks,
+  );
   const ctaLabel = asString(block.label, "Quiero esta oferta");
 
   return (
@@ -1807,7 +1843,7 @@ function OfferBlockAdapter({
           href={ctaHref}
           label={ctaLabel}
           className={buildCtaClassName("primary")}
-          action={asString(block.action) || "offer_cta"}
+          action={ctaAction}
         />
       }
     />

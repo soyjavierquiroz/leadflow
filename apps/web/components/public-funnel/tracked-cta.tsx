@@ -37,6 +37,8 @@ export function TrackedCta({
   const leadCaptureModal = useLeadCaptureModal();
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    console.log("CTA Click interceptado. Acción recibida:", action);
+
     void emitPublicRuntimeEvent({
       eventName: "cta_clicked",
       publicationId,
@@ -51,7 +53,14 @@ export function TrackedCta({
       },
     });
 
-    if (action === "open_lead_capture_modal" && leadCaptureModal) {
+    if (action === "open_lead_capture_modal") {
+      if (!leadCaptureModal) {
+        console.warn(
+          "Lead capture modal context no disponible para este CTA.",
+        );
+        return;
+      }
+
       event.preventDefault();
       leadCaptureModal.openModal();
     }

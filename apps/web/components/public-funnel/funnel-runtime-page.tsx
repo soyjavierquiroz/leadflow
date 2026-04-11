@@ -8,10 +8,9 @@ import {
   PublicSectionSurface,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { FunnelThemeProvider } from "@/components/public-funnel/FunnelThemeProvider";
-import { LeadCaptureProvider } from "@/components/public-funnel/lead-capture-context";
 import { resolveLeadCaptureModalConfig } from "@/components/public-funnel/lead-capture-modal-config";
 import { PublicAnnouncementBanner } from "@/components/public-funnel/public-announcement-banner";
-import { PublicLeadCaptureModalHost } from "@/components/public-funnel/public-lead-capture-modal-host";
+import { PublicLeadCaptureRuntimeBoundary } from "@/components/public-funnel/public-lead-capture-runtime-boundary";
 import {
   isCenteredPublicStepLayout,
   resolvePublicStepLayout,
@@ -89,10 +88,9 @@ export function FunnelRuntimePage({
     }
 
     return (
-      <LeadCaptureProvider>
+      <PublicLeadCaptureRuntimeBoundary runtime={runtime} blocks={blocks}>
         {content}
-        <PublicLeadCaptureModalHost runtime={runtime} blocks={blocks} />
-      </LeadCaptureProvider>
+      </PublicLeadCaptureRuntimeBoundary>
     );
   };
 
