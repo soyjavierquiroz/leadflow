@@ -527,10 +527,11 @@ export function PublicGrandSlamOfferBlock({
           {asString(block.headline) ? (
             <h3
               className={cx(
-                "font-headline max-w-4xl leading-tight",
+                "mx-auto max-w-4xl leading-tight",
                 variant === "flat"
                   ? flatBlockTitleClassName
                   : "text-3xl font-black tracking-tight md:text-4xl",
+                "text-center font-headline font-black",
                 "[color:var(--theme-section-offer-stack-headline-color)]",
               )}
             >
@@ -539,13 +540,13 @@ export function PublicGrandSlamOfferBlock({
           ) : null}
 
           {offerName ? (
-            <p className="font-headline text-sm font-semibold uppercase tracking-[0.22em] [color:var(--theme-section-offer-stack-supporting-text-color)]">
+            <p className="text-center font-headline text-sm font-semibold uppercase tracking-[0.22em] [color:var(--theme-section-offer-stack-supporting-text-color)]">
               {offerName}
             </p>
           ) : null}
 
           {offerIntroText ? (
-            <p className="font-body max-w-3xl text-[15px] leading-relaxed [color:var(--theme-section-offer-stack-text-color)]">
+            <p className="mx-auto max-w-3xl text-center font-body text-lg leading-relaxed [color:var(--theme-section-offer-stack-text-color)]">
               <RichHeadline text={offerIntroText} fontClassName="" />
             </p>
           ) : null}
@@ -593,8 +594,8 @@ export function PublicGrandSlamOfferBlock({
                       key={`${item.kind}-${itemTitle}-${index}`}
                       className="flex flex-col gap-5 py-5 md:flex-row md:items-start md:justify-between md:gap-8"
                     >
-                      <div className="flex min-w-0 gap-4">
-                        <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border [background:color-mix(in_srgb,var(--theme-support-validation)_14%,white)] [border-color:color-mix(in_srgb,var(--theme-support-validation)_30%,white)] [color:var(--theme-support-validation)]">
+                      <div className="flex min-w-0 items-start gap-4">
+                        <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[var(--theme-support-validation)] [background:color-mix(in_srgb,var(--theme-support-validation)_14%,white)] [border-color:color-mix(in_srgb,var(--theme-support-validation)_30%,white)]">
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 16 16"
@@ -641,25 +642,26 @@ export function PublicGrandSlamOfferBlock({
           ) : null}
 
           <div className="border-t pt-7 [border-color:var(--theme-base-divider)]">
-            <div className="flex flex-col items-center gap-6 text-center">
+            <div className="mt-12 flex flex-col items-center text-center">
               <div className="flex flex-col items-center gap-3 text-center">
-                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] [color:var(--theme-section-offer-stack-supporting-text-color)]">
+                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-[var(--theme-text-body)] opacity-60 md:text-sm">
                   Resumen de la oferta
                 </p>
                 {anchorValueText ? (
-                  <p className="font-body text-sm line-through opacity-70 [color:var(--theme-text-body)]">
+                  <p className="mb-2 text-lg line-through text-[var(--theme-text-body)] opacity-70 md:text-xl">
                     {anchorValueText}
                   </p>
                 ) : null}
-                <p className="font-headline text-xs font-black uppercase tracking-[0.28em] [color:var(--theme-text-subtle)]">
+                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-[var(--theme-text-body)] opacity-60 md:text-sm">
                   Precio final
                 </p>
-                <p className="font-headline max-w-none whitespace-normal text-4xl font-black leading-tight tracking-tighter [color:var(--theme-action-cta)] [overflow-wrap:normal] [word-break:normal] md:text-5xl">
-                  {finalPriceDisplay}
-                </p>
+                <RichHeadline
+                  text={finalPriceDisplay}
+                  className="my-4 block text-center text-5xl font-black leading-none text-[var(--theme-action-cta)] md:text-7xl"
+                />
               </div>
 
-              <div className="w-full max-w-md">
+              <div className="mt-4 w-full max-w-md">
                 {ctaAction === "open_lead_capture_modal" && modalConfig ? (
                   <LeadCaptureModal
                     publicationId={runtime.publication.id}
