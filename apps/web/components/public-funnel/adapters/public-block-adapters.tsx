@@ -906,6 +906,8 @@ function StepByStepBlockAdapter({
 function ParadigmShiftBlockAdapter({ block }: PublicBlockAdapterProps) {
   return (
     <ParadigmShift
+      problemHeadline={asString(block.problemHeadline)}
+      problemText={asString(block.problemText)}
       problemStatement={asString(block.problemStatement)}
       transitionMarker={asString(block.transitionMarker)}
       solutionText={asString(block.solutionText)}

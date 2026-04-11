@@ -1103,6 +1103,8 @@ export const builderBlockDefinitionsByKey: Record<
     schema: {
       type: "paradigm_shift",
       variant: "string",
+      problemHeadline: "string",
+      problemText: "string",
       problemStatement: "string",
       transitionMarker: "string",
       solutionText: "string",
@@ -1110,11 +1112,12 @@ export const builderBlockDefinitionsByKey: Record<
     example: {
       type: "paradigm_shift",
       variant: "default",
-      problemStatement:
-        "El problema no es que te falte disciplina.\nEl problema es que sigues intentando resolver esto con una estrategia pensada para otra etapa de tu negocio.",
-      transitionMarker: "el cambio real empieza aqui",
+      problemHeadline: "El problema no es que te falte disciplina.",
+      problemText:
+        "Sigues intentando resolver esto con una estrategia pensada para otra etapa de tu negocio.",
+      transitionMarker: "El cambio real empieza aqui",
       solutionText:
-        "Cuando corriges el paradigma, la ejecucion deja de sentirse pesada.\nEmpiezas a tomar decisiones con una narrativa mas clara, una promesa mas fuerte y una conversion mucho mas natural.",
+        "Cuando corriges el paradigma, la ejecucion deja de sentirse pesada. Empiezas a tomar decisiones con una narrativa mas clara, una promesa mas fuerte y una conversion mucho mas natural.",
     },
   }),
 };
