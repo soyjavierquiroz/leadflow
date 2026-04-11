@@ -7,6 +7,7 @@ import {
   FunnelEyebrow,
   PublicChecklistItem,
   PublicQuoteCard,
+  type PublicSectionSurfaceSlot,
   RichHeadline,
   PublicSectionSurface,
   PublicStatCard,
@@ -73,6 +74,13 @@ type PublicBlockAdapterProps = {
   runtime: PublicFunnelRuntimePayload;
   blocks: RuntimeBlock[];
   layoutVariant?: "single_column" | "sticky_media";
+  surfaceProps?: PublicBlockSurfaceProps;
+};
+
+type PublicBlockSurfaceProps = {
+  isBoxed: boolean;
+  surfaceSlot?: PublicSectionSurfaceSlot;
+  tone?: "brand" | "neutral" | "warm" | "success";
 };
 
 const authorityReferenceCatalog = {
@@ -85,6 +93,47 @@ const authorityReferenceCatalog = {
     meta: "Compendium of Pharmaceuticals",
   },
 } as const;
+
+function resolveBlockSurfaceProps(
+  block: RuntimeBlock,
+  blockType: string,
+): PublicBlockSurfaceProps {
+  const isBoxed = block.is_boxed === true;
+
+  switch (blockType) {
+    case "hero":
+    case "hook_and_promise":
+      return { isBoxed, surfaceSlot: "hero-hook", tone: "brand" };
+    case "who_am_i":
+      return { isBoxed, surfaceSlot: "authority-bio" };
+    case "qualification_checklist":
+      return { isBoxed, surfaceSlot: "qualification" };
+    case "lead_capture_form":
+      return { isBoxed, surfaceSlot: "capture-form", tone: "success" };
+    case "urgency_timer":
+      return { isBoxed, surfaceSlot: "urgency" };
+    case "faq":
+    case "faq_social_proof":
+    case "faq_accordion":
+      return { isBoxed, surfaceSlot: "faq-accordion" };
+    case "risk_reversal":
+      return { isBoxed, surfaceSlot: "guarantee-section" };
+    case "offer_pricing":
+    case "grand_slam_offer":
+      return { isBoxed, surfaceSlot: "offer-stack" };
+    case "social_proof":
+    case "social_proof_grid":
+      return { isBoxed, surfaceSlot: "social-proof-grid" };
+    case "thank_you":
+    case "whatsapp_handoff_cta":
+      return { isBoxed, tone: "success" };
+    case "sponsor_reveal_placeholder":
+    case "thank_you_reveal":
+      return { isBoxed, tone: "warm" };
+    default:
+      return { isBoxed, tone: "neutral" };
+  }
+}
 
 function inferAuthorityItemsFromBlocks(blocks: RuntimeBlock[]) {
   const serialized = JSON.stringify(blocks).toUpperCase();
@@ -160,7 +209,12 @@ function resolveLeadCaptureModalConfig(
   };
 }
 
-function HeroBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
+function HeroBlockAdapter({
+  block,
+  runtime,
+  blocks,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   const variant = asString(block.variant, "leadflow_signal");
   const title = asString(block.title, runtime.funnel.name);
   const description = asString(
@@ -231,6 +285,7 @@ function HeroBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
 
   return (
     <RecycledHeroSection
+      isBoxed={surfaceProps?.isBoxed}
       variant={variant}
       eyebrow={eyebrow}
       pills={[
@@ -295,6 +350,7 @@ function HookAndPromiseBlockAdapter({
   runtime,
   blocks,
   layoutVariant = "single_column",
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const content =
     typeof block.content === "object" &&
@@ -479,6 +535,7 @@ function HookAndPromiseBlockAdapter({
 
   return (
     <JakawiHookAndPromiseSection
+      isBoxed={surfaceProps?.isBoxed}
       variant={layoutVariant === "sticky_media" ? "flat" : "default"}
       eyebrow={asString(
         block.top_bar,
@@ -852,6 +909,7 @@ function UniqueMechanismBlockAdapter({
   block,
   runtime,
   layoutVariant = "single_column",
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const headline = asString(block.headline, asString(block.title));
   const mechanismName = asString(block.mechanism_name);
@@ -904,6 +962,7 @@ function UniqueMechanismBlockAdapter({
 
   return (
     <JakawiUniqueMechanismSection
+      isBoxed={surfaceProps?.isBoxed}
       variant={layoutVariant === "sticky_media" ? "flat" : "default"}
       headline={headline || undefined}
       mechanismName={mechanismName || undefined}
@@ -919,6 +978,7 @@ function UniqueMechanismBlockAdapter({
 function WhoAmIBlockAdapter({
   block,
   runtime,
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const bioParagraphs = asStringArray(
     block.bio_paragraphs ?? block.paragraphs ?? block.story_paragraphs,
@@ -930,6 +990,7 @@ function WhoAmIBlockAdapter({
 
   return (
     <VslAuthorityBioSection
+      isBoxed={surfaceProps?.isBoxed}
       runtime={runtime}
       block={block}
       leadflowMetadata={
@@ -962,6 +1023,7 @@ function WhoAmIBlockAdapter({
 
 function QualificationChecklistBlockAdapter({
   block,
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const goodFitItems = normalizeChecklistItems(
     block.good_fit_items ?? block.for_who_items ?? block.qualifies_items,
@@ -972,6 +1034,7 @@ function QualificationChecklistBlockAdapter({
 
   return (
     <VslQualificationChecklistSection
+      isBoxed={surfaceProps?.isBoxed}
       eyebrow={asString(block.eyebrow, "Filtro de audiencia")}
       headline={asString(
         block.headline,
@@ -995,6 +1058,7 @@ function QualificationChecklistBlockAdapter({
 function SocialProofGridBlockAdapter({
   block,
   runtime,
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const testimonials = normalizeSocialProofGridItems(
     block.testimonials ?? block.items ?? block.reviews,
@@ -1002,6 +1066,7 @@ function SocialProofGridBlockAdapter({
 
   return (
     <VslSocialProofGridSection
+      isBoxed={surfaceProps?.isBoxed}
       runtime={runtime}
       block={block}
       leadflowMetadata={
@@ -1024,7 +1089,12 @@ function SocialProofGridBlockAdapter({
   );
 }
 
-function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
+function TextBlockAdapter({
+  block,
+  runtime,
+  blocks,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   const title = asString(block.title);
   const description = asString(block.description, asString(block.body));
   const variant = asString(block.variant, asString(block.layout));
@@ -1035,6 +1105,7 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
         block={block}
         runtime={runtime}
         blocks={blocks}
+        surfaceProps={surfaceProps}
       />
     );
   }
@@ -1045,6 +1116,7 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
         block={block}
         runtime={runtime}
         blocks={blocks}
+        surfaceProps={surfaceProps}
       />
     );
   }
@@ -1052,7 +1124,11 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
   const items = asFeatureItems(block.items);
 
   return (
-    <PublicSectionSurface>
+    <PublicSectionSurface
+      isBoxed={surfaceProps?.isBoxed}
+      tone={surfaceProps?.tone}
+      surfaceSlot={surfaceProps?.surfaceSlot}
+    >
       <div className="max-w-3xl">
         <FunnelEyebrow>Valor explicado sin ruido</FunnelEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
@@ -1066,10 +1142,7 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
       {items.length > 0 ? (
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {items.map((item, index) => (
-            <article
-              key={`${item.title}-${index}`}
-              className="rounded-[1.6rem] border border-slate-200 bg-white p-5"
-            >
+            <article key={`${item.title}-${index}`} className="p-1">
               <FunnelEyebrow contentClassName="text-teal-700">
                 {item.eyebrow ?? `Punto ${index + 1}`}
               </FunnelEyebrow>
@@ -1084,7 +1157,7 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
           ))}
         </div>
       ) : (
-        <div className="mt-8 rounded-[1.6rem] border border-slate-200 bg-slate-50 p-5 text-sm leading-7 text-slate-700">
+        <div className="mt-8 text-sm leading-7 text-slate-700">
           Este bloque sigue siendo JSON-driven. Lo que cambia en v2 es la
           composición visual: mejor espaciado, más contraste y una lectura más
           clara entre secciones.
@@ -1097,6 +1170,7 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
 function StepByStepBlockAdapter({
   block,
   layoutVariant = "single_column",
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const title = asString(block.headline, asString(block.title, "Paso a paso"));
   const eyebrow = asString(block.eyebrow, asString(block.badge));
@@ -1114,6 +1188,9 @@ function StepByStepBlockAdapter({
 
   return (
     <PublicSectionSurface
+      isBoxed={surfaceProps?.isBoxed}
+      tone={surfaceProps?.tone}
+      surfaceSlot={surfaceProps?.surfaceSlot}
       variant={layoutVariant === "sticky_media" ? "flat" : "default"}
       className={layoutVariant === "sticky_media" ? "py-6 md:py-8" : ""}
     >
@@ -1148,12 +1225,7 @@ function StepByStepBlockAdapter({
             {items.map((item, index) => (
               <article
                 key={`${item.title || item.description}-${index}`}
-                className={cx(
-                  "rounded-[1.6rem] border px-5 py-5",
-                  layoutVariant === "sticky_media"
-                    ? "border-slate-200/80 bg-white shadow-[var(--jakawi-shadow-card)]"
-                    : "border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)]",
-                )}
+                className="px-5 py-5"
               >
                 <div className="flex items-start gap-4">
                   <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-black text-amber-700">
@@ -1181,9 +1253,13 @@ function StepByStepBlockAdapter({
   );
 }
 
-function ParadigmShiftBlockAdapter({ block }: PublicBlockAdapterProps) {
+function ParadigmShiftBlockAdapter({
+  block,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   return (
     <ParadigmShift
+      isBoxed={surfaceProps?.isBoxed}
       problemHeadline={asString(block.problemHeadline)}
       problemText={asString(block.problemText)}
       problemStatement={asString(block.problemStatement)}
@@ -1197,9 +1273,11 @@ function ParadigmShiftBlockAdapter({ block }: PublicBlockAdapterProps) {
 function UrgencyTimerBlockAdapter({
   block,
   layoutVariant = "single_column",
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   return (
     <UrgencyTimerBlock
+      isBoxed={surfaceProps?.isBoxed}
       eyebrow={asString(block.eyebrow) || undefined}
       headline={
         asString(
@@ -1240,7 +1318,11 @@ function UrgencyTimerBlockAdapter({
   );
 }
 
-function VideoBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
+function VideoBlockAdapter({
+  block,
+  runtime,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   const title = asString(block.title, "Vista guiada");
   const caption = asString(block.caption);
   const embedUrl = asString(block.embedUrl);
@@ -1261,6 +1343,7 @@ function VideoBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
 
   return (
     <RecycledVideoSection
+      isBoxed={surfaceProps?.isBoxed}
       sectionId={asString(block.key) || undefined}
       eyebrow="Prueba visual"
       title={title}
@@ -1273,7 +1356,11 @@ function VideoBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
   );
 }
 
-function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
+function CtaBlockAdapter({
+  block,
+  runtime,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   const title = asString(block.title, "Continuar en el funnel");
   const description = asString(
     block.description,
@@ -1300,6 +1387,7 @@ function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
   if (asString(block.variant) === "final_cta") {
     return (
       <RecycledFinalCtaSection
+        isBoxed={surfaceProps?.isBoxed}
         eyebrow={eyebrow}
         title={title}
         description={description}
@@ -1336,7 +1424,12 @@ function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
   }
 
   return (
-    <PublicSectionSurface className="md:p-10">
+    <PublicSectionSurface
+      isBoxed={surfaceProps?.isBoxed}
+      tone={surfaceProps?.tone}
+      surfaceSlot={surfaceProps?.surfaceSlot}
+      className="md:p-10"
+    >
       <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
         <div>
           <FunnelEyebrow>{eyebrow}</FunnelEyebrow>
@@ -1383,6 +1476,7 @@ function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
 function FaqBlockAdapter({
   block,
   layoutVariant = "single_column",
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const variant = asString(block.variant, "accordion");
   const title = asString(
@@ -1394,6 +1488,7 @@ function FaqBlockAdapter({
   if (variant === "social_proof" || variant === "objection_stack") {
     return (
       <FaqSocialProof
+        isBoxed={surfaceProps?.isBoxed}
         eyebrow={asString(block.eyebrow, "Objeciones frecuentes")}
         title={title}
         items={items.length > 0 ? items : undefined}
@@ -1405,6 +1500,7 @@ function FaqBlockAdapter({
   if (block.type === "faq_accordion") {
     return (
       <VslFaqAccordionSection
+        isBoxed={surfaceProps?.isBoxed}
         eyebrow={asString(block.eyebrow, "Preguntas frecuentes")}
         headline={title}
         items={normalizeFaqAccordionItems(block.items ?? block.faqs)}
@@ -1414,6 +1510,7 @@ function FaqBlockAdapter({
 
   return (
     <RecycledFaqAccordionSection
+      isBoxed={surfaceProps?.isBoxed}
       eyebrow={
         variant === "accordion" ? "FAQ accordion" : "Confianza y objeciones"
       }
@@ -1427,6 +1524,7 @@ function FaqBlockAdapter({
 function SocialProofBlockAdapter({
   block,
   layoutVariant = "single_column",
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const variant = asString(block.variant, "metrics_trust");
   const title = asString(
@@ -1466,6 +1564,7 @@ function SocialProofBlockAdapter({
 
   return (
     <RecycledSocialProofSection
+      isBoxed={surfaceProps?.isBoxed}
       variant={variant}
       surfaceVariant={layoutVariant === "sticky_media" ? "flat" : "default"}
       eyebrow="Social proof adapter"
@@ -1482,6 +1581,7 @@ function SocialProofBlockAdapter({
 function RiskReversalBlockAdapter({
   block,
   runtime,
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   const title = asString(
     block.headline,
@@ -1533,7 +1633,10 @@ function RiskReversalBlockAdapter({
 
   return (
     <PublicSectionSurface
-      className="border-2 border-dashed px-6 py-10 text-center [background:var(--theme-section-guarantee-section-bg)] [border-color:var(--theme-brand-trust)] [border-radius:var(--theme-section-guarantee-section-radius)] [box-shadow:var(--theme-section-guarantee-section-shadow)] md:px-10 md:py-12"
+      isBoxed={surfaceProps?.isBoxed}
+      tone={surfaceProps?.tone}
+      surfaceSlot={surfaceProps?.surfaceSlot}
+      className="px-6 py-10 text-center md:px-10 md:py-12"
     >
       <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
         <h2 className="text-4xl font-black leading-tight tracking-tight [color:var(--theme-section-guarantee-section-headline-color)] md:text-5xl">
@@ -1585,7 +1688,10 @@ function RiskReversalBlockAdapter({
   );
 }
 
-function TestimonialsBlockAdapter({ block }: PublicBlockAdapterProps) {
+function TestimonialsBlockAdapter({
+  block,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   const title = asString(block.title, "Testimonios");
   const description = asString(
     block.description,
@@ -1594,7 +1700,11 @@ function TestimonialsBlockAdapter({ block }: PublicBlockAdapterProps) {
   const testimonials = asTestimonialItems(block.items ?? block.testimonials);
 
   return (
-    <PublicSectionSurface>
+    <PublicSectionSurface
+      isBoxed={surfaceProps?.isBoxed}
+      tone={surfaceProps?.tone}
+      surfaceSlot={surfaceProps?.surfaceSlot}
+    >
       <div className="max-w-3xl">
         <FunnelEyebrow>Testimonials adapter</FunnelEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
@@ -1616,7 +1726,10 @@ function TestimonialsBlockAdapter({ block }: PublicBlockAdapterProps) {
   );
 }
 
-function FeatureGridBlockAdapter({ block }: PublicBlockAdapterProps) {
+function FeatureGridBlockAdapter({
+  block,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   const title = asString(block.title, "Bloques de valor");
   const description = asString(
     block.description,
@@ -1625,7 +1738,11 @@ function FeatureGridBlockAdapter({ block }: PublicBlockAdapterProps) {
   const items = asFeatureItems(block.items);
 
   return (
-    <PublicSectionSurface>
+    <PublicSectionSurface
+      isBoxed={surfaceProps?.isBoxed}
+      tone={surfaceProps?.tone}
+      surfaceSlot={surfaceProps?.surfaceSlot}
+    >
       <div className="max-w-3xl">
         <FunnelEyebrow>Feature grid adapter</FunnelEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
@@ -1635,10 +1752,7 @@ function FeatureGridBlockAdapter({ block }: PublicBlockAdapterProps) {
       </div>
       <div className="mt-8 grid gap-4 lg:grid-cols-3">
         {items.map((item, index) => (
-          <article
-            key={`${item.title}-${index}`}
-            className="rounded-[1.75rem] border border-slate-200 bg-white p-5"
-          >
+          <article key={`${item.title}-${index}`} className="p-1">
             <FunnelEyebrow>
               {item.eyebrow ?? `Feature ${index + 1}`}
             </FunnelEyebrow>
@@ -1656,7 +1770,10 @@ function FeatureGridBlockAdapter({ block }: PublicBlockAdapterProps) {
   );
 }
 
-function MediaBlockAdapter({ block }: PublicBlockAdapterProps) {
+function MediaBlockAdapter({
+  block,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   const title = asString(block.title, "Media block");
   const description = asString(
     block.description,
@@ -1670,7 +1787,11 @@ function MediaBlockAdapter({ block }: PublicBlockAdapterProps) {
   }
 
   return (
-    <PublicSectionSurface>
+    <PublicSectionSurface
+      isBoxed={surfaceProps?.isBoxed}
+      tone={surfaceProps?.tone}
+      surfaceSlot={surfaceProps?.surfaceSlot}
+    >
       <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
         <div className="overflow-hidden rounded-[1.8rem] border border-slate-200 bg-slate-100">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1706,7 +1827,11 @@ function MediaBlockAdapter({ block }: PublicBlockAdapterProps) {
   );
 }
 
-function OfferBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
+function OfferBlockAdapter({
+  block,
+  runtime,
+  surfaceProps,
+}: PublicBlockAdapterProps) {
   const variant = asString(block.variant, "offer_stack");
   const title = asString(block.title, "Oferta");
   const description = asString(
@@ -1721,6 +1846,7 @@ function OfferBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
 
   return (
     <RecycledOfferStackSection
+      isBoxed={surfaceProps?.isBoxed}
       variant={variant}
       eyebrow="Offer adapter"
       title={title}
@@ -1751,7 +1877,7 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
   );
 
   return (
-    <PublicSectionSurface tone="success">
+    <PublicSectionSurface isBoxed={block.is_boxed === true} tone="success">
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
           <FunnelEyebrow contentClassName="border-emerald-200 bg-white text-emerald-700">
@@ -1776,7 +1902,7 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
           </div>
         </div>
 
-        <div className="rounded-[1.8rem] border border-emerald-200 bg-white p-5">
+        <div>
           <FunnelEyebrow contentClassName="border-emerald-200 bg-white text-emerald-700">
             Qué pasa ahora
           </FunnelEyebrow>
@@ -1842,6 +1968,7 @@ function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
         blocks={props.blocks}
       />
       <AssignedSponsorReveal
+        isBoxed={props.block.is_boxed === true}
         runtime={props.runtime}
         title={revealTitle}
         description={revealDescription}
@@ -1853,9 +1980,11 @@ function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
 function WhatsappHandoffCtaBlockAdapter({
   block,
   runtime,
+  surfaceProps,
 }: PublicBlockAdapterProps) {
   return (
     <WhatsappHandoffCta
+      isBoxed={surfaceProps?.isBoxed}
       runtime={runtime}
       headline={asString(
         block.headline,
@@ -1995,7 +2124,10 @@ export function PublicBlockAdapter({
   layoutVariant = "single_column",
 }: PublicBlockAdapterProps) {
   try {
-    switch (normalizeRuntimeBlockType(block.type)) {
+    const normalizedType = normalizeRuntimeBlockType(block.type);
+    const surfaceProps = resolveBlockSurfaceProps(block, normalizedType);
+
+    switch (normalizedType) {
       case "announcement":
       case "lead_capture_config":
         return null;
@@ -2006,6 +2138,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "hook_and_promise":
@@ -2015,6 +2148,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "who_am_i":
@@ -2024,6 +2158,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "qualification_checklist":
@@ -2033,6 +2168,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "unique_mechanism":
@@ -2042,6 +2178,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "urgency_timer":
@@ -2051,11 +2188,17 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "text":
         return (
-          <TextBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+          <TextBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            surfaceProps={surfaceProps}
+          />
         );
       case "step_by_step":
         return (
@@ -2064,6 +2207,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "paradigm_shift":
@@ -2073,17 +2217,29 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "video":
         return (
-          <VideoBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+          <VideoBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            surfaceProps={surfaceProps}
+          />
         );
       case "cta":
         return (
-          <CtaBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+          <CtaBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            surfaceProps={surfaceProps}
+          />
         );
       case "faq":
+      case "faq_accordion":
       case "faq_social_proof":
         return (
           <FaqBlockAdapter
@@ -2091,6 +2247,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "lead_capture_form":
@@ -2099,6 +2256,7 @@ export function PublicBlockAdapter({
             publicationId={runtime.publication.id}
             currentStepId={runtime.currentStep.id}
             block={normalizeLeadCaptureFormBlock(block)}
+            isBoxed={surfaceProps.isBoxed}
           />
         );
       case "thank_you":
@@ -2107,6 +2265,7 @@ export function PublicBlockAdapter({
             block={block}
             runtime={runtime}
             blocks={blocks}
+            surfaceProps={surfaceProps}
           />
         );
       case "thank_you_reveal":
@@ -2115,6 +2274,7 @@ export function PublicBlockAdapter({
             block={block}
             runtime={runtime}
             blocks={blocks}
+            surfaceProps={surfaceProps}
           />
         );
       case "conversion_page_config":
@@ -2128,6 +2288,7 @@ export function PublicBlockAdapter({
       case "sponsor_reveal_placeholder":
         return (
           <AssignedSponsorReveal
+            isBoxed={surfaceProps.isBoxed}
             runtime={runtime}
             title={asString(block.title, "Sponsor asignado")}
             description={asString(block.description) || undefined}
@@ -2140,6 +2301,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "social_proof_grid":
@@ -2149,6 +2311,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "risk_reversal":
@@ -2158,6 +2321,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             layoutVariant={layoutVariant}
+            surfaceProps={surfaceProps}
           />
         );
       case "testimonial":
@@ -2167,6 +2331,7 @@ export function PublicBlockAdapter({
             block={block}
             runtime={runtime}
             blocks={blocks}
+            surfaceProps={surfaceProps}
           />
         );
       case "feature_grid":
@@ -2175,16 +2340,27 @@ export function PublicBlockAdapter({
             block={block}
             runtime={runtime}
             blocks={blocks}
+            surfaceProps={surfaceProps}
           />
         );
       case "media":
       case "image":
         return (
-          <MediaBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+          <MediaBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            surfaceProps={surfaceProps}
+          />
         );
       case "offer_pricing":
         return (
-          <OfferBlockAdapter block={block} runtime={runtime} blocks={blocks} />
+          <OfferBlockAdapter
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            surfaceProps={surfaceProps}
+          />
         );
       case "grand_slam_offer":
         return (
@@ -2193,6 +2369,7 @@ export function PublicBlockAdapter({
             runtime={runtime}
             blocks={blocks}
             hideDesktopMedia={layoutVariant === "sticky_media"}
+            isBoxed={surfaceProps.isBoxed}
             variant={layoutVariant === "sticky_media" ? "flat" : "default"}
           />
         );
@@ -2202,6 +2379,7 @@ export function PublicBlockAdapter({
             block={block}
             runtime={runtime}
             blocks={blocks}
+            surfaceProps={surfaceProps}
           />
         );
       case "sticky_conversion_bar":

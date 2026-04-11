@@ -39,6 +39,7 @@ type PublicCaptureFormProps = {
   currentStepId: string;
   block: RuntimeLeadCaptureFormBlock;
   sectionId?: string;
+  isBoxed?: boolean;
 };
 
 type UrlAttribution = {
@@ -179,6 +180,7 @@ export function PublicCaptureForm({
   currentStepId,
   block,
   sectionId = "public-capture-form",
+  isBoxed = false,
 }: PublicCaptureFormProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -331,6 +333,8 @@ export function PublicCaptureForm({
   return (
     <PublicSectionSurface
       id={sectionId}
+      isBoxed={isBoxed}
+      surfaceSlot="capture-form"
       tone="success"
       className={cx(
         "scroll-mt-8",
@@ -361,7 +365,7 @@ export function PublicCaptureForm({
           </p>
 
           {variant === "compact_capture" ? (
-            <div className="mt-7 rounded-[1.5rem] border border-emerald-200 bg-white/90 p-4 text-sm leading-6 text-slate-700">
+            <div className="mt-7 text-sm leading-6 text-slate-700">
               Captura rápida, contexto de URL conservado y continuidad automática
               al siguiente step cuando el runtime lo define.
             </div>
@@ -381,10 +385,10 @@ export function PublicCaptureForm({
         </div>
 
         <form
-          className="grid gap-5 rounded-[1.9rem] border border-white/80 bg-white/92 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]"
+          className="grid gap-5 p-2"
           onSubmit={handleSubmit}
         >
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+          <div className="p-1">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
               Datos de contacto
             </p>
@@ -482,7 +486,7 @@ export function PublicCaptureForm({
             </p>
           ) : null}
 
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
+          <div className="text-sm leading-6 text-slate-700">
             {block.privacyNote}
           </div>
 

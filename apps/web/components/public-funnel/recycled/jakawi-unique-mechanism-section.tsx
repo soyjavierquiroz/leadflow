@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   cx,
   flatBlockTitleClassName,
+  PublicSectionSurface,
   RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
@@ -19,6 +20,7 @@ type UniqueMechanismPairItem = {
 };
 
 type JakawiUniqueMechanismSectionProps = {
+  isBoxed?: boolean;
   variant?: "default" | "flat";
   headline?: string;
   mechanismName?: string;
@@ -30,6 +32,7 @@ type JakawiUniqueMechanismSectionProps = {
 };
 
 export function JakawiUniqueMechanismSection({
+  isBoxed = false,
   variant = "default",
   headline,
   mechanismName,
@@ -40,12 +43,10 @@ export function JakawiUniqueMechanismSection({
   hideDesktopMedia = false,
 }: JakawiUniqueMechanismSectionProps) {
   return (
-    <section
-      className={
-        variant === "flat"
-          ? "w-full py-6 text-[var(--lf-unique-text-main)] md:py-8"
-          : "w-full py-6 text-[var(--lf-unique-text-main)] md:py-8"
-      }
+    <PublicSectionSurface
+      isBoxed={isBoxed}
+      variant={variant}
+      className="text-[var(--lf-unique-text-main)]"
       style={
         {
           ...jakawiPremiumThemeStyle,
@@ -161,6 +162,6 @@ export function JakawiUniqueMechanismSection({
           </div>
         ) : null}
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }

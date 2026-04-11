@@ -1,6 +1,10 @@
-import { RichHeadline } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import {
+  PublicSectionSurface,
+  RichHeadline,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
 
 type ParadigmShiftProps = {
+  isBoxed?: boolean;
   problemHeadline?: string;
   problemText?: string;
   problemStatement?: string;
@@ -11,6 +15,7 @@ type ParadigmShiftProps = {
 };
 
 export function ParadigmShift({
+  isBoxed = false,
   problemHeadline,
   problemText,
   problemStatement,
@@ -33,7 +38,7 @@ export function ParadigmShift({
   }
 
   return (
-    <section className="py-8 md:py-12">
+    <PublicSectionSurface isBoxed={isBoxed} variant="flat" className="py-8 md:py-12">
       <div className="mx-auto max-w-3xl text-left">
         {resolvedProblemHeadline ? (
           <div className="mb-4 font-subheadline text-2xl font-bold text-[var(--theme-text-headline)] md:text-3xl">
@@ -59,6 +64,6 @@ export function ParadigmShift({
           </div>
         ) : null}
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }

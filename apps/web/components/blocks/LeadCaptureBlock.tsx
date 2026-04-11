@@ -59,7 +59,7 @@ export function LeadCaptureBlock(props: LeadCaptureBlockProps) {
   return (
     <section className="px-4 py-12">
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-3xl border border-slate-200 border-t-4 border-t-blue-600 bg-white p-8 shadow-2xl md:p-10">
+        <div className="p-8 md:p-10">
           <h2 className="text-3xl font-bold tracking-tight text-slate-900">
             {title}
           </h2>
@@ -80,10 +80,7 @@ export function LeadCaptureBlock(props: LeadCaptureBlockProps) {
                   `Campo ${index + 1}`;
 
                 return (
-                  <div
-                    key={`${fieldLabel}-${index}`}
-                    className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-400"
-                  >
+                  <div key={`${fieldLabel}-${index}`} className="mb-3 p-3 text-slate-400">
                     {fieldLabel}
                   </div>
                 );

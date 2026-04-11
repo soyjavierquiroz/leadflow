@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   cx,
   FunnelEyebrow,
+  PublicSectionSurface,
   RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 
 type ExpireAction = "hide" | "show_message" | "redirect";
 
 type UrgencyTimerBlockProps = {
+  isBoxed?: boolean;
   eyebrow?: string;
   headline: string;
   subheadline?: string;
@@ -86,6 +88,7 @@ const toCountdownState = (targetTimestamp: number | null): CountdownState => {
 };
 
 export function UrgencyTimerBlock({
+  isBoxed = false,
   eyebrow,
   headline,
   subheadline,
@@ -149,9 +152,11 @@ export function UrgencyTimerBlock({
   const showExpiredMessage = countdown.isExpired && resolvedExpireAction === "show_message";
 
   return (
-    <section
+    <PublicSectionSurface
+      isBoxed={isBoxed}
+      surfaceSlot="urgency"
+      variant={variant}
       className={cx(
-        "w-full border [background:var(--theme-section-urgency-bg)] [border-color:var(--theme-section-urgency-border)] [border-radius:var(--theme-section-urgency-radius)] [box-shadow:var(--theme-section-urgency-shadow)]",
         variant === "flat" ? "px-5 py-6 md:px-8 md:py-8" : "px-6 py-8 md:px-10 md:py-12",
       )}
     >
@@ -186,6 +191,6 @@ export function UrgencyTimerBlock({
           </div>
         )}
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }

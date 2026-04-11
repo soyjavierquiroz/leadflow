@@ -21,6 +21,7 @@ import type {
 } from "@/components/public-funnel/runtime-block-utils";
 
 type RecycledHeroSectionProps = {
+  isBoxed?: boolean;
   variant?: string;
   eyebrow: string;
   pills: Array<{
@@ -39,6 +40,7 @@ type RecycledHeroSectionProps = {
 };
 
 export function RecycledHeroSection({
+  isBoxed = false,
   variant = "leadflow_signal",
   eyebrow,
   pills,
@@ -54,10 +56,12 @@ export function RecycledHeroSection({
 }: RecycledHeroSectionProps) {
   return (
     <PublicSectionSurface
+      isBoxed={isBoxed}
+      surfaceSlot="hero-hook"
       tone="brand"
       className={cx(
         "md:p-10",
-        variant === "opportunity" ? "border-amber-300/30" : "",
+        isBoxed && variant === "opportunity" ? "border-amber-300/30" : "",
       )}
     >
       <div className="grid gap-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-stretch">
@@ -169,6 +173,7 @@ export function RecycledHookSection({
 }
 
 type RecycledSocialProofSectionProps = {
+  isBoxed?: boolean;
   variant?: string;
   surfaceVariant?: "default" | "flat";
   eyebrow: string;
@@ -181,6 +186,7 @@ type RecycledSocialProofSectionProps = {
 };
 
 export function RecycledSocialProofSection({
+  isBoxed = false,
   variant = "metrics_trust",
   surfaceVariant = "default",
   eyebrow,
@@ -193,6 +199,8 @@ export function RecycledSocialProofSection({
 }: RecycledSocialProofSectionProps) {
   return (
     <PublicSectionSurface
+      isBoxed={isBoxed}
+      surfaceSlot="social-proof-grid"
       variant={surfaceVariant}
       className={surfaceVariant === "flat" ? "py-6 text-left md:py-8" : ""}
     >
@@ -287,6 +295,7 @@ export function RecycledSocialProofSection({
 }
 
 type RecycledVideoSectionProps = {
+  isBoxed?: boolean;
   sectionId?: string;
   eyebrow: string;
   title: string;
@@ -298,6 +307,7 @@ type RecycledVideoSectionProps = {
 };
 
 export function RecycledVideoSection({
+  isBoxed = false,
   sectionId,
   eyebrow,
   title,
@@ -308,7 +318,7 @@ export function RecycledVideoSection({
   helperPill,
 }: RecycledVideoSectionProps) {
   return (
-    <PublicSectionSurface id={sectionId}>
+    <PublicSectionSurface id={sectionId} isBoxed={isBoxed}>
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div>
           <PublicEyebrow tone="neutral">{eyebrow}</PublicEyebrow>
@@ -359,6 +369,7 @@ export function RecycledVideoSection({
 }
 
 type RecycledOfferStackSectionProps = {
+  isBoxed?: boolean;
   variant?: string;
   eyebrow: string;
   title: string;
@@ -370,6 +381,7 @@ type RecycledOfferStackSectionProps = {
 };
 
 export function RecycledOfferStackSection({
+  isBoxed = false,
   variant = "offer_stack",
   eyebrow,
   title,
@@ -380,7 +392,11 @@ export function RecycledOfferStackSection({
   cta,
 }: RecycledOfferStackSectionProps) {
   return (
-    <PublicSectionSurface tone="warm">
+    <PublicSectionSurface
+      isBoxed={isBoxed}
+      surfaceSlot="offer-stack"
+      tone="warm"
+    >
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div>
           <PublicEyebrow tone="warm">{eyebrow}</PublicEyebrow>
@@ -431,6 +447,7 @@ export function RecycledOfferStackSection({
 }
 
 type RecycledFinalCtaSectionProps = {
+  isBoxed?: boolean;
   eyebrow: string;
   title: string;
   description: string;
@@ -440,6 +457,7 @@ type RecycledFinalCtaSectionProps = {
 };
 
 export function RecycledFinalCtaSection({
+  isBoxed = false,
   eyebrow,
   title,
   description,
@@ -448,7 +466,7 @@ export function RecycledFinalCtaSection({
   secondaryCta,
 }: RecycledFinalCtaSectionProps) {
   return (
-    <PublicSectionSurface tone="brand" className="md:p-10">
+    <PublicSectionSurface isBoxed={isBoxed} tone="brand" className="md:p-10">
       <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
         <div>
           <PublicEyebrow>{eyebrow}</PublicEyebrow>
@@ -474,6 +492,7 @@ export function RecycledFinalCtaSection({
 }
 
 type RecycledFaqAccordionSectionProps = {
+  isBoxed?: boolean;
   variant?: "default" | "flat";
   eyebrow: string;
   title: string;
@@ -481,6 +500,7 @@ type RecycledFaqAccordionSectionProps = {
 };
 
 export function RecycledFaqAccordionSection({
+  isBoxed = false,
   variant = "default",
   eyebrow,
   title,
@@ -488,6 +508,8 @@ export function RecycledFaqAccordionSection({
 }: RecycledFaqAccordionSectionProps) {
   return (
     <PublicSectionSurface
+      isBoxed={isBoxed}
+      surfaceSlot="faq-accordion"
       variant={variant}
       className={variant === "flat" ? "py-6 text-left md:py-8" : ""}
     >
@@ -513,12 +535,7 @@ export function RecycledFaqAccordionSection({
         {items.map((item) => (
           <details
             key={item.question}
-            className={cx(
-              "group",
-              variant === "flat"
-                ? "rounded-[1.4rem] border border-slate-200 bg-slate-50 px-5 py-5"
-                : "rounded-[1.6rem] border border-slate-200 bg-slate-50 p-5 open:bg-white",
-            )}
+            className="group border-b border-slate-200 py-5"
           >
             <summary
               className={cx(

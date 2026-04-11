@@ -23,6 +23,7 @@ import {
 } from "@/lib/public-runtime-tracking";
 
 type AssignedSponsorRevealProps = {
+  isBoxed?: boolean;
   runtime: PublicFunnelRuntimePayload;
   title: string;
   description?: string;
@@ -50,6 +51,7 @@ const getInitials = (value: string | null | undefined) => {
 };
 
 export function AssignedSponsorReveal({
+  isBoxed = false,
   runtime,
   title,
   description,
@@ -215,7 +217,7 @@ export function AssignedSponsorReveal({
   };
 
   return (
-    <PublicSectionSurface tone="warm">
+    <PublicSectionSurface isBoxed={isBoxed} tone="warm">
       <div className="flex flex-wrap items-center gap-3">
         <PublicPill tone="warm">Reveal & Handoff</PublicPill>
         <PublicPill>Paso final visible</PublicPill>
@@ -229,7 +231,7 @@ export function AssignedSponsorReveal({
           "Presentamos al sponsor asignado y dejamos evidente cómo continúa la conversación, para que el cierre del funnel no se sienta técnico ni ambiguo."}
       </p>
 
-      <div className="mt-6 rounded-[1.85rem] border border-amber-200 bg-white p-5 md:p-6">
+      <div className="mt-6 md:p-1">
         {assignment && sponsor ? (
           <>
             <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">

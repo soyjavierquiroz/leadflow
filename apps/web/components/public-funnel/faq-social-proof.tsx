@@ -1,7 +1,6 @@
 import {
   PublicEyebrow,
   PublicSectionSurface,
-  cx,
   flatBlockTitleClassName,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 
@@ -11,6 +10,7 @@ type FaqSocialProofItem = {
 };
 
 type FaqSocialProofProps = {
+  isBoxed?: boolean;
   eyebrow?: string;
   title?: string;
   items?: FaqSocialProofItem[];
@@ -31,6 +31,7 @@ const defaultFaqSocialProofItems: FaqSocialProofItem[] = [
 ];
 
 export function FaqSocialProof({
+  isBoxed = false,
   eyebrow = "Objeciones frecuentes",
   title = "Lo que muchos preguntan antes de decidir",
   items = defaultFaqSocialProofItems,
@@ -46,6 +47,8 @@ export function FaqSocialProof({
 
   return (
     <PublicSectionSurface
+      isBoxed={isBoxed}
+      surfaceSlot="faq-accordion"
       variant={variant}
       className={variant === "flat" ? "py-6 text-left md:py-8" : ""}
     >
@@ -59,12 +62,7 @@ export function FaqSocialProof({
         {safeItems.map((item) => (
           <details
             key={item.question}
-            className={cx(
-              "group",
-              variant === "flat"
-                ? "rounded-[1.4rem] border border-slate-200 bg-slate-50 px-5 py-5"
-                : "rounded-[1.6rem] border border-slate-800 bg-slate-900 p-5",
-            )}
+            className="group border-b border-slate-200 py-5"
           >
             <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
               {item.question}

@@ -72,7 +72,7 @@ export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
   ].filter((value, index, array) => array.indexOf(value) === index);
 
   return (
-    <section className="bg-[var(--theme-section-hero-hook-bg)] px-4 py-12 text-[color:var(--theme-section-hero-hook-text-color)] shadow-[var(--theme-section-hero-hook-shadow)]">
+    <section className="px-4 py-12 text-[color:var(--theme-section-hero-hook-text-color)]">
       <div className="mx-auto max-w-4xl">
         {eyebrow ? (
           <FunnelEyebrow className="mb-4 justify-center" contentClassName="rounded-full">

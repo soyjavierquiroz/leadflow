@@ -21,9 +21,32 @@ export type BuilderBlockDefinition = {
   example: Record<string, JsonValue>;
 };
 
+const baseFunnelBlockSchema: Record<string, JsonValue> = {
+  key: "string",
+  is_boxed: false,
+};
+
+const withBaseFunnelBlockSchema = (
+  schema: Record<string, JsonValue>,
+): Record<string, JsonValue> => ({
+  ...baseFunnelBlockSchema,
+  ...schema,
+});
+
+const withBaseFunnelBlockExample = (
+  example: Record<string, JsonValue>,
+): Record<string, JsonValue> => ({
+  is_boxed: false,
+  ...example,
+});
+
 const defineBlock = (
   definition: BuilderBlockDefinition,
-): BuilderBlockDefinition => definition;
+): BuilderBlockDefinition => ({
+  ...definition,
+  schema: withBaseFunnelBlockSchema(definition.schema),
+  example: withBaseFunnelBlockExample(definition.example),
+});
 
 export const stickyConversionBarDefinition = defineBlock({
   key: "sticky_conversion_bar",

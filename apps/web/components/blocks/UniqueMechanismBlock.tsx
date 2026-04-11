@@ -54,7 +54,7 @@ export function UniqueMechanismBlock(props: UniqueMechanismBlockProps) {
   ].filter((value, index, array) => array.indexOf(value) === index);
 
   return (
-    <section className="my-8 rounded-2xl bg-slate-50 px-6 py-12">
+    <section className="my-8 px-6 py-12">
       <div className="mx-auto max-w-5xl">
         <h2 className="text-center text-3xl font-bold text-slate-900">
           {headline}
@@ -67,10 +67,7 @@ export function UniqueMechanismBlock(props: UniqueMechanismBlockProps) {
         {highlights.length > 0 ? (
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             {highlights.map((highlight, index) => (
-              <div
-                key={`${highlight}-${index}`}
-                className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-5"
-              >
+              <div key={`${highlight}-${index}`} className="flex items-start gap-3 p-5">
                 <span
                   aria-hidden="true"
                   className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700"

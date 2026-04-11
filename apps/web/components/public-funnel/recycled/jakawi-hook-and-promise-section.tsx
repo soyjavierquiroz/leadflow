@@ -4,6 +4,7 @@ import {
   cx,
   flatBlockTitleClassName,
   FunnelEyebrow,
+  PublicSectionSurface,
   RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { RuntimeMediaItem } from "@/components/public-funnel/runtime-block-utils";
@@ -11,6 +12,7 @@ import { TrustAuthorityBar } from "@/components/public-funnel/trust-authority-ba
 import { jakawiPremiumThemeStyle } from "@/styles/templates/jakawi-premium";
 
 type JakawiHookAndPromiseSectionProps = {
+  isBoxed?: boolean;
   variant?: "default" | "flat";
   eyebrow?: string;
   hookLeadIn?: string;
@@ -149,6 +151,7 @@ function renderSubheadline(
 }
 
 export function JakawiHookAndPromiseSection({
+  isBoxed = false,
   variant = "default",
   eyebrow,
   hookLeadIn,
@@ -170,9 +173,12 @@ export function JakawiHookAndPromiseSection({
   hideDesktopMedia = false,
 }: JakawiHookAndPromiseSectionProps) {
   return (
-    <section
+    <PublicSectionSurface
+      isBoxed={isBoxed}
+      surfaceSlot="hero-hook"
+      variant={variant}
       className={cx(
-        "w-full [background:var(--theme-section-hero-hook-bg)] text-[color:var(--theme-section-hero-hook-text-color)] shadow-[var(--theme-section-hero-hook-shadow)]",
+        "text-[color:var(--theme-section-hero-hook-text-color)]",
         variant === "flat"
           ? "pb-12 pt-6 md:pb-20 md:pt-10 lg:pt-0"
           : "py-2 md:py-3",
@@ -427,6 +433,6 @@ export function JakawiHookAndPromiseSection({
           }
         }
       `}</style>
-    </section>
+    </PublicSectionSurface>
   );
 }

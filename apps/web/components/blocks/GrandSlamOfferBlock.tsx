@@ -2,7 +2,7 @@ type GrandSlamOfferBlockProps = any;
 
 export function GrandSlamOfferBlock(props: GrandSlamOfferBlockProps) {
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="space-y-4 px-4 py-6">
       <div className="space-y-2">
         <p className="text-xs font-semibold tracking-[0.24em] text-slate-400 uppercase">
           Base Block

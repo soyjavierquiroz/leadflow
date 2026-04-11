@@ -2,6 +2,7 @@ import { Check, ChevronDown, Quote, X } from "lucide-react";
 
 import {
   FunnelEyebrow,
+  PublicSectionSurface,
   RichHeadline,
   cx,
   flatBlockTitleClassName,
@@ -40,6 +41,7 @@ type VslSectionBaseProps = {
 };
 
 export type VslAuthorityBioSectionProps = VslSectionBaseProps & {
+  isBoxed?: boolean;
   eyebrow?: string;
   headline?: string;
   expertName?: string;
@@ -53,6 +55,7 @@ export type VslAuthorityBioSectionProps = VslSectionBaseProps & {
 };
 
 export type VslQualificationChecklistSectionProps = {
+  isBoxed?: boolean;
   eyebrow?: string;
   headline?: string;
   subheadline?: string;
@@ -63,6 +66,7 @@ export type VslQualificationChecklistSectionProps = {
 };
 
 export type VslSocialProofGridSectionProps = VslSectionBaseProps & {
+  isBoxed?: boolean;
   eyebrow?: string;
   headline?: string;
   subheadline?: string;
@@ -70,6 +74,7 @@ export type VslSocialProofGridSectionProps = VslSectionBaseProps & {
 };
 
 export type VslFaqAccordionSectionProps = {
+  isBoxed?: boolean;
   eyebrow?: string;
   headline?: string;
   items?: VslFaqAccordionItem[];
@@ -165,6 +170,7 @@ function renderInitialsFallback(label: string) {
 }
 
 export function VslAuthorityBioSection({
+  isBoxed = false,
   runtime,
   block,
   leadflowMetadata,
@@ -198,8 +204,8 @@ export function VslAuthorityBioSection({
   }
 
   return (
-    <section className="py-6 md:py-8">
-      <div className="overflow-hidden rounded-[2rem] border border-slate-200/70 px-6 py-8 [background:var(--theme-section-authority-bio-bg)] md:px-8 md:py-10">
+    <PublicSectionSurface isBoxed={isBoxed} surfaceSlot="authority-bio" variant="flat">
+      <div>
         <div
           className={cx(
             "grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-center",
@@ -289,7 +295,7 @@ export function VslAuthorityBioSection({
           </div>
         </div>
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }
 
@@ -309,7 +315,7 @@ function QualificationColumn({
   }
 
   return (
-    <div className="rounded-[1.8rem] border border-slate-200/80 bg-white/85 p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+    <div className="p-1">
       <h3 className="font-headline text-xl font-black tracking-tight [color:var(--theme-section-qualification-text)]">
         {title}
       </h3>
@@ -352,6 +358,7 @@ function QualificationColumn({
 }
 
 export function VslQualificationChecklistSection({
+  isBoxed = false,
   eyebrow = "Filtro de audiencia",
   headline = "Esta presentacion esta disenada para un perfil muy especifico",
   subheadline = "Cuanto mejor encajes con este marco, mas rapido entenderas por que funciona y si deberias avanzar ahora.",
@@ -368,8 +375,8 @@ export function VslQualificationChecklistSection({
   }
 
   return (
-    <section className="py-6 md:py-8">
-      <div className="overflow-hidden rounded-[2rem] border border-slate-200/70 px-6 py-8 [background:var(--theme-section-qualification-bg)] md:px-8 md:py-10">
+    <PublicSectionSurface isBoxed={isBoxed} surfaceSlot="qualification" variant="flat">
+      <div>
         <div className="max-w-3xl">
           <FunnelEyebrow>{eyebrow}</FunnelEyebrow>
           <h2
@@ -401,11 +408,12 @@ export function VslQualificationChecklistSection({
           />
         </div>
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }
 
 export function VslSocialProofGridSection({
+  isBoxed = false,
   runtime,
   block,
   leadflowMetadata,
@@ -428,8 +436,12 @@ export function VslSocialProofGridSection({
   }
 
   return (
-    <section className="py-6 md:py-8">
-      <div className="overflow-hidden rounded-[2rem] border border-slate-200/70 px-6 py-8 [background:var(--theme-section-social-proof-grid-bg)] md:px-8 md:py-10">
+    <PublicSectionSurface
+      isBoxed={isBoxed}
+      surfaceSlot="social-proof-grid"
+      variant="flat"
+    >
+      <div>
         <div className="max-w-3xl">
           <FunnelEyebrow>{eyebrow}</FunnelEyebrow>
           <h2
@@ -546,11 +558,12 @@ export function VslSocialProofGridSection({
           })}
         </div>
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }
 
 export function VslFaqAccordionSection({
+  isBoxed = false,
   eyebrow = "Preguntas frecuentes",
   headline = "Resolvamos las objeciones antes de que se conviertan en friccion",
   items = defaultFaqItems,
@@ -564,8 +577,8 @@ export function VslFaqAccordionSection({
   }
 
   return (
-    <section className="py-6 md:py-8">
-      <div className="overflow-hidden rounded-[2rem] border border-slate-200/70 px-6 py-8 [background:var(--theme-section-faq-accordion-bg)] md:px-8 md:py-10">
+    <PublicSectionSurface isBoxed={isBoxed} surfaceSlot="faq-accordion" variant="flat">
+      <div>
         <div className="max-w-3xl">
           <FunnelEyebrow>{eyebrow}</FunnelEyebrow>
           <h2
@@ -602,6 +615,6 @@ export function VslFaqAccordionSection({
           ))}
         </div>
       </div>
-    </section>
+    </PublicSectionSurface>
   );
 }

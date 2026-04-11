@@ -7,6 +7,16 @@ import {
 
 type SurfaceTone = "brand" | "neutral" | "warm" | "success";
 type SurfaceVariant = "default" | "flat";
+export type PublicSectionSurfaceSlot =
+  | "hero-hook"
+  | "guarantee-section"
+  | "urgency"
+  | "offer-stack"
+  | "capture-form"
+  | "authority-bio"
+  | "qualification"
+  | "social-proof-grid"
+  | "faq-accordion";
 type RichHeadlineSegmentTone =
   | "default"
   | "accent"
@@ -24,6 +34,26 @@ export const cx = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
 
 const surfaceToneClasses: Record<SurfaceTone, string> = jakawiPremiumSurfaceToneClasses;
+const surfaceSlotClasses: Record<PublicSectionSurfaceSlot, string> = {
+  "hero-hook":
+    "border [background:var(--theme-section-hero-hook-bg)] [border-color:var(--theme-section-hero-hook-border)] [border-radius:var(--theme-section-hero-hook-radius)] [box-shadow:var(--theme-section-hero-hook-shadow)]",
+  "guarantee-section":
+    "border [background:var(--theme-section-guarantee-section-bg)] [border-color:var(--theme-section-guarantee-section-border)] [border-radius:var(--theme-section-guarantee-section-radius)] [box-shadow:var(--theme-section-guarantee-section-shadow)]",
+  urgency:
+    "border [background:var(--theme-section-urgency-bg)] [border-color:var(--theme-section-urgency-border)] [border-radius:var(--theme-section-urgency-radius)] [box-shadow:var(--theme-section-urgency-shadow)]",
+  "offer-stack":
+    "border [background:var(--theme-section-offer-stack-bg)] [border-color:var(--theme-section-offer-stack-border)] [border-radius:var(--theme-section-offer-stack-radius)] [box-shadow:var(--theme-section-offer-stack-shadow)]",
+  "capture-form":
+    "border [background:var(--theme-section-capture-form-bg)] [border-color:var(--theme-section-capture-form-border)] [border-radius:var(--theme-section-capture-form-radius)] [box-shadow:var(--theme-section-capture-form-shadow)]",
+  "authority-bio":
+    "border [background:var(--theme-section-authority-bio-bg)] [border-color:var(--theme-section-authority-bio-border)] [border-radius:var(--theme-section-authority-bio-radius)] [box-shadow:var(--theme-section-authority-bio-shadow)]",
+  qualification:
+    "border [background:var(--theme-section-qualification-bg)] [border-color:var(--theme-section-qualification-border)] [border-radius:var(--theme-section-qualification-radius)] [box-shadow:var(--theme-section-qualification-shadow)]",
+  "social-proof-grid":
+    "border [background:var(--theme-section-social-proof-grid-bg)] [border-color:var(--theme-section-social-proof-grid-border)] [border-radius:var(--theme-section-social-proof-grid-radius)] [box-shadow:var(--theme-section-social-proof-grid-shadow)]",
+  "faq-accordion":
+    "border [background:var(--theme-section-faq-accordion-bg)] [border-color:var(--theme-section-faq-accordion-border)] [border-radius:var(--theme-section-faq-accordion-radius)] [box-shadow:var(--theme-section-faq-accordion-shadow)]",
+};
 
 const readUntil = (text: string, startIndex: number, needle: string) => {
   const endIndex = text.indexOf(needle, startIndex);
@@ -214,21 +244,31 @@ export function PublicSectionSurface({
   className,
   tone = "neutral",
   variant = "default",
+  isBoxed = false,
+  surfaceSlot,
   ...props
 }: {
   children: ReactNode;
   className?: string;
   tone?: SurfaceTone;
   variant?: SurfaceVariant;
+  isBoxed?: boolean;
+  surfaceSlot?: PublicSectionSurfaceSlot;
 } & ComponentPropsWithoutRef<"section">) {
+  const basePaddingClassName = "px-4 py-6 md:px-6 md:py-8";
+  const surfaceClassName = isBoxed
+    ? surfaceSlot
+      ? surfaceSlotClasses[surfaceSlot]
+      : surfaceToneClasses[tone]
+    : "rounded-none border border-transparent bg-transparent shadow-none";
+
   return (
     <section
       {...props}
       className={cx(
-        variant === "flat"
-          ? "overflow-visible p-0"
-          : "overflow-hidden rounded-[2rem] border p-6 md:p-8",
-        variant === "flat" ? "" : surfaceToneClasses[tone],
+        isBoxed ? "overflow-hidden" : "overflow-visible",
+        basePaddingClassName,
+        surfaceClassName,
         className,
       )}
     >

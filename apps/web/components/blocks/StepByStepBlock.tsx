@@ -57,10 +57,7 @@ export function StepByStepBlock(props: StepByStepBlockProps) {
         {steps.length > 0 ? (
           <div className="mt-8 grid grid-cols-1 gap-6">
             {steps.map((step, index) => (
-              <article
-                key={`${step}-${index}`}
-                className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"
-              >
+              <article key={`${step}-${index}`} className="p-6">
                 <p className="text-lg leading-8 text-slate-700">{step}</p>
               </article>
             ))}

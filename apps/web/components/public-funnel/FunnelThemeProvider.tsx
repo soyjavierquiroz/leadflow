@@ -123,6 +123,17 @@ const applyResolvedSectionButtonVariables = (
   applyButtonVariables(style, prefix, theme.primitives.button[buttonVariant]);
 };
 
+const applySlotSurfaceVariables = (
+  style: FunnelThemeStyle,
+  prefix: string,
+  theme: ResolvedFunnelTheme,
+  backgroundColor: string,
+  surfaceVariant: FunnelThemeSurfaceVariant = "section",
+) => {
+  applyResolvedSectionSurfaceVariables(style, prefix, theme, surfaceVariant);
+  style[`${prefix}-bg`] = backgroundColor;
+};
+
 export function FunnelThemeProvider({
   runtime,
   children,
@@ -228,23 +239,43 @@ export function FunnelThemeProvider({
   style["--theme-section-capture-form-surface"] = theme.sections.captureForm.surface;
   style["--theme-section-capture-form-primary-cta"] =
     theme.sections.captureForm.primaryCta;
-  style["--theme-section-authority-bio-bg"] = theme.sections.authorityBioSlot.bg;
+  applySlotSurfaceVariables(
+    style,
+    "--theme-section-authority-bio",
+    theme,
+    theme.sections.authorityBioSlot.bg,
+  );
   style["--theme-section-authority-bio-text"] = theme.sections.authorityBioSlot.text;
   style["--theme-section-authority-bio-expert-name"] =
     theme.sections.authorityBioSlot.expertName;
-  style["--theme-section-qualification-bg"] = theme.sections.qualificationSlot.bg;
+  applySlotSurfaceVariables(
+    style,
+    "--theme-section-qualification",
+    theme,
+    theme.sections.qualificationSlot.bg,
+  );
   style["--theme-section-qualification-text"] = theme.sections.qualificationSlot.text;
   style["--theme-section-qualification-check-color"] =
     theme.sections.qualificationSlot.checkColor;
   style["--theme-section-qualification-cross-color"] =
     theme.sections.qualificationSlot.crossColor;
-  style["--theme-section-social-proof-grid-bg"] = theme.sections.socialProofSlot.bg;
+  applySlotSurfaceVariables(
+    style,
+    "--theme-section-social-proof-grid",
+    theme,
+    theme.sections.socialProofSlot.bg,
+  );
   style["--theme-section-social-proof-grid-text"] = theme.sections.socialProofSlot.text;
   style["--theme-section-social-proof-grid-testimonial-bg"] =
     theme.sections.socialProofSlot.testimonialBg;
   style["--theme-section-social-proof-grid-testimonial-border"] =
     theme.sections.socialProofSlot.testimonialBorder;
-  style["--theme-section-faq-accordion-bg"] = theme.sections.faqAccordionSlot.bg;
+  applySlotSurfaceVariables(
+    style,
+    "--theme-section-faq-accordion",
+    theme,
+    theme.sections.faqAccordionSlot.bg,
+  );
   style["--theme-section-faq-accordion-text-headline"] =
     theme.sections.faqAccordionSlot.textHeadline;
   style["--theme-section-faq-accordion-text-body"] =

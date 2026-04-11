@@ -200,7 +200,7 @@ export function BlockRenderer({
           {isSingleColumnLayout ? (
             <>
               {announcementBlock ? renderBlock(announcementBlock, -1) : null}
-              <div className="bg-white px-4 py-6 md:px-6 md:py-10">
+              <div className="px-4 py-6 md:px-6 md:py-10">
                 {visibleBlocks.map((block, index) => renderBlock(block, index))}
               </div>
             </>

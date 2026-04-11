@@ -11,6 +11,7 @@ export type JsonValue =
 export type RuntimeBlock = {
   type: string;
   key?: string;
+  is_boxed?: boolean;
   [key: string]: JsonValue | undefined;
 };
 

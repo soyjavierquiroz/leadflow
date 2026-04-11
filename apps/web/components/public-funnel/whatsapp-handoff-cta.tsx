@@ -19,6 +19,7 @@ import {
 } from "@/lib/public-runtime-tracking";
 
 type WhatsappHandoffCtaProps = {
+  isBoxed?: boolean;
   runtime: PublicFunnelRuntimePayload;
   headline: string;
   subheadline?: string;
@@ -35,6 +36,7 @@ const buildHandoffMarker = (
 ) => [eventName, publicationId, stepId, assignmentId, "standalone"].join(":");
 
 export function WhatsappHandoffCta({
+  isBoxed = false,
   runtime,
   headline,
   subheadline,
@@ -132,7 +134,7 @@ export function WhatsappHandoffCta({
   ]);
 
   return (
-    <PublicSectionSurface tone="success">
+    <PublicSectionSurface isBoxed={isBoxed} tone="success">
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <div>
           <PublicEyebrow tone="success">WhatsApp handoff CTA</PublicEyebrow>
@@ -145,7 +147,7 @@ export function WhatsappHandoffCta({
           </p>
         </div>
 
-        <div className="rounded-[1.75rem] border border-emerald-200 bg-white p-5">
+        <div className="p-1">
           {whatsappUrl && sponsor ? (
             <>
               <p className="text-sm leading-6 text-slate-700">

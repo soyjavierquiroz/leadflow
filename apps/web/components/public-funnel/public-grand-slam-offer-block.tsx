@@ -6,6 +6,7 @@ import {
   cx,
   flatBlockTitleClassName,
   offerStackPrimaryButtonClassName,
+  PublicSectionSurface,
   RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import {
@@ -30,6 +31,7 @@ type PublicGrandSlamOfferBlockProps = {
   runtime: PublicFunnelRuntimePayload;
   blocks: RuntimeBlock[];
   hideDesktopMedia?: boolean;
+  isBoxed?: boolean;
   variant?: "default" | "flat";
 };
 
@@ -360,6 +362,7 @@ export function PublicGrandSlamOfferBlock({
   runtime,
   blocks,
   hideDesktopMedia = false,
+  isBoxed = false,
   variant = "default",
 }: PublicGrandSlamOfferBlockProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -522,8 +525,13 @@ export function PublicGrandSlamOfferBlock({
 
   return (
     <>
-      <section className="w-full py-6 md:py-8">
-        <div className="space-y-8 border px-6 py-8 [background:var(--theme-section-offer-stack-bg)] [border-color:var(--theme-section-offer-stack-border)] [border-radius:var(--theme-section-offer-stack-radius)] [box-shadow:var(--theme-section-offer-stack-shadow)] [color:var(--theme-section-offer-stack-text-color)] md:px-8 md:py-10">
+      <PublicSectionSurface
+        isBoxed={isBoxed}
+        surfaceSlot="offer-stack"
+        variant={variant}
+        className="[color:var(--theme-section-offer-stack-text-color)]"
+      >
+        <div className="space-y-8">
           {asString(block.headline) ? (
             <h3
               className={cx(
@@ -692,7 +700,7 @@ export function PublicGrandSlamOfferBlock({
             </div>
           </div>
         </div>
-      </section>
+      </PublicSectionSurface>
 
       {isDrawerOpen ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/55 backdrop-blur-sm">
