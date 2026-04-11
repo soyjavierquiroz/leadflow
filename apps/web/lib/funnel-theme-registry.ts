@@ -81,28 +81,28 @@ export const funnelThemeRegistry = {
         primary: {
           surface: {
             rest: {
-              backgroundColor: "#f58320",
-              borderColor: "#f58320",
+              backgroundColor: "#1e73be",
+              borderColor: "#1e73be",
               shadow:
-                "0 10px 25px -5px rgba(245, 131, 32, 0.5), 0 8px 10px -6px rgba(245, 131, 32, 0.28)",
+                "0 10px 25px -5px rgba(30, 115, 190, 0.45), 0 8px 10px -6px rgba(30, 115, 190, 0.24)",
             },
             hover: {
-              backgroundColor: "#e97814",
-              borderColor: "#e97814",
+              backgroundColor: "#0f66b3",
+              borderColor: "#0f66b3",
               shadow:
-                "0 18px 34px -8px rgba(245, 131, 32, 0.62), 0 12px 16px -10px rgba(122, 42, 0, 0.4)",
+                "0 18px 34px -8px rgba(30, 115, 190, 0.56), 0 12px 16px -10px rgba(11, 69, 120, 0.34)",
             },
             active: {
-              backgroundColor: "#cf650c",
-              borderColor: "#cf650c",
+              backgroundColor: "#0b599b",
+              borderColor: "#0b599b",
               shadow:
-                "0 12px 22px -8px rgba(207, 101, 12, 0.58), 0 8px 12px -8px rgba(122, 42, 0, 0.35)",
+                "0 12px 22px -8px rgba(11, 89, 155, 0.52), 0 8px 12px -8px rgba(8, 59, 103, 0.3)",
             },
             focus: {
-              backgroundColor: "#f58320",
-              borderColor: "#f58320",
+              backgroundColor: "#1e73be",
+              borderColor: "#1e73be",
               shadow:
-                "0 0 0 4px rgba(245, 131, 32, 0.26), 0 14px 30px -10px rgba(245, 131, 32, 0.42)",
+                "0 0 0 4px rgba(30, 115, 190, 0.24), 0 14px 30px -10px rgba(30, 115, 190, 0.4)",
             },
           },
           text: {
@@ -166,6 +166,7 @@ export const funnelThemeRegistry = {
           surface: {
             backgroundColor: "#e6f7ff",
             borderColor: "#bfdbfe",
+            radius: "9999px",
           },
           text: {
             color: "#000000",
@@ -178,6 +179,7 @@ export const funnelThemeRegistry = {
           surface: {
             backgroundColor: "#e6f7ff",
             borderColor: "#bfdbfe",
+            radius: "9999px",
           },
           text: {
             color: "#000000",
@@ -191,6 +193,7 @@ export const funnelThemeRegistry = {
         headline: {
           fontFamily: funnelThemeFonts["expert-secrets"].headline,
           fontWeight: 900,
+          fontSize: "clamp(2rem, 4.6vw, 3.35rem)",
         },
         body: {
           fontFamily: funnelThemeFonts["expert-secrets"].body,

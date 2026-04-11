@@ -75,15 +75,17 @@ export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
     <section className="bg-[var(--theme-section-hero-hook-bg)] px-4 py-12 text-[color:var(--theme-section-hero-hook-text-color)] shadow-[var(--theme-section-hero-hook-shadow)]">
       <div className="mx-auto max-w-4xl">
         {eyebrow ? (
-          <FunnelEyebrow className="mb-4">{eyebrow}</FunnelEyebrow>
+          <FunnelEyebrow className="mb-4 justify-center" contentClassName="rounded-full">
+            {eyebrow}
+          </FunnelEyebrow>
         ) : null}
 
-        <h1 className="mb-6 text-4xl font-extrabold [color:var(--theme-section-hero-hook-headline-color)] md:text-5xl">
+        <h1 className="mx-auto mb-6 max-w-5xl text-center text-4xl font-extrabold [color:var(--theme-section-hero-hook-headline-color)] md:text-5xl">
           <RichHeadline text={headline} className="font-black" />
         </h1>
 
         {hookLeadIn ? (
-          <div className="mx-auto mb-8 max-w-4xl text-center text-xl leading-[1.4] [color:var(--theme-section-hero-hook-text-color)] md:text-2xl">
+          <div className="mx-auto mb-8 max-w-4xl text-center text-lg leading-[1.4] [color:var(--theme-section-hero-hook-text-color)] md:text-xl">
             <RichHeadline
               text={hookLeadIn}
               fontClassName="font-subheadline"
@@ -93,8 +95,12 @@ export function HookAndPromiseBlock(props: HookAndPromiseBlockProps) {
         ) : null}
 
         {supportingText ? (
-          <p className="font-subheadline max-w-3xl text-lg leading-8 [color:var(--theme-section-hero-hook-supporting-text-color)]">
-            {supportingText}
+          <p className="mx-auto max-w-3xl text-justify font-subheadline text-lg leading-8 [color:var(--theme-section-hero-hook-supporting-text-color)]">
+            <RichHeadline
+              text={supportingText}
+              fontClassName="font-subheadline"
+              className="font-medium"
+            />
           </p>
         ) : null}
 

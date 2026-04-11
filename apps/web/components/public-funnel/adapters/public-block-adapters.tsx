@@ -493,7 +493,7 @@ function HookAndPromiseBlockAdapter({
       cta={
         <div className="mx-auto flex w-full max-w-md flex-col items-center text-center">
           {layoutVariant === "sticky_media" && ctaLeadIn ? (
-            <span className="mb-3 block text-sm font-bold text-slate-700">
+            <span className="mb-3 block text-base font-bold text-slate-700">
               {ctaLeadIn}
             </span>
           ) : null}

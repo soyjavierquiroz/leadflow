@@ -7,7 +7,12 @@ import {
 
 type SurfaceTone = "brand" | "neutral" | "warm" | "success";
 type SurfaceVariant = "default" | "flat";
-type RichHeadlineSegmentTone = "default" | "accent" | "highlight" | "underline";
+type RichHeadlineSegmentTone =
+  | "default"
+  | "accent"
+  | "highlight"
+  | "underline"
+  | "bold";
 type FunnelEyebrowVariant = "pill" | "attached";
 
 type RichHeadlineSegment = {
@@ -53,6 +58,15 @@ export function parseRichHeadline(text: string): RichHeadlineSegment[] {
       }
     }
 
+    if (text.startsWith("__", cursor)) {
+      const match = readUntil(text, cursor + 2, "__");
+      if (match && match.content.trim()) {
+        segments.push({ content: match.content, tone: "bold" });
+        cursor = match.nextIndex;
+        continue;
+      }
+    }
+
     if (text.startsWith("*", cursor)) {
       const match = readUntil(text, cursor + 1, "*");
       if (match && match.content.trim()) {
@@ -73,7 +87,7 @@ export function parseRichHeadline(text: string): RichHeadlineSegment[] {
 
     let nextTokenIndex = text.length;
 
-    for (const token of ["**", "[[", "*", "_"]) {
+    for (const token of ["**", "[[", "__", "*", "_"]) {
       const tokenIndex = text.indexOf(token, cursor + 1);
       if (tokenIndex !== -1) {
         nextTokenIndex = Math.min(nextTokenIndex, tokenIndex);
@@ -143,6 +157,17 @@ export function RichHeadline({
           );
         }
 
+        if (segment.tone === "bold") {
+          return (
+            <span
+              key={`${segment.tone}-${segment.content}-${index}`}
+              className="font-bold text-inherit"
+            >
+              {segment.content}
+            </span>
+          );
+        }
+
         return <span key={`${segment.tone}-${segment.content}-${index}`}>{segment.content}</span>;
       })}
     </span>
@@ -154,25 +179,31 @@ export const flatBlockTitleClassName = cx("font-headline", jakawiPremiumClassNam
 export function FunnelEyebrow({
   children,
   className,
+  contentClassName,
   variant = "pill",
 }: {
   children: ReactNode;
   className?: string;
+  contentClassName?: string;
   variant?: FunnelEyebrowVariant;
 }) {
   const shellClassName =
     variant === "attached"
       ? "flex w-full justify-[var(--theme-eyebrow-attached-justify)]"
       : "flex w-full justify-[var(--theme-eyebrow-pill-justify)]";
-  const contentClassName =
+  const baseContentClassName =
     variant === "attached"
       ? "inline-block max-w-full border [background:var(--theme-eyebrow-attached-bg)] [border-color:var(--theme-eyebrow-attached-border)] [border-radius:var(--theme-eyebrow-attached-radius)] px-[var(--theme-eyebrow-attached-padding-x)] py-[var(--theme-eyebrow-attached-padding-y)] text-[color:var(--theme-eyebrow-attached-color)] [font-family:var(--theme-eyebrow-attached-font-family)] [font-size:var(--theme-eyebrow-attached-font-size)] [font-weight:var(--theme-eyebrow-attached-font-weight)] [line-height:var(--theme-eyebrow-attached-line-height)] [letter-spacing:var(--theme-eyebrow-attached-letter-spacing)] [text-align:var(--theme-eyebrow-attached-alignment)] [text-transform:var(--theme-eyebrow-attached-text-transform)]"
       : "inline-block max-w-full border [background:var(--theme-eyebrow-pill-bg)] [border-color:var(--theme-eyebrow-pill-border)] [border-radius:var(--theme-eyebrow-pill-radius)] px-[var(--theme-eyebrow-pill-padding-x)] py-[var(--theme-eyebrow-pill-padding-y)] text-[color:var(--theme-eyebrow-pill-color)] [font-family:var(--theme-eyebrow-pill-font-family)] [font-size:var(--theme-eyebrow-pill-font-size)] [font-weight:var(--theme-eyebrow-pill-font-weight)] [line-height:var(--theme-eyebrow-pill-line-height)] [letter-spacing:var(--theme-eyebrow-pill-letter-spacing)] [text-align:var(--theme-eyebrow-pill-alignment)] [text-transform:var(--theme-eyebrow-pill-text-transform)]";
 
   return (
     <div className={cx(shellClassName, className)}>
-      <span className={contentClassName}>
-        {children}
+      <span className={cx(baseContentClassName, contentClassName)}>
+        {typeof children === "string" ? (
+          <RichHeadline text={children} fontClassName="" />
+        ) : (
+          children
+        )}
       </span>
     </div>
   );

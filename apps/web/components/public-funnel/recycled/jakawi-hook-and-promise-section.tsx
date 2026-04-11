@@ -103,14 +103,26 @@ function renderSubheadline(
   }
 
   if (variant !== "flat") {
-    return <>{subheadline}</>;
+    return (
+      <RichHeadline
+        text={subheadline}
+        fontClassName="font-subheadline"
+        className="font-medium"
+      />
+    );
   }
 
   const emphasisNeedle = "Y lo peor…";
   const emphasisIndex = subheadline.indexOf(emphasisNeedle);
 
   if (emphasisIndex === -1) {
-    return <>{subheadline}</>;
+    return (
+      <RichHeadline
+        text={subheadline}
+        fontClassName="font-subheadline"
+        className="font-medium"
+      />
+    );
   }
 
   const prefix = subheadline.slice(0, emphasisIndex).trimEnd();
@@ -118,9 +130,19 @@ function renderSubheadline(
 
   return (
     <>
-      {prefix ? <span>{prefix}</span> : null}
+      {prefix ? (
+        <RichHeadline
+          text={prefix}
+          fontClassName="font-subheadline"
+          className="font-medium"
+        />
+      ) : null}
       <span className="mt-2 block font-semibold [color:var(--theme-section-hero-hook-headline-color)]">
-        {emphasis}
+        <RichHeadline
+          text={emphasis}
+          fontClassName="font-subheadline"
+          className="font-semibold"
+        />
       </span>
     </>
   );
@@ -174,7 +196,8 @@ export function JakawiHookAndPromiseSection({
           <div className="space-y-0.5">
             {eyebrow ? (
               <FunnelEyebrow
-                className={variant === "flat" ? "mb-2" : "mb-3"}
+                className={cx(variant === "flat" ? "mb-2" : "mb-3", "justify-center")}
+                contentClassName={variant === "flat" ? "rounded-full" : "rounded-full"}
                 variant={variant === "flat" ? "attached" : "pill"}
               >
                 {eyebrow}
@@ -184,7 +207,7 @@ export function JakawiHookAndPromiseSection({
             {hookLeadIn ? (
               <div
                 className={cx(
-                  "mx-auto mb-8 max-w-4xl text-center text-xl leading-[1.4] md:text-2xl",
+                  "mx-auto mb-8 max-w-4xl text-center text-lg leading-[1.4] md:text-xl",
                   "[color:var(--theme-section-hero-hook-text-color)]",
                 )}
               >
@@ -198,11 +221,12 @@ export function JakawiHookAndPromiseSection({
 
             <h2
               className={cx(
-                "max-w-5xl text-balance",
+                "mx-auto max-w-5xl text-balance text-center",
                 variant === "flat"
-                  ? "text-left text-[1.8rem] font-black leading-[1.02] tracking-[-0.04em] [color:var(--theme-section-hero-hook-headline-color)] lg:text-5xl"
+                  ? "text-center text-[1.8rem] font-black leading-[1.02] tracking-[-0.04em] [color:var(--theme-section-hero-hook-headline-color)] lg:text-5xl"
                   : cx(
                       flatBlockTitleClassName,
+                      "text-center",
                       "[color:var(--theme-section-hero-hook-headline-color)]",
                     ),
               )}
@@ -213,7 +237,7 @@ export function JakawiHookAndPromiseSection({
             {subheadline ? (
               <p
                 className={cx(
-                  "max-w-3xl",
+                  "mx-auto max-w-3xl text-justify",
                   variant === "flat"
                     ? "mt-6 text-[14px] leading-5 [color:var(--theme-section-hero-hook-supporting-text-color)]"
                     : "mb-2 text-base leading-7 [color:var(--theme-section-hero-hook-supporting-text-color)]",
@@ -341,16 +365,20 @@ export function JakawiHookAndPromiseSection({
           ) : null}
 
           {authorityItems.length === 0 && trustBadges.length > 0 ? (
-            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+            <div className="flex flex-wrap items-center justify-center gap-3 text-sm font-semibold text-gray-500">
               {trustBadges.map((badge, index) => (
-                <span
-                  key={`${badge}-${index}`}
-                  className={cx(
-                    "text-[11px] font-semibold uppercase tracking-wide md:text-xs",
-                    variant === "flat" ? "text-slate-500" : "text-slate-400",
-                  )}
-                >
-                  {badge}
+                <span key={`${badge}-${index}`} className="inline-flex items-center gap-3">
+                  <span className={variant === "flat" ? "text-gray-500" : "text-gray-400"}>
+                    {badge}
+                  </span>
+                  {index < trustBadges.length - 1 ? (
+                    <span
+                      aria-hidden="true"
+                      className={variant === "flat" ? "text-gray-400" : "text-gray-500/70"}
+                    >
+                      •
+                    </span>
+                  ) : null}
                 </span>
               ))}
             </div>
