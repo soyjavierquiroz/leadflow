@@ -44,7 +44,8 @@ export type FunnelThemeSurfaceVariant =
   | "sectionMuted"
   | "sectionEmphasis"
   | "guaranteeCoupon"
-  | "overlay";
+  | "overlay"
+  | "urgencySection";
 
 export type FunnelThemeFontPairing = {
   sans: string;
@@ -215,6 +216,7 @@ export type ThemeSections = {
   guarantee: ThemeContentSection;
   guaranteeSection: ThemeContentSection;
   finalCta: ThemeContentSection;
+  urgencySection: ThemeContentSection;
   offerStack: ThemeContentSection;
   handoff: ThemeContentSection;
   stickyConversionBar: ThemeStickyConversionBarSection;

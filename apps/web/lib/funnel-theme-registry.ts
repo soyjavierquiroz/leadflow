@@ -229,6 +229,14 @@ export const funnelThemeRegistry = {
             radius: "2rem",
           },
         },
+        urgencySection: {
+          surface: {
+            backgroundColor: "#fff5f5",
+            borderColor: "#fecaca",
+            shadow: "0 18px 45px rgba(204, 51, 51, 0.08)",
+            radius: "2rem",
+          },
+        },
       },
     },
     sections: {
@@ -247,6 +255,13 @@ export const funnelThemeRegistry = {
         primaryCta: "primary",
       },
       finalCta: {
+        primaryCta: "urgency",
+      },
+      urgencySection: {
+        surface: "urgencySection",
+        headline: "headline",
+        body: "body",
+        supportingText: "subheadline",
         primaryCta: "urgency",
       },
       offerStack: {

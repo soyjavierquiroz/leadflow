@@ -943,6 +943,18 @@ function UrgencyTimerBlockAdapter({
         asNumber(block.duration_minutes, asNumber(block.durationMinutes, 0)) ||
         undefined
       }
+      expireAction={
+        asString(block.expire_action, asString(block.expireAction)) || undefined
+      }
+      expireMessage={
+        asString(block.expire_message, asString(block.expireMessage)) || undefined
+      }
+      expireRedirectUrl={
+        asString(
+          block.expire_redirect_url,
+          asString(block.expireRedirectUrl, asString(block.redirect_url)),
+        ) || undefined
+      }
       variant={layoutVariant === "sticky_media" ? "flat" : "default"}
     />
   );

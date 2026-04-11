@@ -671,6 +671,24 @@ const normalizeCompatibleExternalBlock = (
           "durationMin",
           "duration",
         ]) ?? undefined;
+      baseBlock.expire_action = pickString(rawBlock, [
+        "expire_action",
+        "expireAction",
+        "expiry_action",
+        "expiryAction",
+      ]);
+      baseBlock.expire_message = pickString(rawBlock, [
+        "expire_message",
+        "expireMessage",
+        "expiry_message",
+        "expiryMessage",
+      ]);
+      baseBlock.expire_redirect_url = pickString(rawBlock, [
+        "expire_redirect_url",
+        "expireRedirectUrl",
+        "redirect_url",
+        "redirectUrl",
+      ]);
       break;
     case "video_block":
       baseBlock.title = title;

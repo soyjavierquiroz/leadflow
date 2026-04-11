@@ -186,6 +186,11 @@ export function FunnelThemeProvider({
     theme.primitives.surface.guaranteeCoupon.surface,
   );
   applySurfaceVariables(style, "--theme-surface-overlay", theme.primitives.surface.overlay.surface);
+  applySurfaceVariables(
+    style,
+    "--theme-surface-urgency-section",
+    theme.primitives.surface.urgencySection.surface,
+  );
 
   applyEyebrowVariables(style, "--theme-eyebrow-pill", theme.primitives.eyebrow.pill);
   applyEyebrowVariables(
@@ -209,6 +214,8 @@ export function FunnelThemeProvider({
     theme.sections.guaranteeSection.primaryCta;
   style["--theme-section-final-cta-surface"] = theme.sections.finalCta.surface;
   style["--theme-section-final-cta-primary-cta"] = theme.sections.finalCta.primaryCta;
+  style["--theme-section-urgency-surface"] = theme.sections.urgencySection.surface;
+  style["--theme-section-urgency-primary-cta"] = theme.sections.urgencySection.primaryCta;
   style["--theme-section-offer-surface"] = theme.sections.offerStack.surface;
   style["--theme-section-offer-primary-cta"] = theme.sections.offerStack.primaryCta;
   style["--theme-section-offer-stack-surface"] = theme.sections.offerStack.surface;
@@ -300,6 +307,36 @@ export function FunnelThemeProvider({
     "--theme-section-guarantee-section-primary-cta",
     theme,
     theme.sections.guaranteeSection.primaryCta,
+  );
+  applyResolvedSectionSurfaceVariables(
+    style,
+    "--theme-section-urgency",
+    theme,
+    theme.sections.urgencySection.surface,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-urgency-headline",
+    theme,
+    theme.sections.urgencySection.headline,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-urgency-text",
+    theme,
+    theme.sections.urgencySection.body,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-urgency-supporting-text",
+    theme,
+    theme.sections.urgencySection.supportingText,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-urgency-primary-cta",
+    theme,
+    theme.sections.urgencySection.primaryCta,
   );
   applyResolvedSectionSurfaceVariables(
     style,

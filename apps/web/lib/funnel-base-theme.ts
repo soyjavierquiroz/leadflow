@@ -452,6 +452,14 @@ export const funnelBaseTheme = {
           radius: "0",
         },
       },
+      urgencySection: {
+        surface: {
+          backgroundColor: "#fffaf5",
+          borderColor: "#fed7aa",
+          shadow: "0 20px 60px rgba(249, 115, 22, 0.08)",
+          radius: "2rem",
+        },
+      },
     },
     text: baseTextStyles,
   },
@@ -485,6 +493,15 @@ export const funnelBaseTheme = {
     },
     finalCta: {
       surface: "sectionEmphasis",
+      eyebrow: "pill",
+      headline: "headline",
+      body: "body",
+      supportingText: "subheadline",
+      primaryCta: "urgency",
+      secondaryCta: "secondary",
+    },
+    urgencySection: {
+      surface: "urgencySection",
       eyebrow: "pill",
       headline: "headline",
       body: "body",

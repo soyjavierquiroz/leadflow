@@ -397,6 +397,9 @@ export const builderBlockDefinitionsByKey: Record<
       subheadline: "string",
       expires_at: "2026-12-31T23:59:59.000Z",
       duration_minutes: 30,
+      expire_action: "hide | show_message | redirect",
+      expire_message: "string",
+      expire_redirect_url: "https://example.com/oferta-cerrada",
     },
     example: {
       type: "urgency_timer",
@@ -405,6 +408,8 @@ export const builderBlockDefinitionsByKey: Record<
       headline: "Tu precio preferencial no estara disponible para siempre",
       subheadline: "Usa este bloque para reforzar el momentum del siguiente paso.",
       duration_minutes: 30,
+      expire_action: "show_message",
+      expire_message: "Esta ventana ya expiro. Revisa la siguiente opcion disponible.",
     },
   }),
   text: defineBlock({
