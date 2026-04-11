@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import {
   buildCtaClassName,
   flatBlockTitleClassName,
+  FunnelEyebrow,
   PublicChecklistItem,
   PublicQuoteCard,
   RichHeadline,
@@ -773,7 +774,7 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
   return (
     <PublicSectionSurface>
       <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral">Valor explicado sin ruido</PublicEyebrow>
+        <FunnelEyebrow>Valor explicado sin ruido</FunnelEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
           <RichHeadline text={title} />
         </h2>
@@ -789,9 +790,9 @@ function TextBlockAdapter({ block, runtime, blocks }: PublicBlockAdapterProps) {
               key={`${item.title}-${index}`}
               className="rounded-[1.6rem] border border-slate-200 bg-white p-5"
             >
-              <PublicEyebrow tone="neutral" className="text-teal-700">
+              <FunnelEyebrow contentClassName="text-teal-700">
                 {item.eyebrow ?? `Punto ${index + 1}`}
-              </PublicEyebrow>
+              </FunnelEyebrow>
               <h3 className="mt-3 text-lg font-semibold text-slate-950">
                 {item.title}
               </h3>
@@ -839,14 +840,11 @@ function StepByStepBlockAdapter({
       <div className="space-y-6">
         <div className="max-w-3xl">
           {eyebrow ? (
-            <PublicEyebrow
-              tone="neutral"
-              className={
-                layoutVariant === "sticky_media" ? "text-slate-500" : ""
-              }
+            <FunnelEyebrow
+              contentClassName={layoutVariant === "sticky_media" ? "text-slate-500" : ""}
             >
               {eyebrow}
-            </PublicEyebrow>
+            </FunnelEyebrow>
           ) : null}
           <h2
             className={cx(
@@ -1049,7 +1047,7 @@ function CtaBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
     <PublicSectionSurface className="md:p-10">
       <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
         <div>
-          <PublicEyebrow tone="neutral">{eyebrow}</PublicEyebrow>
+          <FunnelEyebrow>{eyebrow}</FunnelEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
             <RichHeadline text={title} />
           </h2>
@@ -1288,7 +1286,7 @@ function TestimonialsBlockAdapter({ block }: PublicBlockAdapterProps) {
   return (
     <PublicSectionSurface>
       <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral">Testimonials adapter</PublicEyebrow>
+        <FunnelEyebrow>Testimonials adapter</FunnelEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
           <RichHeadline text={title} />
         </h2>
@@ -1319,7 +1317,7 @@ function FeatureGridBlockAdapter({ block }: PublicBlockAdapterProps) {
   return (
     <PublicSectionSurface>
       <div className="max-w-3xl">
-        <PublicEyebrow tone="neutral">Feature grid adapter</PublicEyebrow>
+        <FunnelEyebrow>Feature grid adapter</FunnelEyebrow>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
           <RichHeadline text={title} />
         </h2>
@@ -1331,9 +1329,9 @@ function FeatureGridBlockAdapter({ block }: PublicBlockAdapterProps) {
             key={`${item.title}-${index}`}
             className="rounded-[1.75rem] border border-slate-200 bg-white p-5"
           >
-            <PublicEyebrow tone="neutral">
+            <FunnelEyebrow>
               {item.eyebrow ?? `Feature ${index + 1}`}
-            </PublicEyebrow>
+            </FunnelEyebrow>
             <h3 className="mt-3 text-lg font-semibold text-slate-950">
               {item.title}
             </h3>
@@ -1373,7 +1371,7 @@ function MediaBlockAdapter({ block }: PublicBlockAdapterProps) {
           />
         </div>
         <div>
-          <PublicEyebrow tone="neutral">Media adapter</PublicEyebrow>
+          <FunnelEyebrow>Media adapter</FunnelEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
             <RichHeadline text={title} />
           </h2>
@@ -1446,9 +1444,9 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
     <PublicSectionSurface tone="success">
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
-          <PublicEyebrow tone="success">
+          <FunnelEyebrow contentClassName="border-emerald-200 bg-white text-emerald-700">
             {asString(block.eyebrow, "Confirmación")}
-          </PublicEyebrow>
+          </FunnelEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
             <RichHeadline text={title} />
           </h2>
@@ -1469,7 +1467,9 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
         </div>
 
         <div className="rounded-[1.8rem] border border-emerald-200 bg-white p-5">
-          <PublicEyebrow tone="success">Qué pasa ahora</PublicEyebrow>
+          <FunnelEyebrow contentClassName="border-emerald-200 bg-white text-emerald-700">
+            Qué pasa ahora
+          </FunnelEyebrow>
           <div className="mt-5 grid gap-4">
             <PublicStatCard
               label="Paso actual"
