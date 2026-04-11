@@ -277,6 +277,13 @@ export const funnelThemeRegistry = {
         text: "body",
         primaryCta: "primary",
       },
+      captureModalSlot: {
+        surface: "section",
+        headline: "headline",
+        body: "body",
+        primaryCta: "primary",
+        overlay: "rgba(0, 0, 0, 0.8)",
+      },
       authorityBioSlot: {
         bg: "#edf6ff",
         text: "#24303f",

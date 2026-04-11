@@ -158,6 +158,8 @@ export function FunnelThemeProvider({
     '--funnel-eyebrow-justify': eyebrowJustifyContentMap[eyebrowPill.alignment],
     '--jakawi-font-sans': theme.tokens.fonts.body,
     '--jakawi-font-display': theme.tokens.fonts.display,
+    '--jakawi-input-focus': theme.tokens.brand.trust,
+    '--jakawi-input-ring': theme.tokens.brand.trust,
     '--theme-base-canvas': theme.tokens.base.canvas,
     '--theme-base-surface': theme.tokens.base.surface,
     '--theme-base-divider': theme.tokens.base.borderSubtle,
@@ -239,6 +241,10 @@ export function FunnelThemeProvider({
   style["--theme-section-capture-form-surface"] = theme.sections.captureForm.surface;
   style["--theme-section-capture-form-primary-cta"] =
     theme.sections.captureForm.primaryCta;
+  style["--theme-section-capture-modal-surface"] = theme.sections.captureModalSlot.surface;
+  style["--theme-section-capture-modal-primary-cta"] =
+    theme.sections.captureModalSlot.primaryCta;
+  style["--theme-section-capture-modal-overlay"] = theme.sections.captureModalSlot.overlay;
   applySlotSurfaceVariables(
     style,
     "--theme-section-authority-bio",
@@ -421,6 +427,30 @@ export function FunnelThemeProvider({
     "--theme-section-offer-stack-primary-cta",
     theme,
     theme.sections.offerStack.primaryCta,
+  );
+  applyResolvedSectionSurfaceVariables(
+    style,
+    "--theme-section-capture-modal",
+    theme,
+    theme.sections.captureModalSlot.surface,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-capture-modal-headline",
+    theme,
+    theme.sections.captureModalSlot.headline,
+  );
+  applyResolvedSectionTextVariables(
+    style,
+    "--theme-section-capture-modal-text",
+    theme,
+    theme.sections.captureModalSlot.body,
+  );
+  applyResolvedSectionButtonVariables(
+    style,
+    "--theme-section-capture-modal-primary-cta",
+    theme,
+    theme.sections.captureModalSlot.primaryCta,
   );
   applyResolvedSectionButtonVariables(
     style,

@@ -211,6 +211,14 @@ export type ThemeCaptureFormSection = {
   primaryCta: FunnelThemeButtonVariant;
 };
 
+export type ThemeCaptureModalSlot = {
+  surface: FunnelThemeSurfaceVariant;
+  headline: FunnelThemeTextVariant;
+  body: FunnelThemeTextVariant;
+  primaryCta: FunnelThemeButtonVariant;
+  overlay: string;
+};
+
 export type ThemeAuthorityBioSlot = {
   bg: string;
   text: string;
@@ -253,6 +261,7 @@ export type ThemeSections = {
   stickyConversionBar: ThemeStickyConversionBarSection;
   announcementBar: ThemeAnnouncementBarSection;
   captureForm: ThemeCaptureFormSection;
+  captureModalSlot: ThemeCaptureModalSlot;
   authorityBioSlot: ThemeAuthorityBioSlot;
   qualificationSlot: ThemeQualificationSlot;
   socialProofSlot: ThemeSocialProofSlot;

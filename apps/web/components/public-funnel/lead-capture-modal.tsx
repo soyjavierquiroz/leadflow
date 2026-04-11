@@ -11,7 +11,8 @@ import {
 import type { Country } from "react-phone-number-input";
 import {
   FunnelButtonContent,
-  buildCtaClassName,
+  RichHeadline,
+  captureModalPrimaryButtonClassName,
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { SmartPhoneInput } from "@/components/public-funnel/smart-phone-input";
@@ -341,104 +342,131 @@ export function LeadCaptureModal({
       ) : null}
 
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[80] bg-slate-950/70 backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 z-[80] bg-[var(--theme-section-capture-modal-overlay)] backdrop-blur-md" />
         <Dialog.Content
-          className={`fixed left-1/2 top-1/2 z-[90] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 outline-none ${jakawiPremiumClassNames.modalPanel}`}
+          className={cx(
+            "fixed left-1/2 top-1/2 z-[90] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-hidden border outline-none [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]",
+            "[&_.PhoneInput:focus-within]:border-[var(--theme-brand-trust)] [&_.PhoneInput:focus-within]:ring-4 [&_.PhoneInput:focus-within]:ring-[var(--theme-brand-trust)]",
+          )}
         >
-          <div className="flex items-start justify-between gap-4">
-            <div className="pr-4">
-              <Dialog.Title className="text-2xl font-black tracking-tight text-slate-950">
-                {modalConfig.title}
+          <div className="relative px-6 pb-6 pt-5 md:px-7 md:pb-7">
+            <div className="absolute inset-x-0 top-0 h-1.5 bg-slate-100">
+              <div
+                className="h-full w-4/5 rounded-r-full bg-[var(--theme-support-validation)]"
+                aria-hidden="true"
+              />
+            </div>
+
+            <div className="flex items-start justify-end">
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            <div className="-mt-3 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--theme-support-validation)]">
+                Paso 2 de 2: Casi terminado
+              </p>
+              <Dialog.Title className="mt-4 text-center">
+                <RichHeadline
+                  text={modalConfig.title}
+                  className="block font-headline text-2xl font-black tracking-tight [color:var(--theme-section-capture-modal-headline-color)]"
+                />
               </Dialog.Title>
-              <Dialog.Description className="mt-2 text-sm leading-6 text-slate-600">
-                {modalConfig.description}
+              <Dialog.Description className="mt-3 text-center leading-6 [color:var(--theme-section-capture-modal-text-color)]">
+                <RichHeadline
+                  text={modalConfig.description}
+                  className="block text-sm"
+                  fontClassName=""
+                />
               </Dialog.Description>
             </div>
 
-            <Dialog.Close asChild>
-              <button
-                type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                aria-label="Cerrar"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </Dialog.Close>
-          </div>
+            <form
+              className="mt-6 flex w-full min-w-0 flex-col gap-4"
+              onSubmit={handleSubmit}
+              noValidate
+            >
+              <label className="grid w-full min-w-0 gap-2 text-sm font-semibold text-slate-800">
+                <span>{modalConfig.nameLabel}</span>
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={fullName}
+                  onChange={(event) => {
+                    setFullName(event.target.value);
+                    setSubmitError(null);
+                  }}
+                  placeholder={modalConfig.namePlaceholder}
+                  autoComplete="name"
+                  required
+                  minLength={2}
+                  aria-invalid={Boolean(nameError)}
+                  aria-describedby={nameError ? nameErrorId : undefined}
+                  className={cx(
+                    jakawiPremiumClassNames.compactInput,
+                    "focus:border-[var(--theme-brand-trust)] focus:ring-4 focus:ring-[var(--theme-brand-trust)]",
+                    nameError
+                      ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                      : "",
+                  )}
+                />
+              </label>
 
-          <form
-            className="mt-6 flex w-full min-w-0 flex-col gap-4"
-            onSubmit={handleSubmit}
-            noValidate
-          >
-            <label className="grid w-full min-w-0 gap-2 text-sm font-semibold text-slate-800">
-              <span>{modalConfig.nameLabel}</span>
-              <input
-                ref={nameInputRef}
-                type="text"
-                value={fullName}
-                onChange={(event) => {
-                  setFullName(event.target.value);
+              {nameError ? (
+                <p id={nameErrorId} className="-mt-2 text-xs text-red-600">
+                  {nameError}
+                </p>
+              ) : null}
+
+              <SmartPhoneInput
+                label={modalConfig.phoneLabel}
+                value={phone}
+                onChange={(nextPhone) => {
+                  setPhone(nextPhone);
                   setSubmitError(null);
                 }}
-                placeholder={modalConfig.namePlaceholder}
-                autoComplete="name"
+                placeholder={modalConfig.phonePlaceholder}
+                error={phoneError ?? undefined}
+                invalidMessage={modalConfig.phoneErrorMessage}
+                defaultCountry={modalConfig.defaultCountry as Country}
                 required
-                minLength={2}
-                aria-invalid={Boolean(nameError)}
-                aria-describedby={nameError ? nameErrorId : undefined}
+                onValidityChange={setIsPhoneValid}
+              />
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
                 className={cx(
-                  jakawiPremiumClassNames.compactInput,
-                  nameError
-                    ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200"
-                    : "",
+                  captureModalPrimaryButtonClassName,
+                  "mt-6 w-full",
+                  modalConfig.ctaSubtext ? "flex-col items-center justify-center" : "",
+                  isSubmitting
+                    ? "cursor-not-allowed opacity-70"
+                    : "cursor-pointer",
                 )}
-              />
-            </label>
+              >
+                <FunnelButtonContent
+                  text={isSubmitting ? "Procesando..." : modalConfig.ctaText}
+                  subtext={isSubmitting ? undefined : modalConfig.ctaSubtext}
+                />
+              </button>
 
-            {nameError ? (
-              <p id={nameErrorId} className="-mt-2 text-xs text-red-600">
-                {nameError}
+              {submitError ? (
+                <p className="text-sm text-rose-600">{submitError}</p>
+              ) : null}
+
+              <p className="mt-4 text-center text-xs opacity-60">
+                🔒 Tu información está 100% segura y libre de spam.
               </p>
-            ) : null}
-
-            <SmartPhoneInput
-              label={modalConfig.phoneLabel}
-              value={phone}
-              onChange={(nextPhone) => {
-                setPhone(nextPhone);
-                setSubmitError(null);
-              }}
-              placeholder={modalConfig.phonePlaceholder}
-              error={phoneError ?? undefined}
-              invalidMessage={modalConfig.phoneErrorMessage}
-              defaultCountry={modalConfig.defaultCountry as Country}
-              required
-              onValidityChange={setIsPhoneValid}
-            />
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={cx(
-                buildCtaClassName("primary"),
-                "mb-2 mt-6 w-full",
-                modalConfig.ctaSubtext ? "flex-col items-center justify-center" : "",
-                isSubmitting
-                  ? "cursor-not-allowed opacity-70"
-                  : "cursor-pointer",
-              )}
-            >
-              <FunnelButtonContent
-                text={isSubmitting ? "Procesando..." : modalConfig.ctaText}
-                subtext={isSubmitting ? undefined : modalConfig.ctaSubtext}
-              />
-            </button>
-
-            {submitError ? (
-              <p className="text-sm text-rose-600">{submitError}</p>
-            ) : null}
-          </form>
+            </form>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

@@ -543,6 +543,13 @@ export const funnelBaseTheme = {
       body: "body",
       primaryCta: "primary",
     },
+    captureModalSlot: {
+      surface: "section",
+      headline: "headline",
+      body: "body",
+      primaryCta: "primary",
+      overlay: "rgba(0, 0, 0, 0.8)",
+    },
     authorityBioSlot: {
       bg: "#eff6ff",
       text: "#1e293b",
