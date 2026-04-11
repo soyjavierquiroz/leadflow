@@ -1,6 +1,49 @@
-export const funnelThemeIds = ['default', 'expert-secrets'] as const;
+export const funnelThemeIds = ["default", "expert-secrets"] as const;
 
 export type FunnelThemeId = (typeof funnelThemeIds)[number];
+
+export type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends readonly (infer U)[]
+    ? readonly DeepPartial<U>[]
+    : T[K] extends object
+      ? DeepPartial<T[K]>
+      : T[K];
+};
+
+export type ThemeState = "rest" | "hover" | "active" | "focus" | "disabled";
+
+export type ThemeStateMap<T> = Record<ThemeState, T>;
+
+export type FunnelThemeTextTransform =
+  | "none"
+  | "uppercase"
+  | "lowercase"
+  | "capitalize";
+
+export type FunnelThemeEyebrowAlignment = "left" | "center" | "right";
+
+export type FunnelThemeButtonVariant =
+  | "primary"
+  | "secondary"
+  | "urgency"
+  | "handoff";
+
+export type FunnelThemeEyebrowVariant = "pill" | "attached";
+
+export type FunnelThemeTextVariant =
+  | "headline"
+  | "body"
+  | "subheadline"
+  | "eyebrow"
+  | "caption"
+  | "price";
+
+export type FunnelThemeSurfaceVariant =
+  | "canvas"
+  | "section"
+  | "sectionMuted"
+  | "sectionEmphasis"
+  | "overlay";
 
 export type FunnelThemeFontPairing = {
   sans: string;
@@ -12,29 +55,190 @@ export type FunnelThemeFontPairing = {
   button: string;
 };
 
-export type FunnelThemeColorTokens = {
-  vslAccent: string;
-  vslHighlight: string;
+export type SurfaceStyle = {
+  backgroundColor: string;
+  borderColor: string;
+  shadow: string;
+  radius: string;
 };
 
-export type FunnelThemeEyebrowAlignment = 'left' | 'center' | 'right';
+export type TextStyle = {
+  color: string;
+  fontFamily: string;
+  fontWeight: string | number;
+  fontSize: string;
+  lineHeight: string;
+  letterSpacing: string;
+  textTransform: FunnelThemeTextTransform;
+};
 
-export type FunnelThemeEyebrowTokens = {
-  backgroundColor: string;
-  textColor: string;
+export type MotionStyle = {
+  duration: string;
+  easing: string;
+  transform: string;
+};
+
+export type FunnelThemeBaseTokens = {
+  pageBackground: string;
+  canvas: string;
+  surface: string;
+  surfaceMuted: string;
+  surfaceEmphasis: string;
+  borderSubtle: string;
+  borderStrong: string;
+  overlay: string;
+};
+
+export type FunnelThemeTextTokens = {
+  strong: string;
+  body: string;
+  muted: string;
+  subtle: string;
+  inverse: string;
+  accent: string;
+};
+
+export type FunnelThemeBrandTokens = {
+  trust: string;
+  accent: string;
+  highlight: string;
+  success: string;
+  warning: string;
+  danger: string;
+};
+
+export type FunnelThemeActionTokens = {
+  primary: string;
+  primaryHover: string;
+  primaryActive: string;
+  secondary: string;
+  secondaryHover: string;
+  secondaryActive: string;
+  urgency: string;
+  urgencyHover: string;
+  urgencyActive: string;
+};
+
+export type FunnelThemeEffectTokens = {
+  shadowXs: string;
+  shadowSm: string;
+  shadowMd: string;
+  shadowLg: string;
+  shadowXl: string;
+  shadowCta: string;
+  focusRingColor: string;
+  focusRingOffsetColor: string;
+};
+
+export type FunnelThemeRadiusTokens = {
+  sm: string;
+  md: string;
+  lg: string;
+  xl: string;
+  pill: string;
+};
+
+export type FunnelThemeTokens = {
+  base: FunnelThemeBaseTokens;
+  text: FunnelThemeTextTokens;
+  brand: FunnelThemeBrandTokens;
+  action: FunnelThemeActionTokens;
+  effects: FunnelThemeEffectTokens;
+  radius: FunnelThemeRadiusTokens;
+  fonts: FunnelThemeFontPairing;
+};
+
+export type ThemeButtonSlot = {
+  surface: ThemeStateMap<SurfaceStyle>;
+  text: ThemeStateMap<TextStyle>;
+  borderWidth: string;
+  outlineColor: string;
+  outlineOffset: string;
+  gap: string;
+  paddingX: string;
+  paddingY: string;
+  minHeight: string;
+  motion: MotionStyle;
+};
+
+export type ThemeEyebrowSlot = {
+  surface: SurfaceStyle;
+  text: TextStyle;
+  paddingX: string;
+  paddingY: string;
   alignment: FunnelThemeEyebrowAlignment;
+};
+
+export type ThemeSurfaceSlot = {
+  surface: SurfaceStyle;
+};
+
+export type ThemePrimitives = {
+  button: Record<FunnelThemeButtonVariant, ThemeButtonSlot>;
+  eyebrow: Record<FunnelThemeEyebrowVariant, ThemeEyebrowSlot>;
+  surface: Record<FunnelThemeSurfaceVariant, ThemeSurfaceSlot>;
+  text: Record<FunnelThemeTextVariant, TextStyle>;
+};
+
+export type ThemeContentSection = {
+  surface: FunnelThemeSurfaceVariant;
+  eyebrow: FunnelThemeEyebrowVariant;
+  headline: FunnelThemeTextVariant;
+  body: FunnelThemeTextVariant;
+  supportingText: FunnelThemeTextVariant;
+  primaryCta: FunnelThemeButtonVariant;
+  secondaryCta: FunnelThemeButtonVariant;
+};
+
+export type ThemeStickyConversionBarSection = {
+  surface: FunnelThemeSurfaceVariant;
+  text: FunnelThemeTextVariant;
+  primaryCta: FunnelThemeButtonVariant;
+};
+
+export type ThemeAnnouncementBarSection = {
+  surface: FunnelThemeSurfaceVariant;
+  text: FunnelThemeTextVariant;
+  emphasisColor: string;
+};
+
+export type ThemeCaptureFormSection = {
+  surface: FunnelThemeSurfaceVariant;
+  headline: FunnelThemeTextVariant;
+  body: FunnelThemeTextVariant;
+  primaryCta: FunnelThemeButtonVariant;
+};
+
+export type ThemeSections = {
+  heroHook: ThemeContentSection;
+  guarantee: ThemeContentSection;
+  finalCta: ThemeContentSection;
+  offerStack: ThemeContentSection;
+  handoff: ThemeContentSection;
+  stickyConversionBar: ThemeStickyConversionBarSection;
+  announcementBar: ThemeAnnouncementBarSection;
+  captureForm: ThemeCaptureFormSection;
 };
 
 export type FunnelThemeDefinition = {
   id: FunnelThemeId;
   name: string;
   description: string;
-  fonts: FunnelThemeFontPairing;
-  colors: FunnelThemeColorTokens;
-  eyebrow: FunnelThemeEyebrowTokens;
+  tokens?: DeepPartial<FunnelThemeTokens>;
+  primitives?: DeepPartial<ThemePrimitives>;
+  sections?: DeepPartial<ThemeSections>;
 };
 
-export type FunnelThemeResolutionSource = 'runtime' | 'template' | 'fallback';
+export type ResolvedFunnelTheme = {
+  id: FunnelThemeId;
+  name: string;
+  description: string;
+  tokens: FunnelThemeTokens;
+  primitives: ThemePrimitives;
+  sections: ThemeSections;
+};
+
+export type FunnelThemeResolutionSource = "runtime" | "template" | "fallback";
 
 export type FunnelThemeResolutionInput = {
   themeId?: string | null;
