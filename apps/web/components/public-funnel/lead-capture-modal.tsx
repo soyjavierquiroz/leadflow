@@ -9,7 +9,11 @@ import {
   type ReadonlyURLSearchParams,
 } from "next/navigation";
 import type { Country } from "react-phone-number-input";
-import { cx } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import {
+  FunnelButtonContent,
+  buildCtaClassName,
+  cx,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { SmartPhoneInput } from "@/components/public-funnel/smart-phone-input";
 import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-runtime-lead-submit-provider";
 import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
@@ -43,6 +47,7 @@ type LeadCaptureModalProps = {
   publicationId: string;
   currentStepId: string;
   triggerLabel: string;
+  triggerSubtext?: string | null;
   triggerClassName: string;
   triggerAction?: string | null;
   modalConfig: LeadCaptureModalConfig;
@@ -118,6 +123,7 @@ export function LeadCaptureModal({
   publicationId,
   currentStepId,
   triggerLabel,
+  triggerSubtext,
   triggerClassName,
   triggerAction,
   modalConfig,
@@ -323,10 +329,13 @@ export function LeadCaptureModal({
         <Dialog.Trigger asChild>
           <button
             type="button"
-            className={triggerClassName}
+            className={cx(
+              triggerClassName,
+              triggerSubtext ? "flex-col items-center justify-center" : "",
+            )}
             onClick={handleTriggerClick}
           >
-            {triggerLabel}
+            <FunnelButtonContent text={triggerLabel} subtext={triggerSubtext} />
           </button>
         </Dialog.Trigger>
       ) : null}
@@ -412,20 +421,19 @@ export function LeadCaptureModal({
               type="submit"
               disabled={isSubmitting}
               className={cx(
-                "mt-6 mb-2 flex w-full items-center justify-center rounded-md bg-orange-500 py-4 font-black text-white shadow-md transition-colors",
+                buildCtaClassName("primary"),
+                "mb-2 mt-6 w-full",
+                modalConfig.ctaSubtext ? "flex-col items-center justify-center" : "",
                 isSubmitting
                   ? "cursor-not-allowed opacity-70"
-                  : "cursor-pointer hover:bg-orange-600",
+                  : "cursor-pointer",
               )}
             >
-              {isSubmitting ? "Procesando..." : modalConfig.ctaText}
+              <FunnelButtonContent
+                text={isSubmitting ? "Procesando..." : modalConfig.ctaText}
+                subtext={isSubmitting ? undefined : modalConfig.ctaSubtext}
+              />
             </button>
-
-            {modalConfig.ctaSubtext ? (
-              <p className="text-center text-xs text-slate-500">
-                {modalConfig.ctaSubtext}
-              </p>
-            ) : null}
 
             {submitError ? (
               <p className="text-sm text-rose-600">{submitError}</p>

@@ -83,45 +83,64 @@ export const funnelThemeRegistry = {
             rest: {
               backgroundColor: "#f58320",
               borderColor: "#f58320",
-              shadow: "0 18px 44px rgba(245, 131, 32, 0.34)",
+              shadow:
+                "0 10px 25px -5px rgba(245, 131, 32, 0.5), 0 8px 10px -6px rgba(245, 131, 32, 0.28)",
             },
             hover: {
-              backgroundColor: "#ff9a3d",
-              borderColor: "#ff9a3d",
-              shadow: "0 22px 54px rgba(245, 131, 32, 0.38)",
+              backgroundColor: "#e97814",
+              borderColor: "#e97814",
+              shadow:
+                "0 18px 34px -8px rgba(245, 131, 32, 0.62), 0 12px 16px -10px rgba(122, 42, 0, 0.4)",
             },
             active: {
-              backgroundColor: "#dd6b0f",
-              borderColor: "#dd6b0f",
-              shadow: "0 12px 30px rgba(221, 107, 15, 0.32)",
+              backgroundColor: "#cf650c",
+              borderColor: "#cf650c",
+              shadow:
+                "0 12px 22px -8px rgba(207, 101, 12, 0.58), 0 8px 12px -8px rgba(122, 42, 0, 0.35)",
             },
             focus: {
               backgroundColor: "#f58320",
               borderColor: "#f58320",
-              shadow: "0 0 0 4px rgba(245, 131, 32, 0.26)",
+              shadow:
+                "0 0 0 4px rgba(245, 131, 32, 0.26), 0 14px 30px -10px rgba(245, 131, 32, 0.42)",
             },
           },
           text: {
             rest: {
-              fontFamily: funnelThemeFonts["expert-secrets"].button,
-              fontWeight: 900,
+              color: "#ffffff",
+              fontFamily:
+                'var(--font-manrope), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+              fontWeight: 800,
             },
             hover: {
-              fontFamily: funnelThemeFonts["expert-secrets"].button,
-              fontWeight: 900,
+              color: "#ffffff",
+              fontFamily:
+                'var(--font-manrope), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+              fontWeight: 800,
             },
             active: {
-              fontFamily: funnelThemeFonts["expert-secrets"].button,
-              fontWeight: 900,
+              color: "#ffffff",
+              fontFamily:
+                'var(--font-manrope), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+              fontWeight: 800,
             },
             focus: {
-              fontFamily: funnelThemeFonts["expert-secrets"].button,
-              fontWeight: 900,
+              color: "#ffffff",
+              fontFamily:
+                'var(--font-manrope), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+              fontWeight: 800,
             },
             disabled: {
-              fontFamily: funnelThemeFonts["expert-secrets"].button,
-              fontWeight: 900,
+              color: "#ffffff",
+              fontFamily:
+                'var(--font-manrope), var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+              fontWeight: 800,
             },
+          },
+          motion: {
+            duration: "200ms",
+            easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+            transform: "translateY(-4px) scale(1.02)",
           },
         },
         urgency: {

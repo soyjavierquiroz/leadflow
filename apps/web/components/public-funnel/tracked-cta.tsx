@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import {
+  FunnelButtonContent,
+  cx,
+} from "@/components/public-funnel/adapters/public-funnel-primitives";
+import {
   emitPublicRuntimeEvent,
   getOrCreateRuntimeSessionId,
 } from "@/lib/public-runtime-tracking";
@@ -13,6 +17,7 @@ type TrackedCtaProps = {
   currentPath: string;
   href: string;
   label: string;
+  subtext?: string | null;
   className: string;
   action?: string | null;
 };
@@ -23,6 +28,7 @@ export function TrackedCta({
   currentPath,
   href,
   label,
+  subtext,
   className,
   action,
 }: TrackedCtaProps) {
@@ -44,15 +50,29 @@ export function TrackedCta({
 
   if (/^https?:\/\//.test(href) || href.startsWith("#")) {
     return (
-      <a href={href} className={className} onClick={handleClick}>
-        {label}
+      <a
+        href={href}
+        className={cx(
+          className,
+          subtext ? "flex-col items-center justify-center" : "",
+        )}
+        onClick={handleClick}
+      >
+        <FunnelButtonContent text={label} subtext={subtext} />
       </a>
     );
   }
 
   return (
-    <Link href={href} className={className} onClick={handleClick}>
-      {label}
+    <Link
+      href={href}
+      className={cx(
+        className,
+        subtext ? "flex-col items-center justify-center" : "",
+      )}
+      onClick={handleClick}
+    >
+      <FunnelButtonContent text={label} subtext={subtext} />
     </Link>
   );
 }

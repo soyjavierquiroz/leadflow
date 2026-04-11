@@ -502,6 +502,7 @@ function HookAndPromiseBlockAdapter({
               publicationId={runtime.publication.id}
               currentStepId={runtime.currentStep.id}
               triggerLabel={ctaLabel}
+              triggerSubtext={ctaHelperText || undefined}
               triggerClassName={
                 layoutVariant === "sticky_media"
                   ? cx(
@@ -527,6 +528,7 @@ function HookAndPromiseBlockAdapter({
               currentPath={runtime.request.path}
               href={ctaHref}
               label={ctaLabel}
+              subtext={ctaHelperText || undefined}
               className={
                 layoutVariant === "sticky_media"
                   ? cx(
@@ -541,7 +543,7 @@ function HookAndPromiseBlockAdapter({
               action={asString(block.action) || "hook_primary"}
             />
           )}
-          {layoutVariant === "sticky_media" ? (
+          {layoutVariant === "sticky_media" && !ctaHelperText ? (
             <p className="mb-10 mt-2 text-center text-xs text-slate-500">
               {ctaHelperText ||
                 "Te contactaremos con la siguiente etapa disponible para tu caso."}
