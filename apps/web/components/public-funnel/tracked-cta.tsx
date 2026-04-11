@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import type { MouseEvent } from "react";
 import {
   FunnelButtonContent,
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
+import { useLeadCaptureModal } from "@/components/public-funnel/lead-capture-context";
 import {
   emitPublicRuntimeEvent,
   getOrCreateRuntimeSessionId,
@@ -32,7 +34,9 @@ export function TrackedCta({
   className,
   action,
 }: TrackedCtaProps) {
-  const handleClick = () => {
+  const leadCaptureModal = useLeadCaptureModal();
+
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     void emitPublicRuntimeEvent({
       eventName: "cta_clicked",
       publicationId,
@@ -46,6 +50,11 @@ export function TrackedCta({
         sessionId: getOrCreateRuntimeSessionId(),
       },
     });
+
+    if (action === "open_lead_capture_modal" && leadCaptureModal) {
+      event.preventDefault();
+      leadCaptureModal.openModal();
+    }
   };
 
   if (/^https?:\/\//.test(href) || href.startsWith("#")) {

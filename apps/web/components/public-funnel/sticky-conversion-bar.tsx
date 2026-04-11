@@ -3,27 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import {
-  LeadCaptureModal,
-  type LeadCaptureModalConfig,
-} from "@/components/public-funnel/lead-capture-modal";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import {
   cx,
   stickyBarPrimaryButtonClassName,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 
-type StickyConversionBarLinkAction = {
-  kind: "link";
+type StickyConversionBarActionConfig = {
   href: string;
-  action?: string | null;
-};
-
-type StickyConversionBarModalAction = {
-  kind: "modal";
-  modalConfig: LeadCaptureModalConfig;
-  sourceChannel?: string | null;
-  tags?: string[];
   action?: string | null;
 };
 
@@ -46,7 +33,7 @@ type StickyConversionBarProps = {
   buttonTextColor?: string;
   /** @deprecated Theme tokens are now the source of truth for border colors. */
   borderColor?: string;
-  actionConfig: StickyConversionBarLinkAction | StickyConversionBarModalAction;
+  actionConfig: StickyConversionBarActionConfig;
 };
 
 const desktopShellClassName =
@@ -136,21 +123,6 @@ export function StickyConversionBar({
   }, []);
 
   const renderActionButton = (label: string, className: string) => {
-    if (actionConfig.kind === "modal") {
-      return (
-        <LeadCaptureModal
-          publicationId={publicationId}
-          currentStepId={currentStepId}
-          triggerLabel={label}
-          triggerClassName={className}
-          triggerAction={actionConfig.action}
-          modalConfig={actionConfig.modalConfig}
-          sourceChannel={actionConfig.sourceChannel}
-          tags={actionConfig.tags}
-        />
-      );
-    }
-
     return (
       <TrackedCta
         publicationId={publicationId}

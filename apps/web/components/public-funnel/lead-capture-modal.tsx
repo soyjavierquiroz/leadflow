@@ -55,6 +55,8 @@ type LeadCaptureModalProps = {
   sourceChannel?: string | null;
   tags?: string[];
   renderTrigger?: boolean;
+  isOpen?: boolean;
+  onOpenChange?: (nextOpen: boolean) => void;
 };
 
 function readUrlAttribution(
@@ -140,12 +142,14 @@ export function LeadCaptureModal({
   sourceChannel,
   tags,
   renderTrigger = true,
+  isOpen,
+  onOpenChange,
 }: LeadCaptureModalProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const portalContainerRef = useRef<HTMLDivElement | null>(null);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [isPhoneValid, setIsPhoneValid] = useState(false);
@@ -167,10 +171,20 @@ export function LeadCaptureModal({
     isPhoneValid,
     modalConfig.phoneErrorMessage,
   );
+  const open = isOpen ?? internalOpen;
   const nameError = hasAttemptedSubmit ? currentNameError : null;
   const phoneError = hasAttemptedSubmit ? currentPhoneError : null;
   const isFormReady = !currentNameError && !currentPhoneError;
   const nameErrorId = "lead-capture-name-error";
+
+  const setModalOpen = (nextOpen: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(nextOpen);
+      return;
+    }
+
+    setInternalOpen(nextOpen);
+  };
 
   useEffect(() => {
     if (!open) {
@@ -193,7 +207,7 @@ export function LeadCaptureModal({
 
     const syncFromHash = () => {
       if (window.location.hash === "#lead-capture-modal") {
-        setOpen(true);
+        setModalOpen(true);
       }
     };
 
@@ -203,7 +217,7 @@ export function LeadCaptureModal({
   }, []);
 
   const handleTriggerClick = () => {
-    setOpen(true);
+    setModalOpen(true);
 
     void emitPublicRuntimeEvent({
       eventName: "cta_clicked",
@@ -222,7 +236,7 @@ export function LeadCaptureModal({
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
+    setModalOpen(nextOpen);
 
     if (!nextOpen) {
       setHasAttemptedSubmit(false);
@@ -319,7 +333,7 @@ export function LeadCaptureModal({
       }
 
       persistSubmissionContext(publicationId, response);
-      setOpen(false);
+      setModalOpen(false);
       window.location.assign(
         resolveLeadCaptureRedirect(modalConfig.successRedirect),
       );

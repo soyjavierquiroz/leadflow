@@ -549,6 +549,9 @@ const normalizeCompatibleExternalBlock = (
       if (heroPrimaryCta?.label) {
         baseBlock.primaryCtaLabel = heroPrimaryCta.label;
       }
+      if (heroPrimaryCta?.action) {
+        baseBlock.action = heroPrimaryCta.action;
+      }
       if (heroSecondaryCta?.href) {
         baseBlock.secondaryCtaHref = heroSecondaryCta.href;
       }

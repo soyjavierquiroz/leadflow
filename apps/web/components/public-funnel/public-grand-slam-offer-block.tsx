@@ -9,12 +9,10 @@ import {
   PublicSectionSurface,
   RichHeadline,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
-import {
-  LeadCaptureModal,
-  type LeadCaptureModalConfig,
-} from "@/components/public-funnel/lead-capture-modal";
+import { resolveLeadCaptureModalConfig } from "@/components/public-funnel/lead-capture-modal-config";
 import { resolveLeadflowBlockMedia } from "@/components/public-funnel/leadflow-media-resolver";
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
+import { TrackedCta } from "@/components/public-funnel/tracked-cta";
 import {
   asRecord,
   asString,
@@ -135,72 +133,6 @@ const dedupeOfferItems = (items: OfferSectionItem[]) => {
     return true;
   });
 };
-
-function resolveLeadCaptureModalConfig(
-  leadCaptureConfigBlock: RuntimeBlock | null,
-): LeadCaptureModalConfig | null {
-  const modalConfigRecord = leadCaptureConfigBlock
-    ? asRecord(leadCaptureConfigBlock.modal_config)
-    : null;
-  const modalFieldsRecord = modalConfigRecord
-    ? asRecord(modalConfigRecord.fields)
-    : null;
-  const modalNameFieldRecord =
-    (modalFieldsRecord ? asRecord(modalFieldsRecord.name) : null) ??
-    (modalConfigRecord ? asRecord(modalConfigRecord.name_fields) : null);
-  const modalPhoneFieldRecord =
-    (modalFieldsRecord ? asRecord(modalFieldsRecord.phone) : null) ??
-    (modalConfigRecord ? asRecord(modalConfigRecord.phone_fields) : null);
-  const modalCtaButtonRecord = modalConfigRecord
-    ? asRecord(modalConfigRecord.cta_button)
-    : null;
-
-  if (
-    !modalConfigRecord ||
-    (!modalNameFieldRecord && !modalPhoneFieldRecord && !modalCtaButtonRecord)
-  ) {
-    return null;
-  }
-
-  return {
-    title: asString(modalConfigRecord.title, "Casi listo..."),
-    description: asString(
-      modalConfigRecord.description,
-      "Déjanos tus datos para continuar con la siguiente etapa.",
-    ),
-    defaultCountry: asString(modalConfigRecord.default_country, "BO"),
-    nameLabel: asString(modalNameFieldRecord?.label, "Nombre"),
-    namePlaceholder: asString(
-      modalNameFieldRecord?.placeholder,
-      "Escribe tu nombre completo",
-    ),
-    nameErrorMessage: asString(
-      modalNameFieldRecord?.error_msg,
-      "Por favor, ingresa tu nombre.",
-    ),
-    phoneLabel: asString(modalPhoneFieldRecord?.label, "WhatsApp"),
-    phonePlaceholder: asString(
-      modalPhoneFieldRecord?.placeholder,
-      "Tu número de WhatsApp",
-    ),
-    phoneErrorMessage: asString(
-      modalPhoneFieldRecord?.error_msg,
-      "Por favor, ingresa un número válido",
-    ),
-    ctaText: asString(
-      modalCtaButtonRecord?.text,
-      asString(modalConfigRecord.cta_text, "Continuar"),
-    ),
-    ctaSubtext: asString(
-      modalCtaButtonRecord?.subtext,
-      asString(modalConfigRecord.cta_subtext),
-    ),
-    successRedirect: asString(
-      leadCaptureConfigBlock?.success_redirect,
-      asString(modalConfigRecord.success_redirect),
-    ),
-  };
-}
 
 function parseAmount(rawValue: string) {
   const compactValue = rawValue.replace(/\s+/g, "");
@@ -671,18 +603,17 @@ export function PublicGrandSlamOfferBlock({
 
               <div className="mt-4 w-full max-w-md">
                 {ctaAction === "open_lead_capture_modal" && modalConfig ? (
-                  <LeadCaptureModal
+                  <TrackedCta
                     publicationId={runtime.publication.id}
                     currentStepId={runtime.currentStep.id}
-                    triggerLabel={ctaLabel}
-                    triggerClassName={cx(
+                    currentPath={runtime.request.path}
+                    href="#lead-capture-modal"
+                    label={ctaLabel}
+                    className={cx(
                       offerStackPrimaryButtonClassName,
                       "w-full text-base [animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none",
                     )}
-                    triggerAction={ctaAction}
-                    modalConfig={modalConfig}
-                    sourceChannel={normalizedOrderBlock.settings.sourceChannel}
-                    tags={normalizedOrderBlock.settings.tags}
+                    action={ctaAction}
                   />
                 ) : (
                   <button

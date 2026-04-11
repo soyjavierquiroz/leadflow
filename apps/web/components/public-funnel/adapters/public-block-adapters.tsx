@@ -15,10 +15,7 @@ import {
   heroHookPrimaryButtonClassName,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { ConversionPage } from "@/components/public-funnel/conversion-page";
-import {
-  LeadCaptureModal,
-  type LeadCaptureModalConfig,
-} from "@/components/public-funnel/lead-capture-modal";
+import { resolveLeadCaptureModalConfig } from "@/components/public-funnel/lead-capture-modal-config";
 import { PublicCaptureForm } from "@/components/public-funnel/public-capture-form";
 import { PublicVideoBlock } from "@/components/public-funnel/public-video-block";
 import {
@@ -147,72 +144,6 @@ function inferAuthorityItemsFromBlocks(blocks: RuntimeBlock[]) {
     .map(([, item]) => item);
 }
 
-function resolveLeadCaptureModalConfig(
-  leadCaptureConfigBlock: RuntimeBlock | null,
-): LeadCaptureModalConfig | null {
-  const modalConfigRecord = leadCaptureConfigBlock
-    ? asRecord(leadCaptureConfigBlock.modal_config)
-    : null;
-  const modalFieldsRecord = modalConfigRecord
-    ? asRecord(modalConfigRecord.fields)
-    : null;
-  const modalNameFieldRecord =
-    (modalFieldsRecord ? asRecord(modalFieldsRecord.name) : null) ??
-    (modalConfigRecord ? asRecord(modalConfigRecord.name_fields) : null);
-  const modalPhoneFieldRecord =
-    (modalFieldsRecord ? asRecord(modalFieldsRecord.phone) : null) ??
-    (modalConfigRecord ? asRecord(modalConfigRecord.phone_fields) : null);
-  const modalCtaButtonRecord = modalConfigRecord
-    ? asRecord(modalConfigRecord.cta_button)
-    : null;
-
-  if (
-    !modalConfigRecord ||
-    (!modalNameFieldRecord && !modalPhoneFieldRecord && !modalCtaButtonRecord)
-  ) {
-    return null;
-  }
-
-  return {
-    title: asString(modalConfigRecord.title, "Casi listo..."),
-    description: asString(
-      modalConfigRecord.description,
-      "Déjanos tus datos para continuar con la siguiente etapa.",
-    ),
-    defaultCountry: asString(modalConfigRecord.default_country, "BO"),
-    nameLabel: asString(modalNameFieldRecord?.label, "Nombre"),
-    namePlaceholder: asString(
-      modalNameFieldRecord?.placeholder,
-      "Escribe tu nombre completo",
-    ),
-    nameErrorMessage: asString(
-      modalNameFieldRecord?.error_msg,
-      "Por favor, ingresa tu nombre.",
-    ),
-    phoneLabel: asString(modalPhoneFieldRecord?.label, "WhatsApp"),
-    phonePlaceholder: asString(
-      modalPhoneFieldRecord?.placeholder,
-      "Tu número de WhatsApp",
-    ),
-    phoneErrorMessage: asString(
-      modalPhoneFieldRecord?.error_msg,
-      "Por favor, ingresa un número válido",
-    ),
-    ctaText: asString(
-      modalCtaButtonRecord?.text,
-      asString(modalConfigRecord.cta_text, "Continuar"),
-    ),
-    ctaSubtext: asString(
-      modalCtaButtonRecord?.subtext,
-      asString(modalConfigRecord.cta_subtext),
-    ),
-    successRedirect: asString(
-      leadCaptureConfigBlock?.success_redirect,
-      asString(modalConfigRecord.success_redirect),
-    ),
-  };
-}
-
 function HeroBlockAdapter({
   block,
   runtime,
@@ -231,6 +162,15 @@ function HeroBlockAdapter({
   const proofItems = asStringArray(block.proofItems);
   const hasCaptureBlock = blocks.some(
     (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
+  );
+  const leadCaptureConfigBlock =
+    blocks.find(
+      (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_config",
+    ) ?? null;
+  const modalConfig = resolveLeadCaptureModalConfig(leadCaptureConfigBlock);
+  const primaryAction = asString(
+    block.action,
+    hasCaptureBlock ? "scroll_to_capture" : "hero_primary",
   );
   const media =
     asMediaItem(block.media, title) ??
@@ -269,7 +209,11 @@ function HeroBlockAdapter({
         ];
   const primaryCtaHref =
     asString(block.primaryCtaHref) ||
-    (hasCaptureBlock ? "#public-capture-form" : runtime.nextStep?.path) ||
+    (primaryAction === "open_lead_capture_modal" && modalConfig
+      ? "#lead-capture-modal"
+      : hasCaptureBlock
+        ? "#public-capture-form"
+        : runtime.nextStep?.path) ||
     runtime.currentStep.path;
   const primaryCtaLabel = asString(
     block.primaryCtaLabel,
@@ -319,7 +263,7 @@ function HeroBlockAdapter({
           href={primaryCtaHref}
           label={primaryCtaLabel}
           className={buildCtaClassName("primary")}
-          action={hasCaptureBlock ? "scroll_to_capture" : "hero_primary"}
+          action={primaryAction}
         />
       }
       secondaryCta={
@@ -440,17 +384,11 @@ function HookAndPromiseBlockAdapter({
     blocks.find(
       (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_config",
     ) ?? null;
-  const leadCaptureFormBlock =
-    blocks.find(
-      (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
-    ) ?? null;
-  const normalizedLeadCaptureFormBlock = leadCaptureFormBlock
-    ? normalizeLeadCaptureFormBlock(leadCaptureFormBlock)
-    : null;
   const ctaHref =
     asString(block.href) ||
     (hasCaptureBlock ? "#public-capture-form" : runtime.nextStep?.path) ||
     runtime.currentStep.path;
+  const ctaAction = asString(block.action) || "hook_primary";
   const ctaLabel =
     asString(block.label) ||
     asString(content?.cta_button_text as never) ||
@@ -568,52 +506,30 @@ function HookAndPromiseBlockAdapter({
               {ctaLeadIn}
             </span>
           ) : null}
-          {modalConfig ? (
-            <LeadCaptureModal
-              publicationId={runtime.publication.id}
-              currentStepId={runtime.currentStep.id}
-              triggerLabel={ctaLabel}
-              triggerSubtext={ctaHelperText || undefined}
-              triggerClassName={
-                layoutVariant === "sticky_media"
-                  ? cx(
-                      heroHookPrimaryButtonClassName,
-                      "mx-auto flex min-h-16 w-full items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
-                      hasPulseScaleCta
-                        ? "[animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none"
-                        : "",
-                    )
-                  : buildCtaClassName("primary")
-              }
-              triggerAction={asString(block.action) || "hook_primary"}
-              modalConfig={modalConfig}
-              sourceChannel={
-                normalizedLeadCaptureFormBlock?.settings.sourceChannel
-              }
-              tags={normalizedLeadCaptureFormBlock?.settings.tags}
-            />
-          ) : (
-            <TrackedCta
-              publicationId={runtime.publication.id}
-              currentStepId={runtime.currentStep.id}
-              currentPath={runtime.request.path}
-              href={ctaHref}
-              label={ctaLabel}
-              subtext={ctaHelperText || undefined}
-              className={
-                layoutVariant === "sticky_media"
-                  ? cx(
-                      heroHookPrimaryButtonClassName,
-                      "mx-auto flex min-h-16 w-full items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
-                      hasPulseScaleCta
-                        ? "[animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none"
-                        : "",
-                    )
-                  : buildCtaClassName("primary")
-              }
-              action={asString(block.action) || "hook_primary"}
-            />
-          )}
+          <TrackedCta
+            publicationId={runtime.publication.id}
+            currentStepId={runtime.currentStep.id}
+            currentPath={runtime.request.path}
+            href={
+              ctaAction === "open_lead_capture_modal" && modalConfig
+                ? "#lead-capture-modal"
+                : ctaHref
+            }
+            label={ctaLabel}
+            subtext={ctaHelperText || undefined}
+            className={
+              layoutVariant === "sticky_media"
+                ? cx(
+                    heroHookPrimaryButtonClassName,
+                    "mx-auto flex min-h-16 w-full items-center justify-center px-8 text-center text-base leading-5 sm:w-auto sm:min-w-[22rem]",
+                    hasPulseScaleCta
+                      ? "[animation:lf-cta-pulse-scale_2.6s_ease-in-out_infinite] transform-gpu motion-reduce:animate-none"
+                      : "",
+                  )
+                : buildCtaClassName("primary")
+            }
+            action={ctaAction}
+          />
           {layoutVariant === "sticky_media" && !ctaHelperText ? (
             <p className="mb-10 mt-2 text-center text-xs text-slate-500">
               {ctaHelperText ||
@@ -2081,13 +1997,6 @@ function StickyConversionBarBlockAdapter({
     blocks.find(
       (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_config",
     ) ?? null;
-  const leadCaptureFormBlock =
-    blocks.find(
-      (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_form",
-    ) ?? null;
-  const normalizedLeadCaptureFormBlock = leadCaptureFormBlock
-    ? normalizeLeadCaptureFormBlock(leadCaptureFormBlock)
-    : null;
   const modalConfig = resolveLeadCaptureModalConfig(leadCaptureConfigBlock);
   const action = asString(
     block.action,
@@ -2131,20 +2040,13 @@ function StickyConversionBarBlockAdapter({
         asBoolean(block.is_inverted, false),
       )}
       actionConfig={
-        modalConfig
-          ? {
-              kind: "modal",
-              modalConfig,
-              action,
-              sourceChannel:
-                normalizedLeadCaptureFormBlock?.settings.sourceChannel,
-              tags: normalizedLeadCaptureFormBlock?.settings.tags,
-            }
-          : {
-              kind: "link",
-              href,
-              action,
-            }
+        {
+          href:
+            action === "open_lead_capture_modal" && modalConfig
+              ? "#lead-capture-modal"
+              : href,
+          action,
+        }
       }
     />
   );
