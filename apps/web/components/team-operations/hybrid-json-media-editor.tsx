@@ -11,7 +11,9 @@ import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import Link from "next/link";
 import {
+  Check,
   ChevronDown,
+  Copy,
   FileJson,
   ImagePlus,
   Link2,
@@ -167,6 +169,16 @@ type HybridJsonMediaEditorProps = {
   previewHref?: string | null;
   previewTheme?: string;
   availableBlocks?: BuilderBlockDefinition[];
+  routingReference?: {
+    title: string;
+    helperText?: string | null;
+    items: Array<{
+      id: string;
+      label: string;
+      path: string;
+      badge?: string | null;
+    }>;
+  } | null;
   stepSwitcher?: {
     activeKey: string;
     badge?: string | null;
@@ -199,6 +211,7 @@ export function HybridJsonMediaEditor({
   previewHref = null,
   previewTheme = "default",
   availableBlocks = defaultBuilderBlockDefinitions,
+  routingReference = null,
   stepSwitcher = null,
 }: HybridJsonMediaEditorProps) {
   const catalogBlocks = useMemo(() => {
@@ -218,6 +231,7 @@ export function HybridJsonMediaEditor({
   const [selectedBlockKey, setSelectedBlockKey] = useState(
     catalogBlocks[0]?.key ?? "",
   );
+  const [copiedRoutingPath, setCopiedRoutingPath] = useState<string | null>(null);
 
   useEffect(() => {
     writeHybridJsonPreviewDraft({
@@ -263,6 +277,18 @@ export function HybridJsonMediaEditor({
     catalogBlocks.find((definition) => definition.key === selectedBlockKey) ??
     catalogBlocks[0] ??
     null;
+
+  const handleCopyRoutingPath = async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopiedRoutingPath(path);
+      window.setTimeout(() => {
+        setCopiedRoutingPath((current) => (current === path ? null : current));
+      }, 1800);
+    } catch {
+      setCopiedRoutingPath(null);
+    }
+  };
 
   return (
     <>
@@ -384,6 +410,72 @@ export function HybridJsonMediaEditor({
               <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                 {stepSwitcher.warningText}
               </p>
+            ) : null}
+
+            {routingReference && routingReference.items.length > 0 ? (
+              <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 px-5 py-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                      {routingReference.title}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                      URLs disponibles para redirección
+                    </h3>
+                    {routingReference.helperText ? (
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        {routingReference.helperText}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 ring-1 ring-sky-200">
+                    {routingReference.items.length} paso
+                    {routingReference.items.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {routingReference.items.map((item) => {
+                    const isCopied = copiedRoutingPath === item.path;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-slate-950">
+                              {item.label}
+                            </p>
+                            {item.badge ? (
+                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                                {item.badge}
+                              </span>
+                            ) : null}
+                          </div>
+                          <code className="mt-2 block overflow-x-auto rounded-xl bg-slate-950 px-3 py-2 text-sm text-slate-100">
+                            {item.path}
+                          </code>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyRoutingPath(item.path)}
+                          className={secondaryButtonClassName}
+                        >
+                          {isCopied ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                          {isCopied ? "Copiado" : "Copiar"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
             ) : null}
 
             <div className="flex flex-wrap items-center justify-between gap-3">

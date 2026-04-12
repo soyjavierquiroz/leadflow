@@ -61,6 +61,46 @@ const editorStepDefinitions = [
 
 type EditorStepTabKey = (typeof editorStepDefinitions)[number]["key"];
 
+const trimOuterSlashes = (value: string) => value.replace(/^\/+|\/+$/g, "");
+
+const normalizePublicationPath = (value?: string | null) => {
+  if (!value) {
+    return "/";
+  }
+
+  const trimmed = value.trim();
+  const withoutQuery = trimmed.split("?")[0] ?? "/";
+  const withoutHash = withoutQuery.split("#")[0] ?? "/";
+  const normalized = withoutHash.replace(/\/+/g, "/").replace(/\/$/, "");
+
+  if (!normalized || normalized === ".") {
+    return "/";
+  }
+
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+};
+
+const buildPublicationStepPath = (
+  publicationPathPrefix: string,
+  stepSlug: string,
+  isEntryStep: boolean,
+) => {
+  const publicationPath = normalizePublicationPath(publicationPathPrefix);
+
+  if (isEntryStep) {
+    return publicationPath;
+  }
+
+  const normalizedSlug = trimOuterSlashes(stepSlug);
+  if (!normalizedSlug) {
+    return publicationPath;
+  }
+
+  return publicationPath === "/"
+    ? `/${normalizedSlug}`
+    : `${publicationPath}/${normalizedSlug}`;
+};
+
 type HybridPublicationStepDetail = {
   id: string;
   slug: string;
@@ -255,6 +295,22 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const extractThemeFromSettings = (value: unknown) => {
   const record = asRecord(value);
   return resolveFunnelThemeId(record?.theme);
+};
+
+const toStepReferenceLabel = (
+  step: HybridPublicationStepDetail,
+  captureStepId: string | null,
+  confirmStepId: string | null,
+) => {
+  if (step.id === captureStepId) {
+    return `Paso ${step.position} (Captura)`;
+  }
+
+  if (step.id === confirmStepId) {
+    return `Paso ${step.position} (Confirmación)`;
+  }
+
+  return `Paso ${step.position} (${step.slug})`;
 };
 
 export function TeamVslPublicationEditor({
@@ -515,6 +571,29 @@ export function TeamVslPublicationEditor({
   const selectedTemplate = visibleTemplateOptions.find(
     (template) => template.id === selectedTemplateId,
   );
+  const routingReference = useMemo(() => {
+    if (!showStepSwitcher || stepRecords.length === 0) {
+      return null;
+    }
+
+    const captureStepId = captureStep?.id ?? null;
+    const confirmStepId = confirmStep?.id ?? null;
+
+    return {
+      title: "Enrutamiento del Embudo (Referencia)",
+      helperText:
+        "Usa estas rutas relativas al configurar success_redirect dentro del JSON del modal de captura.",
+      items: stepRecords
+        .slice()
+        .sort((left, right) => left.position - right.position)
+        .map((step) => ({
+          id: step.id,
+          label: toStepReferenceLabel(step, captureStepId, confirmStepId),
+          path: buildPublicationStepPath(pathPrefix, step.slug, step.isEntryStep),
+          badge: step.isEntryStep ? "Entrada" : step.slug,
+        })),
+    };
+  }, [captureStep, confirmStep, pathPrefix, showStepSwitcher, stepRecords]);
 
   const handleMediaRowChange = (index: number, patch: Partial<MediaRow>) => {
     updateEditorDraft({
@@ -913,6 +992,7 @@ export function TeamVslPublicationEditor({
         }
         previewTheme={selectedThemeId}
         availableBlocks={availableBlocks}
+        routingReference={routingReference}
         stepSwitcher={
           showStepSwitcher
             ? {
