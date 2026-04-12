@@ -5,6 +5,21 @@ import { normalizePublicFunnelRuntimePayload } from '@/lib/public-funnel-runtime
 
 const normalizeHost = (value: string) => value.trim().toLowerCase().replace(/:\d+$/, '');
 
+export const normalizeRuntimePath = (value?: string | null) => {
+  if (!value) {
+    return '/';
+  }
+
+  const trimmed = value.trim();
+  const normalized = trimmed.replace(/\/+/g, '/').replace(/\/$/, '');
+
+  if (!normalized || normalized === '.') {
+    return '/';
+  }
+
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+};
+
 export const resolveRuntimeHost = (
   requestHost: string | null,
   previewHost: string | undefined,
@@ -20,7 +35,9 @@ export const resolveRuntimePath = (segments: string[] | undefined) => {
     return '/';
   }
 
-  return `/${segments.map((segment) => segment.trim()).filter(Boolean).join('/')}`;
+  return normalizeRuntimePath(
+    segments.map((segment) => segment.trim()).filter(Boolean).join('/'),
+  );
 };
 
 export async function fetchPublicFunnelRuntime(params: {

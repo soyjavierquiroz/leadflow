@@ -2,7 +2,10 @@ import { notFound } from 'next/navigation';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
 import { PublicRuntimeLeadSubmitProvider } from '@/components/public-runtime/public-runtime-lead-submit-provider';
 import { fetchPublicFunnelRuntime } from '@/lib/funnel-runtime';
-import { resolvePublicRuntimePath } from '@/lib/public-runtime';
+import {
+  normalizePublicRuntimePath,
+  resolvePublicRuntimePath,
+} from '@/lib/public-runtime';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +38,13 @@ export default async function PublicRuntimePage({
   }
 
   if (!runtime) {
+    notFound();
+  }
+
+  if (
+    normalizePublicRuntimePath(path) !==
+    normalizePublicRuntimePath(runtime.currentStep.path)
+  ) {
     notFound();
   }
 

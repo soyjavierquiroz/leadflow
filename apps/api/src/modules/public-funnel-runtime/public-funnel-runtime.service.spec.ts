@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
 
@@ -43,8 +43,8 @@ type MockPublicationRecord = {
     rotationPoolId: string | null;
     trackingProfileId: string | null;
     handoffStrategyId: string | null;
-    settingsJson: Record<string, never>;
-    mediaMap: Record<string, never>;
+    settingsJson: Record<string, unknown>;
+    mediaMap: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
     trackingProfile: null;
@@ -55,10 +55,10 @@ type MockPublicationRecord = {
       name: string;
       version: number;
       funnelType: string;
-      blocksJson: Record<string, never>;
-      mediaMap: Record<string, never>;
-      settingsJson: Record<string, never>;
-      allowedOverridesJson: Record<string, never>;
+      blocksJson: Record<string, unknown>;
+      mediaMap: Record<string, unknown>;
+      settingsJson: Record<string, unknown>;
+      allowedOverridesJson: Record<string, unknown>;
     };
     steps: Array<{
       id: string;
@@ -70,9 +70,9 @@ type MockPublicationRecord = {
       position: number;
       isEntryStep: boolean;
       isConversionStep: boolean;
-      blocksJson: Record<string, never>;
-      mediaMap: Record<string, never>;
-      settingsJson: Record<string, never>;
+      blocksJson: Record<string, unknown>;
+      mediaMap: Record<string, unknown>;
+      settingsJson: Record<string, unknown>;
       createdAt: Date;
       updatedAt: Date;
     }>;
@@ -89,12 +89,39 @@ type FindManyArgs = {
   };
 };
 
+const buildStepRecord = (input: {
+  publicationId: string;
+  idSuffix: string;
+  slug: string;
+  position: number;
+  isEntryStep?: boolean;
+  stepType?: string;
+  isConversionStep?: boolean;
+  blocksJson?: Record<string, unknown>;
+}) => ({
+  id: `${input.publicationId}-step-${input.idSuffix}`,
+  workspaceId: 'workspace-1',
+  teamId: 'team-1',
+  funnelInstanceId: 'funnel-1',
+  stepType: input.stepType ?? 'landing',
+  slug: input.slug,
+  position: input.position,
+  isEntryStep: input.isEntryStep ?? false,
+  isConversionStep: input.isConversionStep ?? false,
+  blocksJson: input.blocksJson ?? {},
+  mediaMap: {},
+  settingsJson: {},
+  createdAt: new Date('2026-03-26T00:00:00.000Z'),
+  updatedAt: new Date('2026-03-26T00:00:00.000Z'),
+});
+
 const buildPublicationRecord = (input: {
   id: string;
   pathPrefix: string;
   host?: string;
   normalizedHost?: string;
   domainType?: string;
+  steps?: MockPublicationRecord['funnelInstance']['steps'];
 }): MockPublicationRecord => ({
   id: input.id,
   workspaceId: 'workspace-1',
@@ -153,24 +180,16 @@ const buildPublicationRecord = (input: {
       settingsJson: {},
       allowedOverridesJson: {},
     },
-    steps: [
-      {
-        id: `${input.id}-step-entry`,
-        workspaceId: 'workspace-1',
-        teamId: 'team-1',
-        funnelInstanceId: 'funnel-1',
-        stepType: 'landing',
-        slug: 'landing',
-        position: 1,
-        isEntryStep: true,
-        isConversionStep: false,
-        blocksJson: {},
-        mediaMap: {},
-        settingsJson: {},
-        createdAt: new Date('2026-03-26T00:00:00.000Z'),
-        updatedAt: new Date('2026-03-26T00:00:00.000Z'),
-      },
-    ],
+    steps:
+      input.steps ?? [
+        buildStepRecord({
+          publicationId: input.id,
+          idSuffix: 'entry',
+          slug: 'landing',
+          position: 1,
+          isEntryStep: true,
+        }),
+      ],
   },
 });
 
@@ -231,5 +250,98 @@ describe('PublicFunnelRuntimeService', () => {
       service.resolveByHostAndPath('   ', '/'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('normalizes step slugs and resolves secondary steps strictly by URL slug', async () => {
+    const findMany = jest.fn<
+      Promise<MockPublicationRecord[]>,
+      [FindManyArgs]
+    >();
+    const prisma = {
+      funnelPublication: {
+        findMany,
+      },
+    } as unknown as PrismaService;
+
+    findMany.mockResolvedValue([
+      buildPublicationRecord({
+        id: 'publication-root',
+        pathPrefix: '/',
+        steps: [
+          buildStepRecord({
+            publicationId: 'publication-root',
+            idSuffix: 'entry',
+            slug: 'landing',
+            position: 1,
+            isEntryStep: true,
+            blocksJson: { step: 'landing' },
+          }),
+          buildStepRecord({
+            publicationId: 'publication-root',
+            idSuffix: 'confirmado',
+            slug: '/confirmado/',
+            position: 2,
+            stepType: 'thank_you',
+            blocksJson: { step: 'confirmado' },
+          }),
+        ],
+      }),
+    ]);
+
+    const service = new PublicFunnelRuntimeService(prisma);
+    const runtime = await service.resolveByHostAndPath(
+      'LOCALHOST:3000',
+      '/confirmado/',
+    );
+
+    expect(runtime.request.path).toBe('/confirmado');
+    expect(runtime.currentStep.slug).toBe('confirmado');
+    expect(runtime.currentStep.path).toBe('/confirmado');
+    expect(runtime.currentStep.blocksJson).toEqual({ step: 'confirmado' });
+    expect(runtime.steps.map((step) => step.slug)).toEqual([
+      'landing',
+      'confirmado',
+    ]);
+  });
+
+  it('throws 404 when a non-root slug does not match any published step', async () => {
+    const findMany = jest.fn<
+      Promise<MockPublicationRecord[]>,
+      [FindManyArgs]
+    >();
+    const prisma = {
+      funnelPublication: {
+        findMany,
+      },
+    } as unknown as PrismaService;
+
+    findMany.mockResolvedValue([
+      buildPublicationRecord({
+        id: 'publication-root',
+        pathPrefix: '/',
+        steps: [
+          buildStepRecord({
+            publicationId: 'publication-root',
+            idSuffix: 'entry',
+            slug: 'landing',
+            position: 1,
+            isEntryStep: true,
+          }),
+          buildStepRecord({
+            publicationId: 'publication-root',
+            idSuffix: 'confirmado',
+            slug: 'confirmado',
+            position: 2,
+            stepType: 'thank_you',
+          }),
+        ],
+      }),
+    ]);
+
+    const service = new PublicFunnelRuntimeService(prisma);
+
+    await expect(
+      service.resolveByHostAndPath('localhost', '/desconocido'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
 import {
   fetchPublicFunnelRuntime,
+  normalizeRuntimePath,
   resolveRuntimeHost,
   resolveRuntimePath,
 } from '@/lib/funnel-runtime';
@@ -135,6 +136,13 @@ export default async function SiteRuntimePage({
   const runtime = await loadRuntimeSafely(host, path);
 
   if (!runtime) {
+    notFound();
+  }
+
+  if (
+    normalizeRuntimePath(path) !==
+    normalizeRuntimePath(runtime.currentStep.path)
+  ) {
     notFound();
   }
 

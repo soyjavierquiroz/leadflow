@@ -30,12 +30,29 @@ export type PublicRuntimeResolution = {
   };
 };
 
+export const normalizePublicRuntimePath = (value?: string | null) => {
+  if (!value) {
+    return '/';
+  }
+
+  const trimmed = value.trim();
+  const normalized = trimmed.replace(/\/+/g, '/').replace(/\/$/, '');
+
+  if (!normalized || normalized === '.') {
+    return '/';
+  }
+
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+};
+
 export const resolvePublicRuntimePath = (slug: string[] | undefined) => {
   if (!slug || slug.length === 0) {
     return '/';
   }
 
-  return `/${slug.map((segment) => segment.trim()).filter(Boolean).join('/')}`;
+  return normalizePublicRuntimePath(
+    slug.map((segment) => segment.trim()).filter(Boolean).join('/'),
+  );
 };
 
 export async function fetchPublicRuntimeResolution(params: {

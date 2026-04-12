@@ -1,5 +1,8 @@
 const trimOuterSlashes = (value: string) => value.replace(/^\/+|\/+$/g, '');
 
+export const normalizeStepSlug = (value?: string | null) =>
+  trimOuterSlashes((value ?? '').trim().replace(/\/+/g, '/'));
+
 export const normalizeDomainHost = (value: string) => {
   const trimmed = value.trim().toLowerCase();
 
@@ -85,7 +88,7 @@ export const buildPublicationStepPath = (
     return publicationPath;
   }
 
-  const normalizedSlug = trimOuterSlashes(stepSlug);
+  const normalizedSlug = normalizeStepSlug(stepSlug);
   if (!normalizedSlug) {
     return publicationPath;
   }

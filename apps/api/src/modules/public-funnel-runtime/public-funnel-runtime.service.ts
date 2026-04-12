@@ -15,6 +15,7 @@ import {
   matchesPublicationPath,
   normalizeHost,
   normalizePath,
+  normalizeStepSlug,
   resolveRelativeStepPath,
 } from './public-funnel-runtime.utils';
 import { resolvePublicHandoffConfig } from './reveal-handoff.utils';
@@ -161,8 +162,8 @@ export class PublicFunnelRuntimeService {
     );
 
     const steps = publication.funnelInstance.steps.map((step) => ({
+      slug: normalizeStepSlug(step.slug),
       id: step.id,
-      slug: step.slug,
       path: buildPublicationStepPath(
         publication.pathPrefix,
         step.slug,
@@ -185,7 +186,7 @@ export class PublicFunnelRuntimeService {
       });
     }
 
-    const normalizedRelativeSlug = relativeStepPath.replace(/^\/+|\/+$/g, '');
+    const normalizedRelativeSlug = normalizeStepSlug(relativeStepPath);
     const currentStep =
       relativeStepPath === '/'
         ? entryStep

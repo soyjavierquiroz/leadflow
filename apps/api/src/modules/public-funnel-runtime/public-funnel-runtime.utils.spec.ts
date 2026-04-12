@@ -5,6 +5,7 @@ import {
   normalizeHost,
   normalizePath,
   normalizePublicationPathPrefix,
+  normalizeStepSlug,
   resolveRelativeStepPath,
 } from './public-funnel-runtime.utils';
 
@@ -29,6 +30,12 @@ describe('public funnel runtime utils', () => {
       '/oportunidad',
     );
     expect(normalizePublicationPathPrefix('/')).toBe('/');
+  });
+
+  it('normalizes step slugs before matching or building paths', () => {
+    expect(normalizeStepSlug(' confirmado ')).toBe('confirmado');
+    expect(normalizeStepSlug('/confirmado/')).toBe('confirmado');
+    expect(normalizeStepSlug('//post-registro//')).toBe('post-registro');
   });
 
   it('matches root and specific publication prefixes', () => {
