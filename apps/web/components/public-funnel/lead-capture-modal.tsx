@@ -130,12 +130,22 @@ const captureModalScopeStyle = {
   "--jakawi-text-main": "#0f172a",
   "--jakawi-text-muted": "#64748b",
   "--jakawi-input-border": "#cbd5e1",
-  "--jakawi-input-focus": "#3b82f6",
-  "--jakawi-input-ring": "rgb(59 130 246 / 0.18)",
+  "--jakawi-input-focus": "var(--theme-action-cta)",
+  "--jakawi-input-ring":
+    "color-mix(in srgb, var(--theme-action-cta) 24%, transparent)",
 } as CSSProperties & Record<string, string>;
 
 const modalTextInputClassName =
-  "h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500";
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-lg text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-action-cta)] focus:ring-1 focus:ring-[var(--theme-action-cta)]";
+
+const getModalCtaLabel = (text: string) => {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return "QUIERO VER EL SISTEMA >>";
+  }
+
+  return trimmed.includes(">>") ? trimmed : `${trimmed} >>`;
+};
 
 export function LeadCaptureModal({
   publicationId,
@@ -411,13 +421,6 @@ export function LeadCaptureModal({
               style={captureModalScopeStyle}
             >
               <div className="max-h-[calc(100vh-2rem)] overflow-y-auto">
-                <div className="absolute inset-x-0 top-0 h-1.5 bg-slate-100">
-                  <div
-                    className="h-full w-4/5 rounded-r-full bg-[var(--theme-support-validation)]"
-                    aria-hidden="true"
-                  />
-                </div>
-
                 <button
                   type="button"
                   onClick={() => handleOpenChange(false)}
@@ -429,9 +432,15 @@ export function LeadCaptureModal({
 
                 <div className="mt-2">
                   <div className="text-center text-slate-900">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--theme-support-validation)]">
-                      Paso 2 de 2: Casi terminado
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-red-600">
+                      Paso 2 de 2: ¡Casi listo!
                     </p>
+                    <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full w-[85%] rounded-full bg-[var(--theme-action-cta)]"
+                        aria-hidden="true"
+                      />
+                    </div>
                     <div
                       id="lead-capture-modal-title"
                       className="mt-4 mb-2 text-center text-slate-900"
@@ -451,6 +460,9 @@ export function LeadCaptureModal({
                         fontClassName=""
                       />
                     </div>
+                    <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm font-medium text-amber-600">
+                      ⚠️ Tu lugar está reservado por los próximos 5 minutos.
+                    </p>
                   </div>
 
                   <form
@@ -458,7 +470,7 @@ export function LeadCaptureModal({
                     onSubmit={handleSubmit}
                     noValidate
                   >
-                    <label className="grid w-full min-w-0 gap-2 text-sm font-semibold text-slate-900">
+                    <label className="grid w-full min-w-0 gap-2 text-sm font-bold text-slate-900">
                       <span>{modalConfig.nameLabel}</span>
                       <input
                         ref={nameInputRef}
@@ -477,7 +489,7 @@ export function LeadCaptureModal({
                         className={cx(
                           modalTextInputClassName,
                           nameError
-                            ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                            ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-200"
                             : "",
                         )}
                       />
@@ -502,32 +514,34 @@ export function LeadCaptureModal({
                       defaultCountry={modalConfig.defaultCountry as Country}
                       required
                       onValidityChange={setIsPhoneValid}
-                      labelClassName="text-slate-900"
-                      phoneInputClassName="border-slate-300 bg-white text-slate-900 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500 [&_.PhoneInputInput]:bg-white [&_.PhoneInputInput]:text-slate-900 [&_.PhoneInputInput]:placeholder:text-slate-400 [&_.PhoneInputCountry]:bg-white [&_.PhoneInputCountry]:text-slate-900 [&_.PhoneInputCountry>span]:text-slate-900"
+                      labelClassName="text-sm font-bold text-slate-900"
+                      phoneInputClassName="rounded-xl border-slate-200 bg-slate-50 text-slate-900 focus-within:border-[var(--theme-action-cta)] focus-within:ring-1 focus-within:ring-[var(--theme-action-cta)] [&_.PhoneInputInput]:bg-slate-50 [&_.PhoneInputInput]:px-4 [&_.PhoneInputInput]:py-3 [&_.PhoneInputInput]:text-lg [&_.PhoneInputInput]:text-slate-900 [&_.PhoneInputInput]:placeholder:text-slate-400 [&_.PhoneInputCountry]:bg-slate-50 [&_.PhoneInputCountry]:text-slate-900 [&_.PhoneInputCountry>span]:text-slate-900"
                     />
 
                     <button
                       type="submit"
                       disabled={isSubmitting}
                       className={cx(
-                        "mt-6 inline-flex w-full items-center justify-center rounded-xl px-6 py-4 text-center text-base font-bold text-white shadow-[0_18px_38px_rgba(37,99,235,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(37,99,235,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
+                        "mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[var(--theme-action-cta)] px-6 py-4 text-center text-xl font-extrabold uppercase text-white shadow-[0_10px_20px_rgba(0,0,0,0.15)] transition-all hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--theme-action-cta)]",
                         modalConfig.ctaSubtext ? "flex-col gap-1" : "",
                         isSubmitting
                           ? "cursor-not-allowed opacity-70"
                           : "cursor-pointer",
                       )}
-                      style={{
-                        backgroundColor: "var(--theme-action-cta, #2563eb)",
-                      }}
                     >
                       <FunnelButtonContent
-                        text={isSubmitting ? "Procesando..." : modalConfig.ctaText}
+                        text={
+                          isSubmitting
+                            ? "Procesando..."
+                            : getModalCtaLabel(modalConfig.ctaText)
+                        }
                         subtext={isSubmitting ? undefined : modalConfig.ctaSubtext}
                       />
                     </button>
 
-                    <p className="mt-4 text-center text-xs text-slate-500">
-                      Tu información está 100% segura y libre de spam.
+                    <p className="mt-3 flex items-center justify-center gap-1 text-xs text-slate-500">
+                      <span aria-hidden="true">🔒</span>
+                      <span>Tu información está 100% encriptada y segura.</span>
                     </p>
 
                     {submitError ? (
