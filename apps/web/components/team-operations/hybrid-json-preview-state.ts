@@ -1,4 +1,4 @@
-export const HYBRID_JSON_PREVIEW_STORAGE_KEY = "leadflow_draft_preview";
+export const HYBRID_JSON_PREVIEW_STORAGE_PREFIX = "draft_preview";
 
 export type HybridJsonPreviewDraft = {
   blocks: string;
@@ -19,6 +19,17 @@ export const emptyHybridJsonPreviewDraft: HybridJsonPreviewDraft = {
   media: {},
   theme: "default",
 };
+
+const normalizeDraftContextSegment = (value: string) =>
+  value.trim().replace(/[^a-zA-Z0-9_-]+/g, "-") || "draft";
+
+export const buildHybridJsonPreviewDraftKey = (
+  publicationId: string,
+  stepId: string,
+) =>
+  `${HYBRID_JSON_PREVIEW_STORAGE_PREFIX}_${normalizeDraftContextSegment(
+    publicationId,
+  )}_${normalizeDraftContextSegment(stepId)}`;
 
 export const sanitizeMediaMap = (value: unknown) => {
   if (!isRecord(value)) {
@@ -57,23 +68,25 @@ export const buildMediaMap = (rows: MediaRowLike[]) =>
     return accumulator;
   }, {});
 
-export const writeHybridJsonPreviewDraft = (draft: HybridJsonPreviewDraft) => {
+export const writeHybridJsonPreviewDraft = (
+  draftKey: string,
+  draft: HybridJsonPreviewDraft,
+) => {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(
-    HYBRID_JSON_PREVIEW_STORAGE_KEY,
-    JSON.stringify(draft),
-  );
+  window.localStorage.setItem(draftKey, JSON.stringify(draft));
 };
 
-export const readHybridJsonPreviewDraft = (): HybridJsonPreviewDraft => {
+export const readHybridJsonPreviewDraft = (
+  draftKey: string,
+): HybridJsonPreviewDraft => {
   if (typeof window === "undefined") {
     return emptyHybridJsonPreviewDraft;
   }
 
-  const rawDraft = window.localStorage.getItem(HYBRID_JSON_PREVIEW_STORAGE_KEY);
+  const rawDraft = window.localStorage.getItem(draftKey);
   if (!rawDraft) {
     return emptyHybridJsonPreviewDraft;
   }

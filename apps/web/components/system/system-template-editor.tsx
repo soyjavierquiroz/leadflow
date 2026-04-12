@@ -12,6 +12,7 @@ import {
   type MediaRow,
   toMediaRows,
 } from "@/components/team-operations/hybrid-json-media-editor";
+import { buildHybridJsonPreviewDraftKey } from "@/components/team-operations/hybrid-json-preview-state";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
@@ -46,6 +47,10 @@ export function SystemTemplateEditor({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadingRowIndex, setUploadingRowIndex] = useState<number | null>(null);
+  const previewDraftKey = buildHybridJsonPreviewDraftKey(
+    `system-template-${initialTemplate?.id ?? "draft"}`,
+    "root",
+  );
   const [name, setName] = useState(initialTemplate?.name ?? "");
   const [description, setDescription] = useState(initialTemplate?.description ?? "");
   const [blocksText, setBlocksText] = useState(
@@ -352,7 +357,7 @@ export function SystemTemplateEditor({
 
       <HybridJsonMediaEditor
         blocksText={blocksText}
-        previewHref="/admin/preview"
+        previewDraftKey={previewDraftKey}
         onBlocksTextChange={setBlocksText}
         parsedBlocksError={parsedBlocks.error}
         parsedBlocksCount={parsedBlocks.value?.length ?? 0}

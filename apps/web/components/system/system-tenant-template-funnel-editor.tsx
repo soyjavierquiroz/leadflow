@@ -12,6 +12,7 @@ import {
   type MediaRow,
   toMediaRows,
 } from "@/components/team-operations/hybrid-json-media-editor";
+import { buildHybridJsonPreviewDraftKey } from "@/components/team-operations/hybrid-json-preview-state";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import type { FunnelThemeId } from "@/lib/funnel-theme.types";
@@ -220,6 +221,10 @@ export function SystemTenantTemplateFunnelEditor({
     stepName: activeStepTabLabel,
     stepPath: activeStep ? `/${activeStep.slug}` : `/${activeStepTab}`,
   };
+  const previewDraftKey = buildHybridJsonPreviewDraftKey(
+    `tenant-funnel-${funnel.id}`,
+    activeStep?.id ?? activeStepTab,
+  );
 
   const updateActiveStepDraft = (patch: Partial<StepDraft>) => {
     if (activeStep) {
@@ -587,7 +592,7 @@ export function SystemTenantTemplateFunnelEditor({
       <HybridJsonMediaEditor
         key={activeStep?.id ?? activeStepTab}
         blocksText={blocksText}
-        previewHref="/admin/preview"
+        previewDraftKey={previewDraftKey}
         editorContext={editorContext}
         onBlocksTextChange={(value) => updateActiveStepDraft({ blocksText: value })}
         parsedBlocksError={parsedBlocks.error}

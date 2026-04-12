@@ -27,6 +27,7 @@ import {
   type MediaRow,
   toMediaRows,
 } from "@/components/team-operations/hybrid-json-media-editor";
+import { buildHybridJsonPreviewDraftKey } from "@/components/team-operations/hybrid-json-preview-state";
 import type { BuilderBlockDefinition } from "@/lib/blocks/catalog";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
@@ -468,6 +469,13 @@ export function TeamVslPublicationEditor({
             : buildPublicationStepPath(pathPrefix, "confirmado", false),
       }
     : null;
+  const previewDraftKey =
+    mode === "system"
+      ? buildHybridJsonPreviewDraftKey(
+          currentPublicationId ?? `system-${teamId ?? "draft"}`,
+          activeStep?.id ?? activeStepTab,
+        )
+      : null;
 
   const updateEditorDraft = (patch: Partial<StepDraft>) => {
     if (!showStepSwitcher) {
@@ -987,7 +995,7 @@ export function TeamVslPublicationEditor({
       <HybridJsonMediaEditor
         key={activeStep?.id ?? activeStepTab}
         blocksText={editorBlocksText}
-        previewHref={mode === "system" ? "/admin/preview" : null}
+        previewDraftKey={previewDraftKey}
         editorContext={editorContext}
         onBlocksTextChange={(value) => updateEditorDraft({ blocksText: value })}
         parsedBlocksError={parsedBlocks.error}

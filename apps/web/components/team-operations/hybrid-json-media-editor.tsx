@@ -5,11 +5,11 @@ import {
   useMemo,
   useState,
   type ChangeEvent,
+  type MouseEvent,
   type RefObject,
 } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
-import Link from "next/link";
 import {
   Check,
   ChevronDown,
@@ -273,8 +273,8 @@ type HybridJsonMediaEditorProps = {
   onAddMediaRow: (key?: string) => void;
   onUploadMediaClick: (index: number) => void;
   onRemoveMediaRow: (index: number) => void;
-  previewHref?: string | null;
   previewTheme?: string;
+  previewDraftKey?: string | null;
   editorContext?: {
     stepName: string;
     stepPath: string;
@@ -319,8 +319,8 @@ export function HybridJsonMediaEditor({
   onAddMediaRow,
   onUploadMediaClick,
   onRemoveMediaRow,
-  previewHref = null,
   previewTheme = "default",
+  previewDraftKey = null,
   editorContext = null,
   availableBlocks = defaultBuilderBlockDefinitions,
   routingReference = null,
@@ -344,14 +344,22 @@ export function HybridJsonMediaEditor({
     catalogBlocks[0]?.key ?? "",
   );
   const [copiedRoutingPath, setCopiedRoutingPath] = useState<string | null>(null);
-
-  useEffect(() => {
-    writeHybridJsonPreviewDraft({
+  const previewDraft = useMemo(
+    () => ({
       blocks: blocksText,
       media: buildMediaMap(mediaRows),
       theme: previewTheme,
-    });
-  }, [blocksText, mediaRows, previewTheme]);
+    }),
+    [blocksText, mediaRows, previewTheme],
+  );
+
+  useEffect(() => {
+    if (!previewDraftKey) {
+      return;
+    }
+
+    writeHybridJsonPreviewDraft(previewDraftKey, previewDraft);
+  }, [previewDraft, previewDraftKey]);
 
   useEffect(() => {
     if (catalogBlocks.length === 0) {
@@ -418,6 +426,20 @@ export function HybridJsonMediaEditor({
 
   const handleInjectScaffold = (value: string) => {
     onBlocksTextChange(value);
+  };
+
+  const handleOpenPreview = (event: MouseEvent<HTMLButtonElement>) => {
+    if (!previewDraftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    writeHybridJsonPreviewDraft(previewDraftKey, previewDraft);
+    window.open(
+      `/admin/preview?draftKey=${encodeURIComponent(previewDraftKey)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   return (
@@ -620,16 +642,15 @@ export function HybridJsonMediaEditor({
                 </span>
               </div>
 
-              {previewHref ? (
-                <Link
-                  href={previewHref}
-                  target="_blank"
-                  rel="noreferrer"
+              {previewDraftKey ? (
+                <button
+                  type="button"
+                  onClick={handleOpenPreview}
                   className={secondaryButtonClassName}
                 >
                   👀 Ver Vista Previa
-                </Link>
-                ) : null}
+                </button>
+              ) : null}
               </div>
 
             {editorContext ? (
