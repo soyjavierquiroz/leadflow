@@ -105,6 +105,8 @@ export type SmartPhoneInputProps = {
   label?: string;
   placeholder?: string;
   className?: string;
+  labelClassName?: string;
+  phoneInputClassName?: string;
   defaultCountry?: Country;
   autoDetectCountry?: boolean;
   locale?: string;
@@ -270,6 +272,8 @@ export function SmartPhoneInput({
   label,
   placeholder = "Tu número de WhatsApp",
   className,
+  labelClassName,
+  phoneInputClassName,
   defaultCountry = FALLBACK_COUNTRY,
   autoDetectCountry = true,
   locale = "es",
@@ -328,7 +332,13 @@ export function SmartPhoneInput({
   return (
     <div className={cx("w-full", className)}>
       {label ? (
-        <label htmlFor={inputId} className="mb-2 block text-sm font-semibold text-slate-800">
+        <label
+          htmlFor={inputId}
+          className={cx(
+            "mb-2 block text-sm font-semibold text-slate-800",
+            labelClassName,
+          )}
+        >
           {label}
         </label>
       ) : null}
@@ -379,6 +389,7 @@ export function SmartPhoneInput({
             : jakawiPremiumClassNames.phoneInputValid,
           disabled ? "opacity-70" : "",
           jakawiPremiumClassNames.phoneInputField,
+          phoneInputClassName,
         )}
       />
 

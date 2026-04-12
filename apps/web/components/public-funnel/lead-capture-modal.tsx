@@ -18,12 +18,10 @@ import type { Country } from "react-phone-number-input";
 import {
   FunnelButtonContent,
   RichHeadline,
-  captureModalPrimaryButtonClassName,
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import { SmartPhoneInput } from "@/components/public-funnel/smart-phone-input";
 import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-runtime-lead-submit-provider";
-import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 import {
   getOrCreateAnonymousId,
   persistSubmissionContext,
@@ -129,13 +127,15 @@ const resolveLeadCaptureRedirect = (successRedirect?: string) => {
 };
 
 const captureModalScopeStyle = {
-  "--jakawi-text-main": "var(--theme-section-capture-modal-text-color)",
-  "--jakawi-text-muted": "var(--theme-text-caption-color)",
-  "--jakawi-input-border": "var(--theme-base-divider)",
-  "--jakawi-input-focus": "var(--theme-brand-trust)",
-  "--jakawi-input-ring":
-    "color-mix(in srgb, var(--theme-brand-trust) 18%, transparent)",
+  "--jakawi-text-main": "#0f172a",
+  "--jakawi-text-muted": "#64748b",
+  "--jakawi-input-border": "#cbd5e1",
+  "--jakawi-input-focus": "#3b82f6",
+  "--jakawi-input-ring": "rgb(59 130 246 / 0.18)",
 } as CSSProperties & Record<string, string>;
+
+const modalTextInputClassName =
+  "h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500";
 
 export function LeadCaptureModal({
   publicationId,
@@ -407,127 +407,136 @@ export function LeadCaptureModal({
               aria-modal="true"
               aria-labelledby="lead-capture-modal-title"
               aria-describedby="lead-capture-modal-description"
-              className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border bg-white p-6 shadow-2xl outline-none animate-in fade-in zoom-in-95 duration-200 md:p-8 [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]"
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.2)] p-6 md:p-8 border border-slate-100 overflow-hidden outline-none animate-in fade-in zoom-in-95 duration-200"
               style={captureModalScopeStyle}
             >
-              <div className="absolute inset-x-0 top-0 h-1.5 bg-slate-100">
-                <div
-                  className="h-full w-4/5 rounded-r-full bg-[var(--theme-support-validation)]"
-                  aria-hidden="true"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleOpenChange(false)}
-                className="absolute right-4 top-4 z-10 text-2xl font-bold text-slate-400 transition hover:text-slate-800"
-                aria-label="Cerrar"
-              >
-                ✕
-              </button>
-
-              <div className="mt-2">
-                <div className="text-center">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--theme-support-validation)]">
-                    Paso 2 de 2: Casi terminado
-                  </p>
-                  <div id="lead-capture-modal-title" className="mt-4 text-center">
-                    <RichHeadline
-                      text={modalConfig.title}
-                      className="block font-headline text-2xl font-black tracking-tight [color:var(--theme-section-capture-modal-headline-color)]"
-                    />
-                  </div>
+              <div className="max-h-[calc(100vh-2rem)] overflow-y-auto">
+                <div className="absolute inset-x-0 top-0 h-1.5 bg-slate-100">
                   <div
-                    id="lead-capture-modal-description"
-                    className="mt-3 text-center leading-6 [color:var(--theme-section-capture-modal-text-color)]"
-                  >
-                    <RichHeadline
-                      text={modalConfig.description}
-                      className="block text-sm"
-                      fontClassName=""
-                    />
-                  </div>
+                    className="h-full w-4/5 rounded-r-full bg-[var(--theme-support-validation)]"
+                    aria-hidden="true"
+                  />
                 </div>
 
-                <form
-                  className="mt-6 flex w-full min-w-0 flex-col gap-4"
-                  onSubmit={handleSubmit}
-                  noValidate
+                <button
+                  type="button"
+                  onClick={() => handleOpenChange(false)}
+                  className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition-colors z-50"
+                  aria-label="Cerrar"
                 >
-                  <label className="grid w-full min-w-0 gap-2 text-sm font-semibold text-slate-800">
-                    <span>{modalConfig.nameLabel}</span>
-                    <input
-                      ref={nameInputRef}
-                      type="text"
-                      value={fullName}
-                      onChange={(event) => {
-                        setFullName(event.target.value);
+                  ✕
+                </button>
+
+                <div className="mt-2">
+                  <div className="text-center text-slate-900">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--theme-support-validation)]">
+                      Paso 2 de 2: Casi terminado
+                    </p>
+                    <div
+                      id="lead-capture-modal-title"
+                      className="mt-4 mb-2 text-center text-slate-900"
+                    >
+                      <RichHeadline
+                        text={modalConfig.title}
+                        className="block text-2xl font-extrabold tracking-tight"
+                      />
+                    </div>
+                    <div
+                      id="lead-capture-modal-description"
+                      className="mb-6 text-center text-slate-600 text-sm leading-6"
+                    >
+                      <RichHeadline
+                        text={modalConfig.description}
+                        className="block"
+                        fontClassName=""
+                      />
+                    </div>
+                  </div>
+
+                  <form
+                    className="flex w-full min-w-0 flex-col gap-4"
+                    onSubmit={handleSubmit}
+                    noValidate
+                  >
+                    <label className="grid w-full min-w-0 gap-2 text-sm font-semibold text-slate-900">
+                      <span>{modalConfig.nameLabel}</span>
+                      <input
+                        ref={nameInputRef}
+                        type="text"
+                        value={fullName}
+                        onChange={(event) => {
+                          setFullName(event.target.value);
+                          setSubmitError(null);
+                        }}
+                        placeholder={modalConfig.namePlaceholder}
+                        autoComplete="name"
+                        required
+                        minLength={2}
+                        aria-invalid={Boolean(nameError)}
+                        aria-describedby={nameError ? nameErrorId : undefined}
+                        className={cx(
+                          modalTextInputClassName,
+                          nameError
+                            ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                            : "",
+                        )}
+                      />
+                    </label>
+
+                    {nameError ? (
+                      <p id={nameErrorId} className="-mt-2 text-xs text-red-600">
+                        {nameError}
+                      </p>
+                    ) : null}
+
+                    <SmartPhoneInput
+                      label={modalConfig.phoneLabel}
+                      value={phone}
+                      onChange={(nextPhone) => {
+                        setPhone(nextPhone);
                         setSubmitError(null);
                       }}
-                      placeholder={modalConfig.namePlaceholder}
-                      autoComplete="name"
+                      placeholder={modalConfig.phonePlaceholder}
+                      error={phoneError ?? undefined}
+                      invalidMessage={modalConfig.phoneErrorMessage}
+                      defaultCountry={modalConfig.defaultCountry as Country}
                       required
-                      minLength={2}
-                      aria-invalid={Boolean(nameError)}
-                      aria-describedby={nameError ? nameErrorId : undefined}
+                      onValidityChange={setIsPhoneValid}
+                      labelClassName="text-slate-900"
+                      phoneInputClassName="border-slate-300 bg-white text-slate-900 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500 [&_.PhoneInputInput]:bg-white [&_.PhoneInputInput]:text-slate-900 [&_.PhoneInputInput]:placeholder:text-slate-400 [&_.PhoneInputCountry]:bg-white [&_.PhoneInputCountry]:text-slate-900 [&_.PhoneInputCountry>span]:text-slate-900"
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
                       className={cx(
-                        jakawiPremiumClassNames.compactInput,
-                        nameError
-                          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200"
-                          : "",
+                        "mt-6 inline-flex w-full items-center justify-center rounded-xl px-6 py-4 text-center text-base font-bold text-white shadow-[0_18px_38px_rgba(37,99,235,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(37,99,235,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
+                        modalConfig.ctaSubtext ? "flex-col gap-1" : "",
+                        isSubmitting
+                          ? "cursor-not-allowed opacity-70"
+                          : "cursor-pointer",
                       )}
-                    />
-                  </label>
+                      style={{
+                        backgroundColor: "var(--theme-action-cta, #2563eb)",
+                      }}
+                    >
+                      <FunnelButtonContent
+                        text={isSubmitting ? "Procesando..." : modalConfig.ctaText}
+                        subtext={isSubmitting ? undefined : modalConfig.ctaSubtext}
+                      />
+                    </button>
 
-                  {nameError ? (
-                    <p id={nameErrorId} className="-mt-2 text-xs text-red-600">
-                      {nameError}
+                    <p className="mt-4 text-center text-xs text-slate-500">
+                      Tu información está 100% segura y libre de spam.
                     </p>
-                  ) : null}
 
-                  <SmartPhoneInput
-                    label={modalConfig.phoneLabel}
-                    value={phone}
-                    onChange={(nextPhone) => {
-                      setPhone(nextPhone);
-                      setSubmitError(null);
-                    }}
-                    placeholder={modalConfig.phonePlaceholder}
-                    error={phoneError ?? undefined}
-                    invalidMessage={modalConfig.phoneErrorMessage}
-                    defaultCountry={modalConfig.defaultCountry as Country}
-                    required
-                    onValidityChange={setIsPhoneValid}
-                  />
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className={cx(
-                      captureModalPrimaryButtonClassName,
-                      "mt-6 w-full",
-                      modalConfig.ctaSubtext ? "flex-col items-center justify-center" : "",
-                      isSubmitting
-                        ? "cursor-not-allowed opacity-70"
-                        : "cursor-pointer",
-                    )}
-                  >
-                    <FunnelButtonContent
-                      text={isSubmitting ? "Procesando..." : modalConfig.ctaText}
-                      subtext={isSubmitting ? undefined : modalConfig.ctaSubtext}
-                    />
-                  </button>
-
-                  <p className="mt-4 text-center text-xs [color:var(--theme-section-capture-modal-text-color)] opacity-60">
-                    🔒 Tu información está 100% segura y libre de spam.
-                  </p>
-
-                  {submitError ? (
-                    <p className="text-center text-sm text-rose-600">
-                      {submitError}
-                    </p>
-                  ) : null}
-                </form>
+                    {submitError ? (
+                      <p className="text-center text-sm text-rose-600">
+                        {submitError}
+                      </p>
+                    ) : null}
+                  </form>
+                </div>
               </div>
             </div>
           </div>,
