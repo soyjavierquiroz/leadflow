@@ -1,5 +1,7 @@
 "use client";
 
+import { Fragment, useEffect, useState } from "react";
+
 import { LeadCaptureModal } from "@/components/public-funnel/lead-capture-modal";
 import { useLeadCaptureModal } from "@/components/public-funnel/lead-capture-context";
 import { resolveLeadCaptureModalConfig } from "@/components/public-funnel/lead-capture-modal-config";
@@ -22,7 +24,8 @@ export function PublicLeadCaptureModalHost({
   blocks,
 }: PublicLeadCaptureModalHostProps) {
   const leadCapture = useLeadCaptureModal();
-  const isOpen = leadCapture?.isOpen ?? false;
+  const [isNativeOpen, setIsNativeOpen] = useState(false);
+  const isOpen = isNativeOpen || leadCapture?.isOpen || false;
   const openModal = leadCapture?.openModal;
   const closeModal = leadCapture?.closeModal;
   const leadCaptureConfigBlock =
@@ -38,32 +41,51 @@ export function PublicLeadCaptureModalHost({
     : null;
   const modalConfig = resolveLeadCaptureModalConfig(leadCaptureConfigBlock);
 
-  if (!leadCapture || !modalConfig) {
+  useEffect(() => {
+    const handleOpen = () => {
+      console.log("Evento global recibido. Forzando apertura.");
+      setIsNativeOpen(true);
+    };
+
+    window.addEventListener("leadflow:open_modal", handleOpen);
+    return () => window.removeEventListener("leadflow:open_modal", handleOpen);
+  }, []);
+
+  if (!modalConfig) {
     return null;
   }
 
   console.log("Renderizando ModalHost. Estado isOpen:", isOpen);
 
   return (
-    <LeadCaptureModal
-      publicationId={runtime.publication.id}
-      currentStepId={runtime.currentStep.id}
-      triggerLabel={modalConfig.ctaText}
-      triggerClassName="sr-only"
-      triggerAction="open_lead_capture_modal"
-      modalConfig={modalConfig}
-      sourceChannel={normalizedLeadCaptureFormBlock?.settings.sourceChannel}
-      tags={normalizedLeadCaptureFormBlock?.settings.tags}
-      renderTrigger={false}
-      open={isOpen}
-      onOpenChange={(nextOpen) => {
-        if (nextOpen) {
-          openModal?.();
-          return;
-        }
+    <Fragment>
+      <LeadCaptureModal
+        publicationId={runtime.publication.id}
+        currentStepId={runtime.currentStep.id}
+        triggerLabel={modalConfig.ctaText}
+        triggerClassName="sr-only"
+        triggerAction="open_lead_capture_modal"
+        modalConfig={modalConfig}
+        sourceChannel={normalizedLeadCaptureFormBlock?.settings.sourceChannel}
+        tags={normalizedLeadCaptureFormBlock?.settings.tags}
+        renderTrigger={false}
+        open={isOpen}
+        onOpenChange={(nextOpen) => {
+          setIsNativeOpen(nextOpen);
 
-        closeModal?.();
-      }}
-    />
+          if (nextOpen) {
+            openModal?.();
+            return;
+          }
+
+          closeModal?.();
+        }}
+      />
+      {isNativeOpen && (
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-red-500/80 text-4xl font-bold text-white">
+          ¡EL ESTADO ESTÁ TRUE, EL MODAL DEBE VERSE AQUÍ!
+        </div>
+      )}
+    </Fragment>
   );
 }

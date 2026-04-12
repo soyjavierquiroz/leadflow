@@ -148,9 +148,7 @@ export function LeadCaptureModal({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const nameInputRef = useRef<HTMLInputElement | null>(null);
-  const portalAnchorRef = useRef<HTMLDivElement | null>(null);
   const [internalOpen, setInternalOpen] = useState(false);
-  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [isPhoneValid, setIsPhoneValid] = useState(false);
@@ -200,13 +198,6 @@ export function LeadCaptureModal({
       window.clearTimeout(timer);
     };
   }, [open]);
-
-  useEffect(() => {
-    setPortalHost(
-      portalAnchorRef.current?.closest<HTMLElement>("[data-funnel-theme]") ??
-        document.body,
-    );
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -373,11 +364,7 @@ export function LeadCaptureModal({
         </Dialog.Trigger>
       ) : null}
 
-      <div ref={portalAnchorRef} aria-hidden="true" className="hidden" />
-
-      <Dialog.Portal
-        container={portalHost ?? portalAnchorRef.current ?? undefined}
-      >
+      <Dialog.Portal>
         <Dialog.Overlay
           className="fixed inset-0 z-[100000]"
           style={{
@@ -386,7 +373,7 @@ export function LeadCaptureModal({
           }}
         />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-[100001] max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto border outline-none [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]"
+          className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] z-[100001] max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto border outline-none [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]"
           style={captureModalScopeStyle}
         >
           <div className="relative px-6 pb-6 pt-5 md:px-7 md:pb-7">

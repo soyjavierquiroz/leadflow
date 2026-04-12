@@ -54,6 +54,9 @@ export function TrackedCta({
     });
 
     if (action === "open_lead_capture_modal") {
+      event.preventDefault();
+      window.dispatchEvent(new Event("leadflow:open_modal"));
+
       if (!leadCaptureModal) {
         console.warn(
           "Lead capture modal context no disponible para este CTA.",
@@ -61,7 +64,6 @@ export function TrackedCta({
         return;
       }
 
-      event.preventDefault();
       leadCaptureModal.openModal();
     }
   };
