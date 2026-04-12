@@ -147,6 +147,15 @@ type HybridPublicationDetail = {
   };
 };
 
+type FunnelStepHistoryVersion = {
+  id: string;
+  stepId: string;
+  blocksJson: unknown;
+  settingsJson: unknown;
+  createdAt: string;
+  createdBy: string | null;
+};
+
 type StepDraft = {
   blocksText: string;
   mediaRows: MediaRow[];
@@ -371,6 +380,14 @@ export function TeamVslPublicationEditor({
     captura: createEmptyStepDraft(),
     confirmado: createEmptyStepDraft(),
   });
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(
+    null,
+  );
+  const [historyVersions, setHistoryVersions] = useState<FunnelStepHistoryVersion[]>(
+    [],
+  );
   const [activeStepTab, setActiveStepTab] = useState<EditorStepTabKey>("captura");
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
@@ -476,6 +493,9 @@ export function TeamVslPublicationEditor({
           activeStep?.id ?? activeStepTab,
         )
       : null;
+  const activeStepHistoryTitle = activeStep
+    ? `${activeStepTabLabel} (${activeStep.slug})`
+    : activeStepTabLabel;
 
   const updateEditorDraft = (patch: Partial<StepDraft>) => {
     if (!showStepSwitcher) {
@@ -525,6 +545,13 @@ export function TeamVslPublicationEditor({
 
     setSelectedDomainId(activeDomains[0].id);
   }, [activeDomains, selectedDomainId]);
+
+  useEffect(() => {
+    setIsHistoryOpen(false);
+    setIsHistoryLoading(false);
+    setHistoryErrorMessage(null);
+    setHistoryVersions([]);
+  }, [activeStep?.id, currentPublicationId]);
 
   const parsedBlocks = useMemo(() => {
     try {
@@ -637,6 +664,50 @@ export function TeamVslPublicationEditor({
     updateEditorDraft({
       mediaRows: [...editorMediaRows, { key, value: "" }],
     });
+  };
+
+  const handleOpenHistory = () => {
+    if (!currentPublicationId || !activeStep) {
+      return;
+    }
+
+    setIsHistoryOpen(true);
+    setIsHistoryLoading(true);
+    setHistoryErrorMessage(null);
+
+    void teamOperationRequest<FunnelStepHistoryVersion[]>(
+      `${publicationApiBasePath}/${currentPublicationId}/steps/${activeStep.id}/history`,
+      { method: "GET" },
+    )
+      .then((payload) => {
+        setHistoryVersions(Array.isArray(payload) ? payload : []);
+      })
+      .catch((error) => {
+        setHistoryErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No pudimos cargar el historial del paso.",
+        );
+      })
+      .finally(() => setIsHistoryLoading(false));
+  };
+
+  const handleRestoreHistoryVersion = (historyId: string) => {
+    const version = historyVersions.find((entry) => entry.id === historyId);
+    if (!version) {
+      return;
+    }
+
+    updateEditorDraft({
+      blocksText: toBlocksText(version.blocksJson),
+    });
+    setIsHistoryOpen(false);
+    setSuccessMessage(
+      `Versión previa cargada en el borrador de ${
+        activeStepTabLabel.toLowerCase()
+      }. Revisa el JSON y guarda cuando estés listo.`,
+    );
+    setErrorMessage(null);
   };
 
   const handleUploadMediaClick = (index: number) => {
@@ -1018,6 +1089,20 @@ export function TeamVslPublicationEditor({
         }
         previewTheme={selectedThemeId}
         availableBlocks={availableBlocks}
+        historyPanel={
+          currentPublicationId && activeStep
+            ? {
+                isOpen: isHistoryOpen,
+                isLoading: isHistoryLoading,
+                errorMessage: historyErrorMessage,
+                title: activeStepHistoryTitle,
+                versions: historyVersions,
+                onOpen: handleOpenHistory,
+                onClose: () => setIsHistoryOpen(false),
+                onRestore: handleRestoreHistoryVersion,
+              }
+            : null
+        }
         routingReference={routingReference}
         stepSwitcher={
           showStepSwitcher

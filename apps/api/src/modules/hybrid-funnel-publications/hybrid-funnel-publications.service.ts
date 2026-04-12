@@ -78,6 +78,15 @@ type HybridPublicationDetail = {
   };
 };
 
+type FunnelStepHistoryEntry = {
+  id: string;
+  stepId: string;
+  blocksJson: JsonValue;
+  settingsJson: JsonValue;
+  createdAt: Date;
+  createdBy: string | null;
+};
+
 @Injectable()
 export class HybridFunnelPublicationsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -88,6 +97,15 @@ export class HybridFunnelPublicationsService {
   ): Promise<HybridPublicationDetail> {
     const scope = await this.resolveSystemScope(teamId);
     return this.findForTeam(scope, publicationId);
+  }
+
+  async listStepHistoryForSystemTenant(
+    teamId: string,
+    publicationId: string,
+    stepId: string,
+  ): Promise<FunnelStepHistoryEntry[]> {
+    const scope = await this.resolveSystemScope(teamId);
+    return this.listStepHistoryForTeam(scope, publicationId, stepId);
   }
 
   async findForTeam(
@@ -170,6 +188,47 @@ export class HybridFunnelPublicationsService {
         publication.funnelInstance.name,
       ),
     };
+  }
+
+  async listStepHistoryForTeam(
+    scope: TeamScope,
+    publicationId: string,
+    stepId: string,
+  ): Promise<FunnelStepHistoryEntry[]> {
+    const step = await this.prisma.funnelStep.findFirst({
+      where: {
+        id: stepId,
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        funnelInstance: {
+          is: {
+            publications: {
+              some: {
+                id: publicationId,
+                workspaceId: scope.workspaceId,
+                teamId: scope.teamId,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        history: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 20,
+        },
+      },
+    });
+
+    if (!step) {
+      throw new NotFoundException({
+        code: 'HYBRID_PUBLICATION_STEP_NOT_FOUND',
+        message:
+          'The requested funnel step was not found for the selected publication.',
+      });
+    }
+
+    return step.history.map((entry) => this.mapStepHistoryEntry(entry));
   }
 
   async createForTeam(
@@ -375,6 +434,7 @@ export class HybridFunnelPublicationsService {
     scope: TeamScope,
     publicationId: string,
     dto: UpdateTeamHybridFunnelPublicationDto,
+    createdBy: string | null = null,
   ): Promise<HybridPublicationDetail> {
     const existing = await this.prisma.funnelPublication.findFirst({
       where: {
@@ -559,6 +619,13 @@ export class HybridFunnelPublicationsService {
 
         ensuredTargetStep = createdConfirmationStep;
       } else {
+        await this.snapshotStepHistory(
+          tx,
+          targetStep.id,
+          targetStep.blocksJson as JsonValue,
+          targetStep.settingsJson as JsonValue,
+          createdBy,
+        );
         ensuredTargetStep = await tx.funnelStep.update({
           where: { id: targetStep.id },
           data: {
@@ -581,6 +648,13 @@ export class HybridFunnelPublicationsService {
       }
 
       if (targetStep.id !== entryStep.id && (dto.seoTitle !== undefined || dto.metaDescription !== undefined)) {
+        await this.snapshotStepHistory(
+          tx,
+          entryStep.id,
+          entryStep.blocksJson as JsonValue,
+          entryStep.settingsJson as JsonValue,
+          createdBy,
+        );
         await tx.funnelStep.update({
           where: { id: entryStep.id },
           data: {
@@ -688,9 +762,10 @@ export class HybridFunnelPublicationsService {
     teamId: string,
     publicationId: string,
     dto: UpdateTeamHybridFunnelPublicationDto,
+    createdBy: string | null = null,
   ): Promise<HybridPublicationDetail> {
     const scope = await this.resolveSystemScope(teamId);
-    return this.updateForTeam(scope, publicationId, dto);
+    return this.updateForTeam(scope, publicationId, dto, createdBy);
   }
 
   private normalizeEditorInput(input: {
@@ -787,6 +862,60 @@ export class HybridFunnelPublicationsService {
       mediaMap: step.mediaMap as JsonValue,
       settingsJson: step.settingsJson as JsonValue,
     };
+  }
+
+  private mapStepHistoryEntry(entry: {
+    id: string;
+    stepId: string;
+    blocksJson: unknown;
+    settingsJson: unknown;
+    createdAt: Date;
+    createdBy: string | null;
+  }): FunnelStepHistoryEntry {
+    return {
+      id: entry.id,
+      stepId: entry.stepId,
+      blocksJson: entry.blocksJson as JsonValue,
+      settingsJson: entry.settingsJson as JsonValue,
+      createdAt: entry.createdAt,
+      createdBy: entry.createdBy,
+    };
+  }
+
+  private async snapshotStepHistory(
+    tx: Prisma.TransactionClient,
+    stepId: string,
+    blocksJson: JsonValue,
+    settingsJson: JsonValue,
+    createdBy: string | null,
+  ) {
+    await tx.funnelStepHistory.create({
+      data: {
+        stepId,
+        blocksJson: toInputJson(blocksJson),
+        settingsJson: toInputJson(settingsJson),
+        createdBy,
+      },
+    });
+
+    const versionsToKeep = await tx.funnelStepHistory.findMany({
+      where: { stepId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: 20,
+      select: { id: true },
+    });
+
+    if (versionsToKeep.length === 0) {
+      return;
+    }
+
+    await tx.funnelStepHistory.deleteMany({
+      where: {
+        id: {
+          in: versionsToKeep.map((entry) => entry.id),
+        },
+      },
+    });
   }
 
   private resolveRequestedStep<

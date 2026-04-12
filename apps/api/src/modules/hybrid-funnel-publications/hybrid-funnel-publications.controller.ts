@@ -29,6 +29,23 @@ export class HybridFunnelPublicationsController {
     );
   }
 
+  @Get(':id/steps/:stepId/history')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  listStepHistory(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') publicationId: string,
+    @Param('stepId') stepId: string,
+  ) {
+    return this.hybridFunnelPublicationsService.listStepHistoryForTeam(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+      },
+      publicationId,
+      stepId,
+    );
+  }
+
   @Post()
   @RequireRoles(UserRole.TEAM_ADMIN)
   create(
@@ -58,6 +75,7 @@ export class HybridFunnelPublicationsController {
       },
       publicationId,
       dto,
+      user.email,
     );
   }
 }

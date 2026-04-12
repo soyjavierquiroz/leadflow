@@ -55,6 +55,15 @@ type StepDraft = {
   settingsJson: JsonValue;
 };
 
+type FunnelStepHistoryVersion = {
+  id: string;
+  stepId: string;
+  blocksJson: JsonValue;
+  settingsJson: JsonValue;
+  createdAt: string;
+  createdBy: string | null;
+};
+
 const createEmptyStepDraft = (): StepDraft => ({
   blocksText: defaultBlocksSeed,
   mediaRows: toMediaRows(undefined),
@@ -153,6 +162,14 @@ export function SystemTenantTemplateFunnelEditor({
     captura: createEmptyStepDraft(),
     confirmado: createEmptyStepDraft(),
   });
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(
+    null,
+  );
+  const [historyVersions, setHistoryVersions] = useState<FunnelStepHistoryVersion[]>(
+    [],
+  );
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
 
@@ -221,10 +238,20 @@ export function SystemTenantTemplateFunnelEditor({
     stepName: activeStepTabLabel,
     stepPath: activeStep ? `/${activeStep.slug}` : `/${activeStepTab}`,
   };
+
+  useEffect(() => {
+    setIsHistoryOpen(false);
+    setIsHistoryLoading(false);
+    setHistoryErrorMessage(null);
+    setHistoryVersions([]);
+  }, [activeStep?.id]);
   const previewDraftKey = buildHybridJsonPreviewDraftKey(
     `tenant-funnel-${funnel.id}`,
     activeStep?.id ?? activeStepTab,
   );
+  const activeStepHistoryTitle = activeStep
+    ? `${activeStepTabLabel} (${activeStep.slug})`
+    : activeStepTabLabel;
 
   const updateActiveStepDraft = (patch: Partial<StepDraft>) => {
     if (activeStep) {
@@ -330,6 +357,50 @@ export function SystemTenantTemplateFunnelEditor({
   const handleUploadMediaClick = (index: number) => {
     pendingMediaUploadIndexRef.current = index;
     mediaUploadInputRef.current?.click();
+  };
+
+  const handleOpenHistory = () => {
+    if (!activeStep) {
+      return;
+    }
+
+    setIsHistoryOpen(true);
+    setIsHistoryLoading(true);
+    setHistoryErrorMessage(null);
+
+    void authenticatedOperationRequest<FunnelStepHistoryVersion[]>(
+      `/system/tenants/${encodeURIComponent(tenant.id)}/funnels/${encodeURIComponent(funnel.id)}/steps/${encodeURIComponent(activeStep.id)}/history`,
+      { method: "GET" },
+    )
+      .then((payload) => {
+        setHistoryVersions(Array.isArray(payload) ? payload : []);
+      })
+      .catch((error) => {
+        setHistoryErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No pudimos cargar el historial del paso.",
+        );
+      })
+      .finally(() => setIsHistoryLoading(false));
+  };
+
+  const handleRestoreHistoryVersion = (historyId: string) => {
+    const version = historyVersions.find((entry) => entry.id === historyId);
+    if (!version) {
+      return;
+    }
+
+    updateActiveStepDraft({
+      blocksText: toBlocksText(version.blocksJson),
+    });
+    setIsHistoryOpen(false);
+    setSuccessMessage(
+      `Versión previa cargada en el borrador de ${
+        activeStepTabLabel.toLowerCase()
+      }. Guarda cuando confirmes el rollback.`,
+    );
+    setErrorMessage(null);
   };
 
   const handleMediaUploadChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -614,6 +685,20 @@ export function SystemTenantTemplateFunnelEditor({
           })
         }
         previewTheme={selectedThemeId}
+        historyPanel={
+          activeStep
+            ? {
+                isOpen: isHistoryOpen,
+                isLoading: isHistoryLoading,
+                errorMessage: historyErrorMessage,
+                title: activeStepHistoryTitle,
+                versions: historyVersions,
+                onOpen: handleOpenHistory,
+                onClose: () => setIsHistoryOpen(false),
+                onRestore: handleRestoreHistoryVersion,
+              }
+            : null
+        }
         stepSwitcher={{
           activeKey: activeStepTab,
           badge: activeStep?.slug ?? activeStepTab,

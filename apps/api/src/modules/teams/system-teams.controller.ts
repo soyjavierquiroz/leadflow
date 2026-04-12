@@ -8,6 +8,8 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
 import type { UpdateSystemTenantFunnelStepDto } from './dto/update-system-tenant-funnel-step.dto';
@@ -68,6 +70,7 @@ export class SystemTeamsController {
 
   @Patch('tenants/:id/funnels/:funnelId/steps/:stepId')
   updateTenantFunnelStep(
+    @CurrentAuthUser() user: AuthenticatedUser | undefined,
     @Param('id') id: string,
     @Param('funnelId') funnelId: string,
     @Param('stepId') stepId: string,
@@ -78,6 +81,20 @@ export class SystemTeamsController {
       funnelId,
       stepId,
       dto,
+      user?.email ?? null,
+    );
+  }
+
+  @Get('tenants/:id/funnels/:funnelId/steps/:stepId/history')
+  listTenantFunnelStepHistory(
+    @Param('id') id: string,
+    @Param('funnelId') funnelId: string,
+    @Param('stepId') stepId: string,
+  ) {
+    return this.teamsService.listSystemTenantFunnelStepHistory(
+      id,
+      funnelId,
+      stepId,
     );
   }
 

@@ -15,12 +15,15 @@ import {
   ChevronDown,
   Copy,
   FileJson,
+  History,
   ImagePlus,
   Link2,
   Plus,
+  RotateCcw,
   Sparkles,
   Trash2,
 } from "lucide-react";
+import { ModalShell } from "@/components/team-operations/modal-shell";
 import {
   buildMediaMap,
   writeHybridJsonPreviewDraft,
@@ -302,6 +305,20 @@ type HybridJsonMediaEditorProps = {
     warningText?: string | null;
     onChange: (key: string) => void;
   } | null;
+  historyPanel?: {
+    isOpen: boolean;
+    isLoading: boolean;
+    errorMessage?: string | null;
+    title?: string;
+    versions: Array<{
+      id: string;
+      createdAt: string;
+      createdBy?: string | null;
+    }>;
+    onOpen: () => void;
+    onClose: () => void;
+    onRestore: (historyId: string) => void;
+  } | null;
 };
 
 export function HybridJsonMediaEditor({
@@ -325,6 +342,7 @@ export function HybridJsonMediaEditor({
   availableBlocks = defaultBuilderBlockDefinitions,
   routingReference = null,
   stepSwitcher = null,
+  historyPanel = null,
 }: HybridJsonMediaEditorProps) {
   const catalogBlocks = useMemo(() => {
     const merged = new Map<string, BuilderBlockDefinition>();
@@ -642,14 +660,29 @@ export function HybridJsonMediaEditor({
                 </span>
               </div>
 
-              {previewDraftKey ? (
-                <button
-                  type="button"
-                  onClick={handleOpenPreview}
-                  className={secondaryButtonClassName}
-                >
-                  👀 Ver Vista Previa
-                </button>
+              {historyPanel || previewDraftKey ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  {historyPanel ? (
+                    <button
+                      type="button"
+                      onClick={historyPanel.onOpen}
+                      className={secondaryButtonClassName}
+                    >
+                      <History className="h-4 w-4" />
+                      ⏳ Historial de Versiones
+                    </button>
+                  ) : null}
+
+                  {previewDraftKey ? (
+                  <button
+                    type="button"
+                    onClick={handleOpenPreview}
+                    className={secondaryButtonClassName}
+                  >
+                    👀 Ver Vista Previa
+                  </button>
+                  ) : null}
+                </div>
               ) : null}
               </div>
 
@@ -968,6 +1001,65 @@ export function HybridJsonMediaEditor({
           </div>
         </details>
       </div>
+
+      {historyPanel?.isOpen ? (
+        <ModalShell
+          eyebrow="Historial del Paso"
+          title={historyPanel.title ?? "Historial de versiones"}
+          description="Restaura cualquier snapshot al borrador actual. No guardamos en base de datos hasta que confirmes con el botón final del editor."
+          onClose={historyPanel.onClose}
+        >
+          {historyPanel.isLoading ? (
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-6 text-sm text-slate-600">
+              Cargando versiones guardadas...
+            </div>
+          ) : historyPanel.errorMessage ? (
+            <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 px-5 py-6 text-sm text-rose-700">
+              {historyPanel.errorMessage}
+            </div>
+          ) : historyPanel.versions.length === 0 ? (
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-6 text-sm text-slate-600">
+              Todavía no hay versiones previas guardadas para este paso.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {historyPanel.versions.map((version, index) => {
+                const createdAtLabel = new Date(version.createdAt).toLocaleString();
+
+                return (
+                  <div
+                    key={version.id}
+                    className="flex flex-col gap-3 rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-950">
+                        {`Versión ${historyPanel.versions.length - index}`}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {createdAtLabel}
+                      </p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
+                        {version.createdBy?.trim()
+                          ? `Autor: ${version.createdBy}`
+                          : "Autor no disponible"}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => historyPanel.onRestore(version.id)}
+                      className={secondaryButtonClassName}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Restaurar
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </ModalShell>
+      ) : null}
     </>
   );
 }

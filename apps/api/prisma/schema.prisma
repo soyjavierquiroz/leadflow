@@ -620,9 +620,22 @@ model FunnelStep {
   workspace        Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team             Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
   funnelInstance   FunnelInstance @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
+  history          FunnelStepHistory[]
 
   @@unique([funnelInstanceId, position])
   @@unique([funnelInstanceId, slug])
+}
+
+model FunnelStepHistory {
+  id           String     @id @default(uuid())
+  stepId       String
+  blocksJson   Json
+  settingsJson Json
+  createdAt    DateTime   @default(now())
+  createdBy    String?
+  step         FunnelStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([stepId, createdAt])
 }
 
 model FunnelPublication {

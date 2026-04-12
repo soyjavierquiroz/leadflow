@@ -158,6 +158,15 @@ export type SystemTenantFunnelStepMutationResult = {
   step: SystemTenantFunnelStepSnapshot;
 };
 
+export type SystemTenantFunnelStepHistoryEntry = {
+  id: string;
+  stepId: string;
+  blocksJson: JsonValue;
+  settingsJson: JsonValue;
+  createdAt: string;
+  createdBy: string | null;
+};
+
 type TeamScope = {
   workspaceId: string;
   teamId: string;
@@ -556,6 +565,7 @@ export class TeamsService {
     funnelId: string,
     stepId: string,
     dto: UpdateSystemTenantFunnelStepDto,
+    createdBy: string | null = null,
   ): Promise<SystemTenantFunnelStepMutationResult> {
     const tenantId = sanitizeRequiredText(id, 'id');
     const normalizedFunnelId = sanitizeRequiredText(funnelId, 'funnelId');
@@ -619,6 +629,13 @@ export class TeamsService {
           description,
         },
       });
+      await this.snapshotSystemTenantStepHistory(
+        tx,
+        existingStep.id,
+        existingStep.blocksJson as JsonValue,
+        existingStep.settingsJson as JsonValue,
+        createdBy,
+      );
       const step = await tx.funnelStep.update({
         where: {
           id: existingStep.id,
@@ -637,6 +654,47 @@ export class TeamsService {
       funnel: mapFunnelRecord(result.funnel),
       step: this.mapSystemTenantFunnelStep(result.step),
     };
+  }
+
+  async listSystemTenantFunnelStepHistory(
+    id: string,
+    funnelId: string,
+    stepId: string,
+  ): Promise<SystemTenantFunnelStepHistoryEntry[]> {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const normalizedFunnelId = sanitizeRequiredText(funnelId, 'funnelId');
+    const normalizedStepId = sanitizeRequiredText(stepId, 'stepId');
+
+    await this.assertSystemTenantExists(tenantId);
+
+    const step = await this.prisma.funnelStep.findFirst({
+      where: {
+        id: normalizedStepId,
+        teamId: tenantId,
+        funnelInstance: {
+          is: {
+            teamId: tenantId,
+            legacyFunnelId: normalizedFunnelId,
+          },
+        },
+      },
+      include: {
+        history: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 20,
+        },
+      },
+    });
+
+    if (!step) {
+      throw new NotFoundException({
+        code: 'TENANT_FUNNEL_STEP_NOT_FOUND',
+        message:
+          'The requested funnel step was not found for the selected tenant funnel.',
+      });
+    }
+
+    return step.history.map((entry) => this.mapSystemTenantFunnelStepHistory(entry));
   }
 
   async createSystemTenant(dto: CreateSystemTenantDto) {
@@ -1317,6 +1375,60 @@ export class TeamsService {
       createdAt: toIso(step.createdAt),
       updatedAt: toIso(step.updatedAt),
     };
+  }
+
+  private mapSystemTenantFunnelStepHistory(entry: {
+    id: string;
+    stepId: string;
+    blocksJson: unknown;
+    settingsJson: unknown;
+    createdAt: Date;
+    createdBy: string | null;
+  }): SystemTenantFunnelStepHistoryEntry {
+    return {
+      id: entry.id,
+      stepId: entry.stepId,
+      blocksJson: this.cloneJsonValue(entry.blocksJson as JsonValue),
+      settingsJson: this.cloneJsonValue(entry.settingsJson as JsonValue),
+      createdAt: toIso(entry.createdAt),
+      createdBy: entry.createdBy,
+    };
+  }
+
+  private async snapshotSystemTenantStepHistory(
+    tx: Prisma.TransactionClient,
+    stepId: string,
+    blocksJson: JsonValue,
+    settingsJson: JsonValue,
+    createdBy: string | null,
+  ) {
+    await tx.funnelStepHistory.create({
+      data: {
+        stepId,
+        blocksJson: toInputJson(blocksJson),
+        settingsJson: toInputJson(settingsJson),
+        createdBy,
+      },
+    });
+
+    const obsoleteVersions = await tx.funnelStepHistory.findMany({
+      where: { stepId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: 20,
+      select: { id: true },
+    });
+
+    if (obsoleteVersions.length === 0) {
+      return;
+    }
+
+    await tx.funnelStepHistory.deleteMany({
+      where: {
+        id: {
+          in: obsoleteVersions.map((entry) => entry.id),
+        },
+      },
+    });
   }
 
   private async requireSystemTenantFunnelRecord(tenantId: string, funnelId: string) {
