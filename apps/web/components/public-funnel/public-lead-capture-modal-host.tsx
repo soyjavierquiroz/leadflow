@@ -63,6 +63,7 @@ export function PublicLeadCaptureModalHost({
         triggerClassName="sr-only"
         triggerAction="open_lead_capture_modal"
         modalConfig={modalConfig}
+        runtime={runtime}
         sourceChannel={normalizedLeadCaptureFormBlock?.settings.sourceChannel}
         tags={normalizedLeadCaptureFormBlock?.settings.tags}
         renderTrigger={false}
