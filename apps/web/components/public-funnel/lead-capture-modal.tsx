@@ -55,7 +55,7 @@ type LeadCaptureModalProps = {
   sourceChannel?: string | null;
   tags?: string[];
   renderTrigger?: boolean;
-  isOpen?: boolean;
+  open?: boolean;
   onOpenChange?: (nextOpen: boolean) => void;
 };
 
@@ -142,14 +142,15 @@ export function LeadCaptureModal({
   sourceChannel,
   tags,
   renderTrigger = true,
-  isOpen,
+  open: controlledOpen,
   onOpenChange,
 }: LeadCaptureModalProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const nameInputRef = useRef<HTMLInputElement | null>(null);
-  const portalContainerRef = useRef<HTMLDivElement | null>(null);
+  const portalAnchorRef = useRef<HTMLDivElement | null>(null);
   const [internalOpen, setInternalOpen] = useState(false);
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [isPhoneValid, setIsPhoneValid] = useState(false);
@@ -171,7 +172,7 @@ export function LeadCaptureModal({
     isPhoneValid,
     modalConfig.phoneErrorMessage,
   );
-  const open = isOpen ?? internalOpen;
+  const open = controlledOpen ?? internalOpen;
   const nameError = hasAttemptedSubmit ? currentNameError : null;
   const phoneError = hasAttemptedSubmit ? currentPhoneError : null;
   const isFormReady = !currentNameError && !currentPhoneError;
@@ -199,6 +200,13 @@ export function LeadCaptureModal({
       window.clearTimeout(timer);
     };
   }, [open]);
+
+  useEffect(() => {
+    setPortalHost(
+      portalAnchorRef.current?.closest<HTMLElement>("[data-funnel-theme]") ??
+        document.body,
+    );
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -365,18 +373,20 @@ export function LeadCaptureModal({
         </Dialog.Trigger>
       ) : null}
 
-      <div ref={portalContainerRef} />
+      <div ref={portalAnchorRef} aria-hidden="true" className="hidden" />
 
-      <Dialog.Portal container={portalContainerRef.current ?? undefined}>
+      <Dialog.Portal
+        container={portalHost ?? portalAnchorRef.current ?? undefined}
+      >
         <Dialog.Overlay
-          className="fixed inset-0 z-[80]"
+          className="fixed inset-0 z-[100000]"
           style={{
             background: "var(--theme-section-capture-modal-overlay-bg)",
             backdropFilter: "blur(var(--theme-section-capture-modal-overlay-blur))",
           }}
         />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-[90] max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto border outline-none [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]"
+          className="fixed left-1/2 top-1/2 z-[100001] max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto border outline-none [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]"
           style={captureModalScopeStyle}
         >
           <div className="relative px-6 pb-6 pt-5 md:px-7 md:pb-7">

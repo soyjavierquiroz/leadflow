@@ -22,6 +22,9 @@ export function PublicLeadCaptureModalHost({
   blocks,
 }: PublicLeadCaptureModalHostProps) {
   const leadCapture = useLeadCaptureModal();
+  const isOpen = leadCapture?.isOpen ?? false;
+  const openModal = leadCapture?.openModal;
+  const closeModal = leadCapture?.closeModal;
   const leadCaptureConfigBlock =
     blocks.find(
       (item) => normalizeRuntimeBlockType(item.type) === "lead_capture_config",
@@ -39,6 +42,8 @@ export function PublicLeadCaptureModalHost({
     return null;
   }
 
+  console.log("Renderizando ModalHost. Estado isOpen:", isOpen);
+
   return (
     <LeadCaptureModal
       publicationId={runtime.publication.id}
@@ -50,14 +55,14 @@ export function PublicLeadCaptureModalHost({
       sourceChannel={normalizedLeadCaptureFormBlock?.settings.sourceChannel}
       tags={normalizedLeadCaptureFormBlock?.settings.tags}
       renderTrigger={false}
-      isOpen={leadCapture.isOpen}
+      open={isOpen}
       onOpenChange={(nextOpen) => {
         if (nextOpen) {
-          leadCapture.openModal();
+          openModal?.();
           return;
         }
 
-        leadCapture.closeModal();
+        closeModal?.();
       }}
     />
   );
