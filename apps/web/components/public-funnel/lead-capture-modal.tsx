@@ -142,7 +142,7 @@ const captureModalScopeStyle = {
 } as CSSProperties & Record<string, string>;
 
 const modalTextInputClassName =
-  "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-lg text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-1 focus:ring-slate-400";
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-base text-slate-900 outline-none transition placeholder:text-sm md:placeholder:text-base placeholder:text-slate-400 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 md:px-4 md:text-lg";
 
 const getModalCtaLabel = (text: string) => {
   const trimmed = text.trim();
@@ -188,7 +188,12 @@ export function LeadCaptureModal({
     () => getFunnelThemeDefinition(resolveFunnelThemeId(runtime.theme)),
     [runtime.theme],
   );
-  const ctaColor = resolvedTheme.tokens.action.primary || "#2563eb";
+  const ctaColor =
+    resolvedTheme.primitives.button[
+      resolvedTheme.sections.captureModalSlot.primaryCta
+    ]?.surface.rest.backgroundColor ||
+    resolvedTheme.primitives.button.primary.surface.rest.backgroundColor ||
+    "#2563eb";
   const urgencyColor =
     resolvedTheme.tokens.brand.danger ||
     resolvedTheme.tokens.action.urgency ||
@@ -539,7 +544,7 @@ export function LeadCaptureModal({
                         required
                         onValidityChange={setIsPhoneValid}
                         labelClassName="text-sm font-bold text-slate-900"
-                        phoneInputClassName="rounded-xl border-slate-200 bg-slate-50 text-slate-900 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400 [&_.PhoneInputInput]:bg-slate-50 [&_.PhoneInputInput]:px-4 [&_.PhoneInputInput]:py-3 [&_.PhoneInputInput]:text-lg [&_.PhoneInputInput]:text-slate-900 [&_.PhoneInputInput]:placeholder:text-slate-400 [&_.PhoneInputCountry]:bg-slate-50 [&_.PhoneInputCountry]:text-slate-900 [&_.PhoneInputCountry>span]:text-slate-900"
+                        phoneInputClassName="rounded-xl border-slate-200 bg-slate-50 text-slate-900 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400 [&_.PhoneInputInput]:bg-slate-50 [&_.PhoneInputInput]:px-3 [&_.PhoneInputInput]:py-3 [&_.PhoneInputInput]:text-base [&_.PhoneInputInput]:text-slate-900 [&_.PhoneInputInput]:placeholder:text-sm [&_.PhoneInputInput]:placeholder:text-slate-400 md:[&_.PhoneInputInput]:px-4 md:[&_.PhoneInputInput]:text-lg md:[&_.PhoneInputInput]:placeholder:text-base [&_.PhoneInputCountry]:bg-slate-50 [&_.PhoneInputCountry]:text-slate-900 [&_.PhoneInputCountry>span]:text-slate-900"
                       />
 
                       <button
