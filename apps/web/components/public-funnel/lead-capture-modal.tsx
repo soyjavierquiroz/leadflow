@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   usePathname,
   useSearchParams,
@@ -148,6 +154,7 @@ export function LeadCaptureModal({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [internalOpen, setInternalOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -175,6 +182,10 @@ export function LeadCaptureModal({
   const phoneError = hasAttemptedSubmit ? currentPhoneError : null;
   const isFormReady = !currentNameError && !currentPhoneError;
   const nameErrorId = "lead-capture-name-error";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const setModalOpen = (nextOpen: boolean) => {
     if (onOpenChange) {
@@ -254,6 +265,31 @@ export function LeadCaptureModal({
       );
     }
   };
+
+  const closeModal = useEffectEvent(() => {
+    handleOpenChange(false);
+  });
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeModal();
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -347,154 +383,174 @@ export function LeadCaptureModal({
     }
   };
 
-  return (
-    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      {renderTrigger ? (
-        <Dialog.Trigger asChild>
-          <button
-            type="button"
-            className={cx(
-              triggerClassName,
-              triggerSubtext ? "flex-col items-center justify-center" : "",
-            )}
-            onClick={handleTriggerClick}
+  const modalContent =
+    open && mounted && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="fixed inset-0 flex items-center justify-center p-4"
+            style={{ zIndex: 2147483647 }}
           >
-            <FunnelButtonContent text={triggerLabel} subtext={triggerSubtext} />
-          </button>
-        </Dialog.Trigger>
-      ) : null}
+            <div
+              className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm"
+              style={{
+                background:
+                  "var(--theme-section-capture-modal-overlay-bg, rgb(15 23 42 / 0.9))",
+                backdropFilter:
+                  "blur(var(--theme-section-capture-modal-overlay-blur, 4px))",
+              }}
+              onClick={() => handleOpenChange(false)}
+              aria-hidden="true"
+            />
 
-      <Dialog.Portal>
-        <Dialog.Overlay
-          className="fixed inset-0 z-[100000]"
-          style={{
-            background: "var(--theme-section-capture-modal-overlay-bg)",
-            backdropFilter: "blur(var(--theme-section-capture-modal-overlay-blur))",
-          }}
-        />
-        <Dialog.Content
-          className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] z-[100001] max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto border outline-none [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]"
-          style={captureModalScopeStyle}
-        >
-          <div className="relative px-6 pb-6 pt-5 md:px-7 md:pb-7">
-            <div className="absolute inset-x-0 top-0 h-1.5 bg-slate-100">
-              <div
-                className="h-full w-4/5 rounded-r-full bg-[var(--theme-support-validation)]"
-                aria-hidden="true"
-              />
-            </div>
-
-            <div className="flex items-start justify-end">
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border transition hover:bg-slate-100/80 [border-color:var(--theme-section-capture-modal-border)] [color:var(--theme-text-subtle)]"
-                  aria-label="Cerrar"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </Dialog.Close>
-            </div>
-
-            <div className="-mt-3 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--theme-support-validation)]">
-                Paso 2 de 2: Casi terminado
-              </p>
-              <Dialog.Title className="mt-4 text-center">
-                <RichHeadline
-                  text={modalConfig.title}
-                  className="block font-headline text-2xl font-black tracking-tight [color:var(--theme-section-capture-modal-headline-color)]"
-                />
-              </Dialog.Title>
-              <Dialog.Description className="mt-3 text-center leading-6 [color:var(--theme-section-capture-modal-text-color)]">
-                <RichHeadline
-                  text={modalConfig.description}
-                  className="block text-sm"
-                  fontClassName=""
-                />
-              </Dialog.Description>
-            </div>
-
-            <form
-              className="mt-6 flex w-full min-w-0 flex-col gap-4"
-              onSubmit={handleSubmit}
-              noValidate
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="lead-capture-modal-title"
+              aria-describedby="lead-capture-modal-description"
+              className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border bg-white p-6 shadow-2xl outline-none animate-in fade-in zoom-in-95 duration-200 md:p-8 [background:var(--theme-section-capture-modal-bg)] [border-color:var(--theme-section-capture-modal-border)] [border-radius:var(--theme-section-capture-modal-radius)] shadow-[var(--theme-section-capture-modal-shadow)]"
+              style={captureModalScopeStyle}
             >
-              <label className="grid w-full min-w-0 gap-2 text-sm font-semibold text-slate-800">
-                <span>{modalConfig.nameLabel}</span>
-                <input
-                  ref={nameInputRef}
-                  type="text"
-                  value={fullName}
-                  onChange={(event) => {
-                    setFullName(event.target.value);
-                    setSubmitError(null);
-                  }}
-                  placeholder={modalConfig.namePlaceholder}
-                  autoComplete="name"
-                  required
-                  minLength={2}
-                  aria-invalid={Boolean(nameError)}
-                  aria-describedby={nameError ? nameErrorId : undefined}
-                  className={cx(
-                    jakawiPremiumClassNames.compactInput,
-                    nameError
-                      ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200"
-                      : "",
-                  )}
+              <div className="absolute inset-x-0 top-0 h-1.5 bg-slate-100">
+                <div
+                  className="h-full w-4/5 rounded-r-full bg-[var(--theme-support-validation)]"
+                  aria-hidden="true"
                 />
-              </label>
-
-              {nameError ? (
-                <p id={nameErrorId} className="-mt-2 text-xs text-red-600">
-                  {nameError}
-                </p>
-              ) : null}
-
-              <SmartPhoneInput
-                label={modalConfig.phoneLabel}
-                value={phone}
-                onChange={(nextPhone) => {
-                  setPhone(nextPhone);
-                  setSubmitError(null);
-                }}
-                placeholder={modalConfig.phonePlaceholder}
-                error={phoneError ?? undefined}
-                invalidMessage={modalConfig.phoneErrorMessage}
-                defaultCountry={modalConfig.defaultCountry as Country}
-                required
-                onValidityChange={setIsPhoneValid}
-              />
+              </div>
 
               <button
-                type="submit"
-                disabled={isSubmitting}
-                className={cx(
-                  captureModalPrimaryButtonClassName,
-                  "mt-6 w-full",
-                  modalConfig.ctaSubtext ? "flex-col items-center justify-center" : "",
-                  isSubmitting
-                    ? "cursor-not-allowed opacity-70"
-                    : "cursor-pointer",
-                )}
+                type="button"
+                onClick={() => handleOpenChange(false)}
+                className="absolute right-4 top-4 z-10 text-2xl font-bold text-slate-400 transition hover:text-slate-800"
+                aria-label="Cerrar"
               >
-                <FunnelButtonContent
-                  text={isSubmitting ? "Procesando..." : modalConfig.ctaText}
-                  subtext={isSubmitting ? undefined : modalConfig.ctaSubtext}
-                />
+                ✕
               </button>
 
-              <p className="mt-4 text-center text-xs [color:var(--theme-section-capture-modal-text-color)] opacity-60">
-                🔒 Tu información está 100% segura y libre de spam.
-              </p>
+              <div className="mt-2">
+                <div className="text-center">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--theme-support-validation)]">
+                    Paso 2 de 2: Casi terminado
+                  </p>
+                  <div id="lead-capture-modal-title" className="mt-4 text-center">
+                    <RichHeadline
+                      text={modalConfig.title}
+                      className="block font-headline text-2xl font-black tracking-tight [color:var(--theme-section-capture-modal-headline-color)]"
+                    />
+                  </div>
+                  <div
+                    id="lead-capture-modal-description"
+                    className="mt-3 text-center leading-6 [color:var(--theme-section-capture-modal-text-color)]"
+                  >
+                    <RichHeadline
+                      text={modalConfig.description}
+                      className="block text-sm"
+                      fontClassName=""
+                    />
+                  </div>
+                </div>
 
-              {submitError ? (
-                <p className="text-center text-sm text-rose-600">{submitError}</p>
-              ) : null}
-            </form>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+                <form
+                  className="mt-6 flex w-full min-w-0 flex-col gap-4"
+                  onSubmit={handleSubmit}
+                  noValidate
+                >
+                  <label className="grid w-full min-w-0 gap-2 text-sm font-semibold text-slate-800">
+                    <span>{modalConfig.nameLabel}</span>
+                    <input
+                      ref={nameInputRef}
+                      type="text"
+                      value={fullName}
+                      onChange={(event) => {
+                        setFullName(event.target.value);
+                        setSubmitError(null);
+                      }}
+                      placeholder={modalConfig.namePlaceholder}
+                      autoComplete="name"
+                      required
+                      minLength={2}
+                      aria-invalid={Boolean(nameError)}
+                      aria-describedby={nameError ? nameErrorId : undefined}
+                      className={cx(
+                        jakawiPremiumClassNames.compactInput,
+                        nameError
+                          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                          : "",
+                      )}
+                    />
+                  </label>
+
+                  {nameError ? (
+                    <p id={nameErrorId} className="-mt-2 text-xs text-red-600">
+                      {nameError}
+                    </p>
+                  ) : null}
+
+                  <SmartPhoneInput
+                    label={modalConfig.phoneLabel}
+                    value={phone}
+                    onChange={(nextPhone) => {
+                      setPhone(nextPhone);
+                      setSubmitError(null);
+                    }}
+                    placeholder={modalConfig.phonePlaceholder}
+                    error={phoneError ?? undefined}
+                    invalidMessage={modalConfig.phoneErrorMessage}
+                    defaultCountry={modalConfig.defaultCountry as Country}
+                    required
+                    onValidityChange={setIsPhoneValid}
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className={cx(
+                      captureModalPrimaryButtonClassName,
+                      "mt-6 w-full",
+                      modalConfig.ctaSubtext ? "flex-col items-center justify-center" : "",
+                      isSubmitting
+                        ? "cursor-not-allowed opacity-70"
+                        : "cursor-pointer",
+                    )}
+                  >
+                    <FunnelButtonContent
+                      text={isSubmitting ? "Procesando..." : modalConfig.ctaText}
+                      subtext={isSubmitting ? undefined : modalConfig.ctaSubtext}
+                    />
+                  </button>
+
+                  <p className="mt-4 text-center text-xs [color:var(--theme-section-capture-modal-text-color)] opacity-60">
+                    🔒 Tu información está 100% segura y libre de spam.
+                  </p>
+
+                  {submitError ? (
+                    <p className="text-center text-sm text-rose-600">
+                      {submitError}
+                    </p>
+                  ) : null}
+                </form>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <>
+      {renderTrigger ? (
+        <button
+          type="button"
+          className={cx(
+            triggerClassName,
+            triggerSubtext ? "flex-col items-center justify-center" : "",
+          )}
+          onClick={handleTriggerClick}
+        >
+          <FunnelButtonContent text={triggerLabel} subtext={triggerSubtext} />
+        </button>
+      ) : null}
+
+      {modalContent}
+    </>
   );
 }

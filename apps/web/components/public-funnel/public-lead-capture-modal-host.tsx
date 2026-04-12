@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { LeadCaptureModal } from "@/components/public-funnel/lead-capture-modal";
 import { useLeadCaptureModal } from "@/components/public-funnel/lead-capture-context";
@@ -43,7 +43,6 @@ export function PublicLeadCaptureModalHost({
 
   useEffect(() => {
     const handleOpen = () => {
-      console.log("Evento global recibido. Forzando apertura.");
       setIsNativeOpen(true);
     };
 
@@ -55,10 +54,8 @@ export function PublicLeadCaptureModalHost({
     return null;
   }
 
-  console.log("Renderizando ModalHost. Estado isOpen:", isOpen);
-
   return (
-    <Fragment>
+    <>
       <LeadCaptureModal
         publicationId={runtime.publication.id}
         currentStepId={runtime.currentStep.id}
@@ -81,11 +78,6 @@ export function PublicLeadCaptureModalHost({
           closeModal?.();
         }}
       />
-      {isNativeOpen && (
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-red-500/80 text-4xl font-bold text-white">
-          ¡EL ESTADO ESTÁ TRUE, EL MODAL DEBE VERSE AQUÍ!
-        </div>
-      )}
-    </Fragment>
+    </>
   );
 }

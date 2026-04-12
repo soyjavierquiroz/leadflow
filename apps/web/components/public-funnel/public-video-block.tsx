@@ -94,7 +94,7 @@ export function PublicVideoBlock({
       block.leadflow_metadata ?? block.metadata ?? runtime.funnel.settingsJson,
   });
 
-  if (!desktopVideoId) {
+  if (!desktopVideoId || !mounted) {
     return null;
   }
 
@@ -115,41 +115,35 @@ export function PublicVideoBlock({
             fontWeight: "var(--theme-text-subheadline-font-weight)",
           }}
         >
-          {mounted ? resolvedBannerText || fallbackBannerText : fallbackBannerText}
+          {resolvedBannerText || fallbackBannerText}
         </div>
       ) : null}
 
       <div
         className={hasBanner ? "overflow-hidden rounded-b-xl" : "overflow-hidden rounded-xl"}
-        style={{ aspectRatio: mounted ? ratio : baseRatio }}
+        style={{ aspectRatio: ratio || baseRatio }}
       >
-        {!mounted ? (
-          <div className="relative h-full w-full animate-pulse bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(30,41,59,0.88))]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),transparent_38%)]" />
-          </div>
-        ) : (
-          <KurukinPlayer
-            provider={provider}
-            videoId={activeVideoId}
-            vslMode={vslMode}
-            vslProgressBarColor="var(--theme-section-video-progress-bar, var(--theme-button-primary-rest-bg))"
-            lazyLoadYoutube={provider === "youtube" && !vslMode}
-            hideYoutubeUi={provider === "youtube"}
-            smartPoster={
-              posterMedia
-                ? {
-                    imageUrl: posterMedia.src,
-                    eyebrow: "VSL",
-                    title,
-                    description:
-                      "Activa el audio para iniciar la presentacion desde el comienzo.",
-                    buttonText: "Ver ahora",
-                  }
-                : undefined
-            }
-            className="h-full !aspect-auto !rounded-none"
-          />
-        )}
+        <KurukinPlayer
+          provider={provider}
+          videoId={activeVideoId}
+          vslMode={vslMode}
+          vslProgressBarColor="var(--theme-section-video-progress-bar, var(--theme-button-primary-rest-bg))"
+          lazyLoadYoutube={provider === "youtube" && !vslMode}
+          hideYoutubeUi={provider === "youtube"}
+          smartPoster={
+            posterMedia
+              ? {
+                  imageUrl: posterMedia.src,
+                  eyebrow: "VSL",
+                  title,
+                  description:
+                    "Activa el audio para iniciar la presentacion desde el comienzo.",
+                  buttonText: "Ver ahora",
+                }
+              : undefined
+          }
+          className="h-full !aspect-auto !rounded-none"
+        />
       </div>
     </div>
   );
