@@ -204,6 +204,9 @@ export function SystemTenantTemplateFunnelEditor({
   }, [activeStepTab]);
 
   const activeStep = stepTabs.find((tab) => tab.key === activeStepTab)?.step ?? null;
+  const activeStepTabLabel =
+    stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
+    "Paso activo";
   const activeDraft = activeStep
     ? stepDrafts[activeStep.id] ?? buildStepDraft(activeStep)
     : fallbackDrafts[activeStepTab] ?? createEmptyStepDraft();
@@ -213,6 +216,10 @@ export function SystemTenantTemplateFunnelEditor({
   );
   const blocksText = activeDraft.blocksText;
   const mediaRows = activeDraft.mediaRows;
+  const editorContext = {
+    stepName: activeStepTabLabel,
+    stepPath: activeStep ? `/${activeStep.slug}` : `/${activeStepTab}`,
+  };
 
   const updateActiveStepDraft = (patch: Partial<StepDraft>) => {
     if (activeStep) {
@@ -581,6 +588,7 @@ export function SystemTenantTemplateFunnelEditor({
         key={activeStep?.id ?? activeStepTab}
         blocksText={blocksText}
         previewHref="/admin/preview"
+        editorContext={editorContext}
         onBlocksTextChange={(value) => updateActiveStepDraft({ blocksText: value })}
         parsedBlocksError={parsedBlocks.error}
         parsedBlocksCount={parsedBlocks.value?.length ?? 0}

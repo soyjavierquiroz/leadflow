@@ -18,6 +18,7 @@ import {
   ImagePlus,
   Link2,
   Plus,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import {
@@ -35,6 +36,9 @@ const sectionClassName =
 
 const secondaryButtonClassName =
   "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+
+const scaffoldButtonClassName =
+  "inline-flex min-h-28 w-full items-start justify-between gap-4 rounded-[1.75rem] border border-slate-200 bg-white px-5 py-4 text-left text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 export const requiredMediaKeys = [
   "hero",
@@ -115,6 +119,109 @@ export const defaultBlocksSeed = JSON.stringify(
   2,
 );
 
+const captureScaffoldSeed = JSON.stringify(
+  [
+    {
+      type: "hero",
+      key: "hero-captura-base",
+      variant: "opportunity",
+      eyebrow: "borrador de captura",
+      title: "Define la promesa principal de este paso",
+      description:
+        "Usa este hero como base para explicar el resultado, la audiencia correcta y el CTA hacia la captura.",
+      accent: "Completa headline, beneficios y prueba visible",
+      primaryCtaLabel: "Quiero continuar",
+      primaryCtaHref: "#public-capture-form",
+      secondaryCtaLabel: "Ver detalles",
+      secondaryCtaHref: "#video-vsl-base",
+      metrics: [
+        {
+          label: "Promesa",
+          value: "Pendiente",
+          description: "Aterriza el beneficio central en una frase.",
+        },
+        {
+          label: "Prueba",
+          value: "Pendiente",
+          description: "Agrega autoridad o resultado visible.",
+        },
+      ],
+      proofItems: [
+        "Mensaje claro desde el primer scroll",
+        "CTA conectado al flujo de captura",
+      ],
+    },
+    {
+      type: "video",
+      key: "video-vsl-base",
+      title: "Inserta tu VSL o demo principal",
+      caption: "Reemplaza este embed por el video real del funnel.",
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      items: [
+        "Explica el mecanismo o la oportunidad",
+        "Reduce objeciones antes de la captura",
+        "Conecta el cierre con el modal",
+      ],
+    },
+    {
+      type: "lead_capture_config",
+      key: "modal-config-base",
+      modal_config: {
+        title: "",
+        description: "",
+        default_country: "BO",
+        fields: {
+          name: {
+            label: "",
+            placeholder: "",
+            error_msg: "",
+          },
+          phone: {
+            label: "",
+            placeholder: "",
+            error_msg: "",
+          },
+        },
+        cta_button: {
+          text: "",
+          subtext: "",
+        },
+      },
+      success_redirect: "/confirmado",
+    },
+  ],
+  null,
+  2,
+);
+
+const confirmationScaffoldSeed = JSON.stringify(
+  [
+    {
+      type: "thank_you_reveal",
+      key: "thank-you-reveal-base",
+      variant: "confirmation_reveal",
+      headline: "Tu registro fue confirmado",
+      subheadline:
+        "Usa este bloque para validar la acción tomada y preparar el siguiente movimiento.",
+      reveal_headline: "Siguiente paso listo",
+      reveal_subheadline:
+        "Aquí puedes revelar al asesor, sponsor o instrucción final del handoff.",
+    },
+    {
+      type: "whatsapp_handoff_cta",
+      key: "whatsapp-handoff-base",
+      headline: "Continúa ahora por WhatsApp",
+      subheadline:
+        "Actualiza este copy para describir qué va a pasar al abrir la conversación.",
+      button_text: "Abrir WhatsApp",
+      helper_text: "Mantén una instrucción clara y sin fricción.",
+      variant: "handoff_primary",
+    },
+  ],
+  null,
+  2,
+);
+
 export type MediaRow = {
   key: string;
   value: string;
@@ -168,6 +275,10 @@ type HybridJsonMediaEditorProps = {
   onRemoveMediaRow: (index: number) => void;
   previewHref?: string | null;
   previewTheme?: string;
+  editorContext?: {
+    stepName: string;
+    stepPath: string;
+  } | null;
   availableBlocks?: BuilderBlockDefinition[];
   routingReference?: {
     title: string;
@@ -210,6 +321,7 @@ export function HybridJsonMediaEditor({
   onRemoveMediaRow,
   previewHref = null,
   previewTheme = "default",
+  editorContext = null,
   availableBlocks = defaultBuilderBlockDefinitions,
   routingReference = null,
   stepSwitcher = null,
@@ -258,6 +370,20 @@ export function HybridJsonMediaEditor({
     }
   }, [catalogBlocks, selectedBlockKey]);
 
+  const isBlankCanvas = useMemo(() => {
+    const trimmed = blocksText.trim();
+
+    if (!trimmed || trimmed === '""' || trimmed === "[]") {
+      return true;
+    }
+
+    if (parsedBlocksError) {
+      return false;
+    }
+
+    return parsedBlocksCount === 0;
+  }, [blocksText, parsedBlocksCount, parsedBlocksError]);
+
   const handleInsertBlockExample = (definition: BuilderBlockDefinition) => {
     const nextArray = (() => {
       try {
@@ -288,6 +414,10 @@ export function HybridJsonMediaEditor({
     } catch {
       setCopiedRoutingPath(null);
     }
+  };
+
+  const handleInjectScaffold = (value: string) => {
+    onBlocksTextChange(value);
   };
 
   return (
@@ -499,34 +629,96 @@ export function HybridJsonMediaEditor({
                 >
                   👀 Ver Vista Previa
                 </Link>
-              ) : null}
-            </div>
+                ) : null}
+              </div>
 
-            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200">
-              <CodeMirror
-                value={blocksText}
-                height="420px"
-                extensions={[json()]}
-                basicSetup={{
-                  lineNumbers: true,
-                  foldGutter: true,
-                  highlightActiveLine: true,
-                }}
-                onChange={onBlocksTextChange}
-              />
-            </div>
+            {editorContext ? (
+              <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-300 bg-amber-500/10 px-4 py-3 shadow-sm backdrop-blur">
+                <p className="border-l-4 border-amber-500 pl-4 text-sm font-semibold text-amber-900">
+                  {`⚠️ EDITANDO BORRADOR: ${editorContext.stepName} | Ruta: ${editorContext.stepPath}`}
+                </p>
+              </div>
+            ) : null}
 
-            {parsedBlocksError ? (
-              <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {parsedBlocksError}
-              </p>
+            {isBlankCanvas ? (
+              <div className="rounded-[1.75rem] border border-dashed border-amber-300 bg-[linear-gradient(180deg,_rgba(255,251,235,0.95)_0%,_rgba(255,255,255,1)_100%)] p-6">
+                <div className="flex flex-col gap-5">
+                  <div className="max-w-2xl space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
+                      Lienzo en blanco
+                    </p>
+                    <h3 className="text-2xl font-semibold text-slate-950">
+                      Arranca este paso con una estructura segura
+                    </h3>
+                    <p className="text-sm leading-6 text-slate-600">
+                      Evita copiar y pegar desde otro paso. Inyecta una base lista para editar y luego ajusta el JSON en CodeMirror.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => handleInjectScaffold(captureScaffoldSeed)}
+                      className={scaffoldButtonClassName}
+                    >
+                      <div className="space-y-2">
+                        <p className="text-base font-semibold">
+                          ⚡ Inyectar Plantilla VSL / Captura
+                        </p>
+                        <p className="text-sm leading-6 text-slate-600">
+                          Carga un arranque con <code>hero</code>, <code>video</code> y <code>lead_capture_config</code>.
+                        </p>
+                      </div>
+                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-amber-600" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleInjectScaffold(confirmationScaffoldSeed)}
+                      className={scaffoldButtonClassName}
+                    >
+                      <div className="space-y-2">
+                        <p className="text-base font-semibold">
+                          ⚡ Inyectar Plantilla Confirmación
+                        </p>
+                        <p className="text-sm leading-6 text-slate-600">
+                          Carga una base con <code>thank_you_reveal</code> y <code>whatsapp_handoff_cta</code>.
+                        </p>
+                      </div>
+                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-emerald-600" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             ) : (
-              <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                JSON válido. El engine detectó {parsedBlocksCount} bloque
-                {parsedBlocksCount === 1 ? "" : "s"} listo
-                {parsedBlocksCount === 1 ? "" : "s"} para persistir como{" "}
-                <code>blocksJson</code>.
-              </p>
+              <>
+                <div className="overflow-hidden rounded-[1.5rem] border border-slate-200">
+                  <CodeMirror
+                    value={blocksText}
+                    height="420px"
+                    extensions={[json()]}
+                    basicSetup={{
+                      lineNumbers: true,
+                      foldGutter: true,
+                      highlightActiveLine: true,
+                    }}
+                    onChange={onBlocksTextChange}
+                  />
+                </div>
+
+                {parsedBlocksError ? (
+                  <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {parsedBlocksError}
+                  </p>
+                ) : (
+                  <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    JSON válido. El engine detectó {parsedBlocksCount} bloque
+                    {parsedBlocksCount === 1 ? "" : "s"} listo
+                    {parsedBlocksCount === 1 ? "" : "s"} para persistir como{" "}
+                    <code>blocksJson</code>.
+                  </p>
+                )}
+              </>
             )}
 
             {selectedBlockDefinition ? (

@@ -444,6 +444,9 @@ export function TeamVslPublicationEditor({
   const activeStep = showStepSwitcher
     ? stepTabs.find((tab) => tab.key === activeStepTab)?.step ?? null
     : null;
+  const activeStepTabLabel =
+    stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
+    "Paso activo";
   const activeDraft = showStepSwitcher
     ? activeStep
       ? stepDrafts[activeStep.id] ?? buildStepDraft(activeStep)
@@ -451,6 +454,20 @@ export function TeamVslPublicationEditor({
     : null;
   const editorBlocksText = activeDraft?.blocksText ?? blocksText;
   const editorMediaRows = activeDraft?.mediaRows ?? mediaRows;
+  const editorContext = showStepSwitcher
+    ? {
+        stepName: activeStepTabLabel,
+        stepPath: activeStep
+          ? buildPublicationStepPath(
+              pathPrefix,
+              activeStep.slug,
+              activeStep.isEntryStep,
+            )
+          : activeStepTab === "captura"
+            ? normalizePublicationPath(pathPrefix)
+            : buildPublicationStepPath(pathPrefix, "confirmado", false),
+      }
+    : null;
 
   const updateEditorDraft = (patch: Partial<StepDraft>) => {
     if (!showStepSwitcher) {
@@ -971,6 +988,7 @@ export function TeamVslPublicationEditor({
         key={activeStep?.id ?? activeStepTab}
         blocksText={editorBlocksText}
         previewHref={mode === "system" ? "/admin/preview" : null}
+        editorContext={editorContext}
         onBlocksTextChange={(value) => updateEditorDraft({ blocksText: value })}
         parsedBlocksError={parsedBlocks.error}
         parsedBlocksCount={parsedBlocks.value?.length ?? 0}
