@@ -439,10 +439,10 @@ export function LeadCaptureModal({
                 aria-modal="true"
                 aria-labelledby="lead-capture-modal-title"
                 aria-describedby="lead-capture-modal-description"
-                className="relative w-full max-w-md bg-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.2)] p-6 md:p-8 border border-slate-100 overflow-hidden outline-none animate-in fade-in zoom-in-95 duration-200"
+                className="relative w-full max-w-md bg-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.2)] p-6 md:p-8 border border-slate-100 overflow-hidden overflow-x-hidden outline-none animate-in fade-in zoom-in-95 duration-200"
                 style={captureModalScopeStyle}
               >
-                <div className="max-h-[calc(100vh-2rem)] overflow-y-auto">
+                <div className="max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-hidden">
                   <button
                     type="button"
                     onClick={() => handleOpenChange(false)}
@@ -551,7 +551,7 @@ export function LeadCaptureModal({
                         type="submit"
                         disabled={isSubmitting}
                         className={cx(
-                          "mt-6 inline-flex w-full items-center justify-center rounded-xl px-6 py-4 text-center text-xl font-extrabold uppercase text-white shadow-[0_10px_20px_rgba(0,0,0,0.15)] transition-all duration-300 hover:scale-105 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 animate-[pulse_1.8s_ease-in-out_infinite]",
+                          "mt-6 inline-flex w-full items-center justify-center rounded-xl px-6 py-4 text-center text-xl font-extrabold uppercase text-white shadow-[0_10px_20px_rgba(0,0,0,0.15)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_15px_30px_rgba(0,0,0,0.2)] hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 animate-[pulse_1.8s_ease-in-out_infinite]",
                           modalConfig.ctaSubtext ? "flex-col gap-1" : "",
                           isSubmitting
                             ? "cursor-not-allowed opacity-70"
