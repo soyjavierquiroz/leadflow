@@ -24,6 +24,10 @@ import { FunnelThemeProvider } from "@/components/public-funnel/FunnelThemeProvi
 import { SmartPhoneInput } from "@/components/public-funnel/smart-phone-input";
 import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-runtime-lead-submit-provider";
 import {
+  getFunnelThemeDefinition,
+  resolveFunnelThemeId,
+} from "@/lib/funnel-theme-registry";
+import {
   getOrCreateAnonymousId,
   persistSubmissionContext,
   submitPublicLeadCapture,
@@ -133,13 +137,12 @@ const captureModalScopeStyle = {
   "--jakawi-text-main": "#0f172a",
   "--jakawi-text-muted": "#64748b",
   "--jakawi-input-border": "#cbd5e1",
-  "--jakawi-input-focus": "var(--theme-action-cta, #2563eb)",
-  "--jakawi-input-ring":
-    "color-mix(in srgb, var(--theme-action-cta, #2563eb) 24%, transparent)",
+  "--jakawi-input-focus": "#94a3b8",
+  "--jakawi-input-ring": "rgb(148 163 184 / 0.24)",
 } as CSSProperties & Record<string, string>;
 
 const modalTextInputClassName =
-  "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-lg text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-action-cta,#2563eb)] focus:ring-1 focus:ring-[var(--theme-action-cta,#2563eb)]";
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-lg text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-1 focus:ring-slate-400";
 
 const getModalCtaLabel = (text: string) => {
   const trimmed = text.trim();
@@ -181,6 +184,15 @@ export function LeadCaptureModal({
     () => readUrlAttribution(searchParams),
     [searchParams],
   );
+  const resolvedTheme = useMemo(
+    () => getFunnelThemeDefinition(resolveFunnelThemeId(runtime.theme)),
+    [runtime.theme],
+  );
+  const ctaColor = resolvedTheme.tokens.action.primary || "#2563eb";
+  const urgencyColor =
+    resolvedTheme.tokens.brand.danger ||
+    resolvedTheme.tokens.action.urgency ||
+    "#dc2626";
   const runtimeLeadSubmit = usePublicRuntimeLeadSubmit();
   const currentNameError = getNameValidationError(
     fullName,
@@ -437,12 +449,19 @@ export function LeadCaptureModal({
 
                   <div className="mt-2">
                     <div className="text-center text-slate-900">
-                      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-red-600">
+                      <p
+                        className="mb-2 text-xs font-bold uppercase tracking-wider"
+                        style={{ color: urgencyColor }}
+                      >
                         Paso 2 de 2: ¡Casi listo!
                       </p>
                       <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                         <div
-                          className="h-full w-[85%] rounded-full bg-[var(--theme-action-cta,#2563eb)] animate-pulse shadow-[0_0_10px_var(--theme-action-cta,#2563eb)]"
+                          className="h-full w-[85%] rounded-full animate-pulse"
+                          style={{
+                            backgroundColor: urgencyColor,
+                            boxShadow: `0 0 10px ${urgencyColor}`,
+                          }}
                           aria-hidden="true"
                         />
                       </div>
@@ -520,19 +539,20 @@ export function LeadCaptureModal({
                         required
                         onValidityChange={setIsPhoneValid}
                         labelClassName="text-sm font-bold text-slate-900"
-                        phoneInputClassName="rounded-xl border-slate-200 bg-slate-50 text-slate-900 focus-within:border-[var(--theme-action-cta,#2563eb)] focus-within:ring-1 focus-within:ring-[var(--theme-action-cta,#2563eb)] [&_.PhoneInputInput]:bg-slate-50 [&_.PhoneInputInput]:px-4 [&_.PhoneInputInput]:py-3 [&_.PhoneInputInput]:text-lg [&_.PhoneInputInput]:text-slate-900 [&_.PhoneInputInput]:placeholder:text-slate-400 [&_.PhoneInputCountry]:bg-slate-50 [&_.PhoneInputCountry]:text-slate-900 [&_.PhoneInputCountry>span]:text-slate-900"
+                        phoneInputClassName="rounded-xl border-slate-200 bg-slate-50 text-slate-900 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-400 [&_.PhoneInputInput]:bg-slate-50 [&_.PhoneInputInput]:px-4 [&_.PhoneInputInput]:py-3 [&_.PhoneInputInput]:text-lg [&_.PhoneInputInput]:text-slate-900 [&_.PhoneInputInput]:placeholder:text-slate-400 [&_.PhoneInputCountry]:bg-slate-50 [&_.PhoneInputCountry]:text-slate-900 [&_.PhoneInputCountry>span]:text-slate-900"
                       />
 
                       <button
                         type="submit"
                         disabled={isSubmitting}
                         className={cx(
-                          "mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[var(--theme-action-cta,#2563eb)] px-6 py-4 text-center text-xl font-extrabold uppercase text-white shadow-[0_10px_20px_rgba(0,0,0,0.15)] transition-all duration-300 hover:scale-105 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--theme-action-cta,#2563eb)] animate-[pulse_1.8s_ease-in-out_infinite]",
+                          "mt-6 inline-flex w-full items-center justify-center rounded-xl px-6 py-4 text-center text-xl font-extrabold uppercase text-white shadow-[0_10px_20px_rgba(0,0,0,0.15)] transition-all duration-300 hover:scale-105 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 animate-[pulse_1.8s_ease-in-out_infinite]",
                           modalConfig.ctaSubtext ? "flex-col gap-1" : "",
                           isSubmitting
                             ? "cursor-not-allowed opacity-70"
                             : "cursor-pointer",
                         )}
+                        style={{ backgroundColor: ctaColor }}
                       >
                         <FunnelButtonContent
                           text={
