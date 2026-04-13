@@ -8,7 +8,9 @@ import {
   readHybridJsonPreviewDraft,
 } from "@/components/team-operations/hybrid-json-preview-state";
 
-const hasObjectSettingsJson = (value: unknown) =>
+const hasObjectSettingsJson = (
+  value: unknown,
+): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 export function HybridJsonPreviewPage() {
@@ -32,7 +34,9 @@ export function HybridJsonPreviewPage() {
           Object.keys(nextDraft.media).length > 0 ||
           nextDraft.theme !== emptyHybridJsonPreviewDraft.theme ||
           (hasObjectSettingsJson(nextDraft.settingsJson)
-            ? Object.keys(nextDraft.settingsJson).length > 0
+            ? Object.keys(
+                nextDraft.settingsJson as Record<string, unknown>,
+              ).length > 0
             : false);
 
         setDraft(nextDraft);
