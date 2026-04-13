@@ -47,7 +47,7 @@ const secondaryButtonClassName =
   "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
+  "rounded-[2rem] border border-slate-200 bg-white p-6 text-left shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
 
 const fieldLabelClassName = "text-sm font-medium text-slate-700";
 
@@ -900,11 +900,11 @@ export function TeamVslPublicationEditor({
 
       <section className="grid gap-4 md:grid-cols-3">
         <article className={sectionClassName}>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 text-left">
             <div className="rounded-full bg-teal-100 p-2 text-teal-700">
               <Sparkles className="h-4 w-4" />
             </div>
-            <div>
+            <div className="text-left">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                 Template activo
               </p>
@@ -915,11 +915,11 @@ export function TeamVslPublicationEditor({
           </div>
         </article>
         <article className={sectionClassName}>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 text-left">
             <div className="rounded-full bg-amber-100 p-2 text-amber-700">
               <FileJson className="h-4 w-4" />
             </div>
-            <div>
+            <div className="text-left">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                 Bloques válidos
               </p>
@@ -932,11 +932,11 @@ export function TeamVslPublicationEditor({
           </div>
         </article>
         <article className={sectionClassName}>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 text-left">
             <div className="rounded-full bg-sky-100 p-2 text-sky-700">
               <Globe className="h-4 w-4" />
             </div>
-            <div>
+            <div className="text-left">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                 {showStepSwitcher ? "Paso activo" : "Publicación"}
               </p>
@@ -955,7 +955,7 @@ export function TeamVslPublicationEditor({
 
       <details open className={sectionClassName}>
         <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
-          <div>
+          <div className="text-left">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
               Configuración
             </p>
@@ -1102,9 +1102,9 @@ export function TeamVslPublicationEditor({
         previewSettingsJson={editorSettingsJson}
         availableBlocks={availableBlocks}
         stepSpecificSettingsPanel={
-          <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+          <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6 text-left">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
+              <div className="max-w-2xl text-left">
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
                   Configuración específica del paso
                 </p>
@@ -1182,8 +1182,8 @@ export function TeamVslPublicationEditor({
       />
 
       <section className={sectionClassName}>
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
+        <div className="flex flex-col gap-4 text-left md:flex-row md:items-center md:justify-between">
+          <div className="text-left">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
               Persistencia
             </p>

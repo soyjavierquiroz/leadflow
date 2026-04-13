@@ -37,7 +37,7 @@ import {
 import { FUNNEL_ASSET_IMAGE_ACCEPT } from "@/lib/media-optimizer";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
+  "rounded-[2rem] border border-slate-200 bg-white p-6 text-left shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
 
 const secondaryButtonClassName =
   "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
@@ -540,7 +540,7 @@ export function HybridJsonMediaEditor({
       <div className="space-y-6">
         <details open className={sectionClassName}>
           <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
-            <div>
+            <div className="text-left">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
                 Bloques
               </p>
@@ -605,9 +605,9 @@ export function HybridJsonMediaEditor({
             {stepSpecificSettingsPanel}
 
             {routingReference && routingReference.items.length > 0 ? (
-              <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-6">
+              <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-6 text-left">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
+                  <div className="text-left">
                     <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
                       {routingReference.title}
                     </p>
@@ -670,12 +670,15 @@ export function HybridJsonMediaEditor({
               </article>
             ) : null}
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700">
+            <div className="mb-2 flex w-full items-center justify-between gap-3 border-b border-slate-200 pb-2">
+              <div className="flex min-w-0 flex-1 flex-col justify-start gap-1 text-left">
+                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700">
                   <FileJson className="h-3.5 w-3.5" />
                   CodeMirror JSON
                 </span>
+                <p className="text-sm font-semibold text-slate-950">
+                  Codigo JSON
+                </p>
                 <span className="text-xs leading-5 text-slate-500">
                   El guardado solo se habilita si el contenido es un JSON Array
                   válido.
@@ -683,7 +686,7 @@ export function HybridJsonMediaEditor({
               </div>
 
               {historyPanel || previewDraftKey ? (
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap justify-end gap-3">
                   {historyPanel ? (
                     <button
                       type="button"
@@ -696,28 +699,33 @@ export function HybridJsonMediaEditor({
                   ) : null}
 
                   {previewDraftKey ? (
-                  <button
-                    type="button"
-                    onClick={handleOpenPreview}
-                    className={secondaryButtonClassName}
-                  >
-                    👀 Ver Vista Previa
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenPreview}
+                      className={secondaryButtonClassName}
+                    >
+                      👀 Ver Vista Previa
+                    </button>
                   ) : null}
                 </div>
               ) : null}
-              </div>
+            </div>
 
             {editorContext ? (
-              <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-300 bg-amber-500/10 px-4 py-3 shadow-sm backdrop-blur">
-                <p className="border-l-4 border-amber-500 pl-4 text-sm font-semibold text-amber-900">
-                  {`⚠️ EDITANDO BORRADOR: ${editorContext.stepName} | Ruta: ${editorContext.stepPath}`}
-                </p>
+              <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-300 bg-amber-500/10 shadow-sm backdrop-blur">
+                <div className="flex w-full items-center justify-start px-4 py-3 text-left">
+                  <span className="mr-3 shrink-0 text-base leading-none text-amber-700">
+                    ⚠️
+                  </span>
+                  <p className="text-sm font-semibold text-amber-900">
+                    {`EDITANDO BORRADOR: ${editorContext.stepName} | Ruta: ${editorContext.stepPath}`}
+                  </p>
+                </div>
               </div>
             ) : null}
 
             {isBlankCanvas ? (
-              <div className="rounded-[1.75rem] border border-dashed border-amber-300 bg-[linear-gradient(180deg,_rgba(255,251,235,0.95)_0%,_rgba(255,255,255,1)_100%)] p-6">
+              <div className="rounded-[1.75rem] border border-dashed border-amber-300 bg-[linear-gradient(180deg,_rgba(255,251,235,0.95)_0%,_rgba(255,255,255,1)_100%)] p-6 text-left">
                 <div className="flex flex-col gap-5">
                   <div className="max-w-2xl space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
@@ -798,9 +806,9 @@ export function HybridJsonMediaEditor({
             )}
 
             {selectedBlockDefinition ? (
-              <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+              <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6 text-left">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
+                  <div className="text-left">
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                       Catálogo / {selectedBlockDefinition.category}
                     </p>
@@ -878,7 +886,7 @@ export function HybridJsonMediaEditor({
 
         <details open className={sectionClassName}>
           <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
-            <div>
+            <div className="text-left">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
                 Media
               </p>

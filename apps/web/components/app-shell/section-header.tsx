@@ -14,8 +14,8 @@ export function SectionHeader({
   actions,
 }: SectionHeaderProps) {
   return (
-    <div className="flex flex-col gap-5 rounded-[2rem] border border-white/70 bg-white/80 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.06)] md:flex-row md:items-end md:justify-between">
-      <div className="max-w-3xl">
+    <div className="flex w-full flex-col items-start justify-between gap-5 rounded-[2rem] border border-white/70 bg-white/80 p-6 text-left shadow-[0_24px_70px_rgba(15,23,42,0.06)] md:flex-row md:items-center">
+      <div className="max-w-3xl text-left">
         {eyebrow ? (
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
             {eyebrow}
@@ -29,7 +29,9 @@ export function SectionHeader({
         </p>
       </div>
       {actions ? (
-        <div className="flex flex-wrap gap-3 md:justify-end">{actions}</div>
+        <div className="flex w-full flex-wrap justify-start gap-3 md:w-auto md:justify-end">
+          {actions}
+        </div>
       ) : null}
     </div>
   );
