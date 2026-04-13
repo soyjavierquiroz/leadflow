@@ -27,6 +27,7 @@ import {
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import {
   buildMediaMap,
+  type HybridJsonPreviewDraft,
   writeHybridJsonPreviewDraft,
 } from "@/components/team-operations/hybrid-json-preview-state";
 import {
@@ -367,7 +368,7 @@ export function HybridJsonMediaEditor({
     catalogBlocks[0]?.key ?? "",
   );
   const [copiedRoutingPath, setCopiedRoutingPath] = useState<string | null>(null);
-  const previewDraft = useMemo(
+  const previewDraft = useMemo<HybridJsonPreviewDraft>(
     () => ({
       blocks: blocksText,
       media: buildMediaMap(mediaRows),
@@ -382,7 +383,10 @@ export function HybridJsonMediaEditor({
       return;
     }
 
-    writeHybridJsonPreviewDraft(previewDraftKey, previewDraft);
+    writeHybridJsonPreviewDraft(
+      previewDraftKey,
+      previewDraft as HybridJsonPreviewDraft,
+    );
   }, [previewDraft, previewDraftKey]);
 
   useEffect(() => {
