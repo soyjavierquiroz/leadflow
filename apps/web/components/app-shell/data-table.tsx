@@ -37,7 +37,7 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="overflow-hidden rounded-[1.85rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+    <div className="w-full overflow-hidden rounded-[1.85rem] border border-slate-200 bg-white text-left shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
           Vista operativa

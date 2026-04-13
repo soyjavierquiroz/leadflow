@@ -24,7 +24,7 @@ export default async function AdminPage() {
   const priorityTeams = data.teams.slice(0, 5);
 
   return (
-    <div className="space-y-8">
+    <div className="flex w-full flex-col items-start gap-8 text-left">
       <SectionHeader
         eyebrow="Super Admin / Plataforma"
         title="Panel de plataforma Leadflow"
@@ -47,7 +47,7 @@ export default async function AdminPage() {
         }
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Teams operando"
           value={formatCompactNumber(activeTeamsCount)}
@@ -72,8 +72,8 @@ export default async function AdminPage() {
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+      <section className="grid w-full gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="w-full rounded-[2rem] border border-slate-200 bg-white p-6 text-left shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
             Lectura rapida de plataforma
           </p>
@@ -124,7 +124,7 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="w-full space-y-4">
           <SectionHeader
             eyebrow="Teams"
             title="Equipos bajo supervisión"
@@ -172,8 +172,8 @@ export default async function AdminPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-4">
+      <section className="grid w-full gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="w-full space-y-4">
           <SectionHeader
             eyebrow="Templates"
             title="Catálogo que sostiene el funnel"
@@ -215,14 +215,14 @@ export default async function AdminPage() {
           />
         </div>
 
-        <div className="space-y-4">
+        <div className="w-full space-y-4">
           <SectionHeader
             eyebrow="Rollout"
             title="Publicaciones con salida visible"
             description="Lectura rápida para confirmar qué funnels ya se ven como producto en dominio y path reales."
           />
           {recentPublications.length > 0 ? (
-            <div className="space-y-4">
+            <div className="w-full space-y-4">
               {recentPublications.map((publication) => (
                 <PublicationCard
                   key={publication.id}

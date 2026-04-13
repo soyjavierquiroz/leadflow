@@ -6,7 +6,7 @@ type KpiCardProps = {
 
 export function KpiCard({ label, value, hint }: KpiCardProps) {
   return (
-    <article className="rounded-[1.75rem] border border-slate-200/80 bg-[linear-gradient(180deg,_rgba(255,255,255,1)_0%,_rgba(248,250,252,0.96)_100%)] p-5 shadow-[0_20px_50px_rgba(15,23,42,0.07)]">
+    <article className="w-full rounded-[1.75rem] border border-slate-200/80 bg-[linear-gradient(180deg,_rgba(255,255,255,1)_0%,_rgba(248,250,252,0.96)_100%)] p-5 text-left shadow-[0_20px_50px_rgba(15,23,42,0.07)]">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
         {label}
       </p>

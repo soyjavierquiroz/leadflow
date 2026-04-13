@@ -45,7 +45,9 @@ export function AppShellLayout({
             sourceMode={sourceMode}
             currentUser={currentUser}
           />
-          <main className="px-5 py-6 md:px-8 md:py-8">{children}</main>
+          <main className="flex w-full flex-col items-start px-5 py-6 text-left md:px-8 md:py-8">
+            {children}
+          </main>
         </div>
       </div>
     </div>

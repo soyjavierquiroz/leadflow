@@ -54,7 +54,7 @@ export default async function AdminLayout({
       currentUser={snapshot.currentUser}
       nav={adminNav}
     >
-      {children}
+      <div className="flex w-full flex-col items-start text-left">{children}</div>
     </AdminShellFrame>
   );
 }

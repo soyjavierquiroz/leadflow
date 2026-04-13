@@ -14,25 +14,27 @@ export function SectionHeader({
   actions,
 }: SectionHeaderProps) {
   return (
-    <div className="flex w-full flex-col items-start justify-between gap-5 rounded-[2rem] border border-white/70 bg-white/80 p-6 text-left shadow-[0_24px_70px_rgba(15,23,42,0.06)] md:flex-row md:items-center">
-      <div className="max-w-3xl text-left">
-        {eyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
-            {eyebrow}
+    <div className="flex w-full flex-col items-start justify-start gap-5 rounded-[2rem] border border-white/70 bg-white/80 p-6 text-left shadow-[0_24px_70px_rgba(15,23,42,0.06)]">
+      <div className="flex w-full flex-col gap-5 text-left md:flex-row md:items-center md:justify-between">
+        <div className="max-w-3xl flex-1 text-left">
+          {eyebrow ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+              {eyebrow}
+            </p>
+          ) : null}
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
+            {title}
+          </h1>
+          <p className="mt-3 text-sm leading-7 text-slate-600 md:text-base">
+            {description}
           </p>
-        ) : null}
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-          {title}
-        </h1>
-        <p className="mt-3 text-sm leading-7 text-slate-600 md:text-base">
-          {description}
-        </p>
-      </div>
-      {actions ? (
-        <div className="flex w-full flex-wrap justify-start gap-3 md:w-auto md:justify-end">
-          {actions}
         </div>
-      ) : null}
+        {actions ? (
+          <div className="flex w-full flex-wrap justify-start gap-3 md:w-auto md:justify-end">
+            {actions}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
