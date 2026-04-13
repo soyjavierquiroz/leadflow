@@ -10,4 +10,5 @@ export class CreateTeamHybridFunnelPublicationDto {
   readonly metaDescription?: string;
   readonly blocksJson!: JsonValue;
   readonly mediaMap!: JsonValue;
+  readonly settingsJson?: JsonValue;
 }

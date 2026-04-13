@@ -12,4 +12,5 @@ export class UpdateTeamHybridFunnelPublicationDto {
   readonly stepKey?: 'captura' | 'confirmado';
   readonly blocksJson?: JsonValue;
   readonly mediaMap?: JsonValue;
+  readonly settingsJson?: JsonValue;
 }

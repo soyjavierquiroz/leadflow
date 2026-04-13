@@ -235,7 +235,10 @@ export class HybridFunnelPublicationsService {
     scope: TeamScope,
     dto: CreateTeamHybridFunnelPublicationDto,
   ): Promise<HybridPublicationDetail> {
-    const normalized = this.normalizeEditorInput(dto);
+    const normalized = this.normalizeEditorInput({
+      ...dto,
+      settingsJson: dto.settingsJson,
+    });
 
     await this.assertDomain(scope, normalized.domainId);
     const template = await this.assertTemplate(
@@ -332,6 +335,7 @@ export class HybridFunnelPublicationsService {
               ),
               title: normalized.seoTitle,
               metaDescription: normalized.metaDescription,
+              existingSettings: normalized.settingsJson,
             }),
           ),
         },
@@ -383,6 +387,7 @@ export class HybridFunnelPublicationsService {
               ),
               title: normalized.seoTitle,
               metaDescription: normalized.metaDescription,
+              existingSettings: {},
             }),
           ),
         },
@@ -507,6 +512,7 @@ export class HybridFunnelPublicationsService {
         ).metaDescription,
       blocksJson: (dto.blocksJson ?? targetStep.blocksJson) as JsonValue,
       mediaMap: (dto.mediaMap ?? targetStep.mediaMap) as JsonValue,
+      settingsJson: (dto.settingsJson ?? targetStep.settingsJson) as JsonValue,
     });
 
     await this.assertDomain(scope, normalized.domainId);
@@ -612,6 +618,7 @@ export class HybridFunnelPublicationsService {
                 ),
                 title: normalized.seoTitle,
                 metaDescription: normalized.metaDescription,
+                existingSettings: normalized.settingsJson,
               }),
             ),
           },
@@ -641,6 +648,7 @@ export class HybridFunnelPublicationsService {
                 ),
                 title: normalized.seoTitle,
                 metaDescription: normalized.metaDescription,
+                existingSettings: normalized.settingsJson,
               }),
             ),
           },
@@ -671,6 +679,7 @@ export class HybridFunnelPublicationsService {
                   ),
                   title: normalized.seoTitle,
                   metaDescription: normalized.metaDescription,
+                  existingSettings: entryStep.settingsJson as JsonValue,
                 },
               ),
             ),
@@ -778,6 +787,7 @@ export class HybridFunnelPublicationsService {
     metaDescription?: string;
     blocksJson: JsonValue;
     mediaMap: JsonValue;
+    settingsJson?: JsonValue;
   }) {
     const name = input.name.trim();
     if (!name) {
@@ -815,6 +825,7 @@ export class HybridFunnelPublicationsService {
       metaDescription: (input.metaDescription ?? '').trim(),
       blocksJson,
       mediaMap,
+      settingsJson: this.assertSettingsJson(input.settingsJson),
     };
   }
 
@@ -834,6 +845,21 @@ export class HybridFunnelPublicationsService {
       throw new BadRequestException({
         code: 'HYBRID_MEDIA_MAP_INVALID',
         message: 'The mediaMap payload must be a JSON object.',
+      });
+    }
+
+    return value;
+  }
+
+  private assertSettingsJson(value: JsonValue | undefined) {
+    if (value === undefined || value === null) {
+      return {} as JsonValue;
+    }
+
+    if (typeof value !== 'object' || Array.isArray(value)) {
+      throw new BadRequestException({
+        code: 'HYBRID_SETTINGS_JSON_INVALID',
+        message: 'The settingsJson payload must be a JSON object.',
       });
     }
 
@@ -1010,9 +1036,14 @@ export class HybridFunnelPublicationsService {
       structureId: string;
       title: string;
       metaDescription: string;
+      existingSettings?: JsonValue;
     },
   ): JsonValue {
+    const safeExistingSettings = asJsonRecord(input.existingSettings) ?? {};
+    const safeExistingSeo = asJsonRecord(safeExistingSettings.seo) ?? {};
+
     return {
+      ...safeExistingSettings,
       editorSource: 'team-publications-new-vsl',
       templateId: input.templateId,
       templateCode,
@@ -1020,6 +1051,7 @@ export class HybridFunnelPublicationsService {
       hybridRenderer: 'jakawi-bridge',
       blocksJson,
       seo: {
+        ...safeExistingSeo,
         title: input.title,
         metaDescription: input.metaDescription,
       },

@@ -48,8 +48,10 @@ export function FunnelRuntimePage({
   const stepLayout = resolvePublicStepLayout({
     blocks,
     settingsJson: currentStep?.settingsJson,
+    funnelSettingsJson: runtime.funnel.settingsJson,
   });
   const isSingleColumnLayout = stepLayout === "single_column";
+  const isBlankStepLayout = stepLayout === "blank";
   const isCenteredStepLayout = isCenteredPublicStepLayout({
     settingsJson: currentStep?.settingsJson,
   });
@@ -77,7 +79,24 @@ export function FunnelRuntimePage({
   let renderedContent: ReactNode;
 
   if (hasRenderableBlocks) {
-    if (isSingleColumnLayout) {
+    if (isBlankStepLayout) {
+      renderedContent = (
+        <main className="min-h-screen bg-white">
+          <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
+          <div className="min-h-screen">
+            {blocks.map((block, index) => (
+              <PublicBlockAdapter
+                key={`${block.type}-${index}`}
+                block={block}
+                runtime={runtime}
+                blocks={blocks}
+                layoutVariant="single_column"
+              />
+            ))}
+          </div>
+        </main>
+      );
+    } else if (isSingleColumnLayout) {
       renderedContent = (
         <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#ecfdf5_100%)]">
           <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />

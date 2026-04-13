@@ -17,6 +17,11 @@ import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import type { FunnelThemeId } from "@/lib/funnel-theme.types";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
+import {
+  mergeStepLayoutOverride,
+  readStepLayoutOverride,
+  type StepLayoutOverrideValue,
+} from "@/lib/public-step-layout";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import type {
   JsonValue,
@@ -34,7 +39,9 @@ const secondaryButtonClassName =
   "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6";
+  "rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
+
+const fieldLabelClassName = "text-sm font-medium text-slate-700";
 
 const editorStepDefinitions = [
   {
@@ -234,6 +241,7 @@ export function SystemTenantTemplateFunnelEditor({
   );
   const blocksText = activeDraft.blocksText;
   const mediaRows = activeDraft.mediaRows;
+  const stepLayoutOverride = readStepLayoutOverride(activeDraft.settingsJson);
   const editorContext = {
     stepName: activeStepTabLabel,
     stepPath: activeStep ? `/${activeStep.slug}` : `/${activeStepTab}`,
@@ -393,6 +401,7 @@ export function SystemTenantTemplateFunnelEditor({
 
     updateActiveStepDraft({
       blocksText: toBlocksText(version.blocksJson),
+      settingsJson: version.settingsJson,
     });
     setIsHistoryOpen(false);
     setSuccessMessage(
@@ -600,7 +609,7 @@ export function SystemTenantTemplateFunnelEditor({
       </section>
 
       <details open className={sectionClassName}>
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
               Configuración
@@ -608,14 +617,16 @@ export function SystemTenantTemplateFunnelEditor({
             <h2 className="mt-2 text-2xl font-semibold text-slate-950">
               Identidad del funnel
             </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              Ordena nombre, descripción y tema del funnel antes de bajar al
+              detalle operativo por paso.
+            </p>
           </div>
         </summary>
 
         <div className="mt-6 grid gap-5">
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
-              Nombre del funnel
-            </span>
+            <span className={fieldLabelClassName}>Nombre del funnel</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -624,9 +635,7 @@ export function SystemTenantTemplateFunnelEditor({
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
-              Descripción
-            </span>
+            <span className={fieldLabelClassName}>Descripción</span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
@@ -636,9 +645,7 @@ export function SystemTenantTemplateFunnelEditor({
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
-              Funnel Theme
-            </span>
+            <span className={fieldLabelClassName}>Funnel Theme</span>
             <select
               value={selectedThemeId}
               onChange={(event) =>
@@ -685,6 +692,46 @@ export function SystemTenantTemplateFunnelEditor({
           })
         }
         previewTheme={selectedThemeId}
+        previewSettingsJson={activeDraft.settingsJson}
+        stepSpecificSettingsPanel={
+          <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  Configuración específica del paso
+                </p>
+                <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                  Layout del paso
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Ajusta cómo se renderiza este paso en runtime sin tocar el
+                  layout global del funnel. Ideal para que el handoff o la
+                  confirmación salgan del split sticky cuando haga falta.
+                </p>
+              </div>
+
+              <label className="grid min-w-full gap-2 lg:min-w-[22rem]">
+                <span className={fieldLabelClassName}>Layout del paso</span>
+                <select
+                  value={stepLayoutOverride}
+                  onChange={(event) =>
+                    updateActiveStepDraft({
+                      settingsJson: mergeStepLayoutOverride(
+                        activeDraft.settingsJson,
+                        event.target.value as StepLayoutOverrideValue,
+                      ),
+                    })
+                  }
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+                >
+                  <option value="inherit">Heredar del Funnel (Por defecto)</option>
+                  <option value="full-page">Estructura Centrada / Full Page</option>
+                  <option value="blank">Blank</option>
+                </select>
+              </label>
+            </div>
+          </article>
+        }
         historyPanel={
           activeStep
             ? {

@@ -1,9 +1,13 @@
 import {
   normalizeRuntimeBlockType,
 } from "@/components/public-funnel/runtime-block-utils";
+import { readStepLayoutOverride } from "@/lib/public-step-layout";
 import type { JsonValue, RuntimeBlock } from "@/lib/public-funnel-runtime.types";
 
-export type PublicStepLayoutMode = "single_column" | "split_media_focus";
+export type PublicStepLayoutMode =
+  | "single_column"
+  | "split_media_focus"
+  | "blank";
 
 const asRecord = (
   value: JsonValue | undefined,
@@ -21,6 +25,20 @@ const normalizeLayoutToken = (value: unknown) => {
   }
 
   return value.trim().toLowerCase();
+};
+
+const resolveStructureLayout = (settingsJson?: JsonValue) => {
+  const settings = asRecord(settingsJson);
+  const hybridEditor = asRecord(settings?.hybridEditor);
+  const structureId =
+    normalizeLayoutToken(settings?.structureId) ??
+    normalizeLayoutToken(hybridEditor?.structureId);
+
+  if (!structureId) {
+    return null;
+  }
+
+  return structureId === "split-media-focus" ? "split_media_focus" : "single_column";
 };
 
 const resolveExplicitLayoutToken = (settingsJson?: JsonValue) => {
@@ -46,11 +64,18 @@ const normalizeLayoutValue = (value: unknown): PublicStepLayoutMode | null => {
     return null;
   }
 
+  if (normalized === "blank") {
+    return "blank";
+  }
+
   if (
     normalized === "single_column" ||
     normalized === "single-column" ||
     normalized === "centered" ||
     normalized === "center" ||
+    normalized === "full-page" ||
+    normalized === "full_page" ||
+    normalized === "fullpage" ||
     normalized === "success" ||
     normalized === "thank_you" ||
     normalized === "thank-you"
@@ -76,24 +101,53 @@ export const isCenteredPublicStepLayout = ({
 }: {
   settingsJson?: JsonValue;
 }) => {
+  const layoutOverride = readStepLayoutOverride(settingsJson);
+  if (layoutOverride === "full-page") {
+    return true;
+  }
+
+  if (layoutOverride === "blank") {
+    return false;
+  }
+
   const explicitLayout = resolveExplicitLayoutToken(settingsJson);
 
-  return explicitLayout === "centered" || explicitLayout === "center";
+  return (
+    explicitLayout === "centered" ||
+    explicitLayout === "center" ||
+    explicitLayout === "full-page"
+  );
 };
 
 export const resolvePublicStepLayout = ({
   blocks,
   settingsJson,
+  funnelSettingsJson,
 }: {
   blocks: RuntimeBlock[];
   settingsJson?: JsonValue;
+  funnelSettingsJson?: JsonValue;
 }): PublicStepLayoutMode => {
+  const layoutOverride = readStepLayoutOverride(settingsJson);
+  if (layoutOverride === "full-page") {
+    return "single_column";
+  }
+
+  if (layoutOverride === "blank") {
+    return "blank";
+  }
+
   const explicitLayout = normalizeLayoutValue(
     resolveExplicitLayoutToken(settingsJson),
   );
 
   if (explicitLayout) {
     return explicitLayout;
+  }
+
+  const funnelLayout = resolveStructureLayout(funnelSettingsJson);
+  if (funnelLayout) {
+    return funnelLayout;
   }
 
   const hasCenteredConversionBlock = blocks.some(

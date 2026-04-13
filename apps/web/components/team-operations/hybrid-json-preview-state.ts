@@ -4,6 +4,7 @@ export type HybridJsonPreviewDraft = {
   blocks: string;
   media: Record<string, string>;
   theme: string;
+  settingsJson: Record<string, unknown>;
 };
 
 type MediaRowLike = {
@@ -18,6 +19,7 @@ export const emptyHybridJsonPreviewDraft: HybridJsonPreviewDraft = {
   blocks: "[]",
   media: {},
   theme: "default",
+  settingsJson: {},
 };
 
 const normalizeDraftContextSegment = (value: string) =>
@@ -107,6 +109,9 @@ export const readHybridJsonPreviewDraft = (
         typeof parsedDraft.theme === "string" && parsedDraft.theme.trim()
           ? parsedDraft.theme.trim()
           : emptyHybridJsonPreviewDraft.theme,
+      settingsJson: isRecord(parsedDraft.settingsJson)
+        ? parsedDraft.settingsJson
+        : emptyHybridJsonPreviewDraft.settingsJson,
     };
   } catch {
     return emptyHybridJsonPreviewDraft;

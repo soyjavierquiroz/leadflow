@@ -6,6 +6,7 @@ import {
   useState,
   type ChangeEvent,
   type MouseEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 import CodeMirror from "@uiw/react-codemirror";
@@ -35,7 +36,7 @@ import {
 import { FUNNEL_ASSET_IMAGE_ACCEPT } from "@/lib/media-optimizer";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6";
+  "rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
 
 const secondaryButtonClassName =
   "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
@@ -277,6 +278,7 @@ type HybridJsonMediaEditorProps = {
   onUploadMediaClick: (index: number) => void;
   onRemoveMediaRow: (index: number) => void;
   previewTheme?: string;
+  previewSettingsJson?: unknown;
   previewDraftKey?: string | null;
   editorContext?: {
     stepName: string;
@@ -319,6 +321,7 @@ type HybridJsonMediaEditorProps = {
     onClose: () => void;
     onRestore: (historyId: string) => void;
   } | null;
+  stepSpecificSettingsPanel?: ReactNode;
 };
 
 export function HybridJsonMediaEditor({
@@ -337,12 +340,14 @@ export function HybridJsonMediaEditor({
   onUploadMediaClick,
   onRemoveMediaRow,
   previewTheme = "default",
+  previewSettingsJson = null,
   previewDraftKey = null,
   editorContext = null,
   availableBlocks = defaultBuilderBlockDefinitions,
   routingReference = null,
   stepSwitcher = null,
   historyPanel = null,
+  stepSpecificSettingsPanel = null,
 }: HybridJsonMediaEditorProps) {
   const catalogBlocks = useMemo(() => {
     const merged = new Map<string, BuilderBlockDefinition>();
@@ -367,8 +372,9 @@ export function HybridJsonMediaEditor({
       blocks: blocksText,
       media: buildMediaMap(mediaRows),
       theme: previewTheme,
+      settingsJson: isRecord(previewSettingsJson) ? previewSettingsJson : {},
     }),
-    [blocksText, mediaRows, previewTheme],
+    [blocksText, mediaRows, previewSettingsJson, previewTheme],
   );
 
   useEffect(() => {
@@ -472,7 +478,7 @@ export function HybridJsonMediaEditor({
 
       <section className={sectionClassName}>
         <div className="grid gap-4 lg:grid-cols-2">
-          <article className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-5 py-5">
+          <article className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
               Ayuda rápida / blocksJson
             </p>
@@ -494,7 +500,7 @@ export function HybridJsonMediaEditor({
             </div>
           </article>
 
-          <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 px-5 py-5">
+          <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
               Ayuda rápida / mediaMap
             </p>
@@ -519,7 +525,7 @@ export function HybridJsonMediaEditor({
 
       <div className="space-y-6">
         <details open className={sectionClassName}>
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
                 Bloques
@@ -582,8 +588,10 @@ export function HybridJsonMediaEditor({
               </p>
             ) : null}
 
+            {stepSpecificSettingsPanel}
+
             {routingReference && routingReference.items.length > 0 ? (
-              <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 px-5 py-5">
+              <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
@@ -776,13 +784,13 @@ export function HybridJsonMediaEditor({
             )}
 
             {selectedBlockDefinition ? (
-              <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+              <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                       Catálogo / {selectedBlockDefinition.category}
                     </p>
-                    <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                    <h3 className="mt-2 text-xl font-semibold text-slate-950">
                       {selectedBlockDefinition.name}
                     </h3>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -807,7 +815,7 @@ export function HybridJsonMediaEditor({
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,20rem)_1fr] lg:items-start">
                   <label className="space-y-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    <span className="text-sm font-medium text-slate-700">
                       Selector de bloque
                     </span>
                     <select
@@ -855,7 +863,7 @@ export function HybridJsonMediaEditor({
         </details>
 
         <details open className={sectionClassName}>
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
                 Media

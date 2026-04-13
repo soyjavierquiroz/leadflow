@@ -1,6 +1,9 @@
 import { PublicRuntimeLeadSubmitProvider } from "@/components/public-runtime/public-runtime-lead-submit-provider";
 import { FunnelThemeProvider } from "@/components/public-funnel/FunnelThemeProvider";
-import { resolvePublicStepLayout } from "@/components/public-funnel/runtime-layout";
+import {
+  isCenteredPublicStepLayout,
+  resolvePublicStepLayout,
+} from "@/components/public-funnel/runtime-layout";
 import {
   normalizeRuntimeBlockType,
   parseRuntimeBlocks,
@@ -24,6 +27,7 @@ type BlockRendererProps = {
   blocks: BlockDefinition[];
   mediaMap?: Record<string, string>;
   themeId?: string;
+  settingsJson?: JsonValue;
   template?: {
     id: string;
     code?: string;
@@ -50,6 +54,7 @@ function buildPreviewRuntime(
   blocks: RuntimeBlock[],
   mediaMap: Record<string, string>,
   themeId = "default",
+  settingsJson: JsonValue = {},
   template?: BlockRendererProps["template"],
 ): PublicFunnelRuntimePayload {
   const stepType = inferPreviewStepType(blocks);
@@ -67,7 +72,7 @@ function buildPreviewRuntime(
     isConversionStep: stepType === "capture_step",
     blocksJson: blocks as JsonValue,
     mediaMap,
-    settingsJson: {},
+    settingsJson,
   };
 
   return {
@@ -139,10 +144,17 @@ export function BlockRenderer({
   blocks,
   mediaMap = {},
   themeId = "default",
+  settingsJson = {},
   template,
 }: BlockRendererProps) {
   const parsedBlocks = parseRuntimeBlocks(blocks as JsonValue[]).blocks;
-  const runtime = buildPreviewRuntime(parsedBlocks, mediaMap, themeId, template);
+  const runtime = buildPreviewRuntime(
+    parsedBlocks,
+    mediaMap,
+    themeId,
+    settingsJson,
+    template,
+  );
   const announcementBlock =
     parsedBlocks.find((block) => {
       const type = normalizeRuntimeBlockType(block.type);
@@ -163,8 +175,13 @@ export function BlockRenderer({
   const stepLayout = resolvePublicStepLayout({
     blocks: visibleBlocks,
     settingsJson: runtime.currentStep.settingsJson,
+    funnelSettingsJson: runtime.funnel.settingsJson,
   });
   const isSingleColumnLayout = stepLayout === "single_column";
+  const isBlankLayout = stepLayout === "blank";
+  const isCenteredLayout = isCenteredPublicStepLayout({
+    settingsJson: runtime.currentStep.settingsJson,
+  });
 
   const renderBlock = (block: RuntimeBlock, index: number) => {
     const { type, ...props } = block;
@@ -197,10 +214,18 @@ export function BlockRenderer({
     <PublicRuntimeLeadSubmitProvider hostname={previewHost} path={previewPath}>
       <FunnelThemeProvider runtime={runtime}>
         <div className="pb-12">
-          {isSingleColumnLayout ? (
+          {isBlankLayout ? (
+            <div>{visibleBlocks.map((block, index) => renderBlock(block, index))}</div>
+          ) : isSingleColumnLayout ? (
             <>
               {announcementBlock ? renderBlock(announcementBlock, -1) : null}
-              <div className="px-4 py-6 md:px-6 md:py-10">
+              <div
+                className={
+                  isCenteredLayout
+                    ? "flex min-h-screen w-full flex-col px-4 py-0 md:px-6 md:py-0"
+                    : "px-4 py-6 md:px-6 md:py-10"
+                }
+              >
                 {visibleBlocks.map((block, index) => renderBlock(block, index))}
               </div>
             </>

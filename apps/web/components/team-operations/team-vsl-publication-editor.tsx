@@ -30,6 +30,11 @@ import {
 import { buildHybridJsonPreviewDraftKey } from "@/components/team-operations/hybrid-json-preview-state";
 import type { BuilderBlockDefinition } from "@/lib/blocks/catalog";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
+import {
+  mergeStepLayoutOverride,
+  readStepLayoutOverride,
+  type StepLayoutOverrideValue,
+} from "@/lib/public-step-layout";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
@@ -42,7 +47,9 @@ const secondaryButtonClassName =
   "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6";
+  "rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
+
+const fieldLabelClassName = "text-sm font-medium text-slate-700";
 
 const defaultMediaRows = requiredMediaKeys.map((key) => ({
   key,
@@ -372,6 +379,7 @@ export function TeamVslPublicationEditor({
   const [metaDescription, setMetaDescription] = useState("");
   const [blocksText, setBlocksText] = useState(defaultBlocksSeed);
   const [mediaRows, setMediaRows] = useState<MediaRow[]>([...defaultMediaRows]);
+  const [stepSettingsJson, setStepSettingsJson] = useState<unknown>({});
   const [stepRecords, setStepRecords] = useState<HybridPublicationStepDetail[]>([]);
   const [stepDrafts, setStepDrafts] = useState<Record<string, StepDraft>>({});
   const [fallbackDrafts, setFallbackDrafts] = useState<
@@ -406,6 +414,7 @@ export function TeamVslPublicationEditor({
       setCurrentPublicationId(null);
       setStepRecords([]);
       setStepDrafts({});
+      setStepSettingsJson({});
       return;
     }
 
@@ -428,6 +437,7 @@ export function TeamVslPublicationEditor({
         setMetaDescription(payload.seo.metaDescription);
         setBlocksText(JSON.stringify(payload.step.blocksJson, null, 2));
         setMediaRows(toMediaRows(payload.step.mediaMap));
+        setStepSettingsJson(payload.step.settingsJson);
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
       })
@@ -472,6 +482,8 @@ export function TeamVslPublicationEditor({
     : null;
   const editorBlocksText = activeDraft?.blocksText ?? blocksText;
   const editorMediaRows = activeDraft?.mediaRows ?? mediaRows;
+  const editorSettingsJson = activeDraft?.settingsJson ?? stepSettingsJson;
+  const editorLayoutOverride = readStepLayoutOverride(editorSettingsJson);
   const editorContext = showStepSwitcher
     ? {
         stepName: activeStepTabLabel,
@@ -505,6 +517,10 @@ export function TeamVslPublicationEditor({
 
       if (patch.mediaRows !== undefined) {
         setMediaRows(patch.mediaRows);
+      }
+
+      if (patch.settingsJson !== undefined) {
+        setStepSettingsJson(patch.settingsJson);
       }
 
       return;
@@ -700,6 +716,7 @@ export function TeamVslPublicationEditor({
 
     updateEditorDraft({
       blocksText: toBlocksText(version.blocksJson),
+      settingsJson: version.settingsJson,
     });
     setIsHistoryOpen(false);
     setSuccessMessage(
@@ -785,6 +802,7 @@ export function TeamVslPublicationEditor({
           stepKey: showStepSwitcher ? activeStepTab : undefined,
           blocksJson: parsedBlocks.value,
           mediaMap,
+          settingsJson: editorSettingsJson,
         };
 
         if (!currentPublicationId && mode === "system") {
@@ -817,6 +835,7 @@ export function TeamVslPublicationEditor({
         );
         setBlocksText(JSON.stringify(response.step.blocksJson, null, 2));
         setMediaRows(toMediaRows(response.step.mediaMap));
+        setStepSettingsJson(response.step.settingsJson);
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
         setSuccessMessage(
@@ -935,7 +954,7 @@ export function TeamVslPublicationEditor({
       </section>
 
       <details open className={sectionClassName}>
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
               Configuración
@@ -943,15 +962,17 @@ export function TeamVslPublicationEditor({
             <h2 className="mt-2 text-2xl font-semibold text-slate-950">
               Header y metadata del funnel
             </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              Define identidad, dominio, tema y SEO con una jerarquía más clara
+              antes de entrar al JSON operativo de cada paso.
+            </p>
           </div>
           <ChevronDown className="h-5 w-5 text-slate-400" />
         </summary>
 
         <div className="mt-6 grid gap-5 md:grid-cols-2">
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
-              Nombre del funnel
-            </span>
+            <span className={fieldLabelClassName}>Nombre del funnel</span>
             <input
               value={funnelName}
               onChange={(event) => setFunnelName(event.target.value)}
@@ -965,9 +986,7 @@ export function TeamVslPublicationEditor({
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
-              Dominio activo
-            </span>
+            <span className={fieldLabelClassName}>Dominio activo</span>
             <select
               value={selectedDomainId}
               onChange={(event) => setSelectedDomainId(event.target.value)}
@@ -982,7 +1001,7 @@ export function TeamVslPublicationEditor({
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">Ruta</span>
+            <span className={fieldLabelClassName}>Ruta</span>
             <input
               value={pathPrefix}
               onChange={(event) => setPathPrefix(event.target.value)}
@@ -992,9 +1011,7 @@ export function TeamVslPublicationEditor({
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
-              Template base
-            </span>
+            <span className={fieldLabelClassName}>Template base</span>
             <select
               value={selectedTemplateId}
               onChange={(event) => setSelectedTemplateId(event.target.value)}
@@ -1010,9 +1027,7 @@ export function TeamVslPublicationEditor({
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
-              Funnel Theme
-            </span>
+            <span className={fieldLabelClassName}>Funnel Theme</span>
             <select
               value={selectedThemeId}
               onChange={(event) => setSelectedThemeId(event.target.value)}
@@ -1031,9 +1046,7 @@ export function TeamVslPublicationEditor({
           </label>
 
           <label className="grid gap-2 md:col-span-2">
-            <span className="text-sm font-semibold text-slate-900">
-              SEO Title
-            </span>
+            <span className={fieldLabelClassName}>SEO Title</span>
             <input
               value={seoTitle}
               onChange={(event) => setSeoTitle(event.target.value)}
@@ -1046,9 +1059,7 @@ export function TeamVslPublicationEditor({
           </label>
 
           <label className="grid gap-2 md:col-span-2">
-            <span className="text-sm font-semibold text-slate-900">
-              Meta Description
-            </span>
+            <span className={fieldLabelClassName}>Meta Description</span>
             <textarea
               value={metaDescription}
               onChange={(event) => setMetaDescription(event.target.value)}
@@ -1088,7 +1099,48 @@ export function TeamVslPublicationEditor({
           })
         }
         previewTheme={selectedThemeId}
+        previewSettingsJson={editorSettingsJson}
         availableBlocks={availableBlocks}
+        stepSpecificSettingsPanel={
+          <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  Configuración específica del paso
+                </p>
+                <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                  Layout del paso
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Este ajuste vive dentro de <code>settingsJson</code> del paso
+                  activo y permite que páginas como <code>/confirmado</code>{" "}
+                  rompan la herencia del layout sticky del funnel cuando haga
+                  falta.
+                </p>
+              </div>
+
+              <label className="grid min-w-full gap-2 lg:min-w-[22rem]">
+                <span className={fieldLabelClassName}>Layout del paso</span>
+                <select
+                  value={editorLayoutOverride}
+                  onChange={(event) =>
+                    updateEditorDraft({
+                      settingsJson: mergeStepLayoutOverride(
+                        editorSettingsJson,
+                        event.target.value as StepLayoutOverrideValue,
+                      ),
+                    })
+                  }
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+                >
+                  <option value="inherit">Heredar del Funnel (Por defecto)</option>
+                  <option value="full-page">Estructura Centrada / Full Page</option>
+                  <option value="blank">Blank</option>
+                </select>
+              </label>
+            </div>
+          </article>
+        }
         historyPanel={
           currentPublicationId && activeStep
             ? {

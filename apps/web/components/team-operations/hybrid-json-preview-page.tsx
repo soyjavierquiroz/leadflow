@@ -27,7 +27,8 @@ export function HybridJsonPreviewPage() {
         const hasStoredDraft =
           nextDraft.blocks !== emptyHybridJsonPreviewDraft.blocks ||
           Object.keys(nextDraft.media).length > 0 ||
-          nextDraft.theme !== emptyHybridJsonPreviewDraft.theme;
+          nextDraft.theme !== emptyHybridJsonPreviewDraft.theme ||
+          Object.keys(nextDraft.settingsJson).length > 0;
 
         setDraft(nextDraft);
         setErrorMessage(
@@ -78,6 +79,7 @@ export function HybridJsonPreviewPage() {
         blocksText={draft.blocks}
         mediaMap={draft.media}
         themeId={draft.theme}
+        settingsJson={draft.settingsJson}
       />
     </div>
   );
