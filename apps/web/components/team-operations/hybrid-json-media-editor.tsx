@@ -373,7 +373,9 @@ export function HybridJsonMediaEditor({
       blocks: blocksText,
       media: buildMediaMap(mediaRows),
       theme: previewTheme,
-      settingsJson: isRecord(previewSettingsJson) ? previewSettingsJson : {},
+      settingsJson: (
+        isRecord(previewSettingsJson) ? previewSettingsJson : {}
+      ) as any,
     }),
     [blocksText, mediaRows, previewSettingsJson, previewTheme],
   );
