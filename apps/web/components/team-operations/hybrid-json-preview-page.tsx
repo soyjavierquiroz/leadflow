@@ -8,6 +8,9 @@ import {
   readHybridJsonPreviewDraft,
 } from "@/components/team-operations/hybrid-json-preview-state";
 
+const hasObjectSettingsJson = (value: unknown) =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
 export function HybridJsonPreviewPage() {
   const searchParams = useSearchParams();
   const draftKey = searchParams.get("draftKey")?.trim() ?? "";
@@ -28,7 +31,9 @@ export function HybridJsonPreviewPage() {
           nextDraft.blocks !== emptyHybridJsonPreviewDraft.blocks ||
           Object.keys(nextDraft.media).length > 0 ||
           nextDraft.theme !== emptyHybridJsonPreviewDraft.theme ||
-          Object.keys(nextDraft.settingsJson).length > 0;
+          (hasObjectSettingsJson(nextDraft.settingsJson)
+            ? Object.keys(nextDraft.settingsJson).length > 0
+            : false);
 
         setDraft(nextDraft);
         setErrorMessage(
