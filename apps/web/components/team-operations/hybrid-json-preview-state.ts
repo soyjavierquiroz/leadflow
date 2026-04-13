@@ -1,10 +1,12 @@
+import type { JsonValue } from "@/lib/public-funnel-runtime.types";
+
 export const HYBRID_JSON_PREVIEW_STORAGE_PREFIX = "draft_preview";
 
 export type HybridJsonPreviewDraft = {
   blocks: string;
   media: Record<string, string>;
   theme: string;
-  settingsJson: Record<string, unknown>;
+  settingsJson: JsonValue;
 };
 
 type MediaRowLike = {
@@ -12,7 +14,7 @@ type MediaRowLike = {
   value: string;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+const isRecord = (value: unknown): value is Record<string, JsonValue> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 export const emptyHybridJsonPreviewDraft: HybridJsonPreviewDraft = {

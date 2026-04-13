@@ -79,7 +79,7 @@ export function HybridJsonPreviewPage() {
         blocksText={draft.blocks}
         mediaMap={draft.media}
         themeId={draft.theme}
-        settingsJson={draft.settingsJson}
+        settingsJson={draft.settingsJson as any}
       />
     </div>
   );
