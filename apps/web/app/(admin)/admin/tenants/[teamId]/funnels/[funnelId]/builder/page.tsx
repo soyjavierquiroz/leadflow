@@ -71,19 +71,21 @@ export default async function AdminTenantFunnelBuilderPage({
   }
 
   return (
-    <TeamVslPublicationEditor
-      mode="system"
-      teamId={teamId}
-      initialPublicationId={publication.id}
-      editorHref={`/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(funnelId)}/builder`}
-      backHref={`/admin/tenants/${encodeURIComponent(teamId)}`}
-      backLabel="Volver al tenant"
-      headerEyebrow={`Super Admin / Tenant / ${tenant.code}`}
-      headerTitle={`Funnel Builder de ${tenant.name}`}
-      headerDescription="Esta vista reutiliza el builder híbrido real del embudo publicado, incluyendo media dictionary, blocksJson y configuración SEO."
-      domains={domains.filter((item) => item.status === "active")}
-      templates={templates.filter((item) => item.status !== "archived")}
-      availableBlocks={blockDefinitions}
-    />
+    <div className="flex flex-col items-start w-full text-left">
+      <TeamVslPublicationEditor
+        mode="system"
+        teamId={teamId}
+        initialPublicationId={publication.id}
+        editorHref={`/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(funnelId)}/builder`}
+        backHref={`/admin/tenants/${encodeURIComponent(teamId)}`}
+        backLabel="Volver al tenant"
+        headerEyebrow={`Super Admin / Tenant / ${tenant.code}`}
+        headerTitle={`Funnel Builder de ${tenant.name}`}
+        headerDescription="Esta vista reutiliza el builder híbrido real del embudo publicado, incluyendo media dictionary, blocksJson y configuración SEO."
+        domains={domains.filter((item) => item.status === "active")}
+        templates={templates.filter((item) => item.status !== "archived")}
+        availableBlocks={blockDefinitions}
+      />
+    </div>
   );
 }
