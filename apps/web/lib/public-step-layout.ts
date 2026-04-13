@@ -1,6 +1,8 @@
-const asRecord = (value: unknown): Record<string, unknown> | null =>
+import type { JsonValue } from "@/lib/public-funnel-runtime.types";
+
+const asRecord = (value: unknown): Record<string, JsonValue> | null =>
   value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
+    ? (value as Record<string, JsonValue>)
     : null;
 
 export const stepLayoutOverrideValues = [
@@ -57,7 +59,7 @@ export const readStepLayoutOverride = (
 export const mergeStepLayoutOverride = (
   settingsJson: unknown,
   override: StepLayoutOverrideValue,
-) => {
+): JsonValue => {
   const settings = asRecord(settingsJson) ?? {};
 
   if (override === "inherit") {
