@@ -19,6 +19,7 @@ import { MailService } from '../mail/mail.service';
 import { buildEntity } from '../shared/domain.factory';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import type { JsonValue } from '../shared/domain.types';
+import { assertSupportedFunnelBlocksJson } from '../shared/funnel-block-validation';
 import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { CreateTeamDto } from './dto/create-team.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
@@ -609,7 +610,7 @@ export class TeamsService {
     const blocksJson =
       dto.blocksJson === undefined
         ? this.cloneJsonValue(existingStep.blocksJson as JsonValue)
-        : this.cloneJsonValue(dto.blocksJson);
+        : this.assertBlocksJson(this.cloneJsonValue(dto.blocksJson));
     const mediaMap =
       dto.mediaMap === undefined
         ? this.cloneJsonValue(existingStep.mediaMap as JsonValue)
@@ -1258,6 +1259,15 @@ export class TeamsService {
 
   private cloneJsonValue(value: JsonValue): JsonValue {
     return JSON.parse(JSON.stringify(value)) as JsonValue;
+  }
+
+  private assertBlocksJson(value: JsonValue) {
+    return assertSupportedFunnelBlocksJson(value, {
+      invalidArrayCode: 'TENANT_FUNNEL_STEP_BLOCKS_INVALID',
+      invalidArrayMessage: 'The blocksJson payload must be a JSON array.',
+      invalidBlockCode: 'TENANT_FUNNEL_STEP_BLOCK_TYPE_INVALID',
+      field: 'blocksJson',
+    });
   }
 
   private normalizeFunnelSettingsJson(value: JsonValue): JsonValue {

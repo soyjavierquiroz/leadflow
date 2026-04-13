@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizePublicationPathPrefix } from '../shared/publication-resolution.utils';
 import type { JsonValue } from '../shared/domain.types';
+import { assertSupportedFunnelBlocksJson } from '../shared/funnel-block-validation';
 import type { CreateTeamHybridFunnelPublicationDto } from './dto/create-team-hybrid-funnel-publication.dto';
 import type { UpdateTeamHybridFunnelPublicationDto } from './dto/update-team-hybrid-funnel-publication.dto';
 
@@ -830,14 +831,12 @@ export class HybridFunnelPublicationsService {
   }
 
   private assertBlocksJson(value: JsonValue) {
-    if (!Array.isArray(value)) {
-      throw new BadRequestException({
-        code: 'HYBRID_BLOCKS_JSON_INVALID',
-        message: 'The blocksJson payload must be a JSON array.',
-      });
-    }
-
-    return value;
+    return assertSupportedFunnelBlocksJson(value, {
+      invalidArrayCode: 'HYBRID_BLOCKS_JSON_INVALID',
+      invalidArrayMessage: 'The blocksJson payload must be a JSON array.',
+      invalidBlockCode: 'HYBRID_BLOCK_TYPE_INVALID',
+      field: 'blocksJson',
+    });
   }
 
   private assertMediaMap(value: JsonValue) {

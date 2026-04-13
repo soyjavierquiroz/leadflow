@@ -202,15 +202,23 @@ const captureScaffoldSeed = JSON.stringify(
 const confirmationScaffoldSeed = JSON.stringify(
   [
     {
-      type: "thank_you_reveal",
-      key: "thank-you-reveal-base",
-      variant: "confirmation_reveal",
-      headline: "Tu registro fue confirmado",
-      subheadline:
-        "Usa este bloque para validar la acción tomada y preparar el siguiente movimiento.",
-      reveal_headline: "Siguiente paso listo",
-      reveal_subheadline:
-        "Aquí puedes revelar al asesor, sponsor o instrucción final del handoff.",
+      type: "conversion_page_config",
+      key: "conversion-page-base",
+      content: {
+        headline: "Tu registro fue confirmado",
+        subheadline:
+          "Usa esta tarjeta centrada para validar la acción tomada y preparar el siguiente movimiento.",
+        cta_text: "Abrir WhatsApp",
+        whatsapp_message:
+          "Hola, ya completé mi registro y quiero continuar con el siguiente paso.",
+        redirect_delay: 0,
+        fallback_advisor: {
+          name: "Asesor asignado",
+          bio: "Actualiza aquí el nombre, la bio y el CTA principal del handoff.",
+          phone: "",
+          photo_url: "",
+        },
+      },
     },
     {
       type: "whatsapp_handoff_cta",
@@ -750,7 +758,7 @@ export function HybridJsonMediaEditor({
                           ⚡ Inyectar Plantilla Confirmación
                         </p>
                         <p className="text-sm leading-6 text-slate-600">
-                          Carga una base con <code>thank_you_reveal</code> y <code>whatsapp_handoff_cta</code>.
+                          Carga una base con <code>conversion_page_config</code> y <code>whatsapp_handoff_cta</code>.
                         </p>
                       </div>
                       <Sparkles className="mt-1 h-5 w-5 shrink-0 text-emerald-600" />

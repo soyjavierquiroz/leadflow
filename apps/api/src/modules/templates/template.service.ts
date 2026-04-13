@@ -8,6 +8,7 @@ import { Prisma, type FunnelTemplate as PrismaFunnelTemplate } from '@prisma/cli
 import { PrismaService } from '../../prisma/prisma.service';
 import { mapFunnelRecord, mapFunnelTemplateRecord } from '../../prisma/prisma.mappers';
 import type { JsonValue } from '../shared/domain.types';
+import { assertSupportedFunnelBlocksJson } from '../shared/funnel-block-validation';
 import type { DeployTemplateDto } from './dto/deploy-template.dto';
 import type { CreateTemplateDto } from './dto/create-template.dto';
 import type { UpdateTemplateDto } from './dto/update-template.dto';
@@ -284,15 +285,12 @@ export class TemplateService {
   }
 
   private assertBlocks(value: JsonValue) {
-    if (!Array.isArray(value)) {
-      throw new BadRequestException({
-        code: 'TEMPLATE_BLOCKS_INVALID',
-        message: 'The blocks payload must be a JSON array.',
-        field: 'blocks',
-      });
-    }
-
-    return value;
+    return assertSupportedFunnelBlocksJson(value, {
+      invalidArrayCode: 'TEMPLATE_BLOCKS_INVALID',
+      invalidArrayMessage: 'The blocks payload must be a JSON array.',
+      invalidBlockCode: 'TEMPLATE_BLOCK_TYPE_INVALID',
+      field: 'blocks',
+    });
   }
 
   private assertMediaMap(value: JsonValue) {
