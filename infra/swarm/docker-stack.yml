@@ -13,6 +13,7 @@ services:
       NEXT_PUBLIC_MEMBERS_URL: "${MEMBERS_URL:-https://leadflow.kuruk.in}"
       NEXT_PUBLIC_ADMIN_URL: "${ADMIN_URL:-https://leadflow.kuruk.in}"
       NEXT_PUBLIC_API_URL: "${API_URL:-https://api.leadflow.kuruk.in}"
+      API_INTERNAL_BASE_URL: "${API_INTERNAL_BASE_URL:-http://api:3001}"
       NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET: "${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.leadflow.kuruk.in}"
       NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN: "${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kuruk.in}"
       DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-leadflow}:${POSTGRES_PASSWORD}@postgres_postgres:5432/${POSTGRES_DB:-leadflow}?schema=public}"

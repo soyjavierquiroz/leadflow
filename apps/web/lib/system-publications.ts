@@ -1,14 +1,26 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { apiFetchWithSession } from "@/lib/auth";
 import type { SystemTenantRecord } from "@/lib/system-tenants";
+import {
+  buildResponseDebugContext,
+  describePayloadShape,
+  getErrorDebugDetails,
+  logCriticalSsrError,
+} from "@/lib/ssr-debug";
 
-export type SystemPublicationRecord = {
+type LooseRecord = Record<string, unknown>;
+
+export type SystemPublicationRecord = LooseRecord & {
   id: string;
   workspaceId: string;
   teamId: string;
   domainId: string;
   funnelId: string;
   funnelInstanceId: string;
+  trackingProfileId?: string | null;
+  handoffStrategyId?: string | null;
+  metaPixelId?: string | null;
+  tiktokPixelId?: string | null;
   path: string;
   pathPrefix: string;
   status: string;
@@ -17,31 +29,31 @@ export type SystemPublicationRecord = {
   isRoutable: boolean;
   createdAt: string;
   updatedAt: string;
-  workspace: {
+  workspace: LooseRecord & {
     id: string;
     name: string;
     slug: string;
   };
-  team: {
+  team: LooseRecord & {
     id: string;
     name: string;
     code: string;
     status: string;
     isActive: boolean;
   };
-  domain: {
+  domain: LooseRecord & {
     id: string;
     host: string;
     normalizedHost: string;
     status: string;
   };
-  funnel: {
+  funnel: LooseRecord & {
     id: string;
     legacyFunnelId: string | null;
     name: string;
     code: string;
     status: string;
-    template: {
+    template: LooseRecord & {
       id: string;
       name: string;
       code: string;
@@ -60,7 +72,7 @@ export type SystemPublicationTeamOption = Pick<
   | "isActive"
 >;
 
-export type SystemPublicationDomainOption = {
+export type SystemPublicationDomainOption = LooseRecord & {
   id: string;
   workspaceId: string;
   teamId: string;
@@ -70,12 +82,15 @@ export type SystemPublicationDomainOption = {
   verificationStatus: string;
 };
 
-export type SystemPublicationFunnelOption = {
+export type SystemPublicationFunnelOption = LooseRecord & {
   id: string;
   workspaceId: string;
   teamId: string;
   templateId: string;
   legacyFunnelId: string | null;
+  trackingProfileId?: string | null;
+  handoffStrategyId?: string | null;
+  theme?: string | null;
   name: string;
   code: string;
   status: string;
@@ -84,21 +99,40 @@ export type SystemPublicationFunnelOption = {
 export const getSystemPublications = async () => {
   noStore();
 
-  const response = await apiFetchWithSession("/system/publications");
+  try {
+    const response = await apiFetchWithSession("/system/publications");
 
-  if (!response.ok) {
-    throw new Error(
-      `No pudimos cargar los bindings globales (${response.status}).`,
-    );
+    if (!response.ok) {
+      const error = new Error(
+        `No pudimos cargar los bindings globales (${response.status}).`,
+      );
+      logCriticalSsrError(error, {
+        operation: "getSystemPublications",
+        response: await buildResponseDebugContext(response),
+      });
+      throw error;
+    }
+
+    const payload = (await response.json()) as unknown;
+
+    if (!Array.isArray(payload)) {
+      const error = new Error(
+        "El API devolvió un payload inválido para system/publications.",
+      );
+      logCriticalSsrError(error, {
+        operation: "getSystemPublications",
+        response: await buildResponseDebugContext(response),
+        payloadShape: describePayloadShape(payload),
+      });
+      throw error;
+    }
+
+    return payload as SystemPublicationRecord[];
+  } catch (error) {
+    logCriticalSsrError(error, {
+      operation: "getSystemPublications",
+      error: getErrorDebugDetails(error),
+    });
+    throw error;
   }
-
-  const payload = (await response.json()) as unknown;
-
-  if (!Array.isArray(payload)) {
-    throw new Error(
-      "El API devolvió un payload inválido para system/publications.",
-    );
-  }
-
-  return payload as SystemPublicationRecord[];
 };

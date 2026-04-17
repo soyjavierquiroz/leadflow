@@ -3,6 +3,10 @@ import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { webPublicConfig } from "@/lib/public-env";
+import {
+  getErrorDebugDetails,
+  logCriticalSsrError,
+} from "@/lib/ssr-debug";
 
 export type AppUserRole = "SUPER_ADMIN" | "TEAM_ADMIN" | "MEMBER";
 
@@ -53,7 +57,41 @@ type AuthSessionCookie = {
   value: string;
 };
 
-const authApiBaseUrl = `${webPublicConfig.urls.api}/v1`;
+const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
+
+const sanitizeServerEnv = (value: string | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const resolveServerApiOrigin = () => {
+  const internalCandidate =
+    sanitizeServerEnv(process.env.API_INTERNAL_BASE_URL) ??
+    sanitizeServerEnv(process.env.INTERNAL_API_BASE_URL) ??
+    sanitizeServerEnv(process.env.NEXT_PRIVATE_API_URL);
+
+  if (internalCandidate) {
+    return normalizeBaseUrl(internalCandidate);
+  }
+
+  try {
+    const apiUrl = new URL(webPublicConfig.urls.api);
+
+    if (apiUrl.hostname === "localhost" || apiUrl.hostname === "127.0.0.1") {
+      return normalizeBaseUrl(`http://api:${apiUrl.port || "3001"}`);
+    }
+  } catch {
+    return normalizeBaseUrl(webPublicConfig.urls.api);
+  }
+
+  return normalizeBaseUrl(webPublicConfig.urls.api);
+};
+
+const authApiBaseUrl = `${resolveServerApiOrigin()}/v1`;
 const authCookieName =
   process.env.AUTH_COOKIE_NAME?.trim() || "leadflow_session";
 const authCookieDomain = webPublicConfig.baseDomain ?? undefined;
@@ -428,16 +466,30 @@ export const logoutWithServerSession = async () => {
 export const apiFetchWithSession = async (path: string, init?: RequestInit) => {
   const cookieHeader = await buildCookieHeader();
   const headers = new Headers(init?.headers);
+  const requestUrl = `${authApiBaseUrl}${path}`;
 
   if (cookieHeader) {
     headers.set("cookie", cookieHeader);
   }
 
-  return fetch(`${authApiBaseUrl}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  try {
+    return await fetch(requestUrl, {
+      ...init,
+      headers,
+      cache: "no-store",
+    });
+  } catch (error) {
+    logCriticalSsrError(error, {
+      operation: "apiFetchWithSession",
+      requestUrl,
+      path,
+      method: init?.method ?? "GET",
+      apiBaseUrl: authApiBaseUrl,
+      hasCookieHeader: Boolean(cookieHeader),
+      error: getErrorDebugDetails(error),
+    });
+    throw error;
+  }
 };
 
 export const getSessionUser = async () => {
