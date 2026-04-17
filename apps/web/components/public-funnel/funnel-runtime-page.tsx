@@ -11,6 +11,7 @@ import { FunnelThemeProvider } from "@/components/public-funnel/FunnelThemeProvi
 import { LeadCaptureProvider } from "@/components/public-funnel/lead-capture-context";
 import { PublicAnnouncementBanner } from "@/components/public-funnel/public-announcement-banner";
 import { PublicLeadCaptureModalHost } from "@/components/public-funnel/public-lead-capture-modal-host";
+import { PublicRuntimePixelScripts } from "@/components/public-funnel/public-runtime-pixel-scripts";
 import {
   isCenteredPublicStepLayout,
   resolvePublicStepLayout,
@@ -302,6 +303,10 @@ export function FunnelRuntimePage({
   return (
     <LeadCaptureProvider>
       <FunnelThemeProvider runtime={runtime}>
+        <PublicRuntimePixelScripts
+          metaPixelId={runtime.publication.metaPixelId}
+          tiktokPixelId={runtime.publication.tiktokPixelId}
+        />
         {renderedContent}
         <PublicLeadCaptureModalHost runtime={runtime} blocks={blocks} />
       </FunnelThemeProvider>

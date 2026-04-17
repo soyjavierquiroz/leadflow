@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
-import { PublicRuntimePixelScripts } from '@/components/public-funnel/public-runtime-pixel-scripts';
 import {
   fetchPublicFunnelRuntime,
   normalizeRuntimePath,
@@ -149,10 +148,6 @@ export default async function SiteRuntimePage({
 
   return (
     <>
-      <PublicRuntimePixelScripts
-        metaPixelId={runtime.publication.metaPixelId}
-        tiktokPixelId={runtime.publication.tiktokPixelId}
-      />
       <FunnelRuntimePage runtime={runtime} previewHost={previewHost} />
     </>
   );

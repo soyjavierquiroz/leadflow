@@ -1,4 +1,6 @@
-import Script from "next/script";
+"use client";
+
+import { useEffect } from "react";
 
 type PublicRuntimePixelScriptsProps = {
   metaPixelId?: string | null;
@@ -41,43 +43,43 @@ export function PublicRuntimePixelScripts({
   const resolvedMetaPixelId = normalizePixelId(metaPixelId);
   const resolvedTikTokPixelId = normalizePixelId(tiktokPixelId);
 
-  if (!resolvedMetaPixelId && !resolvedTikTokPixelId) {
-    return null;
-  }
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
 
-  return (
-    <>
-      {resolvedMetaPixelId ? (
-        <>
-          <Script
-            id={`meta-pixel-${resolvedMetaPixelId}`}
-            strategy="beforeInteractive"
-            dangerouslySetInnerHTML={{
-              __html: buildMetaPixelScript(resolvedMetaPixelId),
-            }}
-          />
-          <noscript>
-            <img
-              alt=""
-              height="1"
-              width="1"
-              style={{ display: "none" }}
-              src={`https://www.facebook.com/tr?id=${encodeURIComponent(
-                resolvedMetaPixelId,
-              )}&ev=PageView&noscript=1`}
-            />
-          </noscript>
-        </>
-      ) : null}
-      {resolvedTikTokPixelId ? (
-        <Script
-          id={`tiktok-pixel-${resolvedTikTokPixelId}`}
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: buildTikTokPixelScript(resolvedTikTokPixelId),
-          }}
-        />
-      ) : null}
-    </>
-  );
+    const syncHeadScript = (scriptId: string, code: string) => {
+      const current = document.head.querySelector<HTMLScriptElement>(
+        `script[data-leadflow-runtime-script="${scriptId}"]`,
+      );
+
+      if (current?.textContent === code) {
+        return;
+      }
+
+      current?.remove();
+
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.dataset.leadflowRuntimeScript = scriptId;
+      script.text = code;
+      document.head.appendChild(script);
+    };
+
+    if (resolvedMetaPixelId) {
+      syncHeadScript(
+        `meta-pixel-${resolvedMetaPixelId}`,
+        buildMetaPixelScript(resolvedMetaPixelId),
+      );
+    }
+
+    if (resolvedTikTokPixelId) {
+      syncHeadScript(
+        `tiktok-pixel-${resolvedTikTokPixelId}`,
+        buildTikTokPixelScript(resolvedTikTokPixelId),
+      );
+    }
+  }, [resolvedMetaPixelId, resolvedTikTokPixelId]);
+
+  return null;
 }
