@@ -15,6 +15,8 @@ export interface FunnelPublication
   funnelInstanceId: DomainId;
   trackingProfileId: DomainId | null;
   handoffStrategyId: DomainId | null;
+  metaPixelId: string | null;
+  tiktokPixelId: string | null;
   pathPrefix: string;
   status: FunnelPublicationStatus;
   isActive: boolean;

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { mapFunnelPublicationRecord } from '../prisma.mappers';
@@ -55,53 +56,64 @@ export class FunnelPublicationPrismaRepository implements FunnelPublicationRepos
   }
 
   async create(data: CreateFunnelPublicationDto): Promise<FunnelPublication> {
+    const createData = {
+      workspaceId: data.workspaceId,
+      teamId: data.teamId,
+      domainId: data.domainId,
+      funnelInstanceId: data.funnelInstanceId,
+      trackingProfileId: data.trackingProfileId ?? null,
+      handoffStrategyId: data.handoffStrategyId ?? null,
+      metaPixelId: null,
+      tiktokPixelId: null,
+      pathPrefix: normalizePublicationPathPrefix(data.pathPrefix),
+      status: data.isActive ? 'active' : 'draft',
+      isActive: data.isActive ?? false,
+      isPrimary: data.isPrimary ?? false,
+    } as Prisma.FunnelPublicationUncheckedCreateInput;
+
     const record = await this.prisma.funnelPublication.create({
-      data: {
-        workspaceId: data.workspaceId,
-        teamId: data.teamId,
-        domainId: data.domainId,
-        funnelInstanceId: data.funnelInstanceId,
-        trackingProfileId: data.trackingProfileId ?? null,
-        handoffStrategyId: data.handoffStrategyId ?? null,
-        pathPrefix: normalizePublicationPathPrefix(data.pathPrefix),
-        status: data.isActive ? 'active' : 'draft',
-        isActive: data.isActive ?? false,
-        isPrimary: data.isPrimary ?? false,
-      },
+      data: createData,
     });
 
     return mapFunnelPublicationRecord(record);
   }
 
   async save(entity: FunnelPublication): Promise<FunnelPublication> {
+    const createData = {
+      id: entity.id,
+      workspaceId: entity.workspaceId,
+      teamId: entity.teamId,
+      domainId: entity.domainId,
+      funnelInstanceId: entity.funnelInstanceId,
+      trackingProfileId: entity.trackingProfileId,
+      handoffStrategyId: entity.handoffStrategyId,
+      metaPixelId: entity.metaPixelId,
+      tiktokPixelId: entity.tiktokPixelId,
+      pathPrefix: normalizePublicationPathPrefix(entity.pathPrefix),
+      status: entity.status,
+      isActive: entity.isActive,
+      isPrimary: entity.isPrimary,
+      createdAt: new Date(entity.createdAt),
+      updatedAt: new Date(entity.updatedAt),
+    } as Prisma.FunnelPublicationUncheckedCreateInput;
+    const updateData = {
+      teamId: entity.teamId,
+      domainId: entity.domainId,
+      funnelInstanceId: entity.funnelInstanceId,
+      trackingProfileId: entity.trackingProfileId,
+      handoffStrategyId: entity.handoffStrategyId,
+      metaPixelId: entity.metaPixelId,
+      tiktokPixelId: entity.tiktokPixelId,
+      pathPrefix: normalizePublicationPathPrefix(entity.pathPrefix),
+      status: entity.status,
+      isActive: entity.isActive,
+      isPrimary: entity.isPrimary,
+    } as Prisma.FunnelPublicationUncheckedUpdateInput;
+
     const record = await this.prisma.funnelPublication.upsert({
       where: { id: entity.id },
-      create: {
-        id: entity.id,
-        workspaceId: entity.workspaceId,
-        teamId: entity.teamId,
-        domainId: entity.domainId,
-        funnelInstanceId: entity.funnelInstanceId,
-        trackingProfileId: entity.trackingProfileId,
-        handoffStrategyId: entity.handoffStrategyId,
-        pathPrefix: normalizePublicationPathPrefix(entity.pathPrefix),
-        status: entity.status,
-        isActive: entity.isActive,
-        isPrimary: entity.isPrimary,
-        createdAt: new Date(entity.createdAt),
-        updatedAt: new Date(entity.updatedAt),
-      },
-      update: {
-        teamId: entity.teamId,
-        domainId: entity.domainId,
-        funnelInstanceId: entity.funnelInstanceId,
-        trackingProfileId: entity.trackingProfileId,
-        handoffStrategyId: entity.handoffStrategyId,
-        pathPrefix: normalizePublicationPathPrefix(entity.pathPrefix),
-        status: entity.status,
-        isActive: entity.isActive,
-        isPrimary: entity.isPrimary,
-      },
+      create: createData,
+      update: updateData,
     });
 
     return mapFunnelPublicationRecord(record);

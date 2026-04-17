@@ -11,6 +11,8 @@ export type PublicRuntimeResolution = {
     id: string;
     path: string;
     isActive: boolean;
+    metaPixelId: string | null;
+    tiktokPixelId: string | null;
   };
   domain: {
     id: string;

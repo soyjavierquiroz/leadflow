@@ -97,6 +97,8 @@ function buildPreviewRuntime(
       isPrimary: true,
       trackingProfileId: null,
       handoffStrategyId: null,
+      metaPixelId: null,
+      tiktokPixelId: null,
     },
     theme: resolveFunnelThemeId(themeId),
     funnel: {

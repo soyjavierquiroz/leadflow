@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
+import { PublicRuntimePixelScripts } from '@/components/public-funnel/public-runtime-pixel-scripts';
 import { PublicRuntimeLeadSubmitProvider } from '@/components/public-runtime/public-runtime-lead-submit-provider';
 import { fetchPublicFunnelRuntime } from '@/lib/funnel-runtime';
 import {
@@ -49,11 +50,17 @@ export default async function PublicRuntimePage({
   }
 
   return (
-    <PublicRuntimeLeadSubmitProvider
-      hostname={runtime.domain.host}
-      path={runtime.request.path}
-    >
-      <FunnelRuntimePage runtime={runtime} />
-    </PublicRuntimeLeadSubmitProvider>
+    <>
+      <PublicRuntimePixelScripts
+        metaPixelId={runtime.publication.metaPixelId}
+        tiktokPixelId={runtime.publication.tiktokPixelId}
+      />
+      <PublicRuntimeLeadSubmitProvider
+        hostname={runtime.domain.host}
+        path={runtime.request.path}
+      >
+        <FunnelRuntimePage runtime={runtime} />
+      </PublicRuntimeLeadSubmitProvider>
+    </>
   );
 }

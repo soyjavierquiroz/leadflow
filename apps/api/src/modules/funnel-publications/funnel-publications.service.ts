@@ -36,6 +36,8 @@ export class FunnelPublicationsService {
       funnelInstanceId: dto.funnelInstanceId,
       trackingProfileId: dto.trackingProfileId ?? null,
       handoffStrategyId: dto.handoffStrategyId ?? null,
+      metaPixelId: null,
+      tiktokPixelId: null,
       pathPrefix: this.normalizePathPrefix(dto.pathPrefix),
       status: dto.isActive ? 'active' : 'draft',
       isActive: dto.isActive ?? false,

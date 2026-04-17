@@ -20,6 +20,10 @@ import type { JsonValue } from '../modules/shared/domain.types';
 
 const toIso = (value: Date) => value.toISOString();
 const toJson = (value: unknown): JsonValue => value as JsonValue;
+const readNullableString = (record: object, key: string) => {
+  const value = (record as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value : null;
+};
 
 export const teamInclude = {
   sponsors: { select: { id: true } },
@@ -267,6 +271,8 @@ export const mapFunnelPublicationRecord = (
   funnelInstanceId: record.funnelInstanceId,
   trackingProfileId: record.trackingProfileId,
   handoffStrategyId: record.handoffStrategyId,
+  metaPixelId: readNullableString(record, 'metaPixelId'),
+  tiktokPixelId: readNullableString(record, 'tiktokPixelId'),
   pathPrefix: record.pathPrefix,
   status: record.status,
   isActive: record.isActive,

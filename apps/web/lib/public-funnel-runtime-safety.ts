@@ -175,6 +175,14 @@ export function normalizePublicFunnelRuntimePayload(
         typeof publicationRecord.handoffStrategyId === 'string'
           ? publicationRecord.handoffStrategyId
           : null,
+      metaPixelId:
+        typeof publicationRecord.metaPixelId === 'string'
+          ? publicationRecord.metaPixelId
+          : null,
+      tiktokPixelId:
+        typeof publicationRecord.tiktokPixelId === 'string'
+          ? publicationRecord.tiktokPixelId
+          : null,
     },
     theme,
     funnel: {

@@ -55,6 +55,16 @@ const asJsonRecord = (value: Prisma.JsonValue | null | undefined) =>
     ? (value as Record<string, Prisma.JsonValue>)
     : null;
 
+const readNullableString = (
+  value: RuntimePublicationRecord,
+  key: 'metaPixelId' | 'tiktokPixelId',
+) => {
+  const candidate = (value as RuntimePublicationRecord &
+    Partial<Record<'metaPixelId' | 'tiktokPixelId', unknown>>)[key];
+
+  return typeof candidate === 'string' ? candidate : null;
+};
+
 @Injectable()
 export class PublicFunnelRuntimeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -234,6 +244,8 @@ export class PublicFunnelRuntimeService {
         isPrimary: publication.isPrimary,
         trackingProfileId: publication.trackingProfileId,
         handoffStrategyId: publication.handoffStrategyId,
+        metaPixelId: readNullableString(publication, 'metaPixelId'),
+        tiktokPixelId: readNullableString(publication, 'tiktokPixelId'),
       },
       theme,
       funnel: {

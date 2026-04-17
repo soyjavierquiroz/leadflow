@@ -96,6 +96,8 @@ export class PublicRuntimeService {
         id: runtime.publication.id,
         path: runtime.publication.pathPrefix,
         isActive: true,
+        metaPixelId: runtime.publication.metaPixelId,
+        tiktokPixelId: runtime.publication.tiktokPixelId,
       },
       domain: {
         id: publication.domain.id,

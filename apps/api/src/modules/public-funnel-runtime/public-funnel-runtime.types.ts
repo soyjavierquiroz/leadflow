@@ -37,6 +37,8 @@ export type PublicRuntimePayload = {
     isPrimary: boolean;
     trackingProfileId: string | null;
     handoffStrategyId: string | null;
+    metaPixelId: string | null;
+    tiktokPixelId: string | null;
   };
   theme: string | null;
   funnel: {

@@ -10,6 +10,8 @@ type MockPublicationRecord = {
   funnelInstanceId: string;
   trackingProfileId: string | null;
   handoffStrategyId: string | null;
+  metaPixelId: string | null;
+  tiktokPixelId: string | null;
   pathPrefix: string;
   status: 'active';
   isPrimary: boolean;
@@ -130,6 +132,8 @@ const buildPublicationRecord = (input: {
   funnelInstanceId: 'funnel-1',
   trackingProfileId: null,
   handoffStrategyId: null,
+  metaPixelId: 'meta-publication-123',
+  tiktokPixelId: 'tiktok-publication-456',
   pathPrefix: input.pathPrefix,
   status: 'active',
   isPrimary: input.pathPrefix === '/',
@@ -229,6 +233,8 @@ describe('PublicFunnelRuntimeService', () => {
     expect(query?.where.domain.status).toBe('active');
     expect(runtime.publication.id).toBe('publication-opportunity');
     expect(runtime.publication.pathPrefix).toBe('/oportunidad');
+    expect(runtime.publication.metaPixelId).toBe('meta-publication-123');
+    expect(runtime.publication.tiktokPixelId).toBe('tiktok-publication-456');
     expect(runtime.request.path).toBe('/oportunidad');
     expect(runtime.domain.normalizedHost).toBe('localhost');
   });
