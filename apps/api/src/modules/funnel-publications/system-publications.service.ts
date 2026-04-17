@@ -10,9 +10,29 @@ import { normalizePublicationPathPrefix } from '../shared/publication-resolution
 import type { CreateSystemPublicationDto } from './dto/create-system-publication.dto';
 import type { UpdateSystemPublicationDto } from './dto/update-system-publication.dto';
 
-const systemPublicationInclude = {
+const systemPublicationSelect = {
+  id: true,
+  workspaceId: true,
+  teamId: true,
+  domainId: true,
+  funnelInstanceId: true,
+  metaPixelId: true,
+  tiktokPixelId: true,
+  metaCapiToken: true,
+  tiktokAccessToken: true,
+  pathPrefix: true,
+  status: true,
+  isActive: true,
+  isPrimary: true,
+  createdAt: true,
+  updatedAt: true,
   team: {
-    include: {
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      status: true,
+      isActive: true,
       workspace: {
         select: {
           id: true,
@@ -31,7 +51,12 @@ const systemPublicationInclude = {
     },
   },
   funnelInstance: {
-    include: {
+    select: {
+      id: true,
+      legacyFunnelId: true,
+      name: true,
+      code: true,
+      status: true,
       template: {
         select: {
           id: true,
@@ -41,10 +66,10 @@ const systemPublicationInclude = {
       },
     },
   },
-} satisfies Prisma.FunnelPublicationInclude;
+} satisfies Prisma.FunnelPublicationSelect;
 
 type SystemPublicationRecord = Prisma.FunnelPublicationGetPayload<{
-  include: typeof systemPublicationInclude;
+  select: typeof systemPublicationSelect;
 }>;
 
 const toIso = (value: Date) => value.toISOString();
@@ -55,7 +80,7 @@ export class SystemPublicationsService {
 
   async list() {
     const records = await this.prisma.funnelPublication.findMany({
-      include: systemPublicationInclude,
+      select: systemPublicationSelect,
       orderBy: [{ teamId: 'asc' }, { domainId: 'asc' }, { pathPrefix: 'asc' }],
     });
 
@@ -108,7 +133,7 @@ export class SystemPublicationsService {
           isActive,
           isPrimary: normalizedPath === '/',
         },
-        include: systemPublicationInclude,
+        select: systemPublicationSelect,
       });
     });
 
@@ -119,7 +144,7 @@ export class SystemPublicationsService {
     const normalizedId = this.requireId(publicationId, 'id');
     const existing = await this.prisma.funnelPublication.findUnique({
       where: { id: normalizedId },
-      include: systemPublicationInclude,
+      select: systemPublicationSelect,
     });
 
     if (!existing) {
@@ -203,7 +228,7 @@ export class SystemPublicationsService {
           isActive,
           isPrimary: shouldBePrimary,
         },
-        include: systemPublicationInclude,
+        select: systemPublicationSelect,
       });
     });
 

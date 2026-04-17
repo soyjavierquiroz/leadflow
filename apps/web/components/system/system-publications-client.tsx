@@ -62,6 +62,12 @@ type PublicationFormState = {
   tiktokAccessToken: string;
 };
 
+type TrackingFieldName =
+  | "metaPixelId"
+  | "tiktokPixelId"
+  | "metaCapiToken"
+  | "tiktokAccessToken";
+
 const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
@@ -257,6 +263,16 @@ export function SystemPublicationsClient({
   const closeEditor = () => {
     setEditorState(null);
     setFormState(buildInitialFormState(teams));
+  };
+
+  const updateTrackingField = (
+    field: TrackingFieldName,
+    value: PublicationFormState[TrackingFieldName],
+  ) => {
+    setFormState((current) => ({
+      ...current,
+      [field]: value,
+    }));
   };
 
   const openCreateModal = () => {
@@ -691,10 +707,7 @@ export function SystemPublicationsClient({
                   <input
                     value={formState.metaPixelId}
                     onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        metaPixelId: event.target.value,
-                      }))
+                      updateTrackingField("metaPixelId", event.target.value)
                     }
                     placeholder="123456789012345"
                     disabled={isPending}
@@ -710,10 +723,7 @@ export function SystemPublicationsClient({
                   <input
                     value={formState.tiktokPixelId}
                     onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        tiktokPixelId: event.target.value,
-                      }))
+                      updateTrackingField("tiktokPixelId", event.target.value)
                     }
                     placeholder="C123ABC456DEF"
                     disabled={isPending}
@@ -729,10 +739,7 @@ export function SystemPublicationsClient({
                   <input
                     value={formState.metaCapiToken}
                     onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        metaCapiToken: event.target.value,
-                      }))
+                      updateTrackingField("metaCapiToken", event.target.value)
                     }
                     placeholder="EAAB..."
                     disabled={isPending}
@@ -748,10 +755,10 @@ export function SystemPublicationsClient({
                   <input
                     value={formState.tiktokAccessToken}
                     onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        tiktokAccessToken: event.target.value,
-                      }))
+                      updateTrackingField(
+                        "tiktokAccessToken",
+                        event.target.value,
+                      )
                     }
                     placeholder="tt_act_..."
                     disabled={isPending}
