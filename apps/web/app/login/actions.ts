@@ -14,10 +14,20 @@ export const submitLoginAction = async (
   const email = formData.get("email");
   const password = formData.get("password");
 
-  const result = await loginWithServerSession({
-    email: typeof email === "string" ? email : "",
-    password: typeof password === "string" ? password : "",
-  });
+  let result: Awaited<ReturnType<typeof loginWithServerSession>>;
+
+  try {
+    result = await loginWithServerSession({
+      email: typeof email === "string" ? email : "",
+      password: typeof password === "string" ? password : "",
+    });
+  } catch (error) {
+    console.error("\n🔥 CRITICAL LOGIN FRONTEND ERROR:\n", error, "\n");
+
+    return {
+      errorMessage: "Ocurrio un error interno al procesar el login.",
+    };
+  }
 
   if (!result.ok) {
     return {

@@ -16,7 +16,7 @@ services:
       API_INTERNAL_BASE_URL: "${API_INTERNAL_BASE_URL:-http://api:3001}"
       NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET: "${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.leadflow.kuruk.in}"
       NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN: "${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kuruk.in}"
-      DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-leadflow}:${POSTGRES_PASSWORD}@postgres_postgres:5432/${POSTGRES_DB:-leadflow}?schema=public}"
+      DATABASE_URL: "${DATABASE_URL}"
       PORT: "3000"
     networks:
       - traefik_public
@@ -79,7 +79,7 @@ services:
       API_BASE_URL: "${API_URL:-https://api.leadflow.kuruk.in}"
       AUTH_COOKIE_NAME: "${AUTH_COOKIE_NAME:-leadflow_session}"
       AUTH_SESSION_TTL_DAYS: "${AUTH_SESSION_TTL_DAYS:-7}"
-      DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-leadflow}:${POSTGRES_PASSWORD}@postgres_postgres:5432/${POSTGRES_DB:-leadflow}?schema=public}"
+      DATABASE_URL: "${DATABASE_URL}"
       CLOUDFLARE_API_TOKEN: "${CLOUDFLARE_API_TOKEN:-}"
       CLOUDFLARE_ZONE_ID: "${CLOUDFLARE_ZONE_ID:-}"
       CLOUDFLARE_SAAS_FALLBACK_ORIGIN: "${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kuruk.in}"

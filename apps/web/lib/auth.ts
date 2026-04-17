@@ -348,6 +348,7 @@ export const loginWithServerSession = async (input: {
 }) => {
   const email = input.email.trim().toLowerCase();
   const password = input.password;
+  const loginUrl = getAuthLoginApiUrl();
 
   if (!email || !password) {
     return {
@@ -362,7 +363,7 @@ export const loginWithServerSession = async (input: {
   }, LOGIN_REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(getAuthLoginApiUrl(), {
+    const response = await fetch(loginUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -378,6 +379,17 @@ export const loginWithServerSession = async (input: {
     const payload = (await response.json().catch(() => null)) as unknown;
 
     if (!response.ok) {
+      if (response.status >= 500) {
+        console.error("\n🔥 CRITICAL LOGIN FRONTEND ERROR:\n", {
+          apiBaseUrl: authApiBaseUrl,
+          email,
+          loginUrl,
+          payload,
+          status: response.status,
+          statusText: response.statusText,
+        }, "\n");
+      }
+
       return {
         errorMessage: getLoginErrorMessage(payload),
         ok: false as const,
@@ -385,6 +397,14 @@ export const loginWithServerSession = async (input: {
     }
 
     if (!isLoginApiResponse(payload)) {
+      console.error("\n🔥 CRITICAL LOGIN FRONTEND ERROR:\n", {
+        apiBaseUrl: authApiBaseUrl,
+        email,
+        loginUrl,
+        payload,
+        reason: "INVALID_LOGIN_PAYLOAD",
+      }, "\n");
+
       return {
         errorMessage: "El API devolvió una respuesta de login inválida.",
         ok: false as const,
@@ -394,6 +414,14 @@ export const loginWithServerSession = async (input: {
     const sessionCookie = readAuthSessionCookie(response);
 
     if (!sessionCookie) {
+      console.error("\n🔥 CRITICAL LOGIN FRONTEND ERROR:\n", {
+        apiBaseUrl: authApiBaseUrl,
+        email,
+        loginUrl,
+        reason: "MISSING_SESSION_COOKIE",
+        setCookieHeaders: response.headers.getSetCookie(),
+      }, "\n");
+
       return {
         errorMessage:
           "El API no devolvió una cookie de sesión válida para completar el login.",
@@ -408,6 +436,13 @@ export const loginWithServerSession = async (input: {
       redirectUrl: resolveAuthRedirectTarget(payload.redirectPath),
     };
   } catch (error) {
+    console.error("\n🔥 CRITICAL LOGIN FRONTEND ERROR:\n", error, "\n");
+    console.error("[loginWithServerSession] request context", {
+      apiBaseUrl: authApiBaseUrl,
+      email,
+      loginUrl,
+    });
+
     return {
       errorMessage:
         error instanceof Error && error.name === "AbortError"

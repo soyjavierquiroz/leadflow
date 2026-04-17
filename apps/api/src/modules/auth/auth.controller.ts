@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Patch,
   Post,
   Req,
@@ -26,19 +27,28 @@ export class AuthController {
     @Req() request: AuthRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const result = await this.authService.authenticate({
-      email: dto.email,
-      password: dto.password,
-      userAgent: request.headers['user-agent'] ?? null,
-      ipAddress: request.ip ?? null,
-    });
+    try {
+      const result = await this.authService.authenticate({
+        email: dto.email,
+        password: dto.password,
+        userAgent: request.headers['user-agent'] ?? null,
+        ipAddress: request.ip ?? null,
+      });
 
-    this.authService.setSessionCookie(reply, result.sessionToken);
+      this.authService.setSessionCookie(reply, result.sessionToken);
 
-    return {
-      user: result.user,
-      redirectPath: result.user.homePath,
-    };
+      return {
+        user: result.user,
+        redirectPath: result.user.homePath,
+      };
+    } catch (error) {
+      Logger.error(
+        '🔥 CRITICAL LOGIN API ERROR:',
+        error instanceof Error ? error.stack : String(error),
+        AuthController.name,
+      );
+      throw error;
+    }
   }
 
   @Post('logout')

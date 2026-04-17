@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { UserRole, UserStatus, type Prisma } from '@prisma/client';
@@ -46,28 +47,67 @@ export class AuthService {
     userAgent?: string | null;
     ipAddress?: string | null;
   }) {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        email: input.email.trim().toLowerCase(),
-      },
-      include: authUserInclude,
-    });
+    const normalizedEmail = input.email.trim().toLowerCase();
 
-    if (
-      !user ||
-      user.status !== UserStatus.active ||
-      !verifyPassword(input.password, user.passwordHash)
-    ) {
-      throw new UnauthorizedException({
-        code: 'INVALID_CREDENTIALS',
-        message: 'Email or password is invalid.',
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          email: normalizedEmail,
+        },
+        include: authUserInclude,
+      });
+
+      if (
+        !user ||
+        user.status !== UserStatus.active ||
+        !verifyPassword(input.password, user.passwordHash)
+      ) {
+        throw new UnauthorizedException({
+          code: 'INVALID_CREDENTIALS',
+          message: 'Email or password is invalid.',
+        });
+      }
+
+      return this.createSessionForUser(user, {
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+      });
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      const stack =
+        error instanceof Error ? (error.stack ?? error.message) : String(error);
+      const isPrismaRuntimeError =
+        error instanceof Error &&
+        [
+          'PrismaClientInitializationError',
+          'PrismaClientKnownRequestError',
+          'PrismaClientRustPanicError',
+          'PrismaClientUnknownRequestError',
+          'PrismaClientValidationError',
+        ].includes(error.name);
+
+      this.logger.error('🔥 CRITICAL LOGIN API ERROR:', stack);
+      this.logger.error(
+        `Critical login failure for ${normalizedEmail} (ip=${input.ipAddress ?? 'unknown'}, userAgent=${input.userAgent ?? 'unknown'})`,
+      );
+
+      if (isPrismaRuntimeError) {
+        throw new ServiceUnavailableException({
+          code: 'AUTH_STORAGE_UNAVAILABLE',
+          message:
+            'Authentication is temporarily unavailable while the data store recovers.',
+        });
+      }
+
+      throw new ServiceUnavailableException({
+        code: 'AUTH_LOGIN_UNAVAILABLE',
+        message:
+          'Authentication is temporarily unavailable. Please try again shortly.',
       });
     }
-
-    return this.createSessionForUser(user, {
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
-    });
   }
 
   async impersonate(input: {
