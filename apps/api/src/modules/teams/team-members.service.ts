@@ -10,6 +10,7 @@ import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
+import { MailerService } from '../shared/mailer.service';
 import type { CreateTeamMemberDto } from './dto/create-team-member.dto';
 import type { UpdateTeamMemberStatusDto } from './dto/update-team-member-status.dto';
 
@@ -85,6 +86,20 @@ const sanitizeRequiredText = (
   return trimmed;
 };
 
+const sanitizeRequiredEmail = (value: string | null | undefined) => {
+  const normalized = sanitizeRequiredText(value, 'email').toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new BadRequestException({
+      code: 'TEAM_MEMBER_EMAIL_INVALID',
+      message: 'email must be a valid email address.',
+      field: 'email',
+    });
+  }
+
+  return normalized;
+};
+
 const toIso = (value: Date | null) => (value ? value.toISOString() : null);
 
 const teamMemberInclude = {
@@ -102,6 +117,7 @@ export class TeamMembersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
+    private readonly mailerService: MailerService,
   ) {}
 
   async list(scope: TeamMemberScope): Promise<TeamMembersSnapshot> {
@@ -148,7 +164,7 @@ export class TeamMembersService {
       });
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const mutation = await this.prisma.$transaction(async (tx) => {
       const member = await tx.user.findFirst({
         where: {
           id: memberId,
@@ -174,8 +190,9 @@ export class TeamMembersService {
       }
 
       const team = await this.requireTeam(scope, tx);
+      const shouldActivate = dto.isActive && !member.sponsor.isActive;
 
-      if (dto.isActive && !member.sponsor.isActive) {
+      if (shouldActivate) {
         await this.assertSeatAvailability(
           scope,
           team.maxSeats,
@@ -201,8 +218,27 @@ export class TeamMembersService {
           ...member,
           sponsor,
         }),
+        activationEmail:
+          shouldActivate && member.email
+            ? {
+                email: member.email,
+                teamName: team.name,
+              }
+            : null,
       };
     });
+
+    if (mutation.activationEmail) {
+      await this.dispatchAdvisorActivationEmail(
+        mutation.activationEmail.email,
+        mutation.activationEmail.teamName,
+      );
+    }
+
+    return {
+      team: mutation.team,
+      member: mutation.member,
+    };
   }
 
   async invite(
@@ -210,9 +246,16 @@ export class TeamMembersService {
     dto: CreateTeamMemberDto,
   ): Promise<TeamMemberInvitationResult> {
     const fullName = sanitizeRequiredText(dto.fullName, 'fullName');
-    const email = sanitizeRequiredText(dto.email, 'email').toLowerCase();
-    const isActive = dto.isActive ?? false;
+    const email = sanitizeRequiredEmail(dto.email);
     const temporaryPassword = this.generateTemporaryPassword();
+
+    if (dto.isActive === true) {
+      throw new BadRequestException({
+        code: 'TEAM_MEMBER_INVITATION_MUST_START_INACTIVE',
+        message:
+          'New advisors must be created as inactive. Use the activation endpoint after the invitation is created.',
+      });
+    }
 
     const invitation = await this.prisma.$transaction(async (tx) => {
       const team = await this.requireTeam(scope, tx);
@@ -231,10 +274,6 @@ export class TeamMembersService {
           code: 'TEAM_MEMBER_EMAIL_TAKEN',
           message: 'A user with this email already exists.',
         });
-      }
-
-      if (isActive) {
-        await this.assertSeatAvailability(scope, team.maxSeats, tx);
       }
 
       const user = await tx.user.create({
@@ -256,7 +295,7 @@ export class TeamMembersService {
           teamId: scope.teamId,
           displayName: fullName,
           status: 'active',
-          isActive,
+          isActive: false,
           email,
           availabilityStatus: 'available',
           routingWeight: 1,
@@ -280,6 +319,9 @@ export class TeamMembersService {
         team: this.buildSeatSummary(team, activeSeats),
         member: this.mapTeamMember(linkedUser),
         temporaryPassword,
+        welcomeEmail: {
+          email,
+        },
       };
     });
 
@@ -287,7 +329,16 @@ export class TeamMembersService {
       void this.provisionSponsorWelcomeKredits(invitation.member.sponsorId);
     }
 
-    return invitation;
+    await this.dispatchAdvisorWelcomeEmail(
+      invitation.welcomeEmail.email,
+      invitation.temporaryPassword,
+    );
+
+    return {
+      team: invitation.team,
+      member: invitation.member,
+      temporaryPassword: invitation.temporaryPassword,
+    };
   }
 
   private async requireTeam(
@@ -351,7 +402,7 @@ export class TeamMembersService {
     });
 
     if (activeSeats >= maxSeats) {
-      throw new ConflictException({
+      throw new BadRequestException({
         code: 'TEAM_SEAT_LIMIT_REACHED',
         message: `Has alcanzado el limite de ${maxSeats} licencias activas. Desactiva un usuario primero.`,
       });
@@ -436,6 +487,36 @@ export class TeamMembersService {
     } catch (error) {
       this.logger.error(
         `Sponsor ${sponsorId} wallet provisioning failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+  }
+
+  private async dispatchAdvisorWelcomeEmail(
+    email: string,
+    temporaryPassword: string,
+  ) {
+    try {
+      await this.mailerService.sendAdvisorWelcomeEmail(
+        email,
+        temporaryPassword,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Advisor welcome email failed for ${email}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+  }
+
+  private async dispatchAdvisorActivationEmail(email: string, teamName: string) {
+    try {
+      await this.mailerService.sendAdvisorActivationEmail(email, teamName);
+    } catch (error) {
+      this.logger.error(
+        `Advisor activation email failed for ${email}: ${
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );

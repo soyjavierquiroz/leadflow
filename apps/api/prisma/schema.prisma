@@ -348,7 +348,7 @@ model Sponsor {
   teamId               String
   displayName          String
   status               SponsorStatus
-  isActive             Boolean              @default(true)
+  isActive             Boolean              @default(false)
   avatarUrl            String?
   email                String?
   phone                String?

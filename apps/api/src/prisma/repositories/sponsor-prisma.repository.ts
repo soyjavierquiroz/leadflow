@@ -49,7 +49,7 @@ export class SponsorPrismaRepository implements SponsorRepository {
         teamId: data.teamId,
         displayName: data.displayName,
         status: 'draft',
-        isActive: data.isActive ?? true,
+        isActive: data.isActive ?? false,
         email: data.email ?? null,
         phone: data.phone ?? null,
         availabilityStatus: data.availabilityStatus ?? 'available',

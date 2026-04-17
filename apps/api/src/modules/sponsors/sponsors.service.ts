@@ -131,7 +131,7 @@ export class SponsorsService {
       teamId: dto.teamId,
       displayName: dto.displayName,
       status: 'draft',
-      isActive: dto.isActive ?? true,
+      isActive: dto.isActive ?? false,
       avatarUrl: null,
       email: dto.email ?? null,
       phone: dto.phone ?? null,

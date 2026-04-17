@@ -173,4 +173,4 @@ describe('AuthService', () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
-}
+});
