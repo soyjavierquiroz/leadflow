@@ -54,6 +54,7 @@ export type LeadCaptureSubmissionResponse = {
   };
   advisor?: {
     name: string;
+    role?: string | null;
     phone: string | null;
     photoUrl: string | null;
     bio: string | null;
@@ -61,6 +62,7 @@ export type LeadCaptureSubmissionResponse = {
   } | null;
   assigned_advisor?: {
     name: string;
+    role?: string | null;
     phone: string | null;
     photo_url: string | null;
     bio: string | null;
@@ -151,6 +153,7 @@ export const persistSubmissionContext = (
       (payload.assigned_advisor
         ? {
             name: payload.assigned_advisor.name,
+            role: payload.assigned_advisor.role ?? null,
             phone: payload.assigned_advisor.phone,
             photoUrl: payload.assigned_advisor.photo_url,
             bio: payload.assigned_advisor.bio,

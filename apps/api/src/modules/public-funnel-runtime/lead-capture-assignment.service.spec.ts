@@ -115,6 +115,91 @@ describe('LeadCaptureAssignmentService', () => {
     expect(trackingEventsService.recordTrackingEvent).not.toHaveBeenCalled();
   });
 
+  it('returns the assigned advisor payload expected by the conversion handoff widget', async () => {
+    const { prisma, service } = buildService();
+    const publication = buildPublication();
+    const tx = {};
+
+    (prisma.$transaction as jest.Mock).mockImplementation((callback) =>
+      callback(tx),
+    );
+
+    jest
+      .spyOn(service as any, 'getPublicationContextOrThrow')
+      .mockResolvedValue(publication);
+    jest
+      .spyOn(service as any, 'registerVisitorInTransaction')
+      .mockResolvedValue({
+        id: 'visitor-1',
+        anonymousId: 'anon-1',
+      });
+    jest.spyOn(service as any, 'captureLeadInTransaction').mockResolvedValue({
+      lead: {
+        id: 'lead-1',
+        fullName: 'Lead Demo',
+        email: 'lead@example.com',
+        phone: '+57 300 100 1000',
+      },
+      wasCreated: true,
+    });
+    jest
+      .spyOn(service as any, 'assignLeadToNextSponsorInTransaction')
+      .mockResolvedValue({
+        assignment: {
+          id: 'assignment-1',
+          status: 'assigned',
+          reason: 'rotation',
+          assignedAt: '2026-04-17T00:00:00.000Z',
+          sponsor: {
+            id: 'sponsor-1',
+            displayName: 'Advisor Uno',
+            email: 'advisor@example.com',
+            phone: '+57 300 000 0001',
+            avatarUrl: 'https://cdn.example.com/a1.png',
+          },
+        },
+        advisor: {
+          id: 'advisor-1',
+          sponsorId: 'sponsor-1',
+          name: 'Advisor Uno',
+          role: 'Asesor',
+          bio: 'Asesor',
+          phone: '+57 300 000 0001',
+          photoUrl: 'https://cdn.example.com/a1.png',
+        },
+        wasCreated: true,
+      });
+
+    const result = await service.submitLeadCapture({
+      publicationId: publication.id,
+      anonymousId: 'anon-1',
+      currentStepId: 'step-1',
+      sourceChannel: 'form',
+      fullName: 'Lead Demo',
+      email: 'lead@example.com',
+      phone: '+57 300 100 1000',
+      companyName: null,
+      fieldValues: {},
+      tags: [],
+    });
+
+    expect(result.advisor).toEqual({
+      name: 'Advisor Uno',
+      role: 'Asesor',
+      bio: 'Asesor',
+      phone: '+57 300 000 0001',
+      photoUrl: 'https://cdn.example.com/a1.png',
+      whatsappUrl: 'https://wa.me/573000000001',
+    });
+    expect(result.assigned_advisor).toEqual({
+      name: 'Advisor Uno',
+      role: 'Asesor',
+      bio: 'Asesor',
+      phone: '+57 300 000 0001',
+      photo_url: 'https://cdn.example.com/a1.png',
+    });
+  });
+
   it('returns a safe auto-assignment response when the team has zero active sponsors', async () => {
     const { prisma, service, trackingEventsService } = buildService();
     const publication = buildPublication();
@@ -166,117 +251,152 @@ describe('LeadCaptureAssignmentService', () => {
     expect(trackingEventsService.recordTrackingEvent).not.toHaveBeenCalled();
   });
 
-  it('queries only active sponsors when resolving fallback eligibility', async () => {
+  it('selects the next active advisor by team pointer and updates the pointer', async () => {
     const { service } = buildService();
     const publication = buildPublication();
     const tx = {
-      adWheel: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'wheel-1',
-          participants: [
-            { sponsorId: 'sponsor-1' },
-            { sponsorId: 'sponsor-2' },
-          ],
-        }),
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          id: publication.teamId,
+          lastAssignedUserId: 'advisor-1',
+        },
+      ]),
+      user: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'advisor-1',
+            fullName: 'Advisor Uno',
+            role: 'MEMBER',
+            sponsor: {
+              id: 'sponsor-1',
+              displayName: 'Advisor Uno',
+              phone: '+57 300 000 0001',
+              avatarUrl: 'https://cdn.example.com/a1.png',
+            },
+          },
+          {
+            id: 'advisor-2',
+            fullName: 'Advisor Dos',
+            role: 'MEMBER',
+            sponsor: {
+              id: 'sponsor-2',
+              displayName: 'Advisor Dos',
+              phone: '+57 300 000 0002',
+              avatarUrl: 'https://cdn.example.com/a2.png',
+            },
+          },
+        ]),
       },
-      rotationPool: {
-        findFirst: jest.fn().mockResolvedValue(null),
-      },
-      sponsor: {
-        findMany: jest.fn().mockResolvedValue([]),
+      team: {
+        update: jest.fn().mockResolvedValue(undefined),
       },
     };
 
-    await expect(
-      (service as any).resolveFallbackSponsorOrThrow(tx, publication, [
-        'sponsor-1',
-        'sponsor-2',
-      ]),
-    ).rejects.toBeInstanceOf(ConflictException);
+    const result = await (service as any).resolveRoundRobinAssigneeOrThrow(
+      tx,
+      publication,
+    );
 
-    expect(tx.rotationPool.findFirst).toHaveBeenCalledWith({
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.user.findMany).toHaveBeenCalledWith({
       where: {
         workspaceId: publication.workspaceId,
         teamId: publication.teamId,
+        role: 'MEMBER',
         status: 'active',
-        isFallbackPool: true,
+        sponsor: {
+          is: {
+            isActive: true,
+            status: 'active',
+          },
+        },
       },
       include: {
-        members: {
-          where: {
-            isActive: true,
-            sponsorId: {
-              in: ['sponsor-1', 'sponsor-2'],
-            },
-            sponsor: {
-              isActive: true,
-              status: 'active',
-              availabilityStatus: 'available',
-            },
-          },
-          orderBy: {
-            position: 'asc',
-          },
-          include: {
-            sponsor: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
-    expect(tx.sponsor.findMany).toHaveBeenCalledWith({
-      where: {
-        workspaceId: publication.workspaceId,
-        teamId: publication.teamId,
-        id: {
-          in: ['sponsor-1', 'sponsor-2'],
-        },
-        isActive: true,
-        status: 'active',
-        availabilityStatus: 'available',
+        sponsor: true,
       },
       orderBy: [{ createdAt: 'asc' }],
     });
+    expect(tx.team.update).toHaveBeenCalledWith({
+      where: {
+        id: publication.teamId,
+      },
+      data: {
+        lastAssignedUserId: 'advisor-2',
+      },
+    });
+    expect(result).toMatchObject({
+      reason: 'rotation',
+      user: {
+        id: 'advisor-2',
+      },
+    });
   });
 
-  it('keeps the lead unassigned when the team has no active ad wheel', async () => {
-    const { prisma, service, trackingEventsService } = buildService();
+  it('falls back to the team admin when there are no active advisors', async () => {
+    const { service } = buildService();
     const publication = buildPublication();
-    const lead = {
-      id: 'lead-1',
-      currentAssignmentId: null,
-    };
     const tx = {
-      lead: {
-        findFirst: jest.fn().mockResolvedValue(lead),
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          id: publication.teamId,
+          lastAssignedUserId: null,
+        },
+      ]),
+      user: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'admin-1',
+          fullName: 'Admin Owner',
+          role: 'TEAM_ADMIN',
+          sponsor: {
+            id: 'sponsor-admin',
+            displayName: 'Admin Owner',
+            phone: '+57 300 000 0099',
+            avatarUrl: 'https://cdn.example.com/admin.png',
+          },
+        }),
+      },
+      team: {
+        update: jest.fn().mockResolvedValue(undefined),
       },
     };
 
-    (prisma.$transaction as jest.Mock).mockImplementation((callback) =>
-      callback(tx),
+    const result = await (service as any).resolveRoundRobinAssigneeOrThrow(
+      tx,
+      publication,
     );
 
-    jest
-      .spyOn(service as any, 'getPublicationContextOrThrow')
-      .mockResolvedValue(publication);
-    jest
-      .spyOn(service as any, 'assignLeadToNextSponsorInTransaction')
-      .mockRejectedValue(
-        new ConflictException({
-          code: 'NO_ACTIVE_AD_WHEEL',
-          message: 'No active ad wheel.',
-        }),
-      );
-
-    const result = await service.assignLeadToNextSponsor({
-      publicationId: publication.id,
-      leadId: lead.id,
-      triggerEventId: 'trigger-1',
+    expect(tx.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        workspaceId: publication.workspaceId,
+        teamId: publication.teamId,
+        role: 'TEAM_ADMIN',
+        status: 'active',
+        sponsor: {
+          is: {
+            isActive: true,
+            status: 'active',
+          },
+        },
+      },
+      include: {
+        sponsor: true,
+      },
+      orderBy: [{ createdAt: 'asc' }],
     });
-
-    expect(result.assignment).toBeNull();
-    expect(trackingEventsService.recordTrackingEvent).not.toHaveBeenCalled();
+    expect(tx.team.update).toHaveBeenCalledWith({
+      where: {
+        id: publication.teamId,
+      },
+      data: {
+        lastAssignedUserId: 'admin-1',
+      },
+    });
+    expect(result).toMatchObject({
+      reason: 'fallback',
+      user: {
+        id: 'admin-1',
+      },
+    });
   });
 });

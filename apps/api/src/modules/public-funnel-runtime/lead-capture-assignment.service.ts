@@ -92,6 +92,16 @@ type AssignmentSummary = {
   };
 };
 
+type PublicAssignedAdvisor = {
+  id: string;
+  sponsorId: string;
+  name: string;
+  role: string;
+  bio: string;
+  phone: string | null;
+  photoUrl: string | null;
+};
+
 type StepNavigation = {
   id: string;
   slug: string;
@@ -106,6 +116,7 @@ type LeadCaptureResult = {
 
 type AssignmentResolution = {
   assignment: AssignmentSummary | null;
+  advisor: PublicAssignedAdvisor | null;
   wasCreated: boolean;
 };
 
@@ -145,6 +156,11 @@ const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
 ]);
 
 type DirectEligibleSponsor = Prisma.SponsorGetPayload<Record<string, never>>;
+type TeamAssignmentUserRecord = Prisma.UserGetPayload<{
+  include: {
+    sponsor: true;
+  };
+}>;
 
 @Injectable()
 export class LeadCaptureAssignmentService {
@@ -231,7 +247,7 @@ export class LeadCaptureAssignmentService {
           leadId: lead.id,
         };
 
-        const { assignment, wasCreated } =
+        const { assignment, advisor, wasCreated } =
           await this.assignLeadOrLeaveUnassignedInTransaction(
             tx,
             publication,
@@ -249,6 +265,7 @@ export class LeadCaptureAssignmentService {
 
         return {
           assignment,
+          advisor,
           nextStep,
           assignmentWasCreated: wasCreated,
         };
@@ -268,6 +285,7 @@ export class LeadCaptureAssignmentService {
 
       return {
         assignment: result.assignment,
+        advisor: result.advisor,
         nextStep: result.nextStep,
       };
     } catch (error) {
@@ -352,7 +370,7 @@ export class LeadCaptureAssignmentService {
           leadId: leadResult.wasCreated ? null : leadResult.lead.id,
         };
 
-        const { assignment, wasCreated } =
+        const { assignment, advisor, wasCreated } =
           await this.assignLeadOrLeaveUnassignedInTransaction(
             tx,
             publication,
@@ -366,40 +384,13 @@ export class LeadCaptureAssignmentService {
           publication,
           dto.currentStepId,
         );
-        const effectiveHandoffStrategy =
-          publication.handoffStrategy ??
-          publication.funnelInstance.handoffStrategy;
-        const handoffConfig = resolvePublicHandoffConfig(
-          effectiveHandoffStrategy,
-        );
-        const sponsor = assignment?.sponsor
-          ? toPublicVisibleSponsor(assignment.sponsor)
-          : null;
-        const whatsappPhone = normalizeWhatsappPhone(sponsor?.phone ?? null);
-        const whatsappMessage = sponsor
-          ? buildPublicWhatsappMessage({
-              template: handoffConfig.messageTemplate,
-              sponsorName: sponsor.displayName,
-              leadName: leadResult.lead.fullName,
-              leadEmail: leadResult.lead.email,
-              leadPhone: leadResult.lead.phone,
-              funnelName: publication.funnelInstance.name,
-              publicationPath: nextStep?.path ?? publication.pathPrefix,
-            })
-          : null;
-        const whatsappUrl = buildPublicWhatsappUrl(
-          whatsappPhone,
-          whatsappMessage,
-        );
-        const advisor = sponsor
-          ? {
-              name: sponsor.displayName,
-              phone: sponsor.phone ?? whatsappPhone,
-              photoUrl: sponsor.avatarUrl,
-              bio: 'Especialista en Protocolos de Recuperacion',
-              whatsappUrl,
-            }
-          : null;
+        const publicCaptureContext = this.buildPublicCaptureContext({
+          publication,
+          lead: leadResult.lead,
+          assignment,
+          advisor,
+          nextStep,
+        });
 
         failureContext = null;
 
@@ -407,20 +398,12 @@ export class LeadCaptureAssignmentService {
           visitor,
           lead: leadResult.lead,
           assignment,
+          advisor,
           assignmentWasCreated: wasCreated,
           nextStep,
-          handoff: {
-            mode: handoffConfig.mode,
-            channel: handoffConfig.channel,
-            buttonLabel: handoffConfig.buttonLabel,
-            autoRedirect: handoffConfig.autoRedirect,
-            autoRedirectDelayMs: handoffConfig.autoRedirectDelayMs,
-            sponsor,
-            whatsappPhone,
-            whatsappMessage,
-            whatsappUrl,
-          },
-          advisor,
+          handoff: publicCaptureContext.handoff,
+          advisorPayload: publicCaptureContext.advisor,
+          assignedAdvisorPayload: publicCaptureContext.assigned_advisor,
         };
       });
 
@@ -445,15 +428,8 @@ export class LeadCaptureAssignmentService {
         assignment: result.assignment,
         nextStep: result.nextStep,
         handoff: result.handoff,
-        advisor: result.advisor,
-        assigned_advisor: result.advisor
-          ? {
-              name: result.advisor.name,
-              phone: result.advisor.phone,
-              photo_url: result.advisor.photoUrl,
-              bio: result.advisor.bio,
-            }
-          : null,
+        advisor: result.advisorPayload,
+        assigned_advisor: result.assignedAdvisorPayload,
       };
     } catch (error) {
       await this.recordAssignmentFailure(failureContext, error);
@@ -885,43 +861,26 @@ export class LeadCaptureAssignmentService {
             avatarUrl: existingOpenAssignment.sponsor.avatarUrl,
           },
         },
+        advisor: await this.resolveAssignedAdvisorBySponsorId(
+          tx,
+          publication,
+          existingOpenAssignment.sponsor.id,
+        ),
         wasCreated: false,
       };
     }
 
-    let assignmentReason: 'rotation' | 'fallback' = 'rotation';
-    let selectedSponsor: RotationPoolWithMembers['members'][number]['sponsor'];
-    let assignmentRotationPoolId: string | null = null;
-    const eligibleSponsorIds =
-      await this.resolveEligibleAdWheelSponsorIdsOrThrow(tx, publication);
+    const assignee = await this.resolveRoundRobinAssigneeOrThrow(tx, publication);
+    const assignmentReason = assignee.reason;
+    const selectedAdvisor = assignee.user;
+    const selectedSponsor = selectedAdvisor.sponsor;
+    const assignmentRotationPoolId = null;
 
-    try {
-      const rotationPool = await this.resolveRotationPoolOrThrow(
-        tx,
-        publication,
-      );
-      const nextMember = await this.resolveNextRotationMemberOrThrow(
-        tx,
-        rotationPool,
-        eligibleSponsorIds,
-      );
-
-      selectedSponsor = nextMember.sponsor;
-      assignmentRotationPoolId = rotationPool.id;
-    } catch (error) {
-      if (!this.shouldFallbackAssignment(error)) {
-        throw error;
-      }
-
-      const fallbackResolution = await this.resolveFallbackSponsorOrThrow(
-        tx,
-        publication,
-        eligibleSponsorIds,
-      );
-
-      assignmentReason = 'fallback';
-      selectedSponsor = fallbackResolution.sponsor;
-      assignmentRotationPoolId = fallbackResolution.rotationPoolId;
+    if (!selectedSponsor) {
+      throw new ConflictException({
+        code: 'ADVISOR_SPONSOR_REQUIRED',
+        message: `Selected advisor ${selectedAdvisor.id} does not have an operational sponsor profile.`,
+      });
     }
 
     const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
@@ -1044,6 +1003,7 @@ export class LeadCaptureAssignmentService {
           avatarUrl: assignment.sponsor.avatarUrl,
         },
       },
+      advisor: this.toPublicAssignedAdvisor(selectedAdvisor),
       wasCreated: true,
     };
   }
@@ -1080,9 +1040,77 @@ export class LeadCaptureAssignmentService {
 
       return {
         assignment: null,
+        advisor: null,
         wasCreated: false,
       };
     }
+  }
+
+  private buildPublicCaptureContext(input: {
+    publication: FlowPublicationRecord;
+    lead: {
+      fullName: string | null;
+      email: string | null;
+      phone: string | null;
+    };
+    assignment: AssignmentSummary | null;
+    advisor: PublicAssignedAdvisor | null;
+    nextStep: StepNavigation;
+  }) {
+    const effectiveHandoffStrategy =
+      input.publication.handoffStrategy ??
+      input.publication.funnelInstance.handoffStrategy;
+    const handoffConfig = resolvePublicHandoffConfig(effectiveHandoffStrategy);
+    const sponsor = input.assignment?.sponsor
+      ? toPublicVisibleSponsor(input.assignment.sponsor)
+      : null;
+    const whatsappPhone = normalizeWhatsappPhone(sponsor?.phone ?? null);
+    const whatsappMessage = sponsor
+      ? buildPublicWhatsappMessage({
+          template: handoffConfig.messageTemplate,
+          sponsorName: sponsor.displayName,
+          leadName: input.lead.fullName,
+          leadEmail: input.lead.email,
+          leadPhone: input.lead.phone,
+          funnelName: input.publication.funnelInstance.name,
+          publicationPath: input.nextStep?.path ?? input.publication.pathPrefix,
+        })
+      : null;
+    const whatsappUrl = buildPublicWhatsappUrl(whatsappPhone, whatsappMessage);
+    const advisor = input.advisor
+      ? {
+          name: input.advisor.name,
+          role: input.advisor.role,
+          bio: input.advisor.bio,
+          phone: input.advisor.phone ?? whatsappPhone,
+          photoUrl: input.advisor.photoUrl,
+          whatsappUrl,
+        }
+      : null;
+
+    return {
+      handoff: {
+        mode: handoffConfig.mode,
+        channel: handoffConfig.channel,
+        buttonLabel: handoffConfig.buttonLabel,
+        autoRedirect: handoffConfig.autoRedirect,
+        autoRedirectDelayMs: handoffConfig.autoRedirectDelayMs,
+        sponsor,
+        whatsappPhone,
+        whatsappMessage,
+        whatsappUrl,
+      },
+      advisor,
+      assigned_advisor: advisor
+        ? {
+            name: advisor.name,
+            role: advisor.role,
+            bio: advisor.bio,
+            phone: advisor.phone,
+            photo_url: advisor.photoUrl,
+          }
+        : null,
+    };
   }
 
   private async recordAssignmentFailure(
@@ -1165,6 +1193,184 @@ export class LeadCaptureAssignmentService {
     }
 
     return fallbackPool;
+  }
+
+  private async resolveRoundRobinAssigneeOrThrow(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+  ): Promise<{
+    user: TeamAssignmentUserRecord;
+    reason: 'rotation' | 'fallback';
+  }> {
+    const team = await this.lockTeamAssignmentPointerOrThrow(tx, publication);
+    const activeAdvisors = await this.listActiveAdvisorUsers(tx, publication);
+
+    if (activeAdvisors.length > 0) {
+      const currentIndex = activeAdvisors.findIndex(
+        (advisor) => advisor.id === team.lastAssignedUserId,
+      );
+      const nextIndex = (currentIndex + 1) % activeAdvisors.length;
+      const winner = activeAdvisors[nextIndex] ?? activeAdvisors[0];
+
+      await tx.team.update({
+        where: {
+          id: publication.teamId,
+        },
+        data: {
+          lastAssignedUserId: winner.id,
+        },
+      });
+
+      return {
+        user: winner,
+        reason: 'rotation',
+      };
+    }
+
+    const fallbackUser = await this.resolveFallbackTeamAdminOrThrow(
+      tx,
+      publication,
+    );
+
+    await tx.team.update({
+      where: {
+        id: publication.teamId,
+      },
+      data: {
+        lastAssignedUserId: fallbackUser.id,
+      },
+    });
+
+    return {
+      user: fallbackUser,
+      reason: 'fallback',
+    };
+  }
+
+  private async lockTeamAssignmentPointerOrThrow(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+  ) {
+    const [team] = await tx.$queryRaw<
+      Array<{
+        id: string;
+        lastAssignedUserId: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT id, "lastAssignedUserId"
+      FROM "Team"
+      WHERE id = ${publication.teamId}
+        AND "workspaceId" = ${publication.workspaceId}
+      FOR UPDATE
+    `);
+
+    if (!team) {
+      throw new NotFoundException({
+        code: 'TEAM_NOT_FOUND',
+        message: `Team ${publication.teamId} was not found for publication ${publication.id}.`,
+      });
+    }
+
+    return team;
+  }
+
+  private async listActiveAdvisorUsers(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+  ) {
+    return tx.user.findMany({
+      where: {
+        workspaceId: publication.workspaceId,
+        teamId: publication.teamId,
+        role: 'MEMBER',
+        status: 'active',
+        sponsor: {
+          is: {
+            isActive: true,
+            status: 'active',
+          },
+        },
+      },
+      include: {
+        sponsor: true,
+      },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+  }
+
+  private async resolveFallbackTeamAdminOrThrow(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+  ) {
+    const fallbackUser = await tx.user.findFirst({
+      where: {
+        workspaceId: publication.workspaceId,
+        teamId: publication.teamId,
+        role: 'TEAM_ADMIN',
+        status: 'active',
+        sponsor: {
+          is: {
+            isActive: true,
+            status: 'active',
+          },
+        },
+      },
+      include: {
+        sponsor: true,
+      },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+
+    if (!fallbackUser?.sponsor) {
+      throw new ConflictException({
+        code: 'NO_FALLBACK_SPONSOR_AVAILABLE',
+        message: `Team ${publication.teamId} does not have an active team admin sponsor available for assignment.`,
+      });
+    }
+
+    return fallbackUser;
+  }
+
+  private async resolveAssignedAdvisorBySponsorId(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+    sponsorId: string,
+  ) {
+    const user = await tx.user.findFirst({
+      where: {
+        workspaceId: publication.workspaceId,
+        teamId: publication.teamId,
+        sponsorId,
+        status: 'active',
+      },
+      include: {
+        sponsor: true,
+      },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+
+    if (!user?.sponsor) {
+      return null;
+    }
+
+    return this.toPublicAssignedAdvisor(user);
+  }
+
+  private toPublicAssignedAdvisor(
+    user: TeamAssignmentUserRecord,
+  ): PublicAssignedAdvisor {
+    const role =
+      user.role === 'TEAM_ADMIN' ? 'Propietario del equipo' : 'Asesor';
+
+    return {
+      id: user.id,
+      sponsorId: user.sponsor!.id,
+      name: user.sponsor?.displayName ?? user.fullName,
+      role,
+      bio: role,
+      phone: user.sponsor?.phone ?? null,
+      photoUrl: user.sponsor?.avatarUrl ?? null,
+    };
   }
 
   private async resolveNextRotationMemberOrThrow(

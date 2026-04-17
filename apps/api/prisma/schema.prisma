@@ -316,6 +316,7 @@ model Team {
   logoUrl               String?
   status                TeamStatus
   isActive              Boolean               @default(true)
+  lastAssignedUserId    String?
   subscriptionExpiresAt DateTime?
   description           String?
   managerUserId         String?
