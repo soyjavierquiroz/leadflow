@@ -36,6 +36,10 @@ services:
       API_PORT: 3001
       API_GLOBAL_PREFIX: v1
       API_BASE_URL: http://localhost:3001
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
       DATABASE_URL: postgresql://${POSTGRES_USER:-leadflow}:${POSTGRES_PASSWORD:-leadflow}@postgres:5432/${POSTGRES_DB:-leadflow}?schema=public
       SITE_URL: http://localhost:3000
       MEMBERS_URL: http://localhost:3000/members
