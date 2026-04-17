@@ -4,6 +4,10 @@ export class UpdateTeamHybridFunnelPublicationDto {
   readonly name?: string;
   readonly domainId?: string;
   readonly pathPrefix?: string;
+  readonly metaPixelId?: string | null;
+  readonly tiktokPixelId?: string | null;
+  readonly metaCapiToken?: string | null;
+  readonly tiktokAccessToken?: string | null;
   readonly templateId?: string;
   readonly theme?: string;
   readonly seoTitle?: string;

@@ -249,6 +249,12 @@ const buildPublicationViews = (input: {
       normalizedTemplateName.includes("vexercore") ||
       normalizedTemplateName.includes("vsl") ||
       normalizedTemplateName.includes("split 50/50");
+    const hasTrackingConfig =
+      Boolean(publication.trackingProfileId) ||
+      Boolean(publication.metaPixelId) ||
+      Boolean(publication.tiktokPixelId) ||
+      Boolean(publication.metaCapiToken) ||
+      Boolean(publication.tiktokAccessToken);
 
     return {
       ...publication,
@@ -258,7 +264,7 @@ const buildPublicationViews = (input: {
       templateName,
       isHybridVsl,
       teamName: team?.name ?? "Team sin metadata",
-      trackingLabel: publication.trackingProfileId
+      trackingLabel: hasTrackingConfig
         ? "Tracking conectado"
         : "Tracking pendiente",
       handoffLabel: publication.handoffStrategyId

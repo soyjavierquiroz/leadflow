@@ -52,6 +52,10 @@ type HybridPublicationDetail = {
     funnelInstanceId: string;
     domainId: string;
     pathPrefix: string;
+    metaPixelId: string | null;
+    tiktokPixelId: string | null;
+    metaCapiToken: string | null;
+    tiktokAccessToken: string | null;
     status: string;
     isPrimary: boolean;
   };
@@ -250,6 +254,13 @@ export class HybridFunnelPublicationsService {
       normalized.domainId,
       normalized.pathPrefix,
     );
+    const metaPixelId = this.normalizeOptionalString(dto.metaPixelId) ?? null;
+    const tiktokPixelId =
+      this.normalizeOptionalString(dto.tiktokPixelId) ?? null;
+    const metaCapiToken =
+      this.normalizeOptionalString(dto.metaCapiToken) ?? null;
+    const tiktokAccessToken =
+      this.normalizeOptionalString(dto.tiktokAccessToken) ?? null;
 
     const detail = await this.prisma.$transaction(async (tx) => {
       const code = await this.createUniqueCode(
@@ -361,6 +372,10 @@ export class HybridFunnelPublicationsService {
           funnelInstanceId: funnelInstance.id,
           trackingProfileId: null,
           handoffStrategyId: funnelInstance.handoffStrategyId,
+          metaPixelId,
+          tiktokPixelId,
+          metaCapiToken,
+          tiktokAccessToken,
           pathPrefix: normalized.pathPrefix,
           status: 'active',
           isActive: true,
@@ -408,6 +423,10 @@ export class HybridFunnelPublicationsService {
         funnelInstanceId: detail.publication.funnelInstanceId,
         domainId: detail.publication.domainId,
         pathPrefix: detail.publication.pathPrefix,
+        metaPixelId: detail.publication.metaPixelId,
+        tiktokPixelId: detail.publication.tiktokPixelId,
+        metaCapiToken: detail.publication.metaCapiToken,
+        tiktokAccessToken: detail.publication.tiktokAccessToken,
         status: detail.publication.status,
         isPrimary: detail.publication.isPrimary,
       },
@@ -515,6 +534,22 @@ export class HybridFunnelPublicationsService {
       mediaMap: (dto.mediaMap ?? targetStep.mediaMap) as JsonValue,
       settingsJson: (dto.settingsJson ?? targetStep.settingsJson) as JsonValue,
     });
+    const metaPixelId =
+      dto.metaPixelId !== undefined
+        ? this.normalizeOptionalString(dto.metaPixelId)
+        : existing.metaPixelId;
+    const tiktokPixelId =
+      dto.tiktokPixelId !== undefined
+        ? this.normalizeOptionalString(dto.tiktokPixelId)
+        : existing.tiktokPixelId;
+    const metaCapiToken =
+      dto.metaCapiToken !== undefined
+        ? this.normalizeOptionalString(dto.metaCapiToken)
+        : existing.metaCapiToken;
+    const tiktokAccessToken =
+      dto.tiktokAccessToken !== undefined
+        ? this.normalizeOptionalString(dto.tiktokAccessToken)
+        : existing.tiktokAccessToken;
 
     await this.assertDomain(scope, normalized.domainId);
     const template = await this.assertTemplate(
@@ -710,6 +745,10 @@ export class HybridFunnelPublicationsService {
           domainId: normalized.domainId,
           funnelInstanceId: existing.funnelInstance.id,
           handoffStrategyId: funnelInstance.handoffStrategyId,
+          metaPixelId,
+          tiktokPixelId,
+          metaCapiToken,
+          tiktokAccessToken,
           pathPrefix: normalized.pathPrefix,
           status: 'active',
           isActive: true,
@@ -740,6 +779,10 @@ export class HybridFunnelPublicationsService {
         funnelInstanceId: detail.publication.funnelInstanceId,
         domainId: detail.publication.domainId,
         pathPrefix: detail.publication.pathPrefix,
+        metaPixelId: detail.publication.metaPixelId,
+        tiktokPixelId: detail.publication.tiktokPixelId,
+        metaCapiToken: detail.publication.metaCapiToken,
+        tiktokAccessToken: detail.publication.tiktokAccessToken,
         status: detail.publication.status,
         isPrimary: detail.publication.isPrimary,
       },
@@ -828,6 +871,20 @@ export class HybridFunnelPublicationsService {
       mediaMap,
       settingsJson: this.assertSettingsJson(input.settingsJson),
     };
+  }
+
+  private normalizeOptionalString(value?: string | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const normalized = value.trim();
+
+    return normalized.length > 0 ? normalized : null;
   }
 
   private assertBlocksJson(value: JsonValue) {

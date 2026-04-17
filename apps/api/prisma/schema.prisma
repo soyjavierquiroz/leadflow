@@ -649,6 +649,8 @@ model FunnelPublication {
   handoffStrategyId    String?
   metaPixelId          String?
   tiktokPixelId        String?
+  metaCapiToken        String?
+  tiktokAccessToken    String?
   pathPrefix           String
   status               FunnelPublicationStatus
   isActive             Boolean                 @default(true)

@@ -36,8 +36,11 @@ export class FunnelPublicationsService {
       funnelInstanceId: dto.funnelInstanceId,
       trackingProfileId: dto.trackingProfileId ?? null,
       handoffStrategyId: dto.handoffStrategyId ?? null,
-      metaPixelId: null,
-      tiktokPixelId: null,
+      metaPixelId: this.normalizeOptionalString(dto.metaPixelId) ?? null,
+      tiktokPixelId: this.normalizeOptionalString(dto.tiktokPixelId) ?? null,
+      metaCapiToken: this.normalizeOptionalString(dto.metaCapiToken) ?? null,
+      tiktokAccessToken:
+        this.normalizeOptionalString(dto.tiktokAccessToken) ?? null,
       pathPrefix: this.normalizePathPrefix(dto.pathPrefix),
       status: dto.isActive ? 'active' : 'draft',
       isActive: dto.isActive ?? false,
@@ -79,6 +82,13 @@ export class FunnelPublicationsService {
     dto: CreateTeamFunnelPublicationDto,
   ): Promise<FunnelPublication> {
     const pathPrefix = this.normalizePathPrefix(dto.pathPrefix);
+    const metaPixelId = this.normalizeOptionalString(dto.metaPixelId) ?? null;
+    const tiktokPixelId =
+      this.normalizeOptionalString(dto.tiktokPixelId) ?? null;
+    const metaCapiToken =
+      this.normalizeOptionalString(dto.metaCapiToken) ?? null;
+    const tiktokAccessToken =
+      this.normalizeOptionalString(dto.tiktokAccessToken) ?? null;
 
     await this.assertPublicationDependencies(scope, {
       domainId: dto.domainId,
@@ -112,6 +122,10 @@ export class FunnelPublicationsService {
           funnelInstanceId: dto.funnelInstanceId,
           trackingProfileId: dto.trackingProfileId ?? null,
           handoffStrategyId: dto.handoffStrategyId ?? null,
+          metaPixelId,
+          tiktokPixelId,
+          metaCapiToken,
+          tiktokAccessToken,
           pathPrefix,
           status: 'draft',
           isActive: false,
@@ -155,18 +169,36 @@ export class FunnelPublicationsService {
     const status = dto.status ?? existing.status;
     const isActive =
       dto.status !== undefined ? dto.status === 'active' : existing.isActive;
+    const trackingProfileId =
+      dto.trackingProfileId !== undefined
+        ? dto.trackingProfileId
+        : existing.trackingProfileId;
+    const handoffStrategyId =
+      dto.handoffStrategyId !== undefined
+        ? dto.handoffStrategyId
+        : existing.handoffStrategyId;
+    const metaPixelId =
+      dto.metaPixelId !== undefined
+        ? this.normalizeOptionalString(dto.metaPixelId)
+        : existing.metaPixelId;
+    const tiktokPixelId =
+      dto.tiktokPixelId !== undefined
+        ? this.normalizeOptionalString(dto.tiktokPixelId)
+        : existing.tiktokPixelId;
+    const metaCapiToken =
+      dto.metaCapiToken !== undefined
+        ? this.normalizeOptionalString(dto.metaCapiToken)
+        : existing.metaCapiToken;
+    const tiktokAccessToken =
+      dto.tiktokAccessToken !== undefined
+        ? this.normalizeOptionalString(dto.tiktokAccessToken)
+        : existing.tiktokAccessToken;
 
     await this.assertPublicationDependencies(scope, {
       domainId,
       funnelInstanceId,
-      trackingProfileId:
-        dto.trackingProfileId !== undefined
-          ? dto.trackingProfileId
-          : existing.trackingProfileId,
-      handoffStrategyId:
-        dto.handoffStrategyId !== undefined
-          ? dto.handoffStrategyId
-          : existing.handoffStrategyId,
+      trackingProfileId,
+      handoffStrategyId,
       isActive,
       status,
     });
@@ -194,14 +226,12 @@ export class FunnelPublicationsService {
         data: {
           domainId,
           funnelInstanceId,
-          trackingProfileId:
-            dto.trackingProfileId !== undefined
-              ? dto.trackingProfileId
-              : existing.trackingProfileId,
-          handoffStrategyId:
-            dto.handoffStrategyId !== undefined
-              ? dto.handoffStrategyId
-              : existing.handoffStrategyId,
+          trackingProfileId,
+          handoffStrategyId,
+          metaPixelId,
+          tiktokPixelId,
+          metaCapiToken,
+          tiktokAccessToken,
           pathPrefix,
           status,
           isActive,
@@ -352,5 +382,19 @@ export class FunnelPublicationsService {
     }
 
     return normalizePublicationPathPrefix(value);
+  }
+
+  private normalizeOptionalString(value?: string | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const normalized = value.trim();
+
+    return normalized.length > 0 ? normalized : null;
   }
 }

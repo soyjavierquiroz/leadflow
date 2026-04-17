@@ -15,6 +15,10 @@ import { StatusBadge } from "@/components/app-shell/status-badge";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
+import {
+  getFirstZodError,
+  systemPublicationFormSchema,
+} from "@/lib/funnel-publication-form";
 import type {
   SystemPublicationDomainOption,
   SystemPublicationFunnelOption,
@@ -52,6 +56,10 @@ type PublicationFormState = {
   funnelId: string;
   path: string;
   isActive: boolean;
+  metaPixelId: string;
+  tiktokPixelId: string;
+  metaCapiToken: string;
+  tiktokAccessToken: string;
 };
 
 const primaryButtonClassName =
@@ -92,6 +100,10 @@ const buildInitialFormState = (
   funnelId: "",
   path: "/",
   isActive: true,
+  metaPixelId: "",
+  tiktokPixelId: "",
+  metaCapiToken: "",
+  tiktokAccessToken: "",
 });
 
 export function SystemPublicationsClient({
@@ -265,6 +277,10 @@ export function SystemPublicationsClient({
       funnelId: publication.funnel.id,
       path: publication.path,
       isActive: publication.isActive,
+      metaPixelId: publication.metaPixelId ?? "",
+      tiktokPixelId: publication.tiktokPixelId ?? "",
+      metaCapiToken: publication.metaCapiToken ?? "",
+      tiktokAccessToken: publication.tiktokAccessToken ?? "",
     });
   };
 
@@ -272,29 +288,22 @@ export function SystemPublicationsClient({
     event.preventDefault();
     setFeedback(null);
 
-    const domainId = formState.domainId.trim();
-    const funnelId = formState.funnelId.trim();
-    const path = formState.path.trim() || "/";
+    const parsedForm = systemPublicationFormSchema.safeParse({
+      ...formState,
+      path: formState.path.trim() || "/",
+    });
 
-    if (!formState.teamId.trim()) {
+    if (!parsedForm.success) {
       setFeedback({
         tone: "error",
-        message: "Selecciona un tenant para continuar.",
-      });
-      return;
-    }
-
-    if (!domainId || !funnelId) {
-      setFeedback({
-        tone: "error",
-        message:
-          "Selecciona un dominio y un funnel válidos antes de guardar el binding.",
+        message: getFirstZodError(parsedForm.error),
       });
       return;
     }
 
     startTransition(async () => {
       try {
+        const payload = parsedForm.data;
         const record =
           await authenticatedOperationRequest<SystemPublicationRecord>(
             editorState?.mode === "edit"
@@ -303,10 +312,14 @@ export function SystemPublicationsClient({
             {
               method: editorState?.mode === "edit" ? "PATCH" : "POST",
               body: JSON.stringify({
-                domainId,
-                funnelId,
-                path,
-                isActive: formState.isActive,
+                domainId: payload.domainId,
+                funnelId: payload.funnelId,
+                path: payload.path,
+                isActive: payload.isActive,
+                metaPixelId: payload.metaPixelId ?? null,
+                tiktokPixelId: payload.tiktokPixelId ?? null,
+                metaCapiToken: payload.metaCapiToken ?? null,
+                tiktokAccessToken: payload.tiktokAccessToken ?? null,
               }),
             },
           );
@@ -658,6 +671,96 @@ export function SystemPublicationsClient({
                 />
               </label>
             </div>
+
+            <section className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Tracking &amp; CAPI
+                </p>
+                <p className="mt-2 text-sm text-slate-600">
+                  Configura los identificadores y tokens que viajarán con esta
+                  publicación al runtime y al API.
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-5 md:grid-cols-2">
+                <label className="space-y-2 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">
+                    Meta Pixel ID
+                  </span>
+                  <input
+                    value={formState.metaPixelId}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        metaPixelId: event.target.value,
+                      }))
+                    }
+                    placeholder="123456789012345"
+                    disabled={isPending}
+                    spellCheck={false}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                </label>
+
+                <label className="space-y-2 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">
+                    TikTok Pixel ID
+                  </span>
+                  <input
+                    value={formState.tiktokPixelId}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        tiktokPixelId: event.target.value,
+                      }))
+                    }
+                    placeholder="C123ABC456DEF"
+                    disabled={isPending}
+                    spellCheck={false}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                </label>
+
+                <label className="space-y-2 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">
+                    Meta CAPI Token
+                  </span>
+                  <input
+                    value={formState.metaCapiToken}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        metaCapiToken: event.target.value,
+                      }))
+                    }
+                    placeholder="EAAB..."
+                    disabled={isPending}
+                    spellCheck={false}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                </label>
+
+                <label className="space-y-2 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">
+                    TikTok Access Token
+                  </span>
+                  <input
+                    value={formState.tiktokAccessToken}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        tiktokAccessToken: event.target.value,
+                      }))
+                    }
+                    placeholder="tt_act_..."
+                    disabled={isPending}
+                    spellCheck={false}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                </label>
+              </div>
+            </section>
 
             <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">

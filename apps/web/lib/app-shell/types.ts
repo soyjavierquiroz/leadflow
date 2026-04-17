@@ -74,6 +74,10 @@ export type FunnelPublicationRecord = {
   funnelInstanceId: string;
   trackingProfileId: string | null;
   handoffStrategyId: string | null;
+  metaPixelId: string | null;
+  tiktokPixelId: string | null;
+  metaCapiToken: string | null;
+  tiktokAccessToken: string | null;
   pathPrefix: string;
   status: string;
   isPrimary: boolean;

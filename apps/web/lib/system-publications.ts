@@ -21,6 +21,8 @@ export type SystemPublicationRecord = LooseRecord & {
   handoffStrategyId?: string | null;
   metaPixelId?: string | null;
   tiktokPixelId?: string | null;
+  metaCapiToken?: string | null;
+  tiktokAccessToken?: string | null;
   path: string;
   pathPrefix: string;
   status: string;

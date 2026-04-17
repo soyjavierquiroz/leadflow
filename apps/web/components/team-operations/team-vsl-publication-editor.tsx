@@ -127,6 +127,10 @@ type HybridPublicationDetail = {
     funnelInstanceId: string;
     domainId: string;
     pathPrefix: string;
+    metaPixelId: string | null;
+    tiktokPixelId: string | null;
+    metaCapiToken: string | null;
+    tiktokAccessToken: string | null;
     status: string;
     isPrimary: boolean;
   };
@@ -371,6 +375,10 @@ export function TeamVslPublicationEditor({
     activeDomains[0]?.id ?? "",
   );
   const [pathPrefix, setPathPrefix] = useState("/");
+  const [metaPixelId, setMetaPixelId] = useState("");
+  const [tiktokPixelId, setTiktokPixelId] = useState("");
+  const [metaCapiToken, setMetaCapiToken] = useState("");
+  const [tiktokAccessToken, setTiktokAccessToken] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState(
     templateOptions[0]?.id ?? "",
   );
@@ -415,6 +423,10 @@ export function TeamVslPublicationEditor({
       setStepRecords([]);
       setStepDrafts({});
       setStepSettingsJson({});
+      setMetaPixelId("");
+      setTiktokPixelId("");
+      setMetaCapiToken("");
+      setTiktokAccessToken("");
       return;
     }
 
@@ -431,6 +443,10 @@ export function TeamVslPublicationEditor({
         setFunnelName(payload.funnelInstance.name);
         setSelectedDomainId(payload.publication.domainId);
         setPathPrefix(payload.publication.pathPrefix);
+        setMetaPixelId(payload.publication.metaPixelId ?? "");
+        setTiktokPixelId(payload.publication.tiktokPixelId ?? "");
+        setMetaCapiToken(payload.publication.metaCapiToken ?? "");
+        setTiktokAccessToken(payload.publication.tiktokAccessToken ?? "");
         setSelectedTemplateId(payload.funnelInstance.templateId);
         setSelectedThemeId(extractThemeFromSettings(payload.funnelInstance.settingsJson));
         setSeoTitle(payload.seo.title);
@@ -794,6 +810,10 @@ export function TeamVslPublicationEditor({
           name: funnelName.trim(),
           domainId: selectedDomainId,
           pathPrefix: pathPrefix.trim(),
+          metaPixelId: metaPixelId.trim() || null,
+          tiktokPixelId: tiktokPixelId.trim() || null,
+          metaCapiToken: metaCapiToken.trim() || null,
+          tiktokAccessToken: tiktokAccessToken.trim() || null,
           templateId: selectedTemplateId,
           theme: selectedThemeId,
           seoTitle: seoTitle.trim(),
@@ -829,6 +849,10 @@ export function TeamVslPublicationEditor({
               );
 
         setCurrentPublicationId(response.publication.id);
+        setMetaPixelId(response.publication.metaPixelId ?? "");
+        setTiktokPixelId(response.publication.tiktokPixelId ?? "");
+        setMetaCapiToken(response.publication.metaCapiToken ?? "");
+        setTiktokAccessToken(response.publication.tiktokAccessToken ?? "");
         const nextStepRecords = normalizeStepRecords(response.steps, response.step);
         setSelectedThemeId(
           extractThemeFromSettings(response.funnelInstance.settingsJson),
@@ -1044,6 +1068,62 @@ export function TeamVslPublicationEditor({
               en la raíz del payload.
             </span>
           </label>
+
+          <div className="grid gap-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 md:col-span-2 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Tracking &amp; CAPI
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                Estos campos viven en la publicación y se envían junto al PATCH o
+                POST del editor híbrido.
+              </p>
+            </div>
+
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>Meta Pixel ID</span>
+              <input
+                value={metaPixelId}
+                onChange={(event) => setMetaPixelId(event.target.value)}
+                placeholder="123456789012345"
+                spellCheck={false}
+                className="rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>TikTok Pixel ID</span>
+              <input
+                value={tiktokPixelId}
+                onChange={(event) => setTiktokPixelId(event.target.value)}
+                placeholder="C123ABC456DEF"
+                spellCheck={false}
+                className="rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>Meta CAPI Token</span>
+              <input
+                value={metaCapiToken}
+                onChange={(event) => setMetaCapiToken(event.target.value)}
+                placeholder="EAAB..."
+                spellCheck={false}
+                className="rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>TikTok Access Token</span>
+              <input
+                value={tiktokAccessToken}
+                onChange={(event) => setTiktokAccessToken(event.target.value)}
+                placeholder="tt_act_..."
+                spellCheck={false}
+                className="rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              />
+            </label>
+          </div>
 
           <label className="grid gap-2 md:col-span-2">
             <span className={fieldLabelClassName}>SEO Title</span>

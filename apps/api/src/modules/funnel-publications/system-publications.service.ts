@@ -65,6 +65,13 @@ export class SystemPublicationsService {
   async create(dto: CreateSystemPublicationDto) {
     const normalizedPath = this.normalizePath(dto.path);
     const isActive = dto.isActive ?? true;
+    const metaPixelId = this.normalizeOptionalString(dto.metaPixelId) ?? null;
+    const tiktokPixelId =
+      this.normalizeOptionalString(dto.tiktokPixelId) ?? null;
+    const metaCapiToken =
+      this.normalizeOptionalString(dto.metaCapiToken) ?? null;
+    const tiktokAccessToken =
+      this.normalizeOptionalString(dto.tiktokAccessToken) ?? null;
     const scope = await this.resolveScope({
       domainId: dto.domainId,
       funnelId: dto.funnelId,
@@ -92,6 +99,10 @@ export class SystemPublicationsService {
           teamId: scope.domain.teamId,
           domainId: scope.domain.id,
           funnelInstanceId: scope.funnel.id,
+          metaPixelId,
+          tiktokPixelId,
+          metaCapiToken,
+          tiktokAccessToken,
           pathPrefix: normalizedPath,
           status: isActive ? 'active' : 'draft',
           isActive,
@@ -125,6 +136,22 @@ export class SystemPublicationsService {
     const nextDomainId = dto.domainId ?? existing.domainId;
     const nextFunnelId = dto.funnelId ?? existing.funnelInstanceId;
     const isActive = dto.isActive ?? existing.isActive;
+    const metaPixelId =
+      dto.metaPixelId !== undefined
+        ? this.normalizeOptionalString(dto.metaPixelId)
+        : existing.metaPixelId;
+    const tiktokPixelId =
+      dto.tiktokPixelId !== undefined
+        ? this.normalizeOptionalString(dto.tiktokPixelId)
+        : existing.tiktokPixelId;
+    const metaCapiToken =
+      dto.metaCapiToken !== undefined
+        ? this.normalizeOptionalString(dto.metaCapiToken)
+        : existing.metaCapiToken;
+    const tiktokAccessToken =
+      dto.tiktokAccessToken !== undefined
+        ? this.normalizeOptionalString(dto.tiktokAccessToken)
+        : existing.tiktokAccessToken;
     const scope = await this.resolveScope({
       domainId: nextDomainId,
       funnelId: nextFunnelId,
@@ -167,6 +194,10 @@ export class SystemPublicationsService {
         data: {
           domainId: scope.domain.id,
           funnelInstanceId: scope.funnel.id,
+          metaPixelId,
+          tiktokPixelId,
+          metaCapiToken,
+          tiktokAccessToken,
           pathPrefix: normalizedPath,
           status: isActive ? 'active' : 'draft',
           isActive,
@@ -320,6 +351,20 @@ export class SystemPublicationsService {
     return normalizePublicationPathPrefix(trimmed || '/');
   }
 
+  private normalizeOptionalString(value?: string | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const normalized = value.trim();
+
+    return normalized.length > 0 ? normalized : null;
+  }
+
   private requireId(value: string, field: string) {
     const normalized = value.trim();
 
@@ -349,6 +394,10 @@ export class SystemPublicationsService {
       domainId: record.domainId,
       funnelId: record.funnelInstanceId,
       funnelInstanceId: record.funnelInstanceId,
+      metaPixelId: record.metaPixelId,
+      tiktokPixelId: record.tiktokPixelId,
+      metaCapiToken: record.metaCapiToken,
+      tiktokAccessToken: record.tiktokAccessToken,
       path: record.pathPrefix,
       pathPrefix: record.pathPrefix,
       status: record.status,

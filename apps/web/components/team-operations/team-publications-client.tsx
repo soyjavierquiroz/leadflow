@@ -9,6 +9,10 @@ import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
+import {
+  getFirstZodError,
+  teamPublicationFormSchema,
+} from "@/lib/funnel-publication-form";
 import type {
   DomainRecord,
   FunnelView,
@@ -33,7 +37,30 @@ type PublicationFormState = {
   pathPrefix: string;
   trackingProfileId: string;
   handoffStrategyId: string;
+  metaPixelId: string;
+  tiktokPixelId: string;
+  metaCapiToken: string;
+  tiktokAccessToken: string;
   isPrimary: boolean;
+};
+
+type PublicationMutationRecord = {
+  id: string;
+  workspaceId: string;
+  teamId: string;
+  domainId: string;
+  funnelInstanceId: string;
+  trackingProfileId: string | null;
+  handoffStrategyId: string | null;
+  metaPixelId: string | null;
+  tiktokPixelId: string | null;
+  metaCapiToken: string | null;
+  tiktokAccessToken: string | null;
+  pathPrefix: string;
+  status: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 const buttonClassName =
@@ -53,6 +80,10 @@ const buildCreateState = (
   pathPrefix: "/",
   trackingProfileId: trackingProfiles[0]?.id ?? "",
   handoffStrategyId: handoffStrategies[0]?.id ?? "",
+  metaPixelId: "",
+  tiktokPixelId: "",
+  metaCapiToken: "",
+  tiktokAccessToken: "",
   isPrimary: false,
 });
 
@@ -65,6 +96,10 @@ const buildView = (
     funnelInstanceId: string;
     trackingProfileId: string | null;
     handoffStrategyId: string | null;
+    metaPixelId: string | null;
+    tiktokPixelId: string | null;
+    metaCapiToken: string | null;
+    tiktokAccessToken: string | null;
     pathPrefix: string;
     status: string;
     isPrimary: boolean;
@@ -92,6 +127,12 @@ const buildView = (
       : null;
   const templateName = funnel?.templateName ?? "Template sin referencia";
   const normalizedTemplateName = templateName.toLowerCase();
+  const hasTrackingConfig =
+    Boolean(record.trackingProfileId) ||
+    Boolean(record.metaPixelId) ||
+    Boolean(record.tiktokPixelId) ||
+    Boolean(record.metaCapiToken) ||
+    Boolean(record.tiktokAccessToken);
 
   return {
     ...record,
@@ -105,7 +146,9 @@ const buildView = (
       normalizedTemplateName.includes("vsl") ||
       normalizedTemplateName.includes("split 50/50"),
     teamName: funnel?.teamName ?? "Team sin metadata",
-    trackingLabel: record.trackingProfileId ? "Tracking conectado" : "Tracking pendiente",
+    trackingLabel: hasTrackingConfig
+      ? "Tracking conectado"
+      : "Tracking pendiente",
     handoffLabel: record.handoffStrategyId ? "Handoff definido" : "Handoff pendiente",
   };
 };
@@ -153,6 +196,10 @@ export function TeamPublicationsClient({
       pathPrefix: row.pathPrefix,
       trackingProfileId: row.trackingProfileId ?? "",
       handoffStrategyId: row.handoffStrategyId ?? "",
+      metaPixelId: row.metaPixelId ?? "",
+      tiktokPixelId: row.tiktokPixelId ?? "",
+      metaCapiToken: row.metaCapiToken ?? "",
+      tiktokAccessToken: row.tiktokAccessToken ?? "",
       isPrimary: row.isPrimary,
     });
   };
@@ -162,30 +209,31 @@ export function TeamPublicationsClient({
 
     startTransition(async () => {
       try {
-        const record = await teamOperationRequest<{
-          id: string;
-          workspaceId: string;
-          teamId: string;
-          domainId: string;
-          funnelInstanceId: string;
-          trackingProfileId: string | null;
-          handoffStrategyId: string | null;
-          pathPrefix: string;
-          status: string;
-          isPrimary: boolean;
-          createdAt: string;
-          updatedAt: string;
-        }>("/funnel-publications", {
-          method: "POST",
-          body: JSON.stringify({
-            domainId: createState.domainId,
-            funnelInstanceId: createState.funnelInstanceId,
-            pathPrefix: createState.pathPrefix,
-            trackingProfileId: createState.trackingProfileId || null,
-            handoffStrategyId: createState.handoffStrategyId || null,
-            isPrimary: createState.isPrimary,
-          }),
-        });
+        const parsedForm = teamPublicationFormSchema.safeParse(createState);
+
+        if (!parsedForm.success) {
+          setErrorMessage(getFirstZodError(parsedForm.error));
+          return;
+        }
+
+        const record = await teamOperationRequest<PublicationMutationRecord>(
+          "/funnel-publications",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              domainId: parsedForm.data.domainId,
+              funnelInstanceId: parsedForm.data.funnelInstanceId,
+              pathPrefix: parsedForm.data.pathPrefix,
+              trackingProfileId: parsedForm.data.trackingProfileId ?? null,
+              handoffStrategyId: parsedForm.data.handoffStrategyId ?? null,
+              metaPixelId: parsedForm.data.metaPixelId ?? null,
+              tiktokPixelId: parsedForm.data.tiktokPixelId ?? null,
+              metaCapiToken: parsedForm.data.metaCapiToken ?? null,
+              tiktokAccessToken: parsedForm.data.tiktokAccessToken ?? null,
+              isPrimary: parsedForm.data.isPrimary,
+            }),
+          },
+        );
 
         setRows((current) => [
           ...current.map((item) =>
@@ -222,30 +270,31 @@ export function TeamPublicationsClient({
 
     startTransition(async () => {
       try {
-        const record = await teamOperationRequest<{
-          id: string;
-          workspaceId: string;
-          teamId: string;
-          domainId: string;
-          funnelInstanceId: string;
-          trackingProfileId: string | null;
-          handoffStrategyId: string | null;
-          pathPrefix: string;
-          status: string;
-          isPrimary: boolean;
-          createdAt: string;
-          updatedAt: string;
-        }>(`/funnel-publications/${editingRow.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            domainId: editState.domainId,
-            funnelInstanceId: editState.funnelInstanceId,
-            pathPrefix: editState.pathPrefix,
-            trackingProfileId: editState.trackingProfileId || null,
-            handoffStrategyId: editState.handoffStrategyId || null,
-            isPrimary: editState.isPrimary,
-          }),
-        });
+        const parsedForm = teamPublicationFormSchema.safeParse(editState);
+
+        if (!parsedForm.success) {
+          setErrorMessage(getFirstZodError(parsedForm.error));
+          return;
+        }
+
+        const record = await teamOperationRequest<PublicationMutationRecord>(
+          `/funnel-publications/${editingRow.id}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              domainId: parsedForm.data.domainId,
+              funnelInstanceId: parsedForm.data.funnelInstanceId,
+              pathPrefix: parsedForm.data.pathPrefix,
+              trackingProfileId: parsedForm.data.trackingProfileId ?? null,
+              handoffStrategyId: parsedForm.data.handoffStrategyId ?? null,
+              metaPixelId: parsedForm.data.metaPixelId ?? null,
+              tiktokPixelId: parsedForm.data.tiktokPixelId ?? null,
+              metaCapiToken: parsedForm.data.metaCapiToken ?? null,
+              tiktokAccessToken: parsedForm.data.tiktokAccessToken ?? null,
+              isPrimary: parsedForm.data.isPrimary,
+            }),
+          },
+        );
 
         setRows((current) =>
           current.map((item) =>
@@ -278,25 +327,15 @@ export function TeamPublicationsClient({
     startTransition(async () => {
       try {
         const nextStatus = row.status === "active" ? "draft" : "active";
-        const record = await teamOperationRequest<{
-          id: string;
-          workspaceId: string;
-          teamId: string;
-          domainId: string;
-          funnelInstanceId: string;
-          trackingProfileId: string | null;
-          handoffStrategyId: string | null;
-          pathPrefix: string;
-          status: string;
-          isPrimary: boolean;
-          createdAt: string;
-          updatedAt: string;
-        }>(`/funnel-publications/${row.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            status: nextStatus,
-          }),
-        });
+        const record = await teamOperationRequest<PublicationMutationRecord>(
+          `/funnel-publications/${row.id}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              status: nextStatus,
+            }),
+          },
+        );
 
         setRows((current) =>
           current.map((item) =>
@@ -609,111 +648,194 @@ function PublicationForm({
   handoffStrategies,
 }: PublicationFormProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Dominio</span>
-        <select
-          value={state.domainId}
-          onChange={(event) =>
-            onChange((current) => ({
-              ...current,
-              domainId: event.target.value,
-            }))
-          }
-          className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
-        >
-          {domains.map((domain) => (
-            <option key={domain.id} value={domain.id}>
-              {domain.host}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Funnel</span>
-        <select
-          value={state.funnelInstanceId}
-          onChange={(event) =>
-            onChange((current) => ({
-              ...current,
-              funnelInstanceId: event.target.value,
-            }))
-          }
-          className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
-        >
-          {funnels.map((funnel) => (
-            <option key={funnel.id} value={funnel.id}>
-              {funnel.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Path</span>
-        <input
-          value={state.pathPrefix}
-          onChange={(event) =>
-            onChange((current) => ({
-              ...current,
-              pathPrefix: event.target.value,
-            }))
-          }
-          className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
-        />
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Tracking</span>
-        <select
-          value={state.trackingProfileId}
-          onChange={(event) =>
-            onChange((current) => ({
-              ...current,
-              trackingProfileId: event.target.value,
-            }))
-          }
-          className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
-        >
-          <option value="">Sin tracking</option>
-          {trackingProfiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Handoff</span>
-        <select
-          value={state.handoffStrategyId}
-          onChange={(event) =>
-            onChange((current) => ({
-              ...current,
-              handoffStrategyId: event.target.value,
-            }))
-          }
-          className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
-        >
-          <option value="">Sin handoff</option>
-          {handoffStrategies.map((strategy) => (
-            <option key={strategy.id} value={strategy.id}>
-              {strategy.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        <input
-          checked={state.isPrimary}
-          onChange={(event) =>
-            onChange((current) => ({
-              ...current,
-              isPrimary: event.target.checked,
-            }))
-          }
-          type="checkbox"
-        />
-        Marcar como publicación primaria del dominio
-      </label>
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Dominio</span>
+          <select
+            value={state.domainId}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                domainId: event.target.value,
+              }))
+            }
+            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+          >
+            {domains.map((domain) => (
+              <option key={domain.id} value={domain.id}>
+                {domain.host}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Funnel</span>
+          <select
+            value={state.funnelInstanceId}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                funnelInstanceId: event.target.value,
+              }))
+            }
+            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+          >
+            {funnels.map((funnel) => (
+              <option key={funnel.id} value={funnel.id}>
+                {funnel.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Path</span>
+          <input
+            value={state.pathPrefix}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                pathPrefix: event.target.value,
+              }))
+            }
+            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Tracking</span>
+          <select
+            value={state.trackingProfileId}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                trackingProfileId: event.target.value,
+              }))
+            }
+            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+          >
+            <option value="">Sin tracking</option>
+            {trackingProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Handoff</span>
+          <select
+            value={state.handoffStrategyId}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                handoffStrategyId: event.target.value,
+              }))
+            }
+            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+          >
+            <option value="">Sin handoff</option>
+            {handoffStrategies.map((strategy) => (
+              <option key={strategy.id} value={strategy.id}>
+                {strategy.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <input
+            checked={state.isPrimary}
+            onChange={(event) =>
+              onChange((current) => ({
+                ...current,
+                isPrimary: event.target.checked,
+              }))
+            }
+            type="checkbox"
+          />
+          Marcar como publicación primaria del dominio
+        </label>
+      </div>
+
+      <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+          Tracking &amp; CAPI
+        </p>
+        <p className="mt-2 text-sm text-slate-600">
+          Estos datos se guardan directamente en la publicación para que el API
+          y el runtime puedan resolver tracking browser + server-side.
+        </p>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">
+              Meta Pixel ID
+            </span>
+            <input
+              value={state.metaPixelId}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  metaPixelId: event.target.value,
+                }))
+              }
+              placeholder="123456789012345"
+              spellCheck={false}
+              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">
+              TikTok Pixel ID
+            </span>
+            <input
+              value={state.tiktokPixelId}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  tiktokPixelId: event.target.value,
+                }))
+              }
+              placeholder="C123ABC456DEF"
+              spellCheck={false}
+              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">
+              Meta CAPI Token
+            </span>
+            <input
+              value={state.metaCapiToken}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  metaCapiToken: event.target.value,
+                }))
+              }
+              placeholder="EAAB..."
+              spellCheck={false}
+              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">
+              TikTok Access Token
+            </span>
+            <input
+              value={state.tiktokAccessToken}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  tiktokAccessToken: event.target.value,
+                }))
+              }
+              placeholder="tt_act_..."
+              spellCheck={false}
+              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950"
+            />
+          </label>
+        </div>
+      </section>
     </div>
   );
 }
