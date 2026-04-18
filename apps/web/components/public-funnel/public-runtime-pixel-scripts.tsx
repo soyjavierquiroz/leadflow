@@ -48,6 +48,8 @@ export function PublicRuntimePixelScripts({
       return;
     }
 
+    const mountedScriptIds: string[] = [];
+
     const syncHeadScript = (scriptId: string, code: string) => {
       const current = document.head.querySelector<HTMLScriptElement>(
         `script[data-leadflow-runtime-script="${scriptId}"]`,
@@ -64,6 +66,7 @@ export function PublicRuntimePixelScripts({
       script.dataset.leadflowRuntimeScript = scriptId;
       script.text = code;
       document.head.appendChild(script);
+      mountedScriptIds.push(scriptId);
     };
 
     if (resolvedMetaPixelId) {
@@ -79,6 +82,16 @@ export function PublicRuntimePixelScripts({
         buildTikTokPixelScript(resolvedTikTokPixelId),
       );
     }
+
+    return () => {
+      for (const scriptId of mountedScriptIds) {
+        document.head
+          .querySelector<HTMLScriptElement>(
+            `script[data-leadflow-runtime-script="${scriptId}"]`,
+          )
+          ?.remove();
+      }
+    };
   }, [resolvedMetaPixelId, resolvedTikTokPixelId]);
 
   return null;

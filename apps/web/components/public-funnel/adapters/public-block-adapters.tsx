@@ -2236,6 +2236,7 @@ export function PublicBlockAdapter({
             publicationId={runtime.publication.id}
             currentStepId={runtime.currentStep.id}
             block={normalizeLeadCaptureFormBlock(block)}
+            runtimeEntryContext={runtime.entryContext}
             isBoxed={surfaceProps.isBoxed}
           />
         );

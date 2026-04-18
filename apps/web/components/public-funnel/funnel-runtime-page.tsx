@@ -303,10 +303,12 @@ export function FunnelRuntimePage({
   return (
     <LeadCaptureProvider>
       <FunnelThemeProvider runtime={runtime}>
-        <PublicRuntimePixelScripts
-          metaPixelId={runtime.publication.metaPixelId}
-          tiktokPixelId={runtime.publication.tiktokPixelId}
-        />
+        {runtime.entryContext.browserPixelsEnabled ? (
+          <PublicRuntimePixelScripts
+            metaPixelId={runtime.publication.metaPixelId}
+            tiktokPixelId={runtime.publication.tiktokPixelId}
+          />
+        ) : null}
         {renderedContent}
         <PublicLeadCaptureModalHost runtime={runtime} blocks={blocks} />
       </FunnelThemeProvider>

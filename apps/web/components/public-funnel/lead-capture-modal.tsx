@@ -370,6 +370,7 @@ export function LeadCaptureModal({
         publicationId,
         currentStepId,
         anonymousId,
+        entryContext: runtime.entryContext,
         submissionEventId,
         sourceUrl:
           typeof window !== "undefined"

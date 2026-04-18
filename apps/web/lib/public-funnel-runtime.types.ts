@@ -15,6 +15,12 @@ export type RuntimeBlock = {
   [key: string]: JsonValue | undefined;
 };
 
+export type PublicRuntimeEntryContext = {
+  entryMode: "organic_asesor" | "paid_ads";
+  forcedSponsorId: string | null;
+  browserPixelsEnabled: boolean;
+};
+
 export type PublicFunnelRuntimePayload = {
   request: {
     host: string;
@@ -31,6 +37,7 @@ export type PublicFunnelRuntimePayload = {
     canonicalHost: string | null;
     redirectToPrimary: boolean;
   };
+  entryContext: PublicRuntimeEntryContext;
   publication: {
     id: string;
     pathPrefix: string;

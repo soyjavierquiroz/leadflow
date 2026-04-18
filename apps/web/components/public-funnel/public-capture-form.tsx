@@ -33,11 +33,13 @@ import type {
   RuntimeLeadCaptureFormBlock,
 } from "@/components/public-funnel/runtime-block-utils";
 import { resolveKnownLeadFieldName } from "@/components/public-funnel/runtime-block-utils";
+import type { PublicRuntimeEntryContext } from "@/lib/public-funnel-runtime.types";
 
 type PublicCaptureFormProps = {
   publicationId: string;
   currentStepId: string;
   block: RuntimeLeadCaptureFormBlock;
+  runtimeEntryContext: PublicRuntimeEntryContext;
   sectionId?: string;
   isBoxed?: boolean;
 };
@@ -179,6 +181,7 @@ export function PublicCaptureForm({
   publicationId,
   currentStepId,
   block,
+  runtimeEntryContext,
   sectionId = "public-capture-form",
   isBoxed = false,
 }: PublicCaptureFormProps) {
@@ -283,6 +286,7 @@ export function PublicCaptureForm({
         publicationId,
         currentStepId,
         anonymousId,
+        entryContext: runtimeEntryContext,
         submissionEventId,
         sourceUrl:
           typeof window !== "undefined" ? window.location.href : pathname ?? null,

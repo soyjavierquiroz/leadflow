@@ -1,6 +1,7 @@
 "use client";
 
 import { webPublicConfig } from "@/lib/public-env";
+import type { PublicRuntimeEntryContext } from "@/lib/public-funnel-runtime.types";
 
 export type LeadCaptureSubmissionResponse = {
   success?: boolean;
@@ -73,6 +74,7 @@ export type LeadCaptureSubmissionPayload = {
   publicationId: string;
   currentStepId: string;
   anonymousId: string;
+  entryContext?: PublicRuntimeEntryContext;
   submissionEventId?: string | null;
   sourceUrl?: string | null;
   utmSource?: string | null;
@@ -231,6 +233,9 @@ export const submitPublicLeadCapture = async (
       },
       body: JSON.stringify({
         ...payload,
+        entryContext: payload.entryContext,
+        entryMode: payload.entryContext?.entryMode ?? "paid_ads",
+        forcedSponsorId: payload.entryContext?.forcedSponsorId ?? null,
         sourceChannel: payload.sourceChannel ?? "form",
         tags: ["runtime-v1", ...(payload.tags ?? [])],
       }),
@@ -258,6 +263,9 @@ export const submitRuntimeLeadCapture = async (params: {
     body: JSON.stringify({
       hostname,
       path,
+      entryContext: payload.entryContext,
+      entryMode: payload.entryContext?.entryMode ?? "paid_ads",
+      forcedSponsorId: payload.entryContext?.forcedSponsorId ?? null,
       anonymousId: payload.anonymousId,
       submissionEventId: payload.submissionEventId,
       sourceChannel: payload.sourceChannel ?? "form",

@@ -98,6 +98,9 @@ export function normalizePublicFunnelRuntimePayload(
   const record = isRecord(value) ? value : {};
   const requestRecord = isRecord(record.request) ? record.request : {};
   const domainRecord = isRecord(record.domain) ? record.domain : {};
+  const entryContextRecord = isRecord(record.entryContext)
+    ? record.entryContext
+    : {};
   const publicationRecord = isRecord(record.publication) ? record.publication : {};
   const funnelRecord = isRecord(record.funnel) ? record.funnel : {};
   const templateRecord = isRecord(funnelRecord.template) ? funnelRecord.template : {};
@@ -162,6 +165,20 @@ export function normalizePublicFunnelRuntimePayload(
       canonicalHost:
         typeof domainRecord.canonicalHost === 'string' ? domainRecord.canonicalHost : null,
       redirectToPrimary: asBoolean(domainRecord.redirectToPrimary),
+    },
+    entryContext: {
+      entryMode:
+        entryContextRecord.entryMode === 'organic_asesor'
+          ? 'organic_asesor'
+          : 'paid_ads',
+      forcedSponsorId:
+        typeof entryContextRecord.forcedSponsorId === 'string'
+          ? entryContextRecord.forcedSponsorId
+          : null,
+      browserPixelsEnabled: asBoolean(
+        entryContextRecord.browserPixelsEnabled,
+        true,
+      ),
     },
     publication: {
       id: asString(publicationRecord.id, 'runtime-publication'),
