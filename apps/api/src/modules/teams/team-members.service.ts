@@ -14,6 +14,15 @@ import { MailerService } from '../shared/mailer.service';
 import type { CreateTeamMemberDto } from './dto/create-team-member.dto';
 import type { UpdateTeamMemberStatusDto } from './dto/update-team-member-status.dto';
 
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+
 type TeamMemberScope = {
   workspaceId: string;
   teamId: string;
@@ -223,16 +232,18 @@ export class TeamMembersService {
             ? {
                 email: member.email,
                 teamName: team.name,
+                publicSlug: sponsor.publicSlug,
               }
             : null,
       };
     });
 
     if (mutation.activationEmail) {
-      await this.dispatchAdvisorActivationEmail(
-        mutation.activationEmail.email,
-        mutation.activationEmail.teamName,
-      );
+      void this.dispatchAdvisorActivationEmail({
+        email: mutation.activationEmail.email,
+        teamName: mutation.activationEmail.teamName,
+        publicSlug: mutation.activationEmail.publicSlug,
+      });
     }
 
     return {
@@ -294,6 +305,7 @@ export class TeamMembersService {
           workspaceId: scope.workspaceId,
           teamId: scope.teamId,
           displayName: fullName,
+          publicSlug: await this.generateAvailablePublicSlug(tx, fullName),
           status: 'active',
           isActive: false,
           email,
@@ -321,6 +333,7 @@ export class TeamMembersService {
         temporaryPassword,
         welcomeEmail: {
           email,
+          teamName: team.name,
         },
       };
     });
@@ -329,10 +342,11 @@ export class TeamMembersService {
       void this.provisionSponsorWelcomeKredits(invitation.member.sponsorId);
     }
 
-    await this.dispatchAdvisorWelcomeEmail(
-      invitation.welcomeEmail.email,
-      invitation.temporaryPassword,
-    );
+    void this.dispatchAdvisorWelcomeEmail({
+      email: invitation.welcomeEmail.email,
+      temporaryPassword: invitation.temporaryPassword,
+      teamName: invitation.welcomeEmail.teamName,
+    });
 
     return {
       team: invitation.team,
@@ -494,32 +508,69 @@ export class TeamMembersService {
   }
 
   private async dispatchAdvisorWelcomeEmail(
-    email: string,
-    temporaryPassword: string,
+    input: {
+      email: string;
+      temporaryPassword: string;
+      teamName: string;
+    },
   ) {
     try {
-      await this.mailerService.sendAdvisorWelcomeEmail(
-        email,
-        temporaryPassword,
-      );
+      await this.mailerService.sendAdvisorWelcomeEmail({
+        email: input.email,
+        tempPassword: input.temporaryPassword,
+        teamName: input.teamName,
+      });
     } catch (error) {
       this.logger.error(
-        `Advisor welcome email failed for ${email}: ${
+        `Advisor welcome email failed for ${input.email}: ${
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );
     }
   }
 
-  private async dispatchAdvisorActivationEmail(email: string, teamName: string) {
+  private async dispatchAdvisorActivationEmail(input: {
+    email: string;
+    teamName: string;
+    publicSlug: string | null;
+  }) {
     try {
-      await this.mailerService.sendAdvisorActivationEmail(email, teamName);
+      await this.mailerService.sendAdvisorActivationEmail({
+        email: input.email,
+        teamName: input.teamName,
+        publicSlug: input.publicSlug,
+      });
     } catch (error) {
       this.logger.error(
-        `Advisor activation email failed for ${email}: ${
+        `Advisor activation email failed for ${input.email}: ${
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );
     }
+  }
+
+  private async generateAvailablePublicSlug(
+    tx: Prisma.TransactionClient,
+    fullName: string,
+  ) {
+    const baseSlug = slugify(fullName) || 'asesor';
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
+      const existing = await tx.sponsor.findFirst({
+        where: {
+          publicSlug: candidate,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+    }
+
+    return `${baseSlug}-${randomBytes(4).toString('hex')}`;
   }
 }
