@@ -12,6 +12,10 @@ import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
+import {
+  PublicationTrackingFields,
+  type PublicationTrackingFieldName,
+} from "@/components/forms/publication-tracking-fields";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
@@ -61,12 +65,6 @@ type PublicationFormState = {
   metaCapiToken: string;
   tiktokAccessToken: string;
 };
-
-type TrackingFieldName =
-  | "metaPixelId"
-  | "tiktokPixelId"
-  | "metaCapiToken"
-  | "tiktokAccessToken";
 
 const primaryButtonClassName =
   "rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
@@ -688,86 +686,18 @@ export function SystemPublicationsClient({
               </label>
             </div>
 
-            <section className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Tracking &amp; CAPI
-                </p>
-                <p className="mt-2 text-sm text-slate-600">
-                  Configura los identificadores y tokens que viajarán con esta
-                  publicación al runtime y al API.
-                </p>
-              </div>
-
-              <div className="mt-4 grid gap-5 md:grid-cols-2">
-                <label className="space-y-2 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">
-                    Meta Pixel ID
-                  </span>
-                  <input
-                    value={formState.metaPixelId}
-                    onChange={(event) =>
-                      updateTrackingField("metaPixelId", event.target.value)
-                    }
-                    placeholder="123456789012345"
-                    disabled={isPending}
-                    spellCheck={false}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                  />
-                </label>
-
-                <label className="space-y-2 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">
-                    TikTok Pixel ID
-                  </span>
-                  <input
-                    value={formState.tiktokPixelId}
-                    onChange={(event) =>
-                      updateTrackingField("tiktokPixelId", event.target.value)
-                    }
-                    placeholder="C123ABC456DEF"
-                    disabled={isPending}
-                    spellCheck={false}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                  />
-                </label>
-
-                <label className="space-y-2 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">
-                    Meta CAPI Token
-                  </span>
-                  <input
-                    value={formState.metaCapiToken}
-                    onChange={(event) =>
-                      updateTrackingField("metaCapiToken", event.target.value)
-                    }
-                    placeholder="EAAB..."
-                    disabled={isPending}
-                    spellCheck={false}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                  />
-                </label>
-
-                <label className="space-y-2 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">
-                    TikTok Access Token
-                  </span>
-                  <input
-                    value={formState.tiktokAccessToken}
-                    onChange={(event) =>
-                      updateTrackingField(
-                        "tiktokAccessToken",
-                        event.target.value,
-                      )
-                    }
-                    placeholder="tt_act_..."
-                    disabled={isPending}
-                    spellCheck={false}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                  />
-                </label>
-              </div>
-            </section>
+            <PublicationTrackingFields
+              value={{
+                metaPixelId: formState.metaPixelId,
+                tiktokPixelId: formState.tiktokPixelId,
+                metaCapiToken: formState.metaCapiToken,
+                tiktokAccessToken: formState.tiktokAccessToken,
+              }}
+              onChange={updateTrackingField}
+              description="Configura los identificadores y tokens que viajarán con esta publicación al runtime y al API."
+              disabled={isPending}
+              variant="system"
+            />
 
             <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">

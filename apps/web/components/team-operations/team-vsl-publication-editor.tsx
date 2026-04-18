@@ -21,6 +21,10 @@ import {
 
 import { SectionHeader } from "@/components/app-shell/section-header";
 import {
+  PublicationTrackingFields,
+  type PublicationTrackingFieldName,
+} from "@/components/forms/publication-tracking-fields";
+import {
   defaultBlocksSeed,
   HybridJsonMediaEditor,
   requiredMediaKeys,
@@ -891,6 +895,26 @@ export function TeamVslPublicationEditor({
     });
   };
 
+  const updateTrackingField = (
+    field: PublicationTrackingFieldName,
+    value: string,
+  ) => {
+    switch (field) {
+      case "metaPixelId":
+        setMetaPixelId(value);
+        return;
+      case "tiktokPixelId":
+        setTiktokPixelId(value);
+        return;
+      case "metaCapiToken":
+        setMetaCapiToken(value);
+        return;
+      case "tiktokAccessToken":
+        setTiktokAccessToken(value);
+        return;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -1069,61 +1093,17 @@ export function TeamVslPublicationEditor({
             </span>
           </label>
 
-          <div className="grid gap-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 md:col-span-2 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Tracking &amp; CAPI
-              </p>
-              <p className="mt-2 text-sm text-slate-600">
-                Estos campos viven en la publicación y se envían junto al PATCH o
-                POST del editor híbrido.
-              </p>
-            </div>
-
-            <label className="grid gap-2">
-              <span className={fieldLabelClassName}>Meta Pixel ID</span>
-              <input
-                value={metaPixelId}
-                onChange={(event) => setMetaPixelId(event.target.value)}
-                placeholder="123456789012345"
-                spellCheck={false}
-                className="rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950"
-              />
-            </label>
-
-            <label className="grid gap-2">
-              <span className={fieldLabelClassName}>TikTok Pixel ID</span>
-              <input
-                value={tiktokPixelId}
-                onChange={(event) => setTiktokPixelId(event.target.value)}
-                placeholder="C123ABC456DEF"
-                spellCheck={false}
-                className="rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950"
-              />
-            </label>
-
-            <label className="grid gap-2">
-              <span className={fieldLabelClassName}>Meta CAPI Token</span>
-              <input
-                value={metaCapiToken}
-                onChange={(event) => setMetaCapiToken(event.target.value)}
-                placeholder="EAAB..."
-                spellCheck={false}
-                className="rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950"
-              />
-            </label>
-
-            <label className="grid gap-2">
-              <span className={fieldLabelClassName}>TikTok Access Token</span>
-              <input
-                value={tiktokAccessToken}
-                onChange={(event) => setTiktokAccessToken(event.target.value)}
-                placeholder="tt_act_..."
-                spellCheck={false}
-                className="rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950"
-              />
-            </label>
-          </div>
+          <PublicationTrackingFields
+            value={{
+              metaPixelId,
+              tiktokPixelId,
+              metaCapiToken,
+              tiktokAccessToken,
+            }}
+            onChange={updateTrackingField}
+            description="Estos campos viven en la publicación y se envían junto al PATCH o POST del editor híbrido."
+            variant="vsl"
+          />
 
           <label className="grid gap-2 md:col-span-2">
             <span className={fieldLabelClassName}>SEO Title</span>

@@ -21,16 +21,20 @@ const optionalNullableStringField = z.preprocess((value) => {
 const requiredSelection = (message: string) =>
   z.string().trim().min(1, message);
 
+const publicationTrackingFieldShape = {
+  metaPixelId: optionalNullableStringField,
+  tiktokPixelId: optionalNullableStringField,
+  metaCapiToken: optionalNullableStringField,
+  tiktokAccessToken: optionalNullableStringField,
+};
+
 export const systemPublicationFormSchema = z.object({
   teamId: requiredSelection("Selecciona un tenant para continuar."),
   domainId: requiredSelection("Selecciona un dominio válido antes de guardar."),
   funnelId: requiredSelection("Selecciona un funnel válido antes de guardar."),
   path: requiredSelection("Ingresa un path válido para el binding."),
   isActive: z.boolean(),
-  metaPixelId: optionalNullableStringField,
-  tiktokPixelId: optionalNullableStringField,
-  metaCapiToken: optionalNullableStringField,
-  tiktokAccessToken: optionalNullableStringField,
+  ...publicationTrackingFieldShape,
 });
 
 export const teamPublicationFormSchema = z.object({
@@ -41,10 +45,7 @@ export const teamPublicationFormSchema = z.object({
   pathPrefix: requiredSelection("Ingresa un path para la publicación."),
   trackingProfileId: optionalNullableStringField,
   handoffStrategyId: optionalNullableStringField,
-  metaPixelId: optionalNullableStringField,
-  tiktokPixelId: optionalNullableStringField,
-  metaCapiToken: optionalNullableStringField,
-  tiktokAccessToken: optionalNullableStringField,
+  ...publicationTrackingFieldShape,
   isPrimary: z.boolean(),
 });
 

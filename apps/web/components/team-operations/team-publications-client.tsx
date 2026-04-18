@@ -7,6 +7,10 @@ import { KpiCard } from "@/components/app-shell/kpi-card";
 import { PublicationCard } from "@/components/app-shell/publication-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
+import {
+  PublicationTrackingFields,
+  type PublicationTrackingFieldName,
+} from "@/components/forms/publication-tracking-fields";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import {
@@ -647,6 +651,16 @@ function PublicationForm({
   trackingProfiles,
   handoffStrategies,
 }: PublicationFormProps) {
+  const updateTrackingField = (
+    field: PublicationTrackingFieldName,
+    value: string,
+  ) => {
+    onChange((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
@@ -756,86 +770,16 @@ function PublicationForm({
         </label>
       </div>
 
-      <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-          Tracking &amp; CAPI
-        </p>
-        <p className="mt-2 text-sm text-slate-600">
-          Estos datos se guardan directamente en la publicación para que el API
-          y el runtime puedan resolver tracking browser + server-side.
-        </p>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">
-              Meta Pixel ID
-            </span>
-            <input
-              value={state.metaPixelId}
-              onChange={(event) =>
-                onChange((current) => ({
-                  ...current,
-                  metaPixelId: event.target.value,
-                }))
-              }
-              placeholder="123456789012345"
-              spellCheck={false}
-              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">
-              TikTok Pixel ID
-            </span>
-            <input
-              value={state.tiktokPixelId}
-              onChange={(event) =>
-                onChange((current) => ({
-                  ...current,
-                  tiktokPixelId: event.target.value,
-                }))
-              }
-              placeholder="C123ABC456DEF"
-              spellCheck={false}
-              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">
-              Meta CAPI Token
-            </span>
-            <input
-              value={state.metaCapiToken}
-              onChange={(event) =>
-                onChange((current) => ({
-                  ...current,
-                  metaCapiToken: event.target.value,
-                }))
-              }
-              placeholder="EAAB..."
-              spellCheck={false}
-              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">
-              TikTok Access Token
-            </span>
-            <input
-              value={state.tiktokAccessToken}
-              onChange={(event) =>
-                onChange((current) => ({
-                  ...current,
-                  tiktokAccessToken: event.target.value,
-                }))
-              }
-              placeholder="tt_act_..."
-              spellCheck={false}
-              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950"
-            />
-          </label>
-        </div>
-      </section>
+      <PublicationTrackingFields
+        value={{
+          metaPixelId: state.metaPixelId,
+          tiktokPixelId: state.tiktokPixelId,
+          metaCapiToken: state.metaCapiToken,
+          tiktokAccessToken: state.tiktokAccessToken,
+        }}
+        onChange={updateTrackingField}
+        description="Estos datos se guardan directamente en la publicación para que el API y el runtime puedan resolver tracking browser + server-side."
+      />
     </div>
   );
 }
