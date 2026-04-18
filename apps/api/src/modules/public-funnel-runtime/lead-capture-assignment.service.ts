@@ -18,8 +18,10 @@ import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto
 import type { CapturePublicLeadDto } from './dto/capture-public-lead.dto';
 import type { AutoAssignPublicLeadDto } from './dto/auto-assign-public-lead.dto';
 import type { SubmitPublicLeadCaptureDto } from './dto/submit-public-lead-capture.dto';
+import type { PublicRuntimeEntryContext } from './public-funnel-runtime.types';
 import { buildPublicationStepPath } from './public-funnel-runtime.utils';
 import { pickNextRotationMember } from './lead-capture-assignment.utils';
+import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
 import {
   buildPublicWhatsappMessage,
   buildPublicWhatsappUrl,
@@ -171,6 +173,7 @@ export class LeadCaptureAssignmentService {
     private readonly trackingEventsService: TrackingEventsService,
     private readonly messagingAutomationService: MessagingAutomationService,
     private readonly leadDispatcherService: LeadDispatcherService,
+    private readonly publicFunnelRuntimeService: PublicFunnelRuntimeService,
   ) {}
 
   async registerVisitor(dto: RegisterPublicVisitorDto) {
@@ -314,6 +317,12 @@ export class LeadCaptureAssignmentService {
           });
         }
 
+        const entryContext = await this.resolveSubmissionEntryContext(
+          tx,
+          publication,
+          dto.sourceUrl ?? null,
+        );
+
         const visitor = await this.registerVisitorInTransaction(
           tx,
           publication,
@@ -378,6 +387,7 @@ export class LeadCaptureAssignmentService {
             {
               triggerEventId: dto.submissionEventId ?? null,
               funnelStepId: dto.currentStepId,
+              entryContext,
             },
           );
         const nextStep = this.resolveNextStepAfterCaptureFromPublication(
@@ -829,6 +839,7 @@ export class LeadCaptureAssignmentService {
     input?: {
       triggerEventId?: string | null;
       funnelStepId?: string | null;
+      entryContext?: PublicRuntimeEntryContext;
     },
   ): Promise<AssignmentResolution> {
     const existingOpenAssignment = await tx.assignment.findFirst({
@@ -868,6 +879,15 @@ export class LeadCaptureAssignmentService {
         ),
         wasCreated: false,
       };
+    }
+
+    if (input?.entryContext?.forcedSponsorId) {
+      return this.assignLeadToForcedSponsorInTransaction(
+        tx,
+        publication,
+        lead,
+        input,
+      );
     }
 
     const assignee = await this.resolveRoundRobinAssigneeOrThrow(tx, publication);
@@ -1018,6 +1038,7 @@ export class LeadCaptureAssignmentService {
     input?: {
       triggerEventId?: string | null;
       funnelStepId?: string | null;
+      entryContext?: PublicRuntimeEntryContext;
     },
   ): Promise<AssignmentResolution> {
     try {
@@ -1354,6 +1375,228 @@ export class LeadCaptureAssignmentService {
     }
 
     return this.toPublicAssignedAdvisor(user);
+  }
+
+  private async resolveSubmissionEntryContext(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+    sourceUrl: string | null,
+  ) {
+    const requestedPath =
+      this.extractRequestedPathFromSourceUrl(sourceUrl) ?? publication.pathPrefix;
+
+    return this.publicFunnelRuntimeService.resolveEntryContextForPublication({
+      tx,
+      workspaceId: publication.workspaceId,
+      teamId: publication.teamId,
+      publicationPathPrefix: publication.pathPrefix,
+      requestedPath,
+    });
+  }
+
+  private extractRequestedPathFromSourceUrl(sourceUrl: string | null) {
+    if (!sourceUrl?.trim()) {
+      return null;
+    }
+
+    const trimmed = sourceUrl.trim();
+
+    try {
+      return new URL(trimmed).pathname;
+    } catch {
+      return trimmed.startsWith('/') ? trimmed : null;
+    }
+  }
+
+  private async assignLeadToForcedSponsorInTransaction(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+    lead: {
+      id: string;
+      currentAssignmentId: string | null;
+    },
+    input: {
+      triggerEventId?: string | null;
+      funnelStepId?: string | null;
+      entryContext?: PublicRuntimeEntryContext;
+    },
+  ): Promise<AssignmentResolution> {
+    const forcedSponsorId = input.entryContext?.forcedSponsorId;
+
+    if (!forcedSponsorId) {
+      throw new ConflictException({
+        code: 'FORCED_SPONSOR_REQUIRED',
+        message: 'A forced sponsor id is required for organic advisor routing.',
+      });
+    }
+
+    const sponsor = await this.resolveForcedSponsorOrThrow(
+      tx,
+      publication,
+      forcedSponsorId,
+    );
+    const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
+
+    if (!legacyFunnelId) {
+      throw new ConflictException({
+        code: 'LEGACY_FUNNEL_REQUIRED',
+        message:
+          'The current funnel instance is not yet linked to a legacy funnel, so assignment persistence cannot proceed in v1.',
+      });
+    }
+
+    const assignedAt = new Date();
+    const effectiveHandoffStrategy =
+      publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
+    const assignment = await tx.assignment.create({
+      data: {
+        workspaceId: publication.workspaceId,
+        leadId: lead.id,
+        sponsorId: sponsor.id,
+        teamId: publication.teamId,
+        funnelId: legacyFunnelId,
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
+        rotationPoolId: null,
+        status: 'assigned',
+        reason: 'manual',
+        assignedAt,
+        acceptedAt: null,
+        resolvedAt: null,
+      },
+      include: {
+        sponsor: true,
+      },
+    });
+
+    await tx.lead.update({
+      where: { id: lead.id },
+      data: {
+        status: 'assigned',
+        currentAssignmentId: assignment.id,
+      },
+    });
+
+    await tx.domainEvent.create({
+      data: {
+        workspaceId: publication.workspaceId,
+        eventId: randomUUID(),
+        aggregateType: 'lead',
+        aggregateId: lead.id,
+        eventName: 'lead_assigned',
+        actorType: 'system',
+        payload: {
+          assignmentId: assignment.id,
+          sponsorId: assignment.sponsor.id,
+          rotationPoolId: null,
+          funnelPublicationId: publication.id,
+          assignmentMode: 'organic_asesor_bypass',
+          entryMode: input.entryContext?.entryMode ?? 'organic_asesor',
+          teamPointerUnaffected: true,
+        },
+        occurredAt: assignedAt,
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
+        funnelStepId: input.funnelStepId ?? null,
+        leadId: lead.id,
+        assignmentId: assignment.id,
+      },
+    });
+
+    await this.trackingEventsService.recordTrackingEventInTransaction(tx, {
+      workspaceId: publication.workspaceId,
+      aggregateType: 'assignment',
+      aggregateId: assignment.id,
+      eventName: 'assignment_created',
+      actorType: 'system',
+      occurredAt: assignedAt,
+      funnelInstanceId: publication.funnelInstanceId,
+      funnelPublicationId: publication.id,
+      funnelStepId: input.funnelStepId ?? null,
+      leadId: lead.id,
+      assignmentId: assignment.id,
+      payload: {
+        source: 'server',
+        triggerEventId: input.triggerEventId ?? null,
+        sponsorId: assignment.sponsor.id,
+        rotationPoolId: null,
+        assignmentReason: 'manual',
+        assignmentMode: 'organic_asesor_bypass',
+        entryMode: input.entryContext?.entryMode ?? 'organic_asesor',
+        forcedSponsorId,
+        teamPointerUnaffected: true,
+      },
+    });
+
+    await this.trackingEventsService.recordTrackingEventInTransaction(tx, {
+      workspaceId: publication.workspaceId,
+      aggregateType: 'assignment',
+      aggregateId: assignment.id,
+      eventName: 'handoff_started',
+      actorType: 'system',
+      occurredAt: assignedAt,
+      funnelInstanceId: publication.funnelInstanceId,
+      funnelPublicationId: publication.id,
+      funnelStepId: input.funnelStepId ?? null,
+      leadId: lead.id,
+      assignmentId: assignment.id,
+      payload: {
+        source: 'server',
+        triggerEventId: input.triggerEventId ?? null,
+        sponsorId: assignment.sponsor.id,
+        handoffStrategyId: effectiveHandoffStrategy?.id ?? null,
+        assignmentMode: 'organic_asesor_bypass',
+        entryMode: input.entryContext?.entryMode ?? 'organic_asesor',
+      },
+    });
+
+    return {
+      assignment: {
+        id: assignment.id,
+        status: assignment.status,
+        reason: assignment.reason,
+        assignedAt: assignment.assignedAt.toISOString(),
+        sponsor: {
+          id: assignment.sponsor.id,
+          displayName: assignment.sponsor.displayName,
+          email: assignment.sponsor.email,
+          phone: assignment.sponsor.phone,
+          avatarUrl: assignment.sponsor.avatarUrl,
+        },
+      },
+      advisor: await this.resolveAssignedAdvisorBySponsorId(
+        tx,
+        publication,
+        assignment.sponsor.id,
+      ),
+      wasCreated: true,
+    };
+  }
+
+  private async resolveForcedSponsorOrThrow(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+    sponsorId: string,
+  ) {
+    const sponsor = await tx.sponsor.findFirst({
+      where: {
+        id: sponsorId,
+        workspaceId: publication.workspaceId,
+        teamId: publication.teamId,
+        isActive: true,
+        status: 'active',
+        availabilityStatus: 'available',
+      },
+    });
+
+    if (!sponsor) {
+      throw new ConflictException({
+        code: 'FORCED_SPONSOR_UNAVAILABLE',
+        message: `Forced sponsor ${sponsorId} is not active for publication ${publication.id}.`,
+      });
+    }
+
+    return sponsor;
   }
 
   private toPublicAssignedAdvisor(

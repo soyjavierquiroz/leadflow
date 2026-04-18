@@ -348,6 +348,7 @@ model Sponsor {
   workspaceId          String
   teamId               String
   displayName          String
+  publicSlug           String?              @unique
   status               SponsorStatus
   isActive             Boolean              @default(false)
   avatarUrl            String?

@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
+  PublicRuntimeEntryContext,
   PublicRuntimePayload,
   PublicRuntimeStep,
 } from './public-funnel-runtime.types';
@@ -46,9 +47,20 @@ const publicRuntimeInclude = {
   },
 } satisfies Prisma.FunnelPublicationInclude;
 
+const PERSONAL_LINK_PATH_PREFIX = '/a';
+
 type RuntimePublicationRecord = Prisma.FunnelPublicationGetPayload<{
   include: typeof publicRuntimeInclude;
 }>;
+
+type PersonalLinkRoute = {
+  sponsorSlug: string;
+  runtimePathPrefix: string;
+};
+
+type ResolvedRuntimeEntryContext = PublicRuntimeEntryContext & {
+  runtimePathPrefix: string | null;
+};
 
 const asJsonRecord = (value: Prisma.JsonValue | null | undefined) =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -77,6 +89,36 @@ const readNullableString = (
   return typeof candidate === 'string' ? candidate : null;
 };
 
+const normalizePersonalLinkSegment = (value: string | null | undefined) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const decoded = decodeURIComponent(value).trim().toLowerCase();
+  return decoded.length > 0 ? decoded : null;
+};
+
+const parsePersonalLinkRoute = (path: string): PersonalLinkRoute | null => {
+  const segments = normalizePath(path)
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  if (segments[0] !== 'a') {
+    return null;
+  }
+
+  const sponsorSlug = normalizePersonalLinkSegment(segments[1]);
+  if (!sponsorSlug) {
+    return null;
+  }
+
+  return {
+    sponsorSlug,
+    runtimePathPrefix: `${PERSONAL_LINK_PATH_PREFIX}/${sponsorSlug}`,
+  };
+};
+
 @Injectable()
 export class PublicFunnelRuntimeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -87,6 +129,7 @@ export class PublicFunnelRuntimeService {
   ): Promise<PublicRuntimePayload> {
     const normalizedHost = normalizeHost(host);
     const normalizedPath = normalizePath(path);
+    const personalLinkRoute = parsePersonalLinkRoute(normalizedPath);
 
     if (!normalizedHost) {
       throw new BadRequestException({
@@ -111,9 +154,13 @@ export class PublicFunnelRuntimeService {
     });
 
     const matchingPublication = publications
-      .filter((publication) =>
-        matchesPublicationPath(normalizedPath, publication.pathPrefix),
-      )
+      .filter((publication) => {
+        if (personalLinkRoute) {
+          return publication.pathPrefix === '/';
+        }
+
+        return matchesPublicationPath(normalizedPath, publication.pathPrefix);
+      })
       .sort((left, right) =>
         comparePublicationPathPrefix(left.pathPrefix, right.pathPrefix),
       )[0];
@@ -125,11 +172,68 @@ export class PublicFunnelRuntimeService {
       });
     }
 
+    const entryContext = await this.resolveEntryContextForPublication({
+      workspaceId: matchingPublication.workspaceId,
+      teamId: matchingPublication.teamId,
+      publicationPathPrefix: matchingPublication.pathPrefix,
+      requestedPath: normalizedPath,
+    });
+
     return this.buildRuntimePayload(
       matchingPublication,
       normalizedHost,
       normalizedPath,
+      entryContext,
     );
+  }
+
+  async resolveEntryContextForPublication(input: {
+    workspaceId: string;
+    teamId: string;
+    publicationPathPrefix: string;
+    requestedPath: string;
+    tx?: Prisma.TransactionClient | PrismaService;
+  }): Promise<ResolvedRuntimeEntryContext> {
+    const normalizedPath = normalizePath(input.requestedPath);
+    const personalLinkRoute = parsePersonalLinkRoute(normalizedPath);
+
+    if (!personalLinkRoute || input.publicationPathPrefix !== '/') {
+      return {
+        entryMode: 'paid_ads',
+        forcedSponsorId: null,
+        browserPixelsEnabled: true,
+        runtimePathPrefix: null,
+      };
+    }
+
+    const prismaClient = input.tx ?? this.prisma;
+    const sponsor = await prismaClient.sponsor.findFirst({
+      where: {
+        workspaceId: input.workspaceId,
+        teamId: input.teamId,
+        publicSlug: personalLinkRoute.sponsorSlug,
+        isActive: true,
+        status: 'active',
+        availabilityStatus: 'available',
+      } as Prisma.SponsorWhereInput,
+      select: {
+        id: true,
+      },
+    });
+
+    if (!sponsor) {
+      throw new NotFoundException({
+        code: 'PUBLIC_SPONSOR_NOT_FOUND',
+        message: `No active public sponsor matched ${normalizedPath}.`,
+      });
+    }
+
+    return {
+      entryMode: 'organic_asesor',
+      forcedSponsorId: sponsor.id,
+      browserPixelsEnabled: false,
+      runtimePathPrefix: personalLinkRoute.runtimePathPrefix,
+    };
   }
 
   async getPublicationRuntime(
@@ -156,6 +260,12 @@ export class PublicFunnelRuntimeService {
       publication,
       publication.domain.host,
       publication.pathPrefix,
+      {
+        entryMode: 'paid_ads',
+        forcedSponsorId: null,
+        browserPixelsEnabled: true,
+        runtimePathPrefix: null,
+      },
     );
   }
 
@@ -177,17 +287,20 @@ export class PublicFunnelRuntimeService {
     publication: RuntimePublicationRecord,
     requestedHost: string,
     requestedPath: string,
+    entryContext: ResolvedRuntimeEntryContext,
   ): PublicRuntimePayload {
+    const effectivePublicationPathPrefix =
+      entryContext.runtimePathPrefix ?? publication.pathPrefix;
     const relativeStepPath = resolveRelativeStepPath(
       requestedPath,
-      publication.pathPrefix,
+      effectivePublicationPathPrefix,
     );
 
     const steps = publication.funnelInstance.steps.map((step) => ({
       slug: normalizeStepSlug(step.slug),
       id: step.id,
       path: buildPublicationStepPath(
-        publication.pathPrefix,
+        effectivePublicationPathPrefix,
         step.slug,
         step.isEntryStep,
       ),
@@ -238,7 +351,7 @@ export class PublicFunnelRuntimeService {
       request: {
         host: requestedHost,
         path: requestedPath,
-        publicationPathPrefix: publication.pathPrefix,
+        publicationPathPrefix: effectivePublicationPathPrefix,
         relativeStepPath,
       },
       domain: {
@@ -249,6 +362,11 @@ export class PublicFunnelRuntimeService {
         isPrimary: publication.domain.isPrimary,
         canonicalHost: publication.domain.canonicalHost,
         redirectToPrimary: publication.domain.redirectToPrimary,
+      },
+      entryContext: {
+        entryMode: entryContext.entryMode,
+        forcedSponsorId: entryContext.forcedSponsorId,
+        browserPixelsEnabled: entryContext.browserPixelsEnabled,
       },
       publication: {
         id: publication.id,

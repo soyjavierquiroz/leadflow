@@ -47,12 +47,21 @@ describe('LeadCaptureAssignmentService', () => {
     const leadDispatcherService = {
       dispatchLeadContextUpsert: jest.fn().mockResolvedValue(undefined),
     } as any;
+    const publicFunnelRuntimeService = {
+      resolveEntryContextForPublication: jest.fn().mockResolvedValue({
+        entryMode: 'paid_ads',
+        forcedSponsorId: null,
+        browserPixelsEnabled: true,
+        runtimePathPrefix: null,
+      }),
+    } as any;
 
     const service = new LeadCaptureAssignmentService(
       prisma,
       trackingEventsService,
       messagingAutomationService,
       leadDispatcherService,
+      publicFunnelRuntimeService,
     );
 
     return {
@@ -397,6 +406,108 @@ describe('LeadCaptureAssignmentService', () => {
       user: {
         id: 'admin-1',
       },
+    });
+  });
+
+  it('creates a direct manual assignment for personal advisor links without moving the team pointer', async () => {
+    const { service, trackingEventsService } = buildService();
+    const publication = buildPublication();
+    const assignedAt = new Date('2026-04-18T00:00:00.000Z');
+    const tx = {
+      assignment: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: 'assignment-1',
+          status: 'assigned',
+          reason: 'manual',
+          assignedAt,
+          sponsor: {
+            id: 'sponsor-1',
+            displayName: 'Advisor Uno',
+            email: 'advisor@example.com',
+            phone: '+57 300 000 0001',
+            avatarUrl: 'https://cdn.example.com/a1.png',
+          },
+        }),
+      },
+      sponsor: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'sponsor-1',
+          displayName: 'Advisor Uno',
+          email: 'advisor@example.com',
+          phone: '+57 300 000 0001',
+          avatarUrl: 'https://cdn.example.com/a1.png',
+        }),
+      },
+      lead: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+      domainEvent: {
+        create: jest.fn().mockResolvedValue(undefined),
+      },
+      user: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      team: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    const result = await (service as any).assignLeadToNextSponsorInTransaction(
+      tx,
+      publication,
+      {
+        id: 'lead-1',
+        currentAssignmentId: null,
+      },
+      {
+        triggerEventId: 'trigger-1',
+        funnelStepId: 'step-1',
+        entryContext: {
+          entryMode: 'organic_asesor',
+          forcedSponsorId: 'sponsor-1',
+          browserPixelsEnabled: false,
+        },
+      },
+    );
+
+    expect(tx.sponsor.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'sponsor-1',
+        workspaceId: publication.workspaceId,
+        teamId: publication.teamId,
+        isActive: true,
+        status: 'active',
+        availabilityStatus: 'available',
+      },
+    });
+    expect(tx.assignment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        leadId: 'lead-1',
+        sponsorId: 'sponsor-1',
+        reason: 'manual',
+        rotationPoolId: null,
+      }),
+      include: {
+        sponsor: true,
+      },
+    });
+    expect(tx.team.update).not.toHaveBeenCalled();
+    expect(trackingEventsService.recordTrackingEventInTransaction).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        eventName: 'assignment_created',
+        payload: expect.objectContaining({
+          assignmentReason: 'manual',
+          assignmentMode: 'organic_asesor_bypass',
+          forcedSponsorId: 'sponsor-1',
+          teamPointerUnaffected: true,
+        }),
+      }),
+    );
+    expect(result.assignment).toMatchObject({
+      id: 'assignment-1',
+      reason: 'manual',
     });
   });
 });

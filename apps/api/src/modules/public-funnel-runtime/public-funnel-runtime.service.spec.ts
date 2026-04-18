@@ -207,6 +207,9 @@ describe('PublicFunnelRuntimeService', () => {
       funnelPublication: {
         findMany,
       },
+      sponsor: {
+        findFirst: jest.fn(),
+      },
     } as unknown as PrismaService;
 
     findMany.mockResolvedValue([
@@ -237,6 +240,11 @@ describe('PublicFunnelRuntimeService', () => {
     expect(runtime.publication.tiktokPixelId).toBe('tiktok-publication-456');
     expect(runtime.request.path).toBe('/oportunidad');
     expect(runtime.domain.normalizedHost).toBe('localhost');
+    expect(runtime.entryContext).toEqual({
+      entryMode: 'paid_ads',
+      forcedSponsorId: null,
+      browserPixelsEnabled: true,
+    });
   });
 
   it('rejects resolution attempts without a valid host', async () => {
@@ -247,6 +255,9 @@ describe('PublicFunnelRuntimeService', () => {
     const prisma = {
       funnelPublication: {
         findMany,
+      },
+      sponsor: {
+        findFirst: jest.fn(),
       },
     } as unknown as PrismaService;
 
@@ -266,6 +277,9 @@ describe('PublicFunnelRuntimeService', () => {
     const prisma = {
       funnelPublication: {
         findMany,
+      },
+      sponsor: {
+        findFirst: jest.fn(),
       },
     } as unknown as PrismaService;
 
@@ -319,6 +333,9 @@ describe('PublicFunnelRuntimeService', () => {
       funnelPublication: {
         findMany,
       },
+      sponsor: {
+        findFirst: jest.fn(),
+      },
     } as unknown as PrismaService;
 
     findMany.mockResolvedValue([
@@ -349,5 +366,78 @@ describe('PublicFunnelRuntimeService', () => {
     await expect(
       service.resolveByHostAndPath('localhost', '/desconocido'),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('resolves personal advisor links against the root publication and disables browser pixels', async () => {
+    const findMany = jest.fn<
+      Promise<MockPublicationRecord[]>,
+      [FindManyArgs]
+    >();
+    const sponsorFindFirst = jest.fn().mockResolvedValue({
+      id: 'sponsor-1',
+    });
+    const prisma = {
+      funnelPublication: {
+        findMany,
+      },
+      sponsor: {
+        findFirst: sponsorFindFirst,
+      },
+    } as unknown as PrismaService;
+
+    findMany.mockResolvedValue([
+      buildPublicationRecord({
+        id: 'publication-root',
+        pathPrefix: '/',
+        steps: [
+          buildStepRecord({
+            publicationId: 'publication-root',
+            idSuffix: 'entry',
+            slug: 'landing',
+            position: 1,
+            isEntryStep: true,
+          }),
+          buildStepRecord({
+            publicationId: 'publication-root',
+            idSuffix: 'confirmado',
+            slug: 'confirmado',
+            position: 2,
+            stepType: 'thank_you',
+          }),
+        ],
+      }),
+      buildPublicationRecord({
+        id: 'publication-opportunity',
+        pathPrefix: '/oportunidad',
+      }),
+    ]);
+
+    const service = new PublicFunnelRuntimeService(prisma);
+    const runtime = await service.resolveByHostAndPath(
+      'localhost',
+      '/a/asesor-uno/confirmado',
+    );
+
+    expect(sponsorFindFirst).toHaveBeenCalledWith({
+      where: {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        publicSlug: 'asesor-uno',
+        isActive: true,
+        status: 'active',
+        availabilityStatus: 'available',
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(runtime.publication.id).toBe('publication-root');
+    expect(runtime.request.publicationPathPrefix).toBe('/a/asesor-uno');
+    expect(runtime.currentStep.path).toBe('/a/asesor-uno/confirmado');
+    expect(runtime.entryContext).toEqual({
+      entryMode: 'organic_asesor',
+      forcedSponsorId: 'sponsor-1',
+      browserPixelsEnabled: false,
+    });
   });
 });
