@@ -57,10 +57,22 @@ const asJsonRecord = (value: Prisma.JsonValue | null | undefined) =>
 
 const readNullableString = (
   value: RuntimePublicationRecord,
-  key: 'metaPixelId' | 'tiktokPixelId',
+  key:
+    | 'metaPixelId'
+    | 'tiktokPixelId'
+    | 'metaCapiToken'
+    | 'tiktokAccessToken',
 ) => {
   const candidate = (value as RuntimePublicationRecord &
-    Partial<Record<'metaPixelId' | 'tiktokPixelId', unknown>>)[key];
+    Partial<
+      Record<
+        | 'metaPixelId'
+        | 'tiktokPixelId'
+        | 'metaCapiToken'
+        | 'tiktokAccessToken',
+        unknown
+      >
+    >)[key];
 
   return typeof candidate === 'string' ? candidate : null;
 };
@@ -246,6 +258,11 @@ export class PublicFunnelRuntimeService {
         handoffStrategyId: publication.handoffStrategyId,
         metaPixelId: readNullableString(publication, 'metaPixelId'),
         tiktokPixelId: readNullableString(publication, 'tiktokPixelId'),
+        metaCapiToken: readNullableString(publication, 'metaCapiToken'),
+        tiktokAccessToken: readNullableString(
+          publication,
+          'tiktokAccessToken',
+        ),
       },
       theme,
       funnel: {

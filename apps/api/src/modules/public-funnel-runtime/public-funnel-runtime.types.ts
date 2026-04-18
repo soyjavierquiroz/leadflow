@@ -39,6 +39,8 @@ export type PublicRuntimePayload = {
     handoffStrategyId: string | null;
     metaPixelId: string | null;
     tiktokPixelId: string | null;
+    metaCapiToken: string | null;
+    tiktokAccessToken: string | null;
   };
   theme: string | null;
   funnel: {
