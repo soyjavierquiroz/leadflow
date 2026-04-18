@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
+import { Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/app-shell/empty-state";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
@@ -25,6 +26,11 @@ type TeamMemberMutationResponse = {
 
 type TeamMemberInvitationResponse = TeamMemberMutationResponse & {
   temporaryPassword: string;
+};
+
+type TeamMemberDeletionResponse = {
+  team: TeamMembersSeatSummary;
+  deletedMemberId: string;
 };
 
 const primaryButtonClassName =
@@ -95,6 +101,9 @@ export function TeamMembersClient({
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteFullName, setInviteFullName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteWhatsappNumber, setInviteWhatsappNumber] = useState("");
+  const [memberPendingDeletion, setMemberPendingDeletion] =
+    useState<TeamMemberRecord | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const seatUsagePercentage =
@@ -170,11 +179,12 @@ export function TeamMembersClient({
 
     const fullName = inviteFullName.trim();
     const email = inviteEmail.trim().toLowerCase();
+    const whatsappNumber = inviteWhatsappNumber.trim();
 
-    if (!fullName || !email) {
+    if (!fullName || !email || !whatsappNumber) {
       setFeedback({
         tone: "error",
-        message: "Ingresa nombre y email para crear el usuario.",
+        message: "Ingresa nombre, email y WhatsApp para crear el usuario.",
       });
       return;
     }
@@ -189,6 +199,7 @@ export function TeamMembersClient({
               body: JSON.stringify({
                 fullName,
                 email,
+                whatsappNumber,
               }),
             },
           );
@@ -197,6 +208,7 @@ export function TeamMembersClient({
         setTeam(response.team);
         setInviteFullName("");
         setInviteEmail("");
+        setInviteWhatsappNumber("");
         setIsInviteModalOpen(false);
         setFeedback({
           tone: "success",
@@ -209,6 +221,43 @@ export function TeamMembersClient({
             error instanceof Error
               ? error.message
               : "No pudimos crear el usuario del team.",
+        });
+      }
+    });
+  };
+
+  const handleDeleteMember = () => {
+    if (!memberPendingDeletion) {
+      return;
+    }
+
+    resetFeedback();
+
+    startTransition(async () => {
+      try {
+        const response = await teamOperationRequest<TeamMemberDeletionResponse>(
+          `/team/members/${memberPendingDeletion.id}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+        setMembers((current) =>
+          current.filter((item) => item.id !== response.deletedMemberId),
+        );
+        setTeam(response.team);
+        setMemberPendingDeletion(null);
+        setFeedback({
+          tone: "success",
+          message: "Asesor eliminado definitivamente del team.",
+        });
+      } catch (error) {
+        setFeedback({
+          tone: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "No pudimos eliminar al asesor del team.",
         });
       }
     });
@@ -320,6 +369,8 @@ export function TeamMembersClient({
                 {members.map((member) => {
                   const isMemberPending = pendingMemberIds.includes(member.id);
                   const isSeatControlAvailable = Boolean(member.sponsorId);
+                  const isDeletableAdvisor =
+                    member.role === "MEMBER" && Boolean(member.sponsorId);
 
                   return (
                     <tr key={member.id} className="align-top">
@@ -346,7 +397,7 @@ export function TeamMembersClient({
                               {member.email}
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                              {member.phone ?? "Sin telefono"} ·{" "}
+                              WhatsApp: {member.phone ?? "Sin cargar"} ·{" "}
                               {member.memberPortalEnabled
                                 ? "Portal listo"
                                 : "Portal pendiente"}
@@ -378,6 +429,21 @@ export function TeamMembersClient({
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center justify-end gap-4">
+                          {isDeletableAdvisor ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resetFeedback();
+                                setMemberPendingDeletion(member);
+                              }}
+                              disabled={isPending || isMemberPending}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              aria-label={`Eliminar a ${member.displayName ?? member.fullName}`}
+                              title="Eliminar asesor"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : null}
                           <div className="text-right">
                             <p className="font-semibold text-slate-950">
                               {member.isActive ? "Activa" : "Inactiva"}
@@ -468,6 +534,23 @@ export function TeamMembersClient({
                 className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               />
             </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-slate-900">
+                Numero de WhatsApp
+              </span>
+              <input
+                type="tel"
+                value={inviteWhatsappNumber}
+                onChange={(event) =>
+                  setInviteWhatsappNumber(event.target.value)
+                }
+                placeholder="+57 300 123 4567"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+              />
+              <p className="text-xs text-slate-500">
+                Este numero se usara como WhatsApp operativo del asesor.
+              </p>
+            </label>
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
@@ -486,6 +569,46 @@ export function TeamMembersClient({
               </button>
             </div>
           </form>
+        </ModalShell>
+      ) : null}
+
+      {memberPendingDeletion ? (
+        <ModalShell
+          eyebrow="Team Admin / Eliminacion"
+          title="Eliminar asesor definitivamente"
+          description={`Vas a borrar de forma permanente el usuario y el sponsor de ${memberPendingDeletion.displayName ?? memberPendingDeletion.fullName}. Esta accion no se puede deshacer.`}
+          onClose={() => {
+            if (isPending) {
+              return;
+            }
+
+            setMemberPendingDeletion(null);
+          }}
+        >
+          <div className="space-y-5">
+            <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-900">
+              Esto ejecutara un hard delete en Prisma sobre el usuario asesor y
+              su sponsor asociado.
+            </div>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setMemberPendingDeletion(null)}
+                disabled={isPending}
+                className={secondaryButtonClassName}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteMember}
+                disabled={isPending}
+                className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPending ? "Eliminando..." : "Eliminar definitivamente"}
+              </button>
+            </div>
+          </div>
         </ModalShell>
       ) : null}
     </div>

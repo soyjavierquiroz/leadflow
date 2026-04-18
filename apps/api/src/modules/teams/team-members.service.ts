@@ -70,6 +70,11 @@ export type TeamMemberInvitationResult = TeamMemberMutationResult & {
   temporaryPassword: string;
 };
 
+export type TeamMemberDeletionResult = {
+  team: TeamSeatSummary;
+  deletedMemberId: string;
+};
+
 const sanitizeRequiredText = (
   value: string | null | undefined,
   field: string,
@@ -103,6 +108,31 @@ const sanitizeRequiredEmail = (value: string | null | undefined) => {
       code: 'TEAM_MEMBER_EMAIL_INVALID',
       message: 'email must be a valid email address.',
       field: 'email',
+    });
+  }
+
+  return normalized;
+};
+
+const sanitizeRequiredWhatsappNumber = (value: string | null | undefined) => {
+  const normalized = sanitizeRequiredText(value, 'whatsappNumber');
+  const digits = normalized.replace(/\D+/g, '');
+
+  if (!/^[+0-9()\-\s]+$/.test(normalized) || digits.length < 8) {
+    throw new BadRequestException({
+      code: 'TEAM_MEMBER_WHATSAPP_INVALID',
+      message:
+        'whatsappNumber must be a valid WhatsApp number with at least 8 digits.',
+      field: 'whatsappNumber',
+    });
+  }
+
+  if (digits.length > 15) {
+    throw new BadRequestException({
+      code: 'TEAM_MEMBER_WHATSAPP_INVALID',
+      message:
+        'whatsappNumber must contain no more than 15 digits after normalization.',
+      field: 'whatsappNumber',
     });
   }
 
@@ -258,6 +288,7 @@ export class TeamMembersService {
   ): Promise<TeamMemberInvitationResult> {
     const fullName = sanitizeRequiredText(dto.fullName, 'fullName');
     const email = sanitizeRequiredEmail(dto.email);
+    const whatsappNumber = sanitizeRequiredWhatsappNumber(dto.whatsappNumber);
     const temporaryPassword = this.generateTemporaryPassword();
 
     if (dto.isActive === true) {
@@ -309,6 +340,7 @@ export class TeamMembersService {
           status: 'active',
           isActive: false,
           email,
+          phone: whatsappNumber,
           availabilityStatus: 'available',
           routingWeight: 1,
           memberPortalEnabled: true,
@@ -353,6 +385,66 @@ export class TeamMembersService {
       member: invitation.member,
       temporaryPassword: invitation.temporaryPassword,
     };
+  }
+
+  async remove(
+    scope: TeamMemberScope,
+    memberId: string,
+  ): Promise<TeamMemberDeletionResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const member = await tx.user.findFirst({
+        where: {
+          id: memberId,
+          workspaceId: scope.workspaceId,
+          teamId: scope.teamId,
+        },
+        include: teamMemberInclude,
+      });
+
+      if (!member) {
+        throw new NotFoundException({
+          code: 'TEAM_MEMBER_NOT_FOUND',
+          message: 'The requested team member was not found.',
+        });
+      }
+
+      if (member.role !== UserRole.MEMBER) {
+        throw new BadRequestException({
+          code: 'TEAM_MEMBER_DELETE_FORBIDDEN',
+          message:
+            'Only advisor accounts with MEMBER role can be hard deleted from this panel.',
+        });
+      }
+
+      if (!member.sponsor) {
+        throw new ConflictException({
+          code: 'TEAM_MEMBER_SPONSOR_MISSING',
+          message:
+            'The requested team member does not have an operational sponsor profile.',
+        });
+      }
+
+      const team = await this.requireTeam(scope, tx);
+
+      await tx.user.delete({
+        where: {
+          id: member.id,
+        },
+      });
+
+      await tx.sponsor.delete({
+        where: {
+          id: member.sponsor.id,
+        },
+      });
+
+      const activeSeats = await this.countActiveSeats(scope, tx);
+
+      return {
+        team: this.buildSeatSummary(team, activeSeats),
+        deletedMemberId: member.id,
+      };
+    });
   }
 
   private async requireTeam(

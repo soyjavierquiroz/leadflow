@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -59,6 +60,18 @@ export class TeamMembersController {
       this.resolveScope(user, teamId),
       memberId,
       dto,
+    );
+  }
+
+  @Delete(':id')
+  remove(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') memberId: string,
+    @Query('teamId') teamId?: string,
+  ) {
+    return this.teamMembersService.remove(
+      this.resolveScope(user, teamId),
+      memberId,
     );
   }
 
