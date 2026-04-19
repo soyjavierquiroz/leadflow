@@ -91,6 +91,11 @@ function buildPreviewRuntime(
       canonicalHost: null,
       redirectToPrimary: false,
     },
+    entryContext: {
+      entryMode: "paid_ads",
+      forcedSponsorId: null,
+      browserPixelsEnabled: true,
+    },
     publication: {
       id: "preview-publication",
       pathPrefix: previewPath,
