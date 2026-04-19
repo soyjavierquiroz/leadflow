@@ -1,4 +1,5 @@
 import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { requireRole } from "@/lib/auth";
 
 const memberNav = [
@@ -57,6 +58,13 @@ export default async function MemberLayout({
                   No podrás navegar por el CRM ni participar en la asignación
                   automática de leads.
                 </p>
+              </div>
+              <div className="border-t border-amber-100 pt-2">
+                <p className="mb-3 text-sm text-slate-600">
+                  Si ingresaste con una sesión impersonada, cierra sesión para
+                  volver a tu cuenta.
+                </p>
+                <LogoutButton />
               </div>
             </div>
           </section>
