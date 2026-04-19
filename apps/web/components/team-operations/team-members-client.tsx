@@ -10,9 +10,11 @@ import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { teamOperationRequest } from "@/lib/team-operations";
 import type {
+  InviteTeamMemberInput,
   TeamMemberRecord,
   TeamMembersSeatSummary,
 } from "@/lib/team-members";
+import { inviteTeamMemberSchema } from "@/lib/team-members";
 
 type TeamMembersClientProps = {
   initialMembers: TeamMemberRecord[];
@@ -102,6 +104,9 @@ export function TeamMembersClient({
   const [inviteFullName, setInviteFullName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteWhatsappNumber, setInviteWhatsappNumber] = useState("");
+  const [inviteErrors, setInviteErrors] = useState<
+    Partial<Record<keyof InviteTeamMemberInput, string>>
+  >({});
   const [memberPendingDeletion, setMemberPendingDeletion] =
     useState<TeamMemberRecord | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -114,6 +119,13 @@ export function TeamMembersClient({
 
   const resetFeedback = () => {
     setFeedback(null);
+  };
+
+  const resetInviteForm = () => {
+    setInviteFullName("");
+    setInviteEmail("");
+    setInviteWhatsappNumber("");
+    setInviteErrors({});
   };
 
   const handleSeatToggle = (member: TeamMemberRecord) => {
@@ -176,18 +188,32 @@ export function TeamMembersClient({
   const handleInvite = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     resetFeedback();
+    setInviteErrors({});
 
-    const fullName = inviteFullName.trim();
-    const email = inviteEmail.trim().toLowerCase();
-    const whatsappNumber = inviteWhatsappNumber.trim();
+    const parsedInvite = inviteTeamMemberSchema.safeParse({
+      fullName: inviteFullName,
+      email: inviteEmail,
+      whatsappNumber: inviteWhatsappNumber,
+    });
 
-    if (!fullName || !email || !whatsappNumber) {
+    if (!parsedInvite.success) {
+      const flattenedErrors = parsedInvite.error.flatten().fieldErrors;
       setFeedback({
         tone: "error",
-        message: "Ingresa nombre, email y WhatsApp para crear el usuario.",
+        message: "Revisa los datos del asesor antes de continuar.",
+      });
+      setInviteErrors({
+        fullName: flattenedErrors.fullName?.[0],
+        email: flattenedErrors.email?.[0],
+        whatsappNumber: flattenedErrors.whatsappNumber?.[0],
       });
       return;
     }
+
+    const payload = {
+      ...parsedInvite.data,
+      email: parsedInvite.data.email.toLowerCase(),
+    };
 
     startTransition(async () => {
       try {
@@ -196,19 +222,13 @@ export function TeamMembersClient({
             "/team/members",
             {
               method: "POST",
-              body: JSON.stringify({
-                fullName,
-                email,
-                whatsappNumber,
-              }),
+              body: JSON.stringify(payload),
             },
           );
 
         setMembers((current) => upsertMember(current, response.member));
         setTeam(response.team);
-        setInviteFullName("");
-        setInviteEmail("");
-        setInviteWhatsappNumber("");
+        resetInviteForm();
         setIsInviteModalOpen(false);
         setFeedback({
           tone: "success",
@@ -274,6 +294,7 @@ export function TeamMembersClient({
             type="button"
             onClick={() => {
               resetFeedback();
+              setInviteErrors({});
               setIsInviteModalOpen(true);
             }}
             className={primaryButtonClassName}
@@ -507,6 +528,7 @@ export function TeamMembersClient({
               return;
             }
 
+            resetInviteForm();
             setIsInviteModalOpen(false);
           }}
         >
@@ -517,10 +539,20 @@ export function TeamMembersClient({
               </span>
               <input
                 value={inviteFullName}
-                onChange={(event) => setInviteFullName(event.target.value)}
+                onChange={(event) => {
+                  setInviteFullName(event.target.value);
+                  setInviteErrors((current) => ({
+                    ...current,
+                    fullName: undefined,
+                  }));
+                }}
                 placeholder="Nombre del asesor"
+                aria-invalid={inviteErrors.fullName ? "true" : "false"}
                 className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               />
+              {inviteErrors.fullName ? (
+                <p className="text-xs text-red-600">{inviteErrors.fullName}</p>
+              ) : null}
             </label>
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-slate-900">
@@ -529,10 +561,20 @@ export function TeamMembersClient({
               <input
                 type="email"
                 value={inviteEmail}
-                onChange={(event) => setInviteEmail(event.target.value)}
+                onChange={(event) => {
+                  setInviteEmail(event.target.value);
+                  setInviteErrors((current) => ({
+                    ...current,
+                    email: undefined,
+                  }));
+                }}
                 placeholder="asesor@cliente.com"
+                aria-invalid={inviteErrors.email ? "true" : "false"}
                 className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               />
+              {inviteErrors.email ? (
+                <p className="text-xs text-red-600">{inviteErrors.email}</p>
+              ) : null}
             </label>
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-slate-900">
@@ -541,12 +583,22 @@ export function TeamMembersClient({
               <input
                 type="tel"
                 value={inviteWhatsappNumber}
-                onChange={(event) =>
-                  setInviteWhatsappNumber(event.target.value)
-                }
+                onChange={(event) => {
+                  setInviteWhatsappNumber(event.target.value);
+                  setInviteErrors((current) => ({
+                    ...current,
+                    whatsappNumber: undefined,
+                  }));
+                }}
                 placeholder="+57 300 123 4567"
+                aria-invalid={inviteErrors.whatsappNumber ? "true" : "false"}
                 className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               />
+              {inviteErrors.whatsappNumber ? (
+                <p className="text-xs text-red-600">
+                  {inviteErrors.whatsappNumber}
+                </p>
+              ) : null}
               <p className="text-xs text-slate-500">
                 Este numero se usara como WhatsApp operativo del asesor.
               </p>
@@ -554,7 +606,10 @@ export function TeamMembersClient({
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsInviteModalOpen(false)}
+                onClick={() => {
+                  resetInviteForm();
+                  setIsInviteModalOpen(false);
+                }}
                 disabled={isPending}
                 className={secondaryButtonClassName}
               >
