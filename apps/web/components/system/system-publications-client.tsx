@@ -54,7 +54,7 @@ type TeamAssetCache = Record<
   }
 >;
 
-type PublicationFormState = {
+export type PublicationFormState = {
   teamId: string;
   domainId: string;
   funnelId: string;

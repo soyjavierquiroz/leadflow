@@ -35,7 +35,7 @@ type TeamPublicationsClientProps = {
   handoffStrategies: HandoffStrategyRecord[];
 };
 
-type PublicationFormState = {
+export type PublicationFormState = {
   domainId: string;
   funnelInstanceId: string;
   pathPrefix: string;

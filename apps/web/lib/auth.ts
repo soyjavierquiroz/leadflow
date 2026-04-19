@@ -74,9 +74,22 @@ export type LoginApiResponse = {
   redirectPath: string;
 };
 
-export type ImpersonateApiResponse = {
+export type ImpersonationApiResponse = {
+  success: true;
+  message: string;
   redirectPath: string;
+  user: AuthenticatedAppUser;
 };
+
+export type ImpersonationWithServerSessionResult =
+  | {
+      ok: true;
+      payload: ImpersonationApiResponse;
+    }
+  | {
+      ok: false;
+      errorMessage: string;
+    };
 
 const publicCanvasPathPrefix = "/sandbox";
 const publicCanvasBypassHeader = "x-leadflow-public-canvas-bypass";
@@ -240,6 +253,82 @@ const readAuthSessionCookie = (
   return null;
 };
 
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isAppUserRole = (value: unknown): value is AppUserRole =>
+  value === "SUPER_ADMIN" || value === "TEAM_ADMIN" || value === "MEMBER";
+
+const isNullableString = (value: unknown): value is string | null =>
+  typeof value === "string" || value === null;
+
+const isAuthenticatedWorkspace = (
+  value: unknown,
+): value is NonNullable<AuthenticatedAppUser["workspace"]> => {
+  if (!isObjectRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.slug === "string" &&
+    isNullableString(value.primaryDomain)
+  );
+};
+
+const isAuthenticatedTeam = (
+  value: unknown,
+): value is NonNullable<AuthenticatedAppUser["team"]> => {
+  if (!isObjectRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.code === "string"
+  );
+};
+
+const isAuthenticatedSponsor = (
+  value: unknown,
+): value is NonNullable<AuthenticatedAppUser["sponsor"]> => {
+  if (!isObjectRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.displayName === "string" &&
+    isNullableString(value.email) &&
+    typeof value.isActive === "boolean" &&
+    typeof value.availabilityStatus === "string"
+  );
+};
+
+export const isAuthenticatedAppUser = (
+  value: unknown,
+): value is AuthenticatedAppUser => {
+  if (!isObjectRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.fullName === "string" &&
+    typeof value.email === "string" &&
+    isAppUserRole(value.role) &&
+    isNullableString(value.workspaceId) &&
+    isNullableString(value.teamId) &&
+    isNullableString(value.sponsorId) &&
+    typeof value.homePath === "string" &&
+    (value.workspace === null || isAuthenticatedWorkspace(value.workspace)) &&
+    (value.team === null || isAuthenticatedTeam(value.team)) &&
+    (value.sponsor === null || isAuthenticatedSponsor(value.sponsor))
+  );
+};
+
 const setAuthSessionCookie = async (sessionCookie: AuthSessionCookie) => {
   const cookieStore = await cookies();
 
@@ -278,11 +367,19 @@ export const getHomePathForRole = (role: AppUserRole) => {
 };
 
 export const isLoginApiResponse = (value: unknown): value is LoginApiResponse =>
-  typeof value === "object" &&
-  value !== null &&
-  "redirectPath" in value &&
+  isObjectRecord(value) &&
   typeof value.redirectPath === "string" &&
   value.redirectPath.startsWith("/");
+
+export const isImpersonationApiResponse = (
+  value: unknown,
+): value is ImpersonationApiResponse =>
+  isObjectRecord(value) &&
+  value.success === true &&
+  typeof value.message === "string" &&
+  typeof value.redirectPath === "string" &&
+  value.redirectPath.startsWith("/") &&
+  isAuthenticatedAppUser(value.user);
 
 const getAuthErrorMessage = (payload: unknown) =>
   (typeof payload === "object" &&
@@ -479,7 +576,7 @@ export const logoutWithServerSession = async () => {
 
 export const impersonateWithServerSession = async (input: {
   targetUserId: string;
-}) => {
+}): Promise<ImpersonationWithServerSessionResult> => {
   const targetUserId = input.targetUserId.trim();
 
   if (!targetUserId) {
@@ -512,7 +609,7 @@ export const impersonateWithServerSession = async (input: {
       };
     }
 
-    if (!isLoginApiResponse(payload as LoginApiResponse | null)) {
+    if (!isImpersonationApiResponse(payload)) {
       return {
         errorMessage:
           "El API devolvió una respuesta inválida al iniciar la impersonación.",
@@ -534,7 +631,7 @@ export const impersonateWithServerSession = async (input: {
 
     return {
       ok: true as const,
-      redirectUrl: resolveAuthRedirectTarget(payload.redirectPath),
+      payload,
     };
   } catch (error) {
     return {

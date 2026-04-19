@@ -1,11 +1,14 @@
 "use server";
 
-import { impersonateWithServerSession } from "@/lib/auth";
+import {
+  impersonateWithServerSession,
+  type ImpersonationApiResponse,
+} from "@/lib/auth";
 
 export type TeamMemberImpersonationActionResult = {
-  errorMessage: string | null;
-  ok: boolean;
-};
+  success: false;
+  message: string;
+} | ImpersonationApiResponse;
 
 export const submitTeamMemberImpersonationAction = async (
   targetUserId: string,
@@ -16,13 +19,10 @@ export const submitTeamMemberImpersonationAction = async (
 
   if (!result.ok) {
     return {
-      errorMessage: result.errorMessage,
-      ok: false,
+      success: false,
+      message: result.errorMessage,
     };
   }
 
-  return {
-    errorMessage: null,
-    ok: true,
-  };
+  return result.payload;
 };

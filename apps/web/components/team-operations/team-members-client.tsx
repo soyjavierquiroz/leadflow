@@ -295,17 +295,15 @@ export function TeamMembersClient({
       try {
         const result = await submitTeamMemberImpersonationAction(member.id);
 
-        if (!result.ok) {
+        if (!result.success) {
           setFeedback({
             tone: "error",
-            message:
-              result.errorMessage ??
-              "No pudimos iniciar la sesión como asesor.",
+            message: result.message,
           });
           return;
         }
 
-        window.location.href = "/";
+        window.location.href = result.redirectPath;
       } catch (error) {
         setFeedback({
           tone: "error",
