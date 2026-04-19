@@ -13,8 +13,8 @@ import type {
   InviteTeamMemberInput,
   TeamMemberRecord,
   TeamMembersSeatSummary,
-} from "@/lib/team-members";
-import { inviteTeamMemberSchema } from "@/lib/team-members";
+} from "@/lib/team-members.schema";
+import { inviteTeamMemberSchema } from "@/lib/team-members.schema";
 
 type TeamMembersClientProps = {
   initialMembers: TeamMemberRecord[];
