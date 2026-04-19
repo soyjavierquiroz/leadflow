@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Trash2 } from "lucide-react";
+import { LogIn, Trash2 } from "lucide-react";
+import { submitTeamMemberImpersonationAction } from "@/app/(team)/team/members/actions";
 import { EmptyState } from "@/components/app-shell/empty-state";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
@@ -107,6 +108,9 @@ export function TeamMembersClient({
   const [inviteErrors, setInviteErrors] = useState<
     Partial<Record<keyof InviteTeamMemberInput, string>>
   >({});
+  const [impersonatingMemberId, setImpersonatingMemberId] = useState<
+    string | null
+  >(null);
   const [memberPendingDeletion, setMemberPendingDeletion] =
     useState<TeamMemberRecord | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -283,6 +287,39 @@ export function TeamMembersClient({
     });
   };
 
+  const handleImpersonate = (member: TeamMemberRecord) => {
+    resetFeedback();
+    setImpersonatingMemberId(member.id);
+
+    startTransition(async () => {
+      try {
+        const result = await submitTeamMemberImpersonationAction(member.id);
+
+        if (!result.ok) {
+          setFeedback({
+            tone: "error",
+            message:
+              result.errorMessage ??
+              "No pudimos iniciar la sesión como asesor.",
+          });
+          return;
+        }
+
+        window.location.href = "/";
+      } catch (error) {
+        setFeedback({
+          tone: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "No pudimos iniciar la sesión como asesor.",
+        });
+      } finally {
+        setImpersonatingMemberId(null);
+      }
+    });
+  };
+
   return (
     <div className="space-y-8">
       <SectionHeader
@@ -392,6 +429,8 @@ export function TeamMembersClient({
                   const isSeatControlAvailable = Boolean(member.sponsorId);
                   const isDeletableAdvisor =
                     member.role === "MEMBER" && Boolean(member.sponsorId);
+                  const isImpersonatingThisMember =
+                    impersonatingMemberId === member.id;
 
                   return (
                     <tr key={member.id} className="align-top">
@@ -451,19 +490,39 @@ export function TeamMembersClient({
                       <td className="px-6 py-5">
                         <div className="flex items-center justify-end gap-4">
                           {isDeletableAdvisor ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                resetFeedback();
-                                setMemberPendingDeletion(member);
-                              }}
-                              disabled={isPending || isMemberPending}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                              aria-label={`Eliminar a ${member.displayName ?? member.fullName}`}
-                              title="Eliminar asesor"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleImpersonate(member)}
+                                disabled={
+                                  isPending ||
+                                  isMemberPending ||
+                                  isImpersonatingThisMember
+                                }
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                aria-label={`Entrar como ${member.displayName ?? member.fullName}`}
+                                title={
+                                  isImpersonatingThisMember
+                                    ? "Entrando como asesor..."
+                                    : "Entrar como asesor"
+                                }
+                              >
+                                <LogIn className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  resetFeedback();
+                                  setMemberPendingDeletion(member);
+                                }}
+                                disabled={isPending || isMemberPending}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                aria-label={`Eliminar a ${member.displayName ?? member.fullName}`}
+                                title="Eliminar asesor"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
                           ) : null}
                           <div className="text-right">
                             <p className="font-semibold text-slate-950">

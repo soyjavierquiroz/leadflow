@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'crypto';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -115,6 +116,9 @@ export class AuthService {
     impersonator: AuthenticatedUser;
     userAgent?: string | null;
     ipAddress?: string | null;
+    requiredWorkspaceId?: string | null;
+    requiredTeamId?: string | null;
+    allowedTargetRoles?: UserRole[];
   }) {
     const targetUserId = input.targetUserId.trim();
 
@@ -139,6 +143,23 @@ export class AuthService {
       });
     }
 
+    if (
+      input.requiredWorkspaceId &&
+      targetUser.workspaceId !== input.requiredWorkspaceId
+    ) {
+      throw new NotFoundException({
+        code: 'TARGET_USER_NOT_FOUND',
+        message: 'The requested target user was not found or is inactive.',
+      });
+    }
+
+    if (input.requiredTeamId && targetUser.teamId !== input.requiredTeamId) {
+      throw new NotFoundException({
+        code: 'TARGET_USER_NOT_FOUND',
+        message: 'The requested target user was not found or is inactive.',
+      });
+    }
+
     if (targetUser.role === UserRole.SUPER_ADMIN || !targetUser.teamId) {
       throw new BadRequestException({
         code: 'TARGET_USER_NOT_IMPERSONABLE',
@@ -147,8 +168,43 @@ export class AuthService {
       });
     }
 
+    if (
+      input.allowedTargetRoles &&
+      !input.allowedTargetRoles.includes(targetUser.role)
+    ) {
+      throw new BadRequestException({
+        code: 'TARGET_USER_ROLE_NOT_IMPERSONABLE',
+        message: 'The requested target user role cannot be impersonated here.',
+      });
+    }
+
+    if (input.impersonator.role === UserRole.TEAM_ADMIN) {
+      if (!input.impersonator.workspaceId || !input.impersonator.teamId) {
+        throw new ForbiddenException({
+          code: 'IMPERSONATION_SCOPE_INVALID',
+          message:
+            'A workspace and team scope are required for admin impersonation.',
+        });
+      }
+
+      if (
+        targetUser.workspaceId !== input.impersonator.workspaceId ||
+        targetUser.teamId !== input.impersonator.teamId
+      ) {
+        throw new NotFoundException({
+          code: 'TARGET_USER_NOT_FOUND',
+          message: 'The requested target user was not found or is inactive.',
+        });
+      }
+    } else if (input.impersonator.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException({
+        code: 'IMPERSONATION_NOT_ALLOWED',
+        message: 'The current role is not allowed to impersonate a user.',
+      });
+    }
+
     this.logger.warn(
-      `Super admin ${input.impersonator.id} impersonated user ${targetUser.id} (${targetUser.role}) on team ${targetUser.teamId}.`,
+      `${input.impersonator.role} ${input.impersonator.id} impersonated user ${targetUser.id} (${targetUser.role}) on team ${targetUser.teamId}.`,
     );
 
     return this.createSessionForUser(targetUser, {

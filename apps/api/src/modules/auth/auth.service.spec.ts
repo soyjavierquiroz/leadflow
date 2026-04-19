@@ -53,6 +53,22 @@ describe('AuthService', () => {
     },
   };
 
+  const activeMemberUser = {
+    ...activeTeamAdminUser,
+    id: 'user-member-1',
+    sponsorId: 'sponsor-2',
+    fullName: 'Advisor Uno',
+    email: 'advisor@example.com',
+    role: UserRole.MEMBER,
+    sponsor: {
+      id: 'sponsor-2',
+      displayName: 'Advisor Uno',
+      email: 'advisor@example.com',
+      isActive: true,
+      availabilityStatus: 'available',
+    },
+  };
+
   it('creates a normal session for valid credentials', async () => {
     const { prisma, service } = buildService();
 
@@ -120,6 +136,45 @@ describe('AuthService', () => {
     });
   });
 
+  it('creates an advisor session for a team admin impersonation target in the same team', async () => {
+    const { prisma, service } = buildService();
+
+    prisma.user.findUnique = jest.fn().mockResolvedValue(activeMemberUser);
+    prisma.authSession.create = jest.fn().mockResolvedValue({});
+    prisma.user.update = jest.fn().mockResolvedValue({});
+
+    const result = await service.impersonate({
+      targetUserId: activeMemberUser.id,
+      impersonator: {
+        id: activeTeamAdminUser.id,
+        fullName: activeTeamAdminUser.fullName,
+        email: activeTeamAdminUser.email,
+        role: UserRole.TEAM_ADMIN,
+        workspaceId: activeTeamAdminUser.workspaceId,
+        teamId: activeTeamAdminUser.teamId,
+        sponsorId: activeTeamAdminUser.sponsorId,
+        homePath: '/team',
+        workspace: activeTeamAdminUser.workspace,
+        team: activeTeamAdminUser.team,
+        sponsor: activeTeamAdminUser.sponsor,
+      },
+      userAgent: 'jest',
+      ipAddress: '127.0.0.1',
+      requiredWorkspaceId: activeTeamAdminUser.workspaceId,
+      requiredTeamId: activeTeamAdminUser.teamId,
+      allowedTargetRoles: [UserRole.MEMBER],
+    });
+
+    expect(result.user.id).toBe(activeMemberUser.id);
+    expect(result.user.role).toBe(UserRole.MEMBER);
+    expect(result.user.homePath).toBe('/member');
+    expect(prisma.authSession.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: activeMemberUser.id,
+      }),
+    });
+  });
+
   it('rejects targets that are not active tenant users', async () => {
     const { prisma, service } = buildService();
 
@@ -147,6 +202,48 @@ describe('AuthService', () => {
         },
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects team admin impersonation targets outside the admin team scope', async () => {
+    const { prisma, service } = buildService();
+
+    prisma.user.findUnique = jest.fn().mockResolvedValue({
+      ...activeMemberUser,
+      workspaceId: 'workspace-2',
+      teamId: 'team-2',
+      workspace: {
+        ...activeMemberUser.workspace,
+        id: 'workspace-2',
+        slug: 'workspace-dos',
+      },
+      team: {
+        ...activeMemberUser.team,
+        id: 'team-2',
+        code: 'team-dos',
+      },
+    });
+
+    await expect(
+      service.impersonate({
+        targetUserId: activeMemberUser.id,
+        impersonator: {
+          id: activeTeamAdminUser.id,
+          fullName: activeTeamAdminUser.fullName,
+          email: activeTeamAdminUser.email,
+          role: UserRole.TEAM_ADMIN,
+          workspaceId: activeTeamAdminUser.workspaceId,
+          teamId: activeTeamAdminUser.teamId,
+          sponsorId: activeTeamAdminUser.sponsorId,
+          homePath: '/team',
+          workspace: activeTeamAdminUser.workspace,
+          team: activeTeamAdminUser.team,
+          sponsor: activeTeamAdminUser.sponsor,
+        },
+        requiredWorkspaceId: activeTeamAdminUser.workspaceId,
+        requiredTeamId: activeTeamAdminUser.teamId,
+        allowedTargetRoles: [UserRole.MEMBER],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('fails when the impersonation target is missing', async () => {

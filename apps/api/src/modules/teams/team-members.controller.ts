@@ -8,10 +8,14 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import type { FastifyReply } from 'fastify';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
-import type { AuthenticatedUser } from '../auth/auth.types';
+import { AuthService } from '../auth/auth.service';
+import type { AuthRequest, AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
 import type { CreateTeamMemberDto } from './dto/create-team-member.dto';
 import type { UpdateTeamMemberStatusDto } from './dto/update-team-member-status.dto';
@@ -20,7 +24,10 @@ import { TeamMembersService } from './team-members.service';
 @Controller('team/members')
 @RequireRoles(UserRole.SUPER_ADMIN, UserRole.TEAM_ADMIN)
 export class TeamMembersController {
-  constructor(private readonly teamMembersService: TeamMembersService) {}
+  constructor(
+    private readonly teamMembersService: TeamMembersService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Get()
   findAll(
@@ -73,6 +80,35 @@ export class TeamMembersController {
       this.resolveScope(user, teamId),
       memberId,
     );
+  }
+
+  @Post(':id/impersonate')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  async impersonate(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') memberId: string,
+    @Req() request: AuthRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const scope = this.resolveScope(user);
+    const result = await this.authService.impersonate({
+      targetUserId: memberId,
+      impersonator: user,
+      userAgent: request.headers['user-agent'] ?? null,
+      ipAddress: request.ip ?? null,
+      requiredWorkspaceId: scope.workspaceId,
+      requiredTeamId: scope.teamId,
+      allowedTargetRoles: [UserRole.MEMBER],
+    });
+
+    this.authService.setSessionCookie(reply, result.sessionToken);
+
+    return {
+      success: true,
+      message: 'Impersonation session started successfully.',
+      redirectPath: result.user.homePath,
+      user: result.user,
+    };
   }
 
   private resolveScope(user: AuthenticatedUser, explicitTeamId?: string) {

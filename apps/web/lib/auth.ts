@@ -74,6 +74,10 @@ export type LoginApiResponse = {
   redirectPath: string;
 };
 
+export type ImpersonateApiResponse = {
+  redirectPath: string;
+};
+
 const publicCanvasPathPrefix = "/sandbox";
 const publicCanvasBypassHeader = "x-leadflow-public-canvas-bypass";
 const publicCanvasBypassUser: AuthenticatedAppUser = {
@@ -97,6 +101,7 @@ const publicCanvasBypassUser: AuthenticatedAppUser = {
 
 export const LOGIN_REQUEST_TIMEOUT_MS = 10_000;
 export const LOGOUT_REQUEST_TIMEOUT_MS = 10_000;
+export const IMPERSONATE_REQUEST_TIMEOUT_MS = 10_000;
 
 const buildCookieHeader = async () => {
   const cookieStore = await cookies();
@@ -299,6 +304,9 @@ export const getLoginErrorMessage = (payload: unknown) =>
 export const getLogoutErrorMessage = (payload: unknown) =>
   getAuthErrorMessage(payload) ?? "No pudimos cerrar la sesión.";
 
+export const getImpersonationErrorMessage = (payload: unknown) =>
+  getAuthErrorMessage(payload) ?? "No pudimos iniciar la impersonación.";
+
 const isPublicCanvasPath = (pathname: string | null) =>
   typeof pathname === "string" && pathname.startsWith(publicCanvasPathPrefix);
 
@@ -461,6 +469,78 @@ export const logoutWithServerSession = async () => {
       errorMessage:
         error instanceof Error && error.name === "AbortError"
           ? "El logout excedió el tiempo límite del servidor."
+          : "No pudimos conectar con el API de autenticación.",
+      ok: false as const,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+export const impersonateWithServerSession = async (input: {
+  targetUserId: string;
+}) => {
+  const targetUserId = input.targetUserId.trim();
+
+  if (!targetUserId) {
+    return {
+      errorMessage: "No pudimos identificar al asesor a impersonar.",
+      ok: false as const,
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, IMPERSONATE_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await apiFetchWithSession(
+      `/team/members/${encodeURIComponent(targetUserId)}/impersonate`,
+      {
+        method: "POST",
+        signal: controller.signal,
+      },
+    );
+
+    const payload = (await response.json().catch(() => null)) as unknown;
+
+    if (!response.ok) {
+      return {
+        errorMessage: getImpersonationErrorMessage(payload),
+        ok: false as const,
+      };
+    }
+
+    if (!isLoginApiResponse(payload as LoginApiResponse | null)) {
+      return {
+        errorMessage:
+          "El API devolvió una respuesta inválida al iniciar la impersonación.",
+        ok: false as const,
+      };
+    }
+
+    const sessionCookie = readAuthSessionCookie(response);
+
+    if (!sessionCookie) {
+      return {
+        errorMessage:
+          "El API no devolvió una cookie de sesión válida para completar la impersonación.",
+        ok: false as const,
+      };
+    }
+
+    await setAuthSessionCookie(sessionCookie);
+
+    return {
+      ok: true as const,
+      redirectUrl: resolveAuthRedirectTarget(payload.redirectPath),
+    };
+  } catch (error) {
+    return {
+      errorMessage:
+        error instanceof Error && error.name === "AbortError"
+          ? "La impersonación excedió el tiempo límite del servidor."
           : "No pudimos conectar con el API de autenticación.",
       ok: false as const,
     };
