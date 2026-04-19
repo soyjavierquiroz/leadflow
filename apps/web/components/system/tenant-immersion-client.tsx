@@ -15,7 +15,7 @@ import type {
   SystemTenantDomainRecord,
   SystemTenantDetailRecord,
   SystemTenantFunnelRecord,
-} from "@/lib/system-tenants";
+} from "@/lib/system-tenants.types";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 type TenantImmersionClientProps = {

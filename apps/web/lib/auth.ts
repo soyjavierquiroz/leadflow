@@ -2,42 +2,13 @@ import { unstable_noStore as noStore } from "next/cache";
 import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import type { AppUserRole, AuthenticatedAppUser } from "@/lib/auth.types";
 import { webPublicConfig } from "@/lib/public-env";
 import {
   getErrorDebugDetails,
   logCriticalSsrError,
 } from "@/lib/ssr-debug";
-
-export type AppUserRole = "SUPER_ADMIN" | "TEAM_ADMIN" | "MEMBER";
-
-export type AuthenticatedAppUser = {
-  id: string;
-  fullName: string;
-  email: string;
-  role: AppUserRole;
-  workspaceId: string | null;
-  teamId: string | null;
-  sponsorId: string | null;
-  homePath: string;
-  workspace: {
-    id: string;
-    name: string;
-    slug: string;
-    primaryDomain: string | null;
-  } | null;
-  team: {
-    id: string;
-    name: string;
-    code: string;
-  } | null;
-  sponsor: {
-    id: string;
-    displayName: string;
-    email: string | null;
-    isActive: boolean;
-    availabilityStatus: string;
-  } | null;
-};
+export type { AppUserRole, AuthenticatedAppUser } from "@/lib/auth.types";
 
 type AuthMeResponse = {
   user: AuthenticatedAppUser;

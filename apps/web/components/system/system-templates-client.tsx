@@ -15,7 +15,7 @@ import type {
   SystemTemplateDeploymentResponse,
   SystemTemplateRecord,
   SystemTenantRecord,
-} from "@/lib/system-tenants";
+} from "@/lib/system-tenants.types";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 type SystemTemplatesClientProps = {

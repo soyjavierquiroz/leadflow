@@ -11,7 +11,7 @@ import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type {
   CreateSystemTenantResponse,
   SystemTenantRecord,
-} from "@/lib/system-tenants";
+} from "@/lib/system-tenants.types";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 

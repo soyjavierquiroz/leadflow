@@ -1,4 +1,4 @@
-import type { AuthenticatedAppUser } from "@/lib/auth";
+import type { AuthenticatedAppUser } from "@/lib/auth.types";
 
 export type CollectionSource = "live" | "mock";
 export type DataSourceMode = "live" | "mock" | "hybrid";

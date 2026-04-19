@@ -16,7 +16,7 @@ import { buildHybridJsonPreviewDraftKey } from "@/components/team-operations/hyb
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
-import type { SystemTemplateRecord } from "@/lib/system-tenants";
+import type { SystemTemplateRecord } from "@/lib/system-tenants.types";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 const primaryButtonClassName =

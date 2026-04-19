@@ -1,7 +1,7 @@
 "use client";
 
 import { LogoutButton } from "@/components/auth/logout-button";
-import type { AuthenticatedAppUser } from "@/lib/auth";
+import type { AuthenticatedAppUser } from "@/lib/auth.types";
 import type { DataSourceMode } from "@/lib/app-shell/types";
 
 type TopBarProps = {

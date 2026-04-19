@@ -28,7 +28,7 @@ import type {
   SystemPublicationFunnelOption,
   SystemPublicationRecord,
   SystemPublicationTeamOption,
-} from "@/lib/system-publications";
+} from "@/lib/system-publications.types";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 type SystemPublicationsClientProps = {
@@ -264,8 +264,8 @@ export function SystemPublicationsClient({
   };
 
   const updateTrackingField = (
-    field: TrackingFieldName,
-    value: PublicationFormState[TrackingFieldName],
+    field: PublicationTrackingFieldName,
+    value: PublicationFormState[PublicationTrackingFieldName],
   ) => {
     setFormState((current) => ({
       ...current,

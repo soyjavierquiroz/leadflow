@@ -29,7 +29,7 @@ import type {
   SystemTenantFunnelDetailRecord,
   SystemTenantFunnelStepMutationResponse,
   SystemTenantFunnelStepRecord,
-} from "@/lib/system-tenants";
+} from "@/lib/system-tenants.types";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 const primaryButtonClassName =
