@@ -1107,26 +1107,26 @@ export class LeadsService {
     `;
 
     if (filters?.sponsorId) {
-      return this.queryLeadFallback(
+      return (await this.queryLeadFallback(
         `${baseSelect}
         INNER JOIN "Assignment" a ON a."leadId" = l."id"
         WHERE a."sponsorId" = $1
         ORDER BY l."createdAt" DESC`,
         filters.sponsorId,
-      );
+      )) as unknown as Lead[];
     }
 
     if (filters?.funnelPublicationId) {
-      return this.queryLeadFallback(
+      return (await this.queryLeadFallback(
         `${baseSelect}
         WHERE l."funnelPublicationId" = $1
         ORDER BY l."createdAt" DESC`,
         filters.funnelPublicationId,
-      );
+      )) as unknown as Lead[];
     }
 
     if (filters?.teamId) {
-      return this.queryLeadFallback(
+      return (await this.queryLeadFallback(
         `${baseSelect}
         LEFT JOIN "Assignment" a ON a."leadId" = l."id"
         LEFT JOIN "FunnelInstance" fi ON fi."id" = l."funnelInstanceId"
@@ -1134,22 +1134,22 @@ export class LeadsService {
         WHERE a."teamId" = $1 OR fi."teamId" = $1 OR fp."teamId" = $1
         ORDER BY l."createdAt" DESC`,
         filters.teamId,
-      );
+      )) as unknown as Lead[];
     }
 
     if (filters?.workspaceId) {
-      return this.queryLeadFallback(
+      return (await this.queryLeadFallback(
         `${baseSelect}
         WHERE l."workspaceId" = $1
         ORDER BY l."createdAt" ASC`,
         filters.workspaceId,
-      );
+      )) as unknown as Lead[];
     }
 
-    return this.queryLeadFallback(
+    return (await this.queryLeadFallback(
       `${baseSelect}
       ORDER BY l."createdAt" ASC`,
-    );
+    )) as unknown as Lead[];
   }
 
   private async queryLeadFallback(query: string, ...params: string[]) {
