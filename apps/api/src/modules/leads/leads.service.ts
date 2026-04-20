@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import {
   memberLeadStatusValues,
   type UpdateMemberLeadDto,
 } from './dto/update-member-lead.dto';
+import type { SuppressMemberLeadDto } from './dto/suppress-member-lead.dto';
 import type { Lead, LeadRepository } from './interfaces/lead.interface';
 import { buildLeadWorkflow, type LeadWorkflowView } from './leads-workflows';
 import type {
@@ -28,6 +30,7 @@ import type {
   LeadTimelineItem,
   LeadTimelineScope,
 } from './leads.types';
+import { KurukinBlacklistService } from '../kurukin-blacklist/kurukin-blacklist.service';
 
 const leadTimelineInclude = {
   currentAssignment: {
@@ -79,6 +82,35 @@ const INTERNAL_TIMELINE_EVENT_NAMES = new Set([
 const toIso = (value: Date | null) => (value ? value.toISOString() : null);
 const toInputJsonValue = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
+
+type RawLeadFallbackRow = {
+  id: string;
+  workspaceId: string;
+  funnelId: string;
+  funnelInstanceId: string | null;
+  funnelPublicationId: string | null;
+  visitorId: string | null;
+  sourceChannel: string;
+  fullName: string | null;
+  email: string | null;
+  phone: string | null;
+  companyName: string | null;
+  status: Lead['status'];
+  qualificationGrade: Lead['qualificationGrade'];
+  summaryText: string | null;
+  nextActionLabel: string | null;
+  followUpAt: Date | null;
+  lastContactedAt: Date | null;
+  lastQualifiedAt: Date | null;
+  isSuppressed: boolean;
+  suppressedAt: Date | null;
+  suppressedReason: string | null;
+  suppressedSource: string | null;
+  currentAssignmentId: string | null;
+  tags: string[] | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 const prettifyEventName = (value: string) =>
   value
@@ -136,6 +168,17 @@ const buildEventDescription = (
           .filter(Boolean)
           .join(' · ') || 'Se actualizó el plan de seguimiento del lead.'
       );
+    case 'lead_suppressed':
+      return (
+        [
+          typeof payload.reason === 'string' ? `Motivo: ${payload.reason}` : null,
+          typeof payload.hubSyncStatus === 'string'
+            ? `Hub: ${payload.hubSyncStatus}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || 'El lead quedó suprimido para evitar nuevos envíos.'
+      );
     default:
       return typeof payload.message === 'string'
         ? payload.message
@@ -145,8 +188,11 @@ const buildEventDescription = (
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
+    private readonly kurukinBlacklistService: KurukinBlacklistService,
     @Optional()
     @Inject(LEAD_REPOSITORY)
     private readonly repository?: LeadRepository,
@@ -172,6 +218,10 @@ export class LeadsService {
         followUpAt: null,
         lastContactedAt: null,
         lastQualifiedAt: null,
+        isSuppressed: false,
+        suppressedAt: null,
+        suppressedReason: null,
+        suppressedSource: null,
         currentAssignmentId: null,
         tags: dto.tags ?? [],
       }),
@@ -189,52 +239,71 @@ export class LeadsService {
       throw new Error('LeadRepository provider is not configured.');
     }
 
-    if (filters?.sponsorId) {
-      const records = await this.repository.findBySponsorId(filters.sponsorId);
+    try {
+      if (filters?.sponsorId) {
+        const records = await this.repository.findBySponsorId(filters.sponsorId);
+        return this.enrichLeads(
+          filters.status
+            ? records.filter((item) => item.status === filters.status)
+            : records,
+        );
+      }
+
+      if (filters?.funnelPublicationId) {
+        const records = await this.repository.findByPublicationId(
+          filters.funnelPublicationId,
+        );
+        return this.enrichLeads(
+          filters.status
+            ? records.filter((item) => item.status === filters.status)
+            : records,
+        );
+      }
+
+      if (filters?.teamId) {
+        const records = await this.repository.findByTeamId(filters.teamId);
+        return this.enrichLeads(
+          filters.status
+            ? records.filter((item) => item.status === filters.status)
+            : records,
+        );
+      }
+
+      if (filters?.workspaceId) {
+        const records = await this.repository.findByWorkspaceId(
+          filters.workspaceId,
+        );
+        return this.enrichLeads(
+          filters.status
+            ? records.filter((item) => item.status === filters.status)
+            : records,
+        );
+      }
+
+      const records = await this.repository.findAll();
       return this.enrichLeads(
-        filters.status
+        filters?.status
+          ? records.filter((item) => item.status === filters.status)
+          : records,
+      );
+    } catch (error) {
+      if (!this.isLeadSchemaDesyncError(error)) {
+        throw error;
+      }
+
+      this.logger.warn(
+        `Lead list fell back to raw SQL after Prisma schema desync: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+
+      const records = await this.listWithSchemaFallback(filters);
+      return this.enrichLeads(
+        filters?.status
           ? records.filter((item) => item.status === filters.status)
           : records,
       );
     }
-
-    if (filters?.funnelPublicationId) {
-      const records = await this.repository.findByPublicationId(
-        filters.funnelPublicationId,
-      );
-      return this.enrichLeads(
-        filters.status
-          ? records.filter((item) => item.status === filters.status)
-          : records,
-      );
-    }
-
-    if (filters?.teamId) {
-      const records = await this.repository.findByTeamId(filters.teamId);
-      return this.enrichLeads(
-        filters.status
-          ? records.filter((item) => item.status === filters.status)
-          : records,
-      );
-    }
-
-    if (filters?.workspaceId) {
-      const records = await this.repository.findByWorkspaceId(
-        filters.workspaceId,
-      );
-      return this.enrichLeads(
-        filters.status
-          ? records.filter((item) => item.status === filters.status)
-          : records,
-      );
-    }
-
-    const records = await this.repository.findAll();
-    return this.enrichLeads(
-      filters?.status
-        ? records.filter((item) => item.status === filters.status)
-        : records,
-    );
   }
 
   async findOne(filters: {
@@ -551,6 +620,72 @@ export class LeadsService {
     };
   }
 
+  async suppressForMember(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+      sponsorId: string;
+    },
+    leadId: string,
+    dto?: SuppressMemberLeadDto,
+  ) {
+    const lead = await this.prisma.lead.findFirst({
+      where: this.buildLeadWhere(scope, leadId),
+      include: {
+        currentAssignment: true,
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException({
+        code: 'LEAD_NOT_FOUND',
+        message: 'The requested lead was not found for this member.',
+      });
+    }
+
+    return this.applyLeadSuppression(
+      {
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        sponsorId: scope.sponsorId,
+      },
+      {
+        leadId: lead.id,
+        blockedPhone: lead.phone,
+        reason: dto?.reason?.trim() || 'manual_member_opt_out',
+        source: dto?.source?.trim() || 'manual_member_button',
+      },
+    );
+  }
+
+  async suppressFromIncomingWebhook(input: {
+    workspaceId: string;
+    teamId: string;
+    sponsorId: string;
+    leadId: string;
+    blockedPhone?: string | null;
+    reason: string;
+    source: string;
+    occurredAt?: Date;
+    keyword?: string | null;
+  }) {
+    return this.applyLeadSuppression(
+      {
+        workspaceId: input.workspaceId,
+        teamId: input.teamId,
+        sponsorId: input.sponsorId,
+      },
+      {
+        leadId: input.leadId,
+        blockedPhone: input.blockedPhone,
+        reason: input.reason,
+        source: input.source,
+        occurredAt: input.occurredAt,
+        keyword: input.keyword,
+      },
+    );
+  }
+
   async getTimelineDetail(
     scope: LeadTimelineScope,
     leadId: string,
@@ -602,6 +737,10 @@ export class LeadsService {
         followUpAt: toIso(lead.followUpAt),
         lastContactedAt: toIso(lead.lastContactedAt),
         lastQualifiedAt: toIso(lead.lastQualifiedAt),
+        isSuppressed: lead.isSuppressed,
+        suppressedAt: toIso(lead.suppressedAt),
+        suppressedReason: lead.suppressedReason,
+        suppressedSource: lead.suppressedSource,
         sponsorId: lead.currentAssignment?.sponsorId ?? null,
         sponsorName: lead.currentAssignment?.sponsor.displayName ?? null,
         teamId: lead.currentAssignment?.teamId ?? null,
@@ -918,6 +1057,140 @@ export class LeadsService {
     return leads.map((lead) => this.enrichLead(lead));
   }
 
+  private isLeadSchemaDesyncError(error: unknown) {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const candidate = error as { code?: string; message?: string };
+    return (
+      candidate.code === 'P2022' ||
+      candidate.message?.includes('isSuppressed') === true
+    );
+  }
+
+  private async listWithSchemaFallback(filters?: {
+    workspaceId?: string;
+    teamId?: string;
+    sponsorId?: string;
+    funnelPublicationId?: string;
+  }): Promise<Lead[]> {
+    const baseSelect = `
+      SELECT DISTINCT
+        l."id",
+        l."workspaceId",
+        l."funnelId",
+        l."funnelInstanceId",
+        l."funnelPublicationId",
+        l."visitorId",
+        l."sourceChannel",
+        l."fullName",
+        l."email",
+        l."phone",
+        l."companyName",
+        l."status",
+        l."qualificationGrade",
+        l."summaryText",
+        l."nextActionLabel",
+        l."followUpAt",
+        l."lastContactedAt",
+        l."lastQualifiedAt",
+        FALSE AS "isSuppressed",
+        NULL::timestamp AS "suppressedAt",
+        NULL::text AS "suppressedReason",
+        NULL::text AS "suppressedSource",
+        l."currentAssignmentId",
+        l."tags",
+        l."createdAt",
+        l."updatedAt"
+      FROM "Lead" l
+    `;
+
+    if (filters?.sponsorId) {
+      return this.queryLeadFallback(
+        `${baseSelect}
+        INNER JOIN "Assignment" a ON a."leadId" = l."id"
+        WHERE a."sponsorId" = $1
+        ORDER BY l."createdAt" DESC`,
+        filters.sponsorId,
+      );
+    }
+
+    if (filters?.funnelPublicationId) {
+      return this.queryLeadFallback(
+        `${baseSelect}
+        WHERE l."funnelPublicationId" = $1
+        ORDER BY l."createdAt" DESC`,
+        filters.funnelPublicationId,
+      );
+    }
+
+    if (filters?.teamId) {
+      return this.queryLeadFallback(
+        `${baseSelect}
+        LEFT JOIN "Assignment" a ON a."leadId" = l."id"
+        LEFT JOIN "FunnelInstance" fi ON fi."id" = l."funnelInstanceId"
+        LEFT JOIN "FunnelPublication" fp ON fp."id" = l."funnelPublicationId"
+        WHERE a."teamId" = $1 OR fi."teamId" = $1 OR fp."teamId" = $1
+        ORDER BY l."createdAt" DESC`,
+        filters.teamId,
+      );
+    }
+
+    if (filters?.workspaceId) {
+      return this.queryLeadFallback(
+        `${baseSelect}
+        WHERE l."workspaceId" = $1
+        ORDER BY l."createdAt" ASC`,
+        filters.workspaceId,
+      );
+    }
+
+    return this.queryLeadFallback(
+      `${baseSelect}
+      ORDER BY l."createdAt" ASC`,
+    );
+  }
+
+  private async queryLeadFallback(query: string, ...params: string[]) {
+    const rows = await this.prisma.$queryRawUnsafe<RawLeadFallbackRow[]>(
+      query,
+      ...params,
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      workspaceId: row.workspaceId,
+      funnelId: row.funnelId,
+      funnelInstanceId: row.funnelInstanceId,
+      funnelPublicationId: row.funnelPublicationId,
+      visitorId: row.visitorId,
+      sourceChannel:
+        row.sourceChannel === 'landing_page'
+          ? 'landing-page'
+          : row.sourceChannel,
+      fullName: row.fullName,
+      email: row.email,
+      phone: row.phone,
+      companyName: row.companyName,
+      status: row.status,
+      qualificationGrade: row.qualificationGrade,
+      summaryText: row.summaryText,
+      nextActionLabel: row.nextActionLabel,
+      followUpAt: toIso(row.followUpAt),
+      lastContactedAt: toIso(row.lastContactedAt),
+      lastQualifiedAt: toIso(row.lastQualifiedAt),
+      isSuppressed: row.isSuppressed,
+      suppressedAt: toIso(row.suppressedAt),
+      suppressedReason: row.suppressedReason,
+      suppressedSource: row.suppressedSource,
+      currentAssignmentId: row.currentAssignmentId,
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      createdAt: toIso(row.createdAt),
+      updatedAt: toIso(row.updatedAt),
+    }));
+  }
+
   private enrichLead(lead: Lead): Lead {
     const workflow = this.toWorkflowView(lead);
 
@@ -931,6 +1204,147 @@ export class LeadsService {
       playbookTitle: workflow.playbook.title,
       playbookDescription: workflow.playbook.description,
       needsAttention: workflow.reminder.needsAttention,
+    };
+  }
+
+  private async applyLeadSuppression(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+      sponsorId: string;
+    },
+    input: {
+      leadId: string;
+      blockedPhone?: string | null;
+      reason: string;
+      source: string;
+      occurredAt?: Date;
+      keyword?: string | null;
+    },
+  ) {
+    const lead = await this.prisma.lead.findFirst({
+      where: this.buildLeadWhere(scope, input.leadId),
+      include: {
+        currentAssignment: true,
+      },
+    });
+
+    if (!lead) {
+      throw new NotFoundException({
+        code: 'LEAD_NOT_FOUND',
+        message: 'The requested lead was not found for suppression.',
+      });
+    }
+
+    const occurredAt = input.occurredAt ?? new Date();
+    const nextLeadStatus = lead.status === 'won' ? 'won' : 'lost';
+    const hubSync = await (async () => {
+      try {
+        const owner = await this.kurukinBlacklistService.resolveOwnerContext(scope);
+
+        if (!owner.ownerPhone) {
+          throw new Error('owner phone is not configured');
+        }
+
+        return await this.kurukinBlacklistService.safeAdd({
+          ownerPhone: owner.ownerPhone,
+          blockedPhone: input.blockedPhone ?? lead.phone ?? '',
+          reason: input.reason,
+          label: 'opt-out',
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'owner context resolution failed';
+
+        this.logger.warn(
+          `Lead ${lead.id} suppression could not resolve Kurukin owner context: ${message}`,
+        );
+
+        return {
+          synced: false,
+          errorMessage: message,
+        };
+      }
+    })();
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const record = await tx.lead.update({
+        where: {
+          id: lead.id,
+        },
+        data: {
+          status: nextLeadStatus,
+          isSuppressed: true,
+          suppressedAt: lead.suppressedAt ?? occurredAt,
+          suppressedReason: input.reason,
+          suppressedSource: input.source,
+        },
+      });
+
+      if (lead.currentAssignmentId && lead.currentAssignment?.status !== 'closed') {
+        await tx.assignment.updateMany({
+          where: {
+            id: lead.currentAssignmentId,
+            sponsorId: scope.sponsorId,
+            status: {
+              not: 'closed',
+            },
+          },
+          data: {
+            status: 'closed',
+            resolvedAt: occurredAt,
+          },
+        });
+      }
+
+      if (lead.status !== nextLeadStatus) {
+        await this.recordLeadDomainEvent(tx, {
+          leadId: lead.id,
+          workspaceId: lead.workspaceId,
+          assignmentId: lead.currentAssignmentId,
+          eventName: 'lead_status_updated',
+          actorType: input.source.startsWith('inbound') ? 'integration' : 'user',
+          occurredAt,
+          payload: {
+            nextStatus: nextLeadStatus,
+            previousStatus: lead.status,
+            actorSponsorId: scope.sponsorId,
+            source: input.source,
+          },
+        });
+      }
+
+      await this.recordLeadDomainEvent(tx, {
+        leadId: lead.id,
+        workspaceId: lead.workspaceId,
+        assignmentId: lead.currentAssignmentId,
+        eventName: 'lead_suppressed',
+        actorType: input.source.startsWith('inbound') ? 'integration' : 'user',
+        occurredAt,
+        payload: {
+          reason: input.reason,
+          source: input.source,
+          keyword: input.keyword ?? null,
+          blockedPhone: input.blockedPhone ?? lead.phone ?? null,
+          hubSyncStatus: hubSync.synced ? 'synced' : 'failed',
+          hubSyncError: hubSync.errorMessage,
+        },
+      });
+
+      return record;
+    });
+
+    if (!hubSync.synced) {
+      this.logger.warn(
+        `Lead ${lead.id} was suppressed locally but Kurukin Hub sync failed: ${hubSync.errorMessage}`,
+      );
+    }
+
+    return {
+      lead: this.enrichLead(mapLeadRecord(updated)),
+      hubSync,
     };
   }
 

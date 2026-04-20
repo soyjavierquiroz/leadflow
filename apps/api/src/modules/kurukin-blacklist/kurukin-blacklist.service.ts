@@ -19,7 +19,7 @@ type MemberBlacklistScope = {
 };
 
 type ResolvedOwnerContext = {
-  ownerPhone: string;
+  ownerPhone: string | null;
   sponsorId: string;
   sponsorName: string;
 };
@@ -109,11 +109,20 @@ export class KurukinBlacklistService {
   async listForMember(
     scope: MemberBlacklistScope,
   ): Promise<{
-    ownerPhone: string;
+    ownerPhone: string | null;
     sponsorName: string;
     items: KurukinBlacklistEntry[];
   }> {
     const owner = await this.resolveOwnerContext(scope);
+
+    if (!owner.ownerPhone) {
+      return {
+        ownerPhone: null,
+        sponsorName: owner.sponsorName,
+        items: [],
+      };
+    }
+
     const sanitizedOwnerPhone = sanitizeToKurukinFormat(owner.ownerPhone);
 
     try {
@@ -151,6 +160,14 @@ export class KurukinBlacklistService {
     },
   ) {
     const owner = await this.resolveOwnerContext(scope);
+
+    if (!owner.ownerPhone) {
+      throw new BadRequestException({
+        code: 'KURUKIN_BLACKLIST_OWNER_PHONE_REQUIRED',
+        message:
+          'Configure the advisor phone first so Leadflow can identify the personal blacklist owner.',
+      });
+    }
 
     return this.add({
       ownerPhone: owner.ownerPhone,
@@ -209,6 +226,14 @@ export class KurukinBlacklistService {
     },
   ) {
     const owner = await this.resolveOwnerContext(scope);
+
+    if (!owner.ownerPhone) {
+      throw new BadRequestException({
+        code: 'KURUKIN_BLACKLIST_OWNER_PHONE_REQUIRED',
+        message:
+          'Configure the advisor phone first so Leadflow can identify the personal blacklist owner.',
+      });
+    }
 
     if (!input.entryId && !input.blockedPhone) {
       throw new BadRequestException({
@@ -297,14 +322,6 @@ export class KurukinBlacklistService {
           sponsor.phone,
       ) ?? null;
 
-    if (!ownerPhone) {
-      throw new BadRequestException({
-        code: 'KURUKIN_BLACKLIST_OWNER_PHONE_REQUIRED',
-        message:
-          'Configure the advisor phone first so Leadflow can identify the personal blacklist owner.',
-      });
-    }
-
     return {
       ownerPhone,
       sponsorId: sponsor.id,
@@ -374,6 +391,8 @@ export class KurukinBlacklistService {
   ): Promise<SupabaseBlacklistFetchResult> {
     this.logger.log(`Fetching Supabase blacklist from ${url.toString()}`);
     const supabaseKey = this.supabaseKey ?? undefined;
+    const readString = (value: unknown) =>
+      typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -388,9 +407,38 @@ export class KurukinBlacklistService {
     this.logger.log(
       `Supabase blacklist response status=${response.status} body=${JSON.stringify(payload)}`,
     );
+    const mappedPayload = Array.isArray(payload)
+      ? payload.map((item) => {
+          const row =
+            item && typeof item === 'object' && !Array.isArray(item)
+              ? (item as Record<string, unknown>)
+              : {};
+
+          return {
+            id:
+              readString(row.id) ??
+              readString(row.entry_id) ??
+              readString(row.uuid) ??
+              null,
+            ownerPhone:
+              readString(row.owner_phone) ?? readString(row.ownerPhone) ?? null,
+            blockedPhone:
+              readString(row.blocked_phone) ??
+              readString(row.blockedPhone) ??
+              null,
+            sourceApp:
+              readString(row.source_app) ?? readString(row.sourceApp) ?? null,
+            scope: readString(row.scope) ?? null,
+            reason: readString(row.reason) ?? null,
+            label: readString(row.label) ?? null,
+            createdAt:
+              readString(row.created_at) ?? readString(row.createdAt) ?? null,
+          };
+        })
+      : payload;
 
     return {
-      payload,
+      payload: mappedPayload,
       status: response.status,
       url: url.toString(),
     };
@@ -400,9 +448,10 @@ export class KurukinBlacklistService {
     const configured =
       this.configService.get<string>('KURUKIN_BLACKLIST_BASE_URL')?.trim() ??
       'https://blacklist.kuruk.in';
+    const normalized = configured.replace(/\/api\/v1\/?$/, '');
 
     try {
-      return new URL(configured).toString();
+      return new URL(normalized).toString();
     } catch {
       throw new Error('KURUKIN_BLACKLIST_BASE_URL must be a valid URL.');
     }

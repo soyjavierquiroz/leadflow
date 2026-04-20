@@ -23,6 +23,8 @@ export class KurukinBlacklistController {
     });
 
     const response = {
+      ownerPhone: payload.ownerPhone,
+      sponsorName: payload.sponsorName,
       items: payload.items.map((item) => ({
         id: item.id,
         ownerPhone: item.ownerPhone,
@@ -31,8 +33,6 @@ export class KurukinBlacklistController {
         createdAt: item.createdAt,
       })),
     };
-
-    console.log('DATA_TO_FRONTEND:', response);
 
     return response;
   }
