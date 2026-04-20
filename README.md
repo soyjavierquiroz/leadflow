@@ -27,8 +27,10 @@ Piezas principales:
 - `markConnectionProvisioned()` persiste `runtimeContextStatus=PROVISIONED`, guarda el `tenantId` operativo y limpia timestamps/errores previos.
 - `ensureConnectionReady()` solo continúa si existe `externalInstanceId`; si la conexión ya está en `READY`, hace short-circuit.
 - Si la conexión todavía no está onboarded, el servicio marca `PROVISIONED`, ejecuta `register` contra Runtime Context Central y luego persiste `REGISTERED`.
+- Para compatibilidad operativa, si `register` responde `404`, el cliente prueba automáticamente la ruta alternativa `/v1/context/register`; `resolve-full` hace el mismo fallback hacia `/v1/context/resolve-full`.
 - Después entra en polling con `waitUntilResolvable()` contra `resolve-full` usando `RUNTIME_CONTEXT_RESOLVE_RETRIES` y `RUNTIME_CONTEXT_RESOLVE_DELAY_MS`.
 - Cuando `resolve-full` devuelve `200`, la conexión pasa a `READY` y se guardan `runtimeContextReadyAt` y `runtimeContextLastCheckedAt`.
+- Si `RUNTIME_CONTEXT_MODE=optional`, un fallo del microservicio central no bloquea el QR: la API marca la conexión como `READY` usando persistencia local en DB para entornos de desarrollo o despliegues sin Runtime Context Central.
 - Si el registro o la resolución fallan, la conexión queda en `PROVISIONED` o `REGISTERED` según el último punto alcanzado y se persisten `runtimeContextLastErrorAt` y `runtimeContextLastErrorMessage`.
 
 El guardrail del dispatcher vive en `LeadDispatcherService`:
@@ -123,6 +125,7 @@ Variables críticas del onboarding central y del dispatcher:
 - `N8N_DISPATCHER_WEBHOOK_URL`
 - `N8N_DISPATCHER_API_KEY`
 - `RUNTIME_CONTEXT_CENTRAL_BASE_URL`
+- `RUNTIME_CONTEXT_MODE`
 - `RUNTIME_CONTEXT_REGISTER_PATH`
 - `RUNTIME_CONTEXT_RESOLVE_FULL_PATH`
 - `RUNTIME_CONTEXT_CENTRAL_API_KEY`
@@ -216,7 +219,7 @@ docker service logs -f --tail 200 leadflow_api 2>&1 | grep --line-buffered -E 'D
 
 Si una conexión se queda en `REGISTERED` y no pasa a `READY`, revisa en este orden:
 
-1. Confirma que `leadflow_api` expone `RUNTIME_CONTEXT_CENTRAL_BASE_URL`, `RUNTIME_CONTEXT_CENTRAL_API_KEY`, `RUNTIME_CONTEXT_REGISTER_PATH` y `RUNTIME_CONTEXT_RESOLVE_FULL_PATH`.
+1. Confirma que `leadflow_api` expone `RUNTIME_CONTEXT_CENTRAL_BASE_URL`, `RUNTIME_CONTEXT_MODE`, `RUNTIME_CONTEXT_CENTRAL_API_KEY`, `RUNTIME_CONTEXT_REGISTER_PATH` y `RUNTIME_CONTEXT_RESOLVE_FULL_PATH`.
 2. Confirma conectividad desde la API al servicio central. En Swarm local, el target operativo es `http://runtime_context_service:8080/health`.
 3. Revisa que Runtime Context Central responda `200` en `/health` y que esté accesible por la red compartida entre servicios.
 4. Busca en los logs de API errores del polling, especialmente mensajes equivalentes a `Runtime context resolve-full still missing instance ...`.

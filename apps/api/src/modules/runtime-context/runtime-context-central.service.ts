@@ -24,8 +24,12 @@ type RuntimeContextResponse = {
   data: unknown;
 };
 
+type RuntimeContextMode = 'required' | 'optional';
+
 const DEFAULT_REGISTER_PATH = '/register';
+const FALLBACK_REGISTER_PATH = '/v1/context/register';
 const DEFAULT_RESOLVE_FULL_PATH = '/resolve-full';
+const FALLBACK_RESOLVE_FULL_PATH = '/v1/context/resolve-full';
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_RESOLVE_RETRIES = 5;
 const DEFAULT_RESOLVE_DELAY_MS = 1_000;
@@ -62,6 +66,31 @@ const normalizePath = (value: string | null | undefined, fallback: string) => {
   return sanitized.replace(/^\/+/, '').replace(/\/+$/, '');
 };
 
+const normalizePathCandidates = (
+  primaryValue: string | null | undefined,
+  fallback: string,
+  extraCandidates: string[],
+) => {
+  const candidates = [
+    normalizePath(primaryValue, fallback),
+    ...extraCandidates.map((candidate) => normalizePath(candidate, candidate)),
+  ];
+
+  return [...new Set(candidates)];
+};
+
+const normalizeMode = (
+  value: string | null | undefined,
+): RuntimeContextMode => {
+  const sanitized = sanitizeNullableText(value)?.toLowerCase();
+
+  if (sanitized === 'optional') {
+    return 'optional';
+  }
+
+  return 'required';
+};
+
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
 
@@ -80,14 +109,17 @@ export class RuntimeContextCentralService {
   private readonly baseUrl = normalizeBaseUrl(
     process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL,
   );
-  private readonly registerPath = normalizePath(
+  private readonly registerPaths = normalizePathCandidates(
     process.env.RUNTIME_CONTEXT_REGISTER_PATH,
     DEFAULT_REGISTER_PATH,
+    [FALLBACK_REGISTER_PATH],
   );
-  private readonly resolveFullPath = normalizePath(
+  private readonly resolveFullPaths = normalizePathCandidates(
     process.env.RUNTIME_CONTEXT_RESOLVE_FULL_PATH,
     DEFAULT_RESOLVE_FULL_PATH,
+    [FALLBACK_RESOLVE_FULL_PATH],
   );
+  private readonly mode = normalizeMode(process.env.RUNTIME_CONTEXT_MODE);
   private readonly apiKey = sanitizeNullableText(
     process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY,
   );
@@ -154,14 +186,32 @@ export class RuntimeContextCentralService {
       } as const;
     }
 
-    this.ensureConfigured();
-
     const tenantId = connection.runtimeContextTenantId ?? connection.workspaceId;
     let currentStatus = connection.runtimeContextStatus;
     const registrationInput = {
       instanceName: connection.externalInstanceId,
       tenantId,
     } satisfies RuntimeContextRegistrationInput;
+
+    if (!this.baseUrl) {
+      if (this.mode === 'optional') {
+        await this.markConnectionReadyLocally({
+          connectionId: connection.id,
+          tenantId,
+        });
+
+        return {
+          ready: true,
+          resolution: {
+            mode: 'local',
+            reason:
+              'Runtime Context Central is not configured. Local persistence fallback was used.',
+          },
+        } as const;
+      }
+
+      this.ensureConfigured();
+    }
 
     if (
       connection.runtimeContextStatus !==
@@ -214,6 +264,24 @@ export class RuntimeContextCentralService {
         resolution,
       } as const;
     } catch (error) {
+      if (this.shouldUseLocalFallback(error)) {
+        await this.markConnectionReadyLocally({
+          connectionId: connection.id,
+          tenantId,
+        });
+
+        return {
+          ready: true,
+          resolution: {
+            mode: 'local',
+            reason:
+              error instanceof Error
+                ? error.message
+                : 'Runtime context onboarding failed and local persistence fallback was used.',
+          },
+        } as const;
+      }
+
       const lastErrorMessage =
         error instanceof Error
           ? error.message
@@ -247,7 +315,7 @@ export class RuntimeContextCentralService {
     this.ensureConfigured();
 
     const payload = this.buildPayload(input);
-    const response = await this.request(this.registerPath, payload);
+    const response = await this.requestWithFallback(this.registerPaths, payload);
 
     if (
       (response.status >= 200 && response.status < 300) ||
@@ -272,8 +340,8 @@ export class RuntimeContextCentralService {
       }
 
       try {
-        const response = await this.request(
-          this.resolveFullPath,
+        const response = await this.requestWithFallback(
+          this.resolveFullPaths,
           this.buildPayload(input),
         );
 
@@ -329,6 +397,55 @@ export class RuntimeContextCentralService {
       service_owner_key: 'lead-handler',
       status: 'active',
     };
+  }
+
+  private async requestWithFallback(
+    paths: string[],
+    payload: RuntimeContextRegistrationPayload,
+  ) {
+    let lastResponse: RuntimeContextResponse | null = null;
+
+    for (const path of paths) {
+      const response = await this.request(path, payload);
+      lastResponse = response;
+
+      if (response.status !== 404) {
+        return response;
+      }
+    }
+
+    return (
+      lastResponse ?? {
+        status: 404,
+        data: null,
+      }
+    );
+  }
+
+  private async markConnectionReadyLocally(input: {
+    connectionId: string;
+    tenantId: string;
+  }) {
+    const now = new Date();
+
+    await this.prisma.messagingConnection.update({
+      where: {
+        id: input.connectionId,
+      },
+      data: {
+        runtimeContextStatus: MessagingRuntimeContextStatus.READY,
+        runtimeContextTenantId: input.tenantId,
+        runtimeContextRegisteredAt: now,
+        runtimeContextReadyAt: now,
+        runtimeContextLastCheckedAt: now,
+        runtimeContextLastErrorAt: null,
+        runtimeContextLastErrorMessage: null,
+      },
+    });
+  }
+
+  private shouldUseLocalFallback(error: unknown) {
+    return this.mode === 'optional' && error instanceof Error;
   }
 
   private async request(
