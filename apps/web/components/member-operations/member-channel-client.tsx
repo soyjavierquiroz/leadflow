@@ -9,6 +9,7 @@ import {
   memberOperationRequest,
   type MemberSponsorDashboard,
 } from "@/lib/member-operations";
+import { MemberProtectionListPanel } from "@/components/member-operations/member-protection-list-panel";
 
 type ChannelAction = "connect" | "qr" | "refresh" | "reset" | null;
 
@@ -373,166 +374,170 @@ export function MemberChannelClient() {
       ) : null}
 
       {currentSnapshot ? (
-        <section className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  {currentCopy.eyebrow}
-                </p>
-                <h2 className="mt-3 text-3xl font-semibold text-slate-950">
-                  {currentSnapshot.sponsorName}
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-                  {currentCopy.description}
-                </p>
-              </div>
-
-              <span
-                className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${
-                  currentSnapshot.isConnected
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                {currentSnapshot.status}
-              </span>
-            </div>
-
-            {currentSnapshot.isConnected ? (
-              <div className="mt-8 rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-6">
-                <h3 className="text-2xl font-semibold text-emerald-950">
-                  Canal Activo y Operativo
-                </h3>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-900/80">
-                  Tu canal ya quedó enlazado. No hay advertencias de
-                  configuración pendientes en esta vista.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-                <div className="flex justify-center rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6">
-                  {currentSnapshot.qrCode && !isQrExpired ? (
-                    <Image
-                      src={currentSnapshot.qrCode}
-                      alt="QR para conectar WhatsApp"
-                      width={320}
-                      height={320}
-                      unoptimized
-                      className="h-72 w-72 rounded-[1.5rem] border border-slate-200 bg-white p-4"
-                    />
-                  ) : (
-                    <div className="flex h-72 w-72 items-center justify-center rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-8 text-center text-sm leading-6 text-slate-500">
-                      {isQrExpired
-                        ? "El QR anterior venció. Genera uno nuevo para continuar desde WhatsApp."
-                        : "Genera o actualiza tu QR para conectarlo desde la app de WhatsApp."}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-2xl font-semibold text-slate-950">
-                    {currentCopy.title}
-                  </h3>
-                  <p className="text-sm leading-6 text-slate-600">
-                    {isQrExpired
-                      ? "El intento anterior ya no sirve. Genera un QR nuevo y seguiremos sincronizando el estado automáticamente."
-                      : currentSnapshot.qrCode
-                        ? "Escanea este QR desde WhatsApp en tu teléfono para terminar el enlace."
-                        : "Tu canal todavía no tiene un QR visible. Puedes generarlo desde aquí y seguiremos refrescando el estado automáticamente."}
+        <>
+          <section className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+            <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    {currentCopy.eyebrow}
                   </p>
-
-                  <div className="flex flex-wrap gap-2">
-                    {qrExpiresAtIsValid && !isQrExpired ? (
-                      <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
-                        QR vence en {formatQrCountdown(qrRemainingMs)}
-                      </span>
-                    ) : null}
-
-                    {isQrExpired ? (
-                      <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">
-                        QR vencido
-                      </span>
-                    ) : null}
-
-                    {currentSnapshot.connectionStatus &&
-                    POLLABLE_CONNECTION_STATUSES.has(
-                      currentSnapshot.connectionStatus,
-                    ) ? (
-                      <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                        Auto refresh 8s
-                      </span>
-                    ) : null}
-                  </div>
+                  <h2 className="mt-3 text-3xl font-semibold text-slate-950">
+                    {currentSnapshot.sponsorName}
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                    {currentCopy.description}
+                  </p>
                 </div>
-              </div>
-            )}
-          </div>
 
-          <aside className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Acciones
-            </p>
-            <h3 className="mt-3 text-2xl font-semibold text-slate-950">
-              {currentSnapshot.isConnected
-                ? "Mantener el canal al día"
-                : "Terminar la conexión"}
-            </h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              {currentSnapshot.isConnected
-                ? "Puedes refrescar el estado del canal o generar un nuevo proceso de enlace si necesitas reconectarlo."
-                : "Genera el QR, escanéalo desde tu teléfono y actualiza el estado para confirmar cuando el canal quede listo."}
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              {!currentSnapshot.isConnected ? (
-                <button
-                  type="button"
-                  disabled={action !== null || isLoading}
-                  onClick={handlePrepareConnection}
-                  className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                <span
+                  className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${
+                    currentSnapshot.isConnected
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-slate-100 text-slate-700"
+                  }`}
                 >
-                  {primaryActionLabel}
-                </button>
-              ) : null}
-
-              <button
-                type="button"
-                disabled={action !== null || isLoading}
-                onClick={handleRefresh}
-                className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {action === "refresh" ? "Actualizando..." : "Actualizar estado"}
-              </button>
+                  {currentSnapshot.status}
+                </span>
+              </div>
 
               {currentSnapshot.isConnected ? (
+                <div className="mt-8 rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-6">
+                  <h3 className="text-2xl font-semibold text-emerald-950">
+                    Canal Activo y Operativo
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-900/80">
+                    Tu canal ya quedó enlazado. No hay advertencias de
+                    configuración pendientes en esta vista.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+                  <div className="flex justify-center rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6">
+                    {currentSnapshot.qrCode && !isQrExpired ? (
+                      <Image
+                        src={currentSnapshot.qrCode}
+                        alt="QR para conectar WhatsApp"
+                        width={320}
+                        height={320}
+                        unoptimized
+                        className="h-72 w-72 rounded-[1.5rem] border border-slate-200 bg-white p-4"
+                      />
+                    ) : (
+                      <div className="flex h-72 w-72 items-center justify-center rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-8 text-center text-sm leading-6 text-slate-500">
+                        {isQrExpired
+                          ? "El QR anterior venció. Genera uno nuevo para continuar desde WhatsApp."
+                          : "Genera o actualiza tu QR para conectarlo desde la app de WhatsApp."}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-2xl font-semibold text-slate-950">
+                      {currentCopy.title}
+                    </h3>
+                    <p className="text-sm leading-6 text-slate-600">
+                      {isQrExpired
+                        ? "El intento anterior ya no sirve. Genera un QR nuevo y seguiremos sincronizando el estado automáticamente."
+                        : currentSnapshot.qrCode
+                          ? "Escanea este QR desde WhatsApp en tu teléfono para terminar el enlace."
+                          : "Tu canal todavía no tiene un QR visible. Puedes generarlo desde aquí y seguiremos refrescando el estado automáticamente."}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {qrExpiresAtIsValid && !isQrExpired ? (
+                        <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                          QR vence en {formatQrCountdown(qrRemainingMs)}
+                        </span>
+                      ) : null}
+
+                      {isQrExpired ? (
+                        <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">
+                          QR vencido
+                        </span>
+                      ) : null}
+
+                      {currentSnapshot.connectionStatus &&
+                      POLLABLE_CONNECTION_STATUSES.has(
+                        currentSnapshot.connectionStatus,
+                      ) ? (
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+                          Auto refresh 8s
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <aside className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Acciones
+              </p>
+              <h3 className="mt-3 text-2xl font-semibold text-slate-950">
+                {currentSnapshot.isConnected
+                  ? "Mantener el canal al día"
+                  : "Terminar la conexión"}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {currentSnapshot.isConnected
+                  ? "Puedes refrescar el estado del canal o generar un nuevo proceso de enlace si necesitas reconectarlo."
+                  : "Genera el QR, escanéalo desde tu teléfono y actualiza el estado para confirmar cuando el canal quede listo."}
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                {!currentSnapshot.isConnected ? (
+                  <button
+                    type="button"
+                    disabled={action !== null || isLoading}
+                    onClick={handlePrepareConnection}
+                    className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {primaryActionLabel}
+                  </button>
+                ) : null}
+
                 <button
                   type="button"
                   disabled={action !== null || isLoading}
-                  onClick={handleReset}
+                  onClick={handleRefresh}
                   className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {action === "reset" ? "Preparando..." : "Reconectar canal"}
+                  {action === "refresh" ? "Actualizando..." : "Actualizar estado"}
                 </button>
-              ) : null}
-            </div>
 
-            <div className="mt-8 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-              <p className="text-sm font-semibold text-slate-950">
-                Estado actual
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {currentSnapshot.isConnected
-                  ? "El canal ya está confirmado como listo."
-                  : isQrExpired
-                    ? "El QR anterior expiró. Genera uno nuevo para retomar la conexión."
-                    : currentSnapshot.qrCode
-                    ? "El siguiente paso es escanear el QR para completar la conexión."
-                    : "El siguiente paso es generar el QR para iniciar la conexión."}
-              </p>
-            </div>
-          </aside>
-        </section>
+                {currentSnapshot.isConnected ? (
+                  <button
+                    type="button"
+                    disabled={action !== null || isLoading}
+                    onClick={handleReset}
+                    className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {action === "reset" ? "Preparando..." : "Reconectar canal"}
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-8 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
+                <p className="text-sm font-semibold text-slate-950">
+                  Estado actual
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {currentSnapshot.isConnected
+                    ? "El canal ya está confirmado como listo."
+                    : isQrExpired
+                      ? "El QR anterior expiró. Genera uno nuevo para retomar la conexión."
+                      : currentSnapshot.qrCode
+                        ? "El siguiente paso es escanear el QR para completar la conexión."
+                        : "El siguiente paso es generar el QR para iniciar la conexión."}
+                </p>
+              </div>
+            </aside>
+          </section>
+
+          <MemberProtectionListPanel />
+        </>
       ) : null}
     </div>
   );

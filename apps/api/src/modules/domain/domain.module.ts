@@ -14,6 +14,7 @@ import { FunnelsModule } from '../funnels/funnels.module';
 import { HandoffStrategiesModule } from '../handoff-strategies/handoff-strategies.module';
 import { HybridFunnelPublicationsModule } from '../hybrid-funnel-publications/hybrid-funnel-publications.module';
 import { IncomingWebhooksModule } from '../incoming-webhooks/incoming-webhooks.module';
+import { KurukinBlacklistModule } from '../kurukin-blacklist/kurukin-blacklist.module';
 import { LeadsModule } from '../leads/leads.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { MessagingIntegrationsModule } from '../messaging-integrations/messaging-integrations.module';
@@ -46,6 +47,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     TemplatesModule,
     HandoffStrategiesModule,
     HybridFunnelPublicationsModule,
+    KurukinBlacklistModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
     PublicFunnelRuntimeModule,
@@ -76,6 +78,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     TemplatesModule,
     HandoffStrategiesModule,
     HybridFunnelPublicationsModule,
+    KurukinBlacklistModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
     PublicFunnelRuntimeModule,

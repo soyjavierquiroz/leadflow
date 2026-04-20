@@ -41,6 +41,23 @@ export type MemberSponsorDashboard = {
   qrExpired: boolean;
 };
 
+export type MemberProtectionListEntry = {
+  id: string | null;
+  ownerPhone: string | null;
+  blockedPhone: string;
+  sourceApp: string | null;
+  scope: string | null;
+  reason: string | null;
+  label: string | null;
+  createdAt: string | null;
+};
+
+export type MemberProtectionListSnapshot = {
+  ownerPhone: string;
+  sponsorName: string;
+  items: MemberProtectionListEntry[];
+};
+
 export const memberOperationRequest = async <T>(
   path: string,
   init: RequestInit,
