@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   GatewayTimeoutException,
+  GoneException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -26,6 +27,7 @@ import {
 import {
   buildAutomationWebhookUrl,
   buildEvolutionInstanceId,
+  isQrExpired,
   normalizeMessagingPhone,
   resolveMessagingConnectionStatus,
   sanitizeNullableText,
@@ -364,10 +366,28 @@ export class MessagingIntegrationsService {
       await this.evolutionClient.deleteInstance(preparedInput.instanceId);
     }
 
-    await this.evolutionClient.ensureInstanceExists(preparedInput.instanceId);
+    const currentState = await this.evolutionClient.ensureInstanceExists(
+      preparedInput.instanceId,
+    );
     const connectionWebhookUrl = this.evolutionClient.buildInboundWebhookUrl(
       preparedInput.instanceId,
     );
+
+    if (
+      !options.resetRemoteFirst &&
+      options.fetchQr &&
+      currentState.exists &&
+      this.evolutionClient.shouldRegenerateQrSession({
+        state: currentState.state,
+        qrExpiresAt: existingConnection?.pairingExpiresAt ?? null,
+      })
+    ) {
+      await this.recreateQrSession(
+        preparedInput.instanceId,
+        connectionWebhookUrl,
+      );
+    }
+
     await this.evolutionClient.setWebhook(
       preparedInput.instanceId,
       connectionWebhookUrl,
@@ -385,10 +405,14 @@ export class MessagingIntegrationsService {
     });
 
     const qrPayload = options.fetchQr
-      ? await this.evolutionClient.fetchQr(preparedInput.instanceId)
+      ? await this.fetchQrWithRecovery({
+          instanceId: preparedInput.instanceId,
+          webhookUrl: connectionWebhookUrl,
+        })
       : {
           qrCodeData: baseConnection.qrCodeData,
           pairingCode: baseConnection.pairingCode,
+          expiresAt: baseConnection.pairingExpiresAt,
           raw: null,
         };
 
@@ -424,11 +448,12 @@ export class MessagingIntegrationsService {
             : qrPayload.pairingCode,
         pairingExpiresAt:
           status === MessagingConnectionStatus.qr_ready
-            ? this.inFiveMinutes()
+            ? (qrPayload.expiresAt ?? this.inFiveMinutes())
             : null,
         metadataJson: this.buildMetadata(baseConnection.metadataJson, {
           lastKnownState: statusPayload.state,
           lastConnectResponse: qrPayload.raw,
+          lastQrExpiresAt: qrPayload.expiresAt?.toISOString() ?? null,
           lastStatusResponse: statusPayload.raw,
           routingMode: this.evolutionClient.getRoutingMode(),
         }),
@@ -580,12 +605,16 @@ export class MessagingIntegrationsService {
   ): SponsorDashboardDto {
     const status = this.resolveDashboardStatus(connection);
     const isConnected = status === 'READY';
+    const qrExpired = isQrExpired(connection?.pairingExpiresAt);
 
     return new SponsorDashboardDto({
       status,
-      qrCode: isConnected ? null : connection?.qrCodeData ?? null,
+      qrCode: isConnected || qrExpired ? null : connection?.qrCodeData ?? null,
       sponsorName: sponsor.displayName,
       isConnected,
+      connectionStatus: connection?.status ?? null,
+      qrExpiresAt: connection?.pairingExpiresAt?.toISOString() ?? null,
+      qrExpired,
     });
   }
 
@@ -597,9 +626,8 @@ export class MessagingIntegrationsService {
     }
 
     if (
-      connection?.runtimeContextStatus ===
-        MessagingRuntimeContextStatus.REGISTERED ||
-      connection?.runtimeContextStatus === MessagingRuntimeContextStatus.READY
+      connection?.status === MessagingConnectionStatus.qr_ready ||
+      connection?.status === MessagingConnectionStatus.connecting
     ) {
       return 'REGISTERED';
     }
@@ -706,6 +734,14 @@ export class MessagingIntegrationsService {
 
   private toHttpException(error: unknown) {
     if (error instanceof EvolutionApiClientError) {
+      if (error.status === 410) {
+        return new GoneException({
+          code: 'EVOLUTION_QR_EXPIRED',
+          message: error.message,
+          details: error.details ?? null,
+        });
+      }
+
       if (error.status === 503) {
         return new ServiceUnavailableException({
           code: 'EVOLUTION_UNAVAILABLE',
@@ -738,5 +774,32 @@ export class MessagingIntegrationsService {
 
   private inFiveMinutes() {
     return new Date(Date.now() + 5 * 60 * 1000);
+  }
+
+  private async fetchQrWithRecovery(input: {
+    instanceId: string;
+    webhookUrl: string | null;
+  }) {
+    try {
+      return await this.evolutionClient.fetchQr(input.instanceId);
+    } catch (error) {
+      if (
+        error instanceof EvolutionApiClientError &&
+        error.status === 410
+      ) {
+        await this.recreateQrSession(input.instanceId, input.webhookUrl);
+        return await this.evolutionClient.fetchQr(input.instanceId);
+      }
+
+      throw error;
+    }
+  }
+
+  private async recreateQrSession(
+    instanceId: string,
+    webhookUrl: string | null,
+  ) {
+    await this.evolutionClient.recreateInstance(instanceId);
+    await this.evolutionClient.setWebhook(instanceId, webhookUrl);
   }
 }

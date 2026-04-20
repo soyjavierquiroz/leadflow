@@ -23,11 +23,22 @@ export type MemberSponsorDashboardStatus =
   | "REGISTERED"
   | "READY";
 
+export type MemberMessagingConnectionStatus =
+  | "provisioning"
+  | "qr_ready"
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "error";
+
 export type MemberSponsorDashboard = {
   status: MemberSponsorDashboardStatus;
   qrCode: string | null;
   sponsorName: string;
   isConnected: boolean;
+  connectionStatus: MemberMessagingConnectionStatus | null;
+  qrExpiresAt: string | null;
+  qrExpired: boolean;
 };
 
 export const memberOperationRequest = async <T>(

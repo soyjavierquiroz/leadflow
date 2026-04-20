@@ -1,8 +1,11 @@
 import {
   buildAutomationWebhookUrl,
   buildEvolutionInstanceId,
+  isDisconnectedEvolutionState,
+  isQrExpired,
   normalizeMessagingPhone,
   normalizeQrCodeData,
+  resolveQrExpiresAt,
   resolveMessagingConnectionStatus,
 } from './messaging-integrations.utils';
 
@@ -58,5 +61,38 @@ describe('messaging integrations utils', () => {
         assumeProvisioning: true,
       }),
     ).toBe('provisioning');
+  });
+
+  it('derives qr expiration from ttl and explicit timestamps', () => {
+    const now = new Date('2026-04-20T12:00:00.000Z');
+
+    expect(
+      resolveQrExpiresAt({
+        payload: {
+          ttl: 60,
+        },
+        now,
+      })?.toISOString(),
+    ).toBe('2026-04-20T12:01:00.000Z');
+
+    expect(
+      resolveQrExpiresAt({
+        payload: {
+          qrcode: {
+            expiresAt: '2026-04-20T12:03:00.000Z',
+          },
+        },
+        now,
+      })?.toISOString(),
+    ).toBe('2026-04-20T12:03:00.000Z');
+  });
+
+  it('detects expired qr timestamps and disconnected remote states', () => {
+    const now = new Date('2026-04-20T12:05:00.000Z');
+
+    expect(isQrExpired('2026-04-20T12:04:59.000Z', now)).toBe(true);
+    expect(isQrExpired('2026-04-20T12:05:10.000Z', now)).toBe(false);
+    expect(isDisconnectedEvolutionState('DISCONNECTED')).toBe(true);
+    expect(isDisconnectedEvolutionState('connecting')).toBe(false);
   });
 });

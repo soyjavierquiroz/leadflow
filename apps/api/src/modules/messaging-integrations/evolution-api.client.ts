@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  isDisconnectedEvolutionState,
   normalizeMessagingPhone,
   normalizeQrCodeData,
+  resolveQrExpiresAt,
   sanitizeNullableText,
 } from './messaging-integrations.utils';
 
@@ -23,6 +25,7 @@ type EvolutionConnectionState = {
 type EvolutionQrPayload = {
   qrCodeData: string | null;
   pairingCode: string | null;
+  expiresAt: Date | null;
   raw: unknown;
 };
 
@@ -341,11 +344,15 @@ export class EvolutionApiClient {
         readString(payload?.code) ??
         readString(payload?.pairingCode) ??
         readString(payload?.pairing_code);
+      const expiresAt = resolveQrExpiresAt({
+        payload: response.data,
+      });
 
       if (qrCodeData || pairingCode) {
         return {
           qrCodeData,
           pairingCode,
+          expiresAt,
           raw: response.data,
         };
       }
@@ -358,6 +365,7 @@ export class EvolutionApiClient {
     return {
       qrCodeData: null,
       pairingCode: null,
+      expiresAt: null,
       raw: null,
     };
   }
@@ -425,6 +433,50 @@ export class EvolutionApiClient {
       'EVOLUTION_INSTANCE_DELETE_FAILED',
       response,
       'No pudimos eliminar la instancia en Evolution.',
+    );
+  }
+
+  async restartInstance(instanceId: string) {
+    const response = await this.request(`instance/restart/${instanceId}`, {
+      method: 'PUT',
+    });
+
+    if (response.status >= 200 && response.status < 300) {
+      return response;
+    }
+
+    if (response.status === 404) {
+      return response;
+    }
+
+    throw this.toError(
+      'EVOLUTION_INSTANCE_RESTART_FAILED',
+      response,
+      'No pudimos reiniciar la instancia en Evolution.',
+    );
+  }
+
+  async recreateInstance(instanceId: string) {
+    await this.deleteInstance(instanceId);
+    await this.createInstance(instanceId);
+    return await this.waitForInstanceExists(instanceId);
+  }
+
+  shouldRegenerateQrSession(input: {
+    state: string | null;
+    qrExpiresAt?: Date | null;
+  }) {
+    const normalizedState = input.state?.trim().toLowerCase() ?? null;
+
+    if (normalizedState === 'open' || normalizedState === 'connected') {
+      return false;
+    }
+
+    return (
+      isDisconnectedEvolutionState(input.state) ||
+      Boolean(
+        input.qrExpiresAt && input.qrExpiresAt.getTime() <= Date.now(),
+      )
     );
   }
 
