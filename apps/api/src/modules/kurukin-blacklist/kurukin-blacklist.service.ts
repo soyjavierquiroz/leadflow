@@ -10,7 +10,6 @@ import {
   sanitizeToKurukinFormat,
   sanitizeToKurukinFormatOrNull,
 } from '../shared/phone-utils';
-import { normalizeBlacklistEntries } from './kurukin-blacklist.utils';
 
 type MemberBlacklistScope = {
   workspaceId: string;
@@ -25,15 +24,7 @@ type ResolvedOwnerContext = {
 };
 
 export type KurukinBlacklistEntry = {
-  id: string | null;
-  ownerPhone: string | null;
-  blockedPhone: string;
-  sourceApp: string | null;
-  scope: string | null;
-  reason: string | null;
-  label: string | null;
-  createdAt: string | null;
-  raw: Record<string, unknown>;
+  [key: string]: unknown;
 };
 
 type AddBlacklistInput = {
@@ -109,16 +100,12 @@ export class KurukinBlacklistService {
   async listForMember(
     scope: MemberBlacklistScope,
   ): Promise<{
-    ownerPhone: string | null;
-    sponsorName: string;
     items: KurukinBlacklistEntry[];
   }> {
     const owner = await this.resolveOwnerContext(scope);
 
     if (!owner.ownerPhone) {
       return {
-        ownerPhone: null,
-        sponsorName: owner.sponsorName,
         items: [],
       };
     }
@@ -126,16 +113,10 @@ export class KurukinBlacklistService {
     const sanitizedOwnerPhone = sanitizeToKurukinFormat(owner.ownerPhone);
 
     try {
-      const payload =
+      const items =
         await this.requestSupabaseBlacklistEntries(sanitizedOwnerPhone);
-      const items = normalizeBlacklistEntries(payload).filter(
-        (item) =>
-          item.ownerPhone === null || item.ownerPhone === sanitizedOwnerPhone,
-      );
 
       return {
-        ownerPhone: sanitizedOwnerPhone,
-        sponsorName: owner.sponsorName,
         items,
       };
     } catch (error) {
@@ -363,7 +344,7 @@ export class KurukinBlacklistService {
 
   private async requestSupabaseBlacklistEntries(
     sanitizedOwnerPhone: string,
-  ): Promise<unknown> {
+  ): Promise<KurukinBlacklistEntry[]> {
     if (!this.supabaseUrl || !this.supabaseKey) {
       throw new Error(
         'BLACKLIST_SUPABASE_URL and BLACKLIST_SUPABASE_KEY must be configured for blacklist reads.',
@@ -383,7 +364,7 @@ export class KurukinBlacklistService {
       );
     }
 
-    return payload;
+    return Array.isArray(payload) ? (payload as KurukinBlacklistEntry[]) : [];
   }
 
   private async fetchMemberBlacklist(
@@ -391,8 +372,6 @@ export class KurukinBlacklistService {
   ): Promise<SupabaseBlacklistFetchResult> {
     this.logger.log(`Fetching Supabase blacklist from ${url.toString()}`);
     const supabaseKey = this.supabaseKey ?? undefined;
-    const readString = (value: unknown) =>
-      typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -407,38 +386,9 @@ export class KurukinBlacklistService {
     this.logger.log(
       `Supabase blacklist response status=${response.status} body=${JSON.stringify(payload)}`,
     );
-    const mappedPayload = Array.isArray(payload)
-      ? payload.map((item) => {
-          const row =
-            item && typeof item === 'object' && !Array.isArray(item)
-              ? (item as Record<string, unknown>)
-              : {};
-
-          return {
-            id:
-              readString(row.id) ??
-              readString(row.entry_id) ??
-              readString(row.uuid) ??
-              null,
-            ownerPhone:
-              readString(row.owner_phone) ?? readString(row.ownerPhone) ?? null,
-            blockedPhone:
-              readString(row.blocked_phone) ??
-              readString(row.blockedPhone) ??
-              null,
-            sourceApp:
-              readString(row.source_app) ?? readString(row.sourceApp) ?? null,
-            scope: readString(row.scope) ?? null,
-            reason: readString(row.reason) ?? null,
-            label: readString(row.label) ?? null,
-            createdAt:
-              readString(row.created_at) ?? readString(row.createdAt) ?? null,
-          };
-        })
-      : payload;
 
     return {
-      payload: mappedPayload,
+      payload,
       status: response.status,
       url: url.toString(),
     };

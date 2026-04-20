@@ -23,16 +23,10 @@ export class KurukinBlacklistController {
     });
 
     const response = {
-      ownerPhone: payload.ownerPhone,
-      sponsorName: payload.sponsorName,
-      items: payload.items.map((item) => ({
-        id: item.id,
-        ownerPhone: item.ownerPhone,
-        blockedPhone: item.blockedPhone,
-        reason: item.reason,
-        createdAt: item.createdAt,
-      })),
+      items: payload.items,
     };
+
+    console.log('FINAL_API_RESPONSE:', response);
 
     return response;
   }

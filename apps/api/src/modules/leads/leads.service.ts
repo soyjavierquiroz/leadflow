@@ -83,35 +83,6 @@ const toIso = (value: Date | null) => (value ? value.toISOString() : null);
 const toInputJsonValue = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
 
-type RawLeadFallbackRow = {
-  id: string;
-  workspaceId: string;
-  funnelId: string;
-  funnelInstanceId: string | null;
-  funnelPublicationId: string | null;
-  visitorId: string | null;
-  sourceChannel: string;
-  fullName: string | null;
-  email: string | null;
-  phone: string | null;
-  companyName: string | null;
-  status: Lead['status'];
-  qualificationGrade: Lead['qualificationGrade'];
-  summaryText: string | null;
-  nextActionLabel: string | null;
-  followUpAt: Date | null;
-  lastContactedAt: Date | null;
-  lastQualifiedAt: Date | null;
-  isSuppressed: boolean;
-  suppressedAt: Date | null;
-  suppressedReason: string | null;
-  suppressedSource: string | null;
-  currentAssignmentId: string | null;
-  tags: string[] | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
 const prettifyEventName = (value: string) =>
   value
     .replace(/[_-]+/g, ' ')
@@ -218,10 +189,6 @@ export class LeadsService {
         followUpAt: null,
         lastContactedAt: null,
         lastQualifiedAt: null,
-        isSuppressed: false,
-        suppressedAt: null,
-        suppressedReason: null,
-        suppressedSource: null,
         currentAssignmentId: null,
         tags: dto.tags ?? [],
       }),
@@ -239,71 +206,52 @@ export class LeadsService {
       throw new Error('LeadRepository provider is not configured.');
     }
 
-    try {
-      if (filters?.sponsorId) {
-        const records = await this.repository.findBySponsorId(filters.sponsorId);
-        return this.enrichLeads(
-          filters.status
-            ? records.filter((item) => item.status === filters.status)
-            : records,
-        );
-      }
-
-      if (filters?.funnelPublicationId) {
-        const records = await this.repository.findByPublicationId(
-          filters.funnelPublicationId,
-        );
-        return this.enrichLeads(
-          filters.status
-            ? records.filter((item) => item.status === filters.status)
-            : records,
-        );
-      }
-
-      if (filters?.teamId) {
-        const records = await this.repository.findByTeamId(filters.teamId);
-        return this.enrichLeads(
-          filters.status
-            ? records.filter((item) => item.status === filters.status)
-            : records,
-        );
-      }
-
-      if (filters?.workspaceId) {
-        const records = await this.repository.findByWorkspaceId(
-          filters.workspaceId,
-        );
-        return this.enrichLeads(
-          filters.status
-            ? records.filter((item) => item.status === filters.status)
-            : records,
-        );
-      }
-
-      const records = await this.repository.findAll();
+    if (filters?.sponsorId) {
+      const records = await this.repository.findBySponsorId(filters.sponsorId);
       return this.enrichLeads(
-        filters?.status
-          ? records.filter((item) => item.status === filters.status)
-          : records,
-      );
-    } catch (error) {
-      if (!this.isLeadSchemaDesyncError(error)) {
-        throw error;
-      }
-
-      this.logger.warn(
-        `Lead list fell back to raw SQL after Prisma schema desync: ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`,
-      );
-
-      const records = await this.listWithSchemaFallback(filters);
-      return this.enrichLeads(
-        filters?.status
+        filters.status
           ? records.filter((item) => item.status === filters.status)
           : records,
       );
     }
+
+    if (filters?.funnelPublicationId) {
+      const records = await this.repository.findByPublicationId(
+        filters.funnelPublicationId,
+      );
+      return this.enrichLeads(
+        filters.status
+          ? records.filter((item) => item.status === filters.status)
+          : records,
+      );
+    }
+
+    if (filters?.teamId) {
+      const records = await this.repository.findByTeamId(filters.teamId);
+      return this.enrichLeads(
+        filters.status
+          ? records.filter((item) => item.status === filters.status)
+          : records,
+      );
+    }
+
+    if (filters?.workspaceId) {
+      const records = await this.repository.findByWorkspaceId(
+        filters.workspaceId,
+      );
+      return this.enrichLeads(
+        filters.status
+          ? records.filter((item) => item.status === filters.status)
+          : records,
+      );
+    }
+
+    const records = await this.repository.findAll();
+    return this.enrichLeads(
+      filters?.status
+        ? records.filter((item) => item.status === filters.status)
+        : records,
+    );
   }
 
   async findOne(filters: {
@@ -737,10 +685,6 @@ export class LeadsService {
         followUpAt: toIso(lead.followUpAt),
         lastContactedAt: toIso(lead.lastContactedAt),
         lastQualifiedAt: toIso(lead.lastQualifiedAt),
-        isSuppressed: lead.isSuppressed,
-        suppressedAt: toIso(lead.suppressedAt),
-        suppressedReason: lead.suppressedReason,
-        suppressedSource: lead.suppressedSource,
         sponsorId: lead.currentAssignment?.sponsorId ?? null,
         sponsorName: lead.currentAssignment?.sponsor.displayName ?? null,
         teamId: lead.currentAssignment?.teamId ?? null,
@@ -1057,140 +1001,6 @@ export class LeadsService {
     return leads.map((lead) => this.enrichLead(lead));
   }
 
-  private isLeadSchemaDesyncError(error: unknown) {
-    if (!error || typeof error !== 'object') {
-      return false;
-    }
-
-    const candidate = error as { code?: string; message?: string };
-    return (
-      candidate.code === 'P2022' ||
-      candidate.message?.includes('isSuppressed') === true
-    );
-  }
-
-  private async listWithSchemaFallback(filters?: {
-    workspaceId?: string;
-    teamId?: string;
-    sponsorId?: string;
-    funnelPublicationId?: string;
-  }): Promise<Lead[]> {
-    const baseSelect = `
-      SELECT DISTINCT
-        l."id",
-        l."workspaceId",
-        l."funnelId",
-        l."funnelInstanceId",
-        l."funnelPublicationId",
-        l."visitorId",
-        l."sourceChannel",
-        l."fullName",
-        l."email",
-        l."phone",
-        l."companyName",
-        l."status",
-        l."qualificationGrade",
-        l."summaryText",
-        l."nextActionLabel",
-        l."followUpAt",
-        l."lastContactedAt",
-        l."lastQualifiedAt",
-        FALSE AS "isSuppressed",
-        NULL::timestamp AS "suppressedAt",
-        NULL::text AS "suppressedReason",
-        NULL::text AS "suppressedSource",
-        l."currentAssignmentId",
-        l."tags",
-        l."createdAt",
-        l."updatedAt"
-      FROM "Lead" l
-    `;
-
-    if (filters?.sponsorId) {
-      return (await this.queryLeadFallback(
-        `${baseSelect}
-        INNER JOIN "Assignment" a ON a."leadId" = l."id"
-        WHERE a."sponsorId" = $1
-        ORDER BY l."createdAt" DESC`,
-        filters.sponsorId,
-      )) as unknown as Lead[];
-    }
-
-    if (filters?.funnelPublicationId) {
-      return (await this.queryLeadFallback(
-        `${baseSelect}
-        WHERE l."funnelPublicationId" = $1
-        ORDER BY l."createdAt" DESC`,
-        filters.funnelPublicationId,
-      )) as unknown as Lead[];
-    }
-
-    if (filters?.teamId) {
-      return (await this.queryLeadFallback(
-        `${baseSelect}
-        LEFT JOIN "Assignment" a ON a."leadId" = l."id"
-        LEFT JOIN "FunnelInstance" fi ON fi."id" = l."funnelInstanceId"
-        LEFT JOIN "FunnelPublication" fp ON fp."id" = l."funnelPublicationId"
-        WHERE a."teamId" = $1 OR fi."teamId" = $1 OR fp."teamId" = $1
-        ORDER BY l."createdAt" DESC`,
-        filters.teamId,
-      )) as unknown as Lead[];
-    }
-
-    if (filters?.workspaceId) {
-      return (await this.queryLeadFallback(
-        `${baseSelect}
-        WHERE l."workspaceId" = $1
-        ORDER BY l."createdAt" ASC`,
-        filters.workspaceId,
-      )) as unknown as Lead[];
-    }
-
-    return (await this.queryLeadFallback(
-      `${baseSelect}
-      ORDER BY l."createdAt" ASC`,
-    )) as unknown as Lead[];
-  }
-
-  private async queryLeadFallback(query: string, ...params: string[]) {
-    const rows = await this.prisma.$queryRawUnsafe<RawLeadFallbackRow[]>(
-      query,
-      ...params,
-    );
-
-    return rows.map((row) => ({
-      id: row.id,
-      workspaceId: row.workspaceId,
-      funnelId: row.funnelId,
-      funnelInstanceId: row.funnelInstanceId,
-      funnelPublicationId: row.funnelPublicationId,
-      visitorId: row.visitorId,
-      sourceChannel:
-        row.sourceChannel === 'landing_page'
-          ? 'landing-page'
-          : row.sourceChannel,
-      fullName: row.fullName,
-      email: row.email,
-      phone: row.phone,
-      companyName: row.companyName,
-      status: row.status,
-      qualificationGrade: row.qualificationGrade,
-      summaryText: row.summaryText,
-      nextActionLabel: row.nextActionLabel,
-      followUpAt: toIso(row.followUpAt),
-      lastContactedAt: toIso(row.lastContactedAt),
-      lastQualifiedAt: toIso(row.lastQualifiedAt),
-      isSuppressed: row.isSuppressed,
-      suppressedAt: toIso(row.suppressedAt),
-      suppressedReason: row.suppressedReason,
-      suppressedSource: row.suppressedSource,
-      currentAssignmentId: row.currentAssignmentId,
-      tags: Array.isArray(row.tags) ? row.tags : [],
-      createdAt: toIso(row.createdAt),
-      updatedAt: toIso(row.updatedAt),
-    }));
-  }
-
   private enrichLead(lead: Lead): Lead {
     const workflow = this.toWorkflowView(lead);
 
@@ -1276,10 +1086,6 @@ export class LeadsService {
         },
         data: {
           status: nextLeadStatus,
-          isSuppressed: true,
-          suppressedAt: lead.suppressedAt ?? occurredAt,
-          suppressedReason: input.reason,
-          suppressedSource: input.source,
         },
       });
 

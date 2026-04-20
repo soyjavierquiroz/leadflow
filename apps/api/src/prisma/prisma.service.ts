@@ -1,19 +1,5 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit {
-  private readonly logger = new Logger(PrismaService.name);
-
-  async onModuleInit() {
-    await this.$connect();
-
-    this.logger.log(
-      'Ensuring Lead.isSuppressed exists before serving application traffic.',
-    );
-
-    await this.$executeRawUnsafe(
-      'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "isSuppressed" BOOLEAN DEFAULT false;',
-    );
-  }
-}
+export class PrismaService extends PrismaClient {}
