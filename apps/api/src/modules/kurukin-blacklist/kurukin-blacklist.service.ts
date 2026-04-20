@@ -381,7 +381,7 @@ export class KurukinBlacklistService {
         Accept: 'application/json',
         apikey: supabaseKey,
         Authorization: supabaseKey ? `Bearer ${supabaseKey}` : undefined,
-      },
+      } as any,
     });
 
     const payload = await response.json().catch(() => null);
