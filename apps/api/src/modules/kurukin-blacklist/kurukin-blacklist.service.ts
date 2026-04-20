@@ -373,13 +373,14 @@ export class KurukinBlacklistService {
     url: URL,
   ): Promise<SupabaseBlacklistFetchResult> {
     this.logger.log(`Fetching Supabase blacklist from ${url.toString()}`);
+    const supabaseKey = this.supabaseKey ?? undefined;
 
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
-        apikey: this.supabaseKey,
-        Authorization: `Bearer ${this.supabaseKey}`,
+        apikey: supabaseKey,
+        Authorization: supabaseKey ? `Bearer ${supabaseKey}` : undefined,
       },
     });
 
