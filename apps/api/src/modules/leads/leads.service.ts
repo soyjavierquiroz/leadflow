@@ -202,56 +202,66 @@ export class LeadsService {
     funnelPublicationId?: string;
     status?: string;
   }): Promise<Lead[]> {
-    if (!this.repository) {
-      throw new Error('LeadRepository provider is not configured.');
-    }
+    try {
+      if (!this.repository) {
+        throw new Error('LeadRepository provider is not configured.');
+      }
 
-    if (filters?.sponsorId) {
-      const records = await this.repository.findBySponsorId(filters.sponsorId);
+      if (filters?.sponsorId) {
+        const records = await this.repository.findBySponsorId(filters.sponsorId);
+        return this.enrichLeads(
+          filters.status
+            ? records.filter((item) => item.status === filters.status)
+            : records,
+        );
+      }
+
+      if (filters?.funnelPublicationId) {
+        const records = await this.repository.findByPublicationId(
+          filters.funnelPublicationId,
+        );
+        return this.enrichLeads(
+          filters.status
+            ? records.filter((item) => item.status === filters.status)
+            : records,
+        );
+      }
+
+      if (filters?.teamId) {
+        const records = await this.repository.findByTeamId(filters.teamId);
+        return this.enrichLeads(
+          filters.status
+            ? records.filter((item) => item.status === filters.status)
+            : records,
+        );
+      }
+
+      if (filters?.workspaceId) {
+        const records = await this.repository.findByWorkspaceId(
+          filters.workspaceId,
+        );
+        return this.enrichLeads(
+          filters.status
+            ? records.filter((item) => item.status === filters.status)
+            : records,
+        );
+      }
+
+      const records = await this.repository.findAll();
       return this.enrichLeads(
-        filters.status
+        filters?.status
           ? records.filter((item) => item.status === filters.status)
           : records,
       );
-    }
+    } catch (error) {
+      this.logger.warn(
+        `LeadsService.list suppressed an error and returned []. ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
 
-    if (filters?.funnelPublicationId) {
-      const records = await this.repository.findByPublicationId(
-        filters.funnelPublicationId,
-      );
-      return this.enrichLeads(
-        filters.status
-          ? records.filter((item) => item.status === filters.status)
-          : records,
-      );
+      return [];
     }
-
-    if (filters?.teamId) {
-      const records = await this.repository.findByTeamId(filters.teamId);
-      return this.enrichLeads(
-        filters.status
-          ? records.filter((item) => item.status === filters.status)
-          : records,
-      );
-    }
-
-    if (filters?.workspaceId) {
-      const records = await this.repository.findByWorkspaceId(
-        filters.workspaceId,
-      );
-      return this.enrichLeads(
-        filters.status
-          ? records.filter((item) => item.status === filters.status)
-          : records,
-      );
-    }
-
-    const records = await this.repository.findAll();
-    return this.enrichLeads(
-      filters?.status
-        ? records.filter((item) => item.status === filters.status)
-        : records,
-    );
   }
 
   async findOne(filters: {
@@ -284,40 +294,60 @@ export class LeadsService {
   async getRemindersSummary(
     scope: LeadTimelineScope,
   ): Promise<LeadReminderSummary> {
-    const leads = await this.list(scope);
+    try {
+      const leads = await this.list(scope);
 
-    return leads.reduce<LeadReminderSummary>(
-      (summary, lead) => {
-        if (lead.reminderBucket === 'none') {
+      return leads.reduce<LeadReminderSummary>(
+        (summary, lead) => {
+          if (lead.reminderBucket === 'none') {
+            return summary;
+          }
+
+          summary.totals.active += 1;
+
+          if (lead.needsAttention) {
+            summary.totals.needsAttention += 1;
+          }
+
+          switch (lead.reminderBucket) {
+            case 'overdue':
+              summary.totals.overdue += 1;
+              break;
+            case 'due_today':
+              summary.totals.dueToday += 1;
+              break;
+            case 'upcoming':
+              summary.totals.upcoming += 1;
+              break;
+            case 'unscheduled':
+              summary.totals.unscheduled += 1;
+              break;
+            default:
+              break;
+          }
+
           return summary;
-        }
+        },
+        {
+          generatedAt: new Date().toISOString(),
+          totals: {
+            active: 0,
+            overdue: 0,
+            dueToday: 0,
+            upcoming: 0,
+            unscheduled: 0,
+            needsAttention: 0,
+          },
+        },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `LeadsService.getRemindersSummary suppressed an error and returned zeroes. ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
 
-        summary.totals.active += 1;
-
-        if (lead.needsAttention) {
-          summary.totals.needsAttention += 1;
-        }
-
-        switch (lead.reminderBucket) {
-          case 'overdue':
-            summary.totals.overdue += 1;
-            break;
-          case 'due_today':
-            summary.totals.dueToday += 1;
-            break;
-          case 'upcoming':
-            summary.totals.upcoming += 1;
-            break;
-          case 'unscheduled':
-            summary.totals.unscheduled += 1;
-            break;
-          default:
-            break;
-        }
-
-        return summary;
-      },
-      {
+      return {
         generatedAt: new Date().toISOString(),
         totals: {
           active: 0,
@@ -327,8 +357,8 @@ export class LeadsService {
           unscheduled: 0,
           needsAttention: 0,
         },
-      },
-    );
+      };
+    }
   }
 
   async getLeadPlaybook(scope: LeadTimelineScope, leadId: string) {

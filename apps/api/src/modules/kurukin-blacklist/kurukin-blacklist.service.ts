@@ -182,22 +182,44 @@ export class KurukinBlacklistService {
   }
 
   async add(input: AddBlacklistInput) {
+    if (!this.supabaseUrl || !this.supabaseKey) {
+      throw new Error(
+        'BLACKLIST_SUPABASE_URL and BLACKLIST_SUPABASE_KEY must be configured for blacklist writes.',
+      );
+    }
+
     const ownerPhone = sanitizeToKurukinFormat(input.ownerPhone);
     const blockedPhone = sanitizeToKurukinFormat(input.blockedPhone);
+    const url = this.buildSupabaseUrl('master_suppression_list');
     const payload = {
       owner_phone: ownerPhone,
       blocked_phone: blockedPhone,
-      source_app: this.sourceApp,
-      scope: input.scope?.trim() || this.defaultScope,
+      source_app: 'leadflow',
+      scope: 'personal',
       reason: input.reason.trim(),
-      label: input.label?.trim() || this.defaultLabel,
     };
 
-    return this.requestHub({
+    const response = await fetch(url, {
       method: 'POST',
-      path: this.addPath,
-      body: payload,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+        apikey: this.supabaseKey,
+        Authorization: `Bearer ${this.supabaseKey}`,
+      } as any,
+      body: JSON.stringify(payload),
     });
+
+    const responsePayload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(
+        `Supabase blacklist write responded with HTTP ${response.status} on POST ${url.toString()}.`,
+      );
+    }
+
+    return responsePayload;
   }
 
   async safeAdd(input: AddBlacklistInput) {
