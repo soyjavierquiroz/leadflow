@@ -23,6 +23,8 @@ export class KurukinBlacklistController {
     });
 
     const response = {
+      ownerPhone: payload.ownerPhone,
+      sponsorName: payload.sponsorName,
       items: payload.items,
     };
 

@@ -24,7 +24,12 @@ type ResolvedOwnerContext = {
 };
 
 export type KurukinBlacklistEntry = {
-  [key: string]: unknown;
+  id: string | null;
+  ownerPhone: string | null;
+  blockedPhone: string | null;
+  reason: string | null;
+  createdAt: string | null;
+  raw: Record<string, unknown>;
 };
 
 type AddBlacklistInput = {
@@ -100,12 +105,16 @@ export class KurukinBlacklistService {
   async listForMember(
     scope: MemberBlacklistScope,
   ): Promise<{
+    ownerPhone: string | null;
+    sponsorName: string;
     items: KurukinBlacklistEntry[];
   }> {
     const owner = await this.resolveOwnerContext(scope);
 
     if (!owner.ownerPhone) {
       return {
+        ownerPhone: null,
+        sponsorName: owner.sponsorName,
         items: [],
       };
     }
@@ -117,6 +126,8 @@ export class KurukinBlacklistService {
         await this.requestSupabaseBlacklistEntries(sanitizedOwnerPhone);
 
       return {
+        ownerPhone: sanitizedOwnerPhone,
+        sponsorName: owner.sponsorName,
         items,
       };
     } catch (error) {
@@ -150,12 +161,24 @@ export class KurukinBlacklistService {
       });
     }
 
-    return this.add({
+    const hubResponse = await this.add({
       ownerPhone: owner.ownerPhone,
       blockedPhone: input.blockedPhone,
       reason: input.reason?.trim() || 'manual_member_blacklist',
       label: input.label?.trim() || this.defaultLabel,
     });
+
+    try {
+      await this.trySyncLocalLeadAfterBlacklistAdd(input.blockedPhone);
+    } catch (error) {
+      this.logger.warn(
+        `Ignoring local Lead sync failure after blacklist add for blocked=${input.blockedPhone}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+
+    return hubResponse;
   }
 
   async add(input: AddBlacklistInput) {
@@ -372,6 +395,8 @@ export class KurukinBlacklistService {
   ): Promise<SupabaseBlacklistFetchResult> {
     this.logger.log(`Fetching Supabase blacklist from ${url.toString()}`);
     const supabaseKey = this.supabaseKey ?? undefined;
+    const readString = (value: unknown) =>
+      typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -386,12 +411,48 @@ export class KurukinBlacklistService {
     this.logger.log(
       `Supabase blacklist response status=${response.status} body=${JSON.stringify(payload)}`,
     );
+    const mappedPayload = Array.isArray(payload)
+      ? payload.map((item) => {
+          const row =
+            item && typeof item === 'object' && !Array.isArray(item)
+              ? (item as Record<string, unknown>)
+              : {};
+
+          return {
+            id:
+              readString(row.id) ??
+              readString(row.entry_id) ??
+              readString(row.uuid) ??
+              null,
+            ownerPhone:
+              readString(row.owner_phone) ?? readString(row.ownerPhone) ?? null,
+            blockedPhone:
+              readString(row.blocked_phone) ??
+              readString(row.blockedPhone) ??
+              null,
+            reason: readString(row.reason) ?? null,
+            createdAt:
+              readString(row.created_at) ?? readString(row.createdAt) ?? null,
+            raw: row,
+          };
+        })
+      : payload;
 
     return {
-      payload,
+      payload: mappedPayload,
       status: response.status,
       url: url.toString(),
     };
+  }
+
+  private async trySyncLocalLeadAfterBlacklistAdd(blockedPhone: string) {
+    const normalizedBlockedPhone = sanitizeToKurukinFormat(blockedPhone);
+
+    await this.prisma.lead.findFirst({
+      where: {
+        phone: normalizedBlockedPhone,
+      },
+    });
   }
 
   private readRequiredBaseUrl() {
