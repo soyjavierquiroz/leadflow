@@ -57,6 +57,12 @@ type HubRequestInit = {
   query?: Record<string, string | null | undefined>;
 };
 
+type SupabaseBlacklistFetchResult = {
+  payload: unknown;
+  status: number;
+  url: string;
+};
+
 @Injectable()
 export class KurukinBlacklistService {
   private readonly logger = new Logger(KurukinBlacklistService.name);
@@ -351,6 +357,23 @@ export class KurukinBlacklistService {
     url.searchParams.set('owner_phone', `eq.${sanitizedOwnerPhone}`);
     url.searchParams.set('select', '*');
 
+    const { payload, status, url: requestUrl } =
+      await this.fetchMemberBlacklist(url);
+
+    if (status < 200 || status >= 300) {
+      throw new Error(
+        `Supabase blacklist read responded with HTTP ${status} on GET ${requestUrl}.`,
+      );
+    }
+
+    return payload;
+  }
+
+  private async fetchMemberBlacklist(
+    url: URL,
+  ): Promise<SupabaseBlacklistFetchResult> {
+    this.logger.log(`Fetching Supabase blacklist from ${url.toString()}`);
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -361,14 +384,15 @@ export class KurukinBlacklistService {
     });
 
     const payload = await response.json().catch(() => null);
+    this.logger.log(
+      `Supabase blacklist response status=${response.status} body=${JSON.stringify(payload)}`,
+    );
 
-    if (!response.ok) {
-      throw new Error(
-        `Supabase blacklist read responded with HTTP ${response.status} on GET ${url.pathname}.`,
-      );
-    }
-
-    return payload;
+    return {
+      payload,
+      status: response.status,
+      url: url.toString(),
+    };
   }
 
   private readRequiredBaseUrl() {
