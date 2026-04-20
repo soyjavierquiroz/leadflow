@@ -4,7 +4,6 @@ import { validateApiEnvironment } from './config/runtime';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DomainModule } from './modules/domain/domain.module';
-import { LeadsSchemaInitializerService } from './modules/leads/leads-schema-initializer.service';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -20,6 +19,5 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     DomainModule,
   ],
-  providers: [LeadsSchemaInitializerService],
 })
 export class AppModule {}

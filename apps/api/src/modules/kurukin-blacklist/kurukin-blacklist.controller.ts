@@ -15,12 +15,26 @@ export class KurukinBlacklistController {
   ) {}
 
   @Get('me')
-  listForMember(@CurrentAuthUser() user: AuthenticatedUser) {
-    return this.kurukinBlacklistService.listForMember({
+  async listForMember(@CurrentAuthUser() user: AuthenticatedUser) {
+    const payload = await this.kurukinBlacklistService.listForMember({
       workspaceId: user.workspaceId!,
       teamId: user.teamId!,
       sponsorId: user.sponsorId!,
     });
+
+    const response = {
+      items: payload.items.map((item) => ({
+        id: item.id,
+        ownerPhone: item.ownerPhone,
+        blockedPhone: item.blockedPhone,
+        reason: item.reason,
+        createdAt: item.createdAt,
+      })),
+    };
+
+    console.log('DATA_TO_FRONTEND:', response);
+
+    return response;
   }
 
   @Post('me')
