@@ -9,7 +9,7 @@ import {
   memberOperationRequest,
   type MemberSponsorDashboard,
 } from "@/lib/member-operations";
-import { MemberProtectionListPanel } from "@/components/member-operations/member-protection-list-panel";
+import { MemberProtectionHubButton } from "@/components/member-operations/member-protection-hub-button";
 
 type ChannelAction = "connect" | "qr" | "refresh" | "reset" | null;
 
@@ -536,7 +536,10 @@ export function MemberChannelClient() {
             </aside>
           </section>
 
-          <MemberProtectionListPanel />
+          <MemberProtectionHubButton
+            advisorPhone={currentSnapshot.sponsorPhone}
+            isSsoAvailable={currentSnapshot.blacklistSsoAvailable}
+          />
         </>
       ) : null}
     </div>

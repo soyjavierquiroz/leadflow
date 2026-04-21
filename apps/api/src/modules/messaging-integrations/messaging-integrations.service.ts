@@ -606,15 +606,20 @@ export class MessagingIntegrationsService {
     const status = this.resolveDashboardStatus(connection);
     const isConnected = status === 'READY';
     const qrExpired = isQrExpired(connection?.pairingExpiresAt);
+    const blacklistSsoAvailable = Boolean(
+      process.env.SSO_BLACKLIST_SECRET?.trim(),
+    );
 
     return new SponsorDashboardDto({
       status,
       qrCode: isConnected || qrExpired ? null : connection?.qrCodeData ?? null,
       sponsorName: sponsor.displayName,
+      sponsorPhone: sponsor.phone,
       isConnected,
       connectionStatus: connection?.status ?? null,
       qrExpiresAt: connection?.pairingExpiresAt?.toISOString() ?? null,
       qrExpired,
+      blacklistSsoAvailable,
     });
   }
 

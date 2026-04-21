@@ -35,27 +35,12 @@ export type MemberSponsorDashboard = {
   status: MemberSponsorDashboardStatus;
   qrCode: string | null;
   sponsorName: string;
+  sponsorPhone: string | null;
   isConnected: boolean;
   connectionStatus: MemberMessagingConnectionStatus | null;
   qrExpiresAt: string | null;
   qrExpired: boolean;
-};
-
-export type MemberProtectionListEntry = {
-  id: string | null;
-  ownerPhone: string | null;
-  blockedPhone: string;
-  sourceApp: string | null;
-  scope: string | null;
-  reason: string | null;
-  label: string | null;
-  createdAt: string | null;
-};
-
-export type MemberProtectionListSnapshot = {
-  ownerPhone: string;
-  sponsorName: string;
-  items: MemberProtectionListEntry[];
+  blacklistSsoAvailable: boolean;
 };
 
 export const memberOperationRequest = async <T>(
