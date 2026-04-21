@@ -14,12 +14,12 @@ import { FunnelsModule } from '../funnels/funnels.module';
 import { HandoffStrategiesModule } from '../handoff-strategies/handoff-strategies.module';
 import { HybridFunnelPublicationsModule } from '../hybrid-funnel-publications/hybrid-funnel-publications.module';
 import { IncomingWebhooksModule } from '../incoming-webhooks/incoming-webhooks.module';
-import { KurukinBlacklistModule } from '../kurukin-blacklist/kurukin-blacklist.module';
 import { LeadsModule } from '../leads/leads.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { MessagingIntegrationsModule } from '../messaging-integrations/messaging-integrations.module';
 import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
 import { RotationPoolsModule } from '../rotation-pools/rotation-pools.module';
+import { SsoModule } from '../sso/sso.module';
 import { SponsorsModule } from '../sponsors/sponsors.module';
 import { StorageModule } from '../storage/storage.module';
 import { TeamsModule } from '../teams/teams.module';
@@ -47,7 +47,6 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     TemplatesModule,
     HandoffStrategiesModule,
     HybridFunnelPublicationsModule,
-    KurukinBlacklistModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
     PublicFunnelRuntimeModule,
@@ -58,6 +57,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     WalletEngineModule,
     MessagingAutomationModule,
     MessagingIntegrationsModule,
+    SsoModule,
     AssignmentsModule,
     EventsModule,
   ],
@@ -78,7 +78,6 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     TemplatesModule,
     HandoffStrategiesModule,
     HybridFunnelPublicationsModule,
-    KurukinBlacklistModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
     PublicFunnelRuntimeModule,
@@ -89,6 +88,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     WalletEngineModule,
     MessagingAutomationModule,
     MessagingIntegrationsModule,
+    SsoModule,
     AssignmentsModule,
     EventsModule,
   ],

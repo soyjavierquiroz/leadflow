@@ -20,7 +20,6 @@ import {
   memberLeadStatusValues,
   type UpdateMemberLeadDto,
 } from './dto/update-member-lead.dto';
-import type { SuppressMemberLeadDto } from './dto/suppress-member-lead.dto';
 import type { Lead, LeadRepository } from './interfaces/lead.interface';
 import { buildLeadWorkflow, type LeadWorkflowView } from './leads-workflows';
 import type {
@@ -30,7 +29,6 @@ import type {
   LeadTimelineItem,
   LeadTimelineScope,
 } from './leads.types';
-import { KurukinBlacklistService } from '../kurukin-blacklist/kurukin-blacklist.service';
 
 const leadTimelineInclude = {
   currentAssignment: {
@@ -139,17 +137,6 @@ const buildEventDescription = (
           .filter(Boolean)
           .join(' · ') || 'Se actualizó el plan de seguimiento del lead.'
       );
-    case 'lead_suppressed':
-      return (
-        [
-          typeof payload.reason === 'string' ? `Motivo: ${payload.reason}` : null,
-          typeof payload.hubSyncStatus === 'string'
-            ? `Hub: ${payload.hubSyncStatus}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(' · ') || 'El lead quedó suprimido para evitar nuevos envíos.'
-      );
     default:
       return typeof payload.message === 'string'
         ? payload.message
@@ -163,7 +150,6 @@ export class LeadsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly kurukinBlacklistService: KurukinBlacklistService,
     @Optional()
     @Inject(LEAD_REPOSITORY)
     private readonly repository?: LeadRepository,
@@ -598,72 +584,6 @@ export class LeadsService {
     };
   }
 
-  async suppressForMember(
-    scope: {
-      workspaceId: string;
-      teamId: string;
-      sponsorId: string;
-    },
-    leadId: string,
-    dto?: SuppressMemberLeadDto,
-  ) {
-    const lead = await this.prisma.lead.findFirst({
-      where: this.buildLeadWhere(scope, leadId),
-      include: {
-        currentAssignment: true,
-      },
-    });
-
-    if (!lead) {
-      throw new NotFoundException({
-        code: 'LEAD_NOT_FOUND',
-        message: 'The requested lead was not found for this member.',
-      });
-    }
-
-    return this.applyLeadSuppression(
-      {
-        workspaceId: scope.workspaceId,
-        teamId: scope.teamId,
-        sponsorId: scope.sponsorId,
-      },
-      {
-        leadId: lead.id,
-        blockedPhone: lead.phone,
-        reason: dto?.reason?.trim() || 'manual_member_opt_out',
-        source: dto?.source?.trim() || 'manual_member_button',
-      },
-    );
-  }
-
-  async suppressFromIncomingWebhook(input: {
-    workspaceId: string;
-    teamId: string;
-    sponsorId: string;
-    leadId: string;
-    blockedPhone?: string | null;
-    reason: string;
-    source: string;
-    occurredAt?: Date;
-    keyword?: string | null;
-  }) {
-    return this.applyLeadSuppression(
-      {
-        workspaceId: input.workspaceId,
-        teamId: input.teamId,
-        sponsorId: input.sponsorId,
-      },
-      {
-        leadId: input.leadId,
-        blockedPhone: input.blockedPhone,
-        reason: input.reason,
-        source: input.source,
-        occurredAt: input.occurredAt,
-        keyword: input.keyword,
-      },
-    );
-  }
-
   async getTimelineDetail(
     scope: LeadTimelineScope,
     leadId: string,
@@ -1044,143 +964,6 @@ export class LeadsService {
       playbookTitle: workflow.playbook.title,
       playbookDescription: workflow.playbook.description,
       needsAttention: workflow.reminder.needsAttention,
-    };
-  }
-
-  private async applyLeadSuppression(
-    scope: {
-      workspaceId: string;
-      teamId: string;
-      sponsorId: string;
-    },
-    input: {
-      leadId: string;
-      blockedPhone?: string | null;
-      reason: string;
-      source: string;
-      occurredAt?: Date;
-      keyword?: string | null;
-    },
-  ) {
-    const lead = await this.prisma.lead.findFirst({
-      where: this.buildLeadWhere(scope, input.leadId),
-      include: {
-        currentAssignment: true,
-      },
-    });
-
-    if (!lead) {
-      throw new NotFoundException({
-        code: 'LEAD_NOT_FOUND',
-        message: 'The requested lead was not found for suppression.',
-      });
-    }
-
-    const occurredAt = input.occurredAt ?? new Date();
-    const nextLeadStatus = lead.status === 'won' ? 'won' : 'lost';
-    const hubSync = await (async () => {
-      try {
-        const owner = await this.kurukinBlacklistService.resolveOwnerContext(scope);
-
-        if (!owner.ownerPhone) {
-          throw new Error('owner phone is not configured');
-        }
-
-        return await this.kurukinBlacklistService.safeAdd({
-          ownerPhone: owner.ownerPhone,
-          blockedPhone: input.blockedPhone ?? lead.phone ?? '',
-          reason: input.reason,
-          label: 'opt-out',
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : 'owner context resolution failed';
-
-        this.logger.warn(
-          `Lead ${lead.id} suppression could not resolve Kurukin owner context: ${message}`,
-        );
-
-        return {
-          synced: false,
-          errorMessage: message,
-        };
-      }
-    })();
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const record = await tx.lead.update({
-        where: {
-          id: lead.id,
-        },
-        data: {
-          status: nextLeadStatus,
-        },
-      });
-
-      if (lead.currentAssignmentId && lead.currentAssignment?.status !== 'closed') {
-        await tx.assignment.updateMany({
-          where: {
-            id: lead.currentAssignmentId,
-            sponsorId: scope.sponsorId,
-            status: {
-              not: 'closed',
-            },
-          },
-          data: {
-            status: 'closed',
-            resolvedAt: occurredAt,
-          },
-        });
-      }
-
-      if (lead.status !== nextLeadStatus) {
-        await this.recordLeadDomainEvent(tx, {
-          leadId: lead.id,
-          workspaceId: lead.workspaceId,
-          assignmentId: lead.currentAssignmentId,
-          eventName: 'lead_status_updated',
-          actorType: input.source.startsWith('inbound') ? 'integration' : 'user',
-          occurredAt,
-          payload: {
-            nextStatus: nextLeadStatus,
-            previousStatus: lead.status,
-            actorSponsorId: scope.sponsorId,
-            source: input.source,
-          },
-        });
-      }
-
-      await this.recordLeadDomainEvent(tx, {
-        leadId: lead.id,
-        workspaceId: lead.workspaceId,
-        assignmentId: lead.currentAssignmentId,
-        eventName: 'lead_suppressed',
-        actorType: input.source.startsWith('inbound') ? 'integration' : 'user',
-        occurredAt,
-        payload: {
-          reason: input.reason,
-          source: input.source,
-          keyword: input.keyword ?? null,
-          blockedPhone: input.blockedPhone ?? lead.phone ?? null,
-          hubSyncStatus: hubSync.synced ? 'synced' : 'failed',
-          hubSyncError: hubSync.errorMessage,
-        },
-      });
-
-      return record;
-    });
-
-    if (!hubSync.synced) {
-      this.logger.warn(
-        `Lead ${lead.id} was suppressed locally but Kurukin Hub sync failed: ${hubSync.errorMessage}`,
-      );
-    }
-
-    return {
-      lead: this.enrichLead(mapLeadRecord(updated)),
-      hubSync,
     };
   }
 

@@ -1,105 +1,125 @@
+version: "3.9"
+
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: leadflow-postgres-dev
+  web:
+    image: leadflow-web:latest
+    # ELIMINADO: env_file para evitar el error de Portainer
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-leadflow}
-      POSTGRES_USER: ${POSTGRES_USER:-leadflow}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-leadflow}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-leadflow} -d ${POSTGRES_DB:-leadflow}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - leadflow_postgres_data:/var/lib/postgresql/data
+      NEXT_PUBLIC_APP_NAME: "Leadflow"
+      NEXT_PUBLIC_APP_ENV: "${APP_ENV:-staging}"
+      NEXT_PUBLIC_APP_BASE_DOMAIN: "${APP_BASE_DOMAIN:-leadflow.kuruk.in}"
+      NEXT_PUBLIC_SITE_URL: "${SITE_URL:-https://leadflow.kuruk.in}"
+      NEXT_PUBLIC_MEMBERS_URL: "${MEMBERS_URL:-https://leadflow.kuruk.in}"
+      NEXT_PUBLIC_ADMIN_URL: "${ADMIN_URL:-https://leadflow.kuruk.in}"
+      NEXT_PUBLIC_API_URL: "${API_URL:-https://api.leadflow.kuruk.in}"
+      API_INTERNAL_BASE_URL: "${API_INTERNAL_BASE_URL:-http://api:3001}"
+      NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET: "${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.leadflow.kuruk.in}"
+      NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN: "${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kuruk.in}"
+      DATABASE_URL: "${DATABASE_URL}"
+      PORT: "3000"
     networks:
-      - leadflow_core
+      - traefik_public
+      - general_network
+    deploy:
+      replicas: ${LEADFLOW_WEB_REPLICAS:-1}
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik_public"
+        - "traefik.http.services.leadflow-web.loadbalancer.server.port=3000"
+        - "traefik.http.routers.leadflow-site.rule=Host(`${LEADFLOW_SITE_HOST:-leadflow.kuruk.in}`)"
+        - "traefik.http.routers.leadflow-site.priority=200"
+        - "traefik.http.routers.leadflow-site.entrypoints=websecure"
+        - "traefik.http.routers.leadflow-site.tls=true"
+        - "traefik.http.routers.leadflow-site.tls.certresolver=le"
+        - "traefik.http.routers.leadflow-site.service=leadflow-web"
+        - "traefik.http.routers.leadflow-public.rule=HostRegexp(`{host:.+}`) && !HostRegexp(`{sub:.+}.kuruk.in`) && !Host(`kuruk.in`)"
+        - "traefik.http.routers.leadflow-public.priority=1"
+        - "traefik.http.routers.leadflow-public.entrypoints=websecure"
+        - "traefik.http.routers.leadflow-public.tls=true"
+        - "traefik.http.routers.leadflow-public.tls.certresolver=le"
+        - "traefik.http.routers.leadflow-public.tls.domains[0].main=${LEADFLOW_SAAS_CUSTOMERS_HOST:-customers.leadflow.kuruk.in}"
+        - "traefik.http.routers.leadflow-public.tls.domains[0].sans=${LEADFLOW_SAAS_FALLBACK_HOST:-proxy-fallback.leadflow.kuruk.in}"
+        - "traefik.http.routers.leadflow-public.service=leadflow-web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const net=require('net');const s=net.connect(3000,'127.0.0.1');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),2000)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   api:
-    build:
-      context: ../..
-      dockerfile: apps/api/Dockerfile
-      target: dev
-    container_name: leadflow-api-dev
-    command: >
-      sh -c "pnpm install --no-frozen-lockfile && pnpm --filter @leadflow/api dev"
-    env_file:
-      - ../../apps/api/.env.example
+    image: leadflow-api:latest
     environment:
-      NODE_ENV: development
-      API_NAME: leadflow-api
-      API_VERSION: 0.2.0
-      API_HOST: 0.0.0.0
-      API_PORT: 3001
-      API_GLOBAL_PREFIX: v1
-      API_BASE_URL: http://localhost:3001
-      AWS_REGION: ${AWS_REGION}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-leadflow}:${POSTGRES_PASSWORD:-leadflow}@postgres:5432/${POSTGRES_DB:-leadflow}?schema=public
-      SITE_URL: http://localhost:3000
-      MEMBERS_URL: http://localhost:3000/members
-      ADMIN_URL: http://localhost:3000/admin
-      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
-      INCOMING_MESSAGING_WEBHOOK_SECRET: ${INCOMING_MESSAGING_WEBHOOK_SECRET:-}
-      KURUKIN_BLACKLIST_BASE_URL: ${KURUKIN_BLACKLIST_BASE_URL:-https://blacklist.kuruk.in}
-      KURUKIN_BLACKLIST_API_TOKEN: ${KURUKIN_BLACKLIST_API_TOKEN:-}
-      BLACKLIST_SUPABASE_URL: ${BLACKLIST_SUPABASE_URL:-}
-      BLACKLIST_SUPABASE_KEY: ${BLACKLIST_SUPABASE_KEY:-}
-      KURUKIN_BLACKLIST_ADD_PATH: ${KURUKIN_BLACKLIST_ADD_PATH:-/api/v1/add}
-      KURUKIN_BLACKLIST_REMOVE_PATHS: ${KURUKIN_BLACKLIST_REMOVE_PATHS:-/api/v1/remove,/api/v1/delete,/api/v1/entries}
-      KURUKIN_BLACKLIST_SOURCE_APP: ${KURUKIN_BLACKLIST_SOURCE_APP:-leadflow}
-      KURUKIN_BLACKLIST_SCOPE: ${KURUKIN_BLACKLIST_SCOPE:-personal}
-      KURUKIN_BLACKLIST_LABEL: ${KURUKIN_BLACKLIST_LABEL:-opt-out}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "${API_PORT:-3001}:3001"
-    volumes:
-      - ../../:/workspace
-      - leadflow_node_modules:/workspace/node_modules
-      - leadflow_pnpm_store:/pnpm/store
+      NODE_ENV: "production"
+      APP_ENV: "${APP_ENV:-staging}"
+      APP_BASE_DOMAIN: "${APP_BASE_DOMAIN:-leadflow.kuruk.in}"
+      API_NAME: "leadflow-api"
+      API_VERSION: "0.2.0"
+      API_HOST: "0.0.0.0"
+      API_PORT: "3001"
+      API_GLOBAL_PREFIX: "v1"
+      API_BASE_URL: "${API_URL:-https://api.leadflow.kuruk.in}"
+      AUTH_COOKIE_NAME: "${AUTH_COOKIE_NAME:-leadflow_session}"
+      DATABASE_URL: "${DATABASE_URL}"
+      SSO_BLACKLIST_SECRET: "${SSO_BLACKLIST_SECRET:-sso_live_8x7y6z5w4v3u2t1s0r9q}"
+      KURUKIN_BLACKLIST_API_TOKEN: "${KURUKIN_BLACKLIST_API_TOKEN}"
+      EVOLUTION_API_INTERNAL_BASE_URL: "${EVOLUTION_API_INTERNAL_BASE_URL:-http://evolution_api_v2:8080}"
+      N8N_DISPATCHER_WEBHOOK_URL: "${N8N_DISPATCHER_WEBHOOK_URL}"
+      N8N_WEBHOOK_SECRET: "${N8N_WEBHOOK_SECRET}"
+      RUNTIME_CONTEXT_CENTRAL_BASE_URL: "${RUNTIME_CONTEXT_CENTRAL_BASE_URL:-http://runtime_context_service:8080}"
+      RUNTIME_CONTEXT_CENTRAL_API_KEY: "${RUNTIME_CONTEXT_CENTRAL_API_KEY}"
+      MINIO_ENDPOINT: "${MINIO_ENDPOINT:-https://myminioback.kuruk.in}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY}"
+      MINIO_PUBLIC_URL: "${MINIO_PUBLIC_URL:-https://cdn.kuruk.in}"
+      SITE_URL: "${SITE_URL:-https://leadflow.kuruk.in}"
+      MEMBERS_URL: "${MEMBERS_URL:-https://leadflow.kuruk.in}"
+      ADMIN_URL: "${ADMIN_URL:-https://leadflow.kuruk.in}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-https://leadflow.kuruk.in}"
+      AWS_REGION: "${AWS_REGION:-us-east-1}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
     networks:
-      - leadflow_core
-
-  web:
-    build:
-      context: ../..
-      dockerfile: apps/web/Dockerfile
-      target: dev
-    container_name: leadflow-web-dev
-    command: >
-      sh -c "pnpm install --no-frozen-lockfile && pnpm --filter @leadflow/web dev"
-    env_file:
-      - ../../apps/web/.env.example
-    environment:
-      NEXT_PUBLIC_APP_NAME: Leadflow
-      NEXT_PUBLIC_SITE_URL: http://localhost:3000
-      NEXT_PUBLIC_MEMBERS_URL: http://localhost:3000/members
-      NEXT_PUBLIC_ADMIN_URL: http://localhost:3000/admin
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      API_INTERNAL_BASE_URL: http://api:3001
-    depends_on:
-      - api
-    ports:
-      - "${WEB_PORT:-3000}:3000"
-    volumes:
-      - ../../:/workspace
-      - leadflow_node_modules:/workspace/node_modules
-      - leadflow_pnpm_store:/pnpm/store
-    networks:
-      - leadflow_core
+      - traefik_public
+      - general_network
+    deploy:
+      replicas: ${LEADFLOW_API_REPLICAS:-1}
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik_public"
+        - "traefik.http.services.leadflow-api.loadbalancer.server.port=3001"
+        - "traefik.http.routers.leadflow-api.rule=Host(`${LEADFLOW_API_HOST:-api.leadflow.kuruk.in}`)"
+        - "traefik.http.routers.leadflow-api.priority=200"
+        - "traefik.http.routers.leadflow-api.entrypoints=websecure"
+        - "traefik.http.routers.leadflow-api.tls=true"
+        - "traefik.http.routers.leadflow-api.tls.certresolver=le"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 networks:
-  leadflow_core:
-    name: leadflow_core
-
-volumes:
-  leadflow_node_modules:
-  leadflow_pnpm_store:
-  leadflow_postgres_data:
+  traefik_public:
+    external: true
+  general_network:
+    external: true

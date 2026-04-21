@@ -13,6 +13,9 @@ import {
   resolveMessagingConnectionStatus,
 } from '../messaging-integrations/messaging-integrations.utils';
 import {
+  detectOptOutKeyword,
+  extractInboundMessagePhone,
+  extractInboundMessageText,
   matchesIncomingWebhookSecret,
   readIncomingWebhookSecret,
 } from './incoming-webhooks.utils';
@@ -305,6 +308,92 @@ export class IncomingWebhooksService {
     };
   }
 
+  async ingestMessagingSignal(
+    headers: Record<string, string | string[] | undefined>,
+    query: {
+      instanceId?: string;
+      secret?: string;
+    },
+    payload?: unknown,
+  ) {
+    this.assertWebhookSecret(headers, query.secret ?? null);
+
+    const root = asRecord(payload);
+    const data = asRecord(root?.data);
+    const leadId =
+      readString(root?.leadId) ??
+      readString(data?.leadId) ??
+      readString(root?.lead_id) ??
+      null;
+    const assignmentId =
+      readString(root?.assignmentId) ??
+      readString(data?.assignmentId) ??
+      readString(root?.assignment_id) ??
+      null;
+    const sponsorId =
+      readString(root?.sponsorId) ??
+      readString(data?.sponsorId) ??
+      readString(root?.sponsor_id) ??
+      null;
+    const instanceId =
+      readString(query.instanceId) ??
+      readString(root?.messagingInstanceId) ??
+      readString(data?.messagingInstanceId) ??
+      readString(root?.instanceId) ??
+      null;
+    const externalEventId =
+      readString(root?.externalEventId) ??
+      readString(data?.externalEventId) ??
+      readString(root?.eventId) ??
+      readString(data?.eventId) ??
+      null;
+    const messageText = extractInboundMessageText(payload);
+    const keyword = detectOptOutKeyword(messageText);
+    const senderPhone = normalizeMessagingPhone(extractInboundMessagePhone(payload));
+
+    const leadContext = await this.resolveLeadContext({
+      leadId,
+      assignmentId,
+      sponsorId,
+      instanceId,
+      senderPhone,
+    });
+
+    if (!leadContext) {
+      this.logger.warn(
+        `Inbound messaging signal could not be scoped to a lead. externalEventId=${externalEventId ?? 'n/a'} leadId=${leadId ?? 'n/a'} assignmentId=${assignmentId ?? 'n/a'} sponsorId=${sponsorId ?? 'n/a'} instanceId=${instanceId ?? 'n/a'}`,
+      );
+
+      return {
+        ok: true,
+        applied: false,
+        reason: 'lead_context_not_found',
+        keyword,
+      };
+    }
+
+    if (!keyword) {
+      return {
+        ok: true,
+        applied: false,
+        reason: 'no_opt_out_keyword_detected',
+        leadId: leadContext.leadId,
+      };
+    }
+
+    this.logger.log(
+      `Inbound opt-out detected for lead=${leadContext.leadId} keyword=${keyword}. Leadflow no longer applies blacklist writes and delegates protection management to Kurukin Hub via SSO.`,
+    );
+
+    return {
+      ok: true,
+      applied: false,
+      leadId: leadContext.leadId,
+      keyword,
+      reason: 'external_blacklist_managed_in_kurukin',
+    };
+  }
+
   private assertWebhookSecret(
     headers: Record<string, string | string[] | undefined>,
     querySecret?: string | null,
@@ -353,5 +442,121 @@ export class IncomingWebhooksService {
       ...patch,
       updatedBy: 'leadflow-api',
     } as Prisma.InputJsonValue;
+  }
+
+  private async resolveLeadContext(input: {
+    leadId: string | null;
+    assignmentId: string | null;
+    sponsorId: string | null;
+    instanceId: string | null;
+    senderPhone: string | null;
+  }) {
+    if (input.leadId) {
+      const lead = await this.prisma.lead.findUnique({
+        where: {
+          id: input.leadId,
+        },
+        include: {
+          currentAssignment: true,
+        },
+      });
+
+      if (lead?.currentAssignment) {
+        return {
+          workspaceId: lead.workspaceId,
+          teamId: lead.currentAssignment.teamId,
+          sponsorId: lead.currentAssignment.sponsorId,
+          leadId: lead.id,
+          leadPhone: lead.phone,
+        };
+      }
+    }
+
+    if (input.assignmentId) {
+      const assignment = await this.prisma.assignment.findUnique({
+        where: {
+          id: input.assignmentId,
+        },
+        include: {
+          lead: true,
+        },
+      });
+
+      if (assignment) {
+        return {
+          workspaceId: assignment.workspaceId,
+          teamId: assignment.teamId,
+          sponsorId: assignment.sponsorId,
+          leadId: assignment.leadId,
+          leadPhone: assignment.lead.phone,
+        };
+      }
+    }
+
+    const resolvedSponsorId =
+      input.sponsorId ??
+      (input.instanceId
+        ? (
+            await this.prisma.messagingConnection.findUnique({
+              where: {
+                externalInstanceId: input.instanceId,
+              },
+              select: {
+                sponsorId: true,
+              },
+            })
+          )?.sponsorId ??
+          null
+        : null);
+
+    if (!resolvedSponsorId) {
+      return null;
+    }
+
+    if (!input.senderPhone) {
+      return null;
+    }
+
+    const lead = await this.prisma.lead.findFirst({
+      where: {
+        assignments: {
+          some: {
+            sponsorId: resolvedSponsorId,
+          },
+        },
+        ...(input.senderPhone
+          ? {
+              OR: [
+                {
+                  phone: input.senderPhone,
+                },
+                {
+                  phone: {
+                    contains: input.senderPhone.slice(-8),
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        currentAssignment: true,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+
+    if (!lead?.currentAssignment) {
+      return null;
+    }
+
+    return {
+      workspaceId: lead.workspaceId,
+      teamId: lead.currentAssignment.teamId,
+      sponsorId: lead.currentAssignment.sponsorId,
+      leadId: lead.id,
+      leadPhone: lead.phone,
+    };
   }
 }

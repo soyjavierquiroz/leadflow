@@ -44,6 +44,33 @@ export class IncomingWebhooksController {
     );
   }
 
+  @Post('messaging')
+  @HttpCode(202)
+  receiveMessagingSignal(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('instanceId') instanceId?: string,
+    @Query('secret') secret?: string,
+    @Body() payload?: unknown,
+  ) {
+    this.logger.log(
+      `Inbound messaging signal attempt: headers=${this.stringifyForLogs(
+        headers,
+      )} query=${this.stringifyForLogs({
+        instanceId: instanceId ?? null,
+        secret: secret ?? null,
+      })} body=${this.stringifyForLogs(payload)}`,
+    );
+
+    return this.incomingWebhooksService.ingestMessagingSignal(
+      headers,
+      {
+        instanceId,
+        secret,
+      },
+      payload,
+    );
+  }
+
   private stringifyForLogs(value: unknown) {
     try {
       return JSON.stringify(value);

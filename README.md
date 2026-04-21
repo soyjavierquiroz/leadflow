@@ -132,6 +132,8 @@ Variables críticas del onboarding central y del dispatcher:
 - `RUNTIME_CONTEXT_REQUEST_TIMEOUT_MS`
 - `RUNTIME_CONTEXT_RESOLVE_RETRIES`
 - `RUNTIME_CONTEXT_RESOLVE_DELAY_MS`
+- `SSO_BLACKLIST_SECRET`
+- `KURUKIN_BLACKLIST_API_TOKEN`
 
 ### Web
 
@@ -144,6 +146,24 @@ La web publica y consume:
 - `NEXT_PUBLIC_API_URL`
 - `NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET`
 - `NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN`
+
+## Integración con Kurukin Blacklist
+
+Leadflow expone un puente controlado hacia Kurukin Blacklist para dos perfiles operativos distintos. Esta integración requiere configurar siempre estas variables de entorno en la API:
+
+- `SSO_BLACKLIST_SECRET`: secreto compartido para firmar y validar JWT `HS256` del flujo SSO de asesores.
+- `KURUKIN_BLACKLIST_API_TOKEN`: admin key usada para habilitar el acceso maestro de Super Admin.
+
+Flujos soportados:
+
+- Asesores: ingresan a `/dashboard/importaciones` usando el parámetro `token`. Leadflow valida un JWT `HS256` firmado con `SSO_BLACKLIST_SECRET` y habilita el acceso SSO al módulo de importaciones.
+- Super Admin: ingresa a `/dashboard/reportes` usando el parámetro `admin_key`. Leadflow compara ese valor contra `KURUKIN_BLACKLIST_API_TOKEN` y, si coincide, habilita el acceso maestro al módulo de reportes.
+
+Notas operativas:
+
+- `token` y `admin_key` deben viajar solo sobre HTTPS.
+- Los valores reales no se versionan; defínelos en Portainer, variables del host o archivos locales ignorados por Git.
+- Si falta cualquiera de estas variables en la API, el puente con Kurukin Blacklist queda incompleto.
 
 ## Desarrollo local
 

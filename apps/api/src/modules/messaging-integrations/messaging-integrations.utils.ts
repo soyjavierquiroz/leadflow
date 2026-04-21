@@ -1,4 +1,5 @@
 import type { MessagingConnectionStatus } from '@prisma/client';
+import { sanitizeToKurukinFormatOrNull } from '../shared/phone-utils';
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -33,12 +34,7 @@ const slugify = (value: string) =>
 export const normalizeMessagingPhone = (
   value: string | null | undefined,
 ): string | null => {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.replace(/[^\d]/g, '').trim();
-  return normalized ? normalized : null;
+  return sanitizeToKurukinFormatOrNull(value);
 };
 
 export const sanitizeNullableText = (
