@@ -53,6 +53,7 @@ describe('LeadDispatcherService', () => {
   afterEach(() => {
     delete process.env.N8N_DISPATCHER_WEBHOOK_URL;
     delete process.env.N8N_DISPATCHER_API_KEY;
+    delete process.env.N8N_WEBHOOK_INTERNAL_BASE;
     jest.restoreAllMocks();
   });
 
@@ -137,7 +138,7 @@ describe('LeadDispatcherService', () => {
     const [requestUrl, requestInit] = fetchSpy.mock.calls[0] ?? [];
 
     expect(requestUrl).toBe(
-      'http://n8n-v2_n8n_v2_webhook:5678/webhook/channels/dispatcher/lead-context-upsert',
+      'http://n8n_v2_webhook:5678/webhook/channels/dispatcher/lead-context-upsert',
     );
     expect(requestInit).toBeDefined();
     expect(requestInit?.method).toBe('POST');
@@ -182,5 +183,31 @@ describe('LeadDispatcherService', () => {
       data: { accepted: true },
     });
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('sanitizes dispatcher urls to avoid double slashes in the webhook path', async () => {
+    process.env.N8N_DISPATCHER_WEBHOOK_URL =
+      'https://n8n.example.com/webhook/channels/dispatcher/lead-context-upsert/';
+    process.env.N8N_WEBHOOK_INTERNAL_BASE =
+      'http://n8n_v2_webhook:5678/webhook//';
+
+    const service = new LeadDispatcherService({} as never, {} as never);
+    const payload = buildPayload(service, 'evt_test_sanitized_dispatcher_url');
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(buildResponse(202, { accepted: true }));
+
+    await (
+      service as unknown as {
+        postWithRetry: (
+          input: unknown,
+        ) => Promise<{ status: number; data: unknown }>;
+      }
+    ).postWithRetry(payload);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://n8n_v2_webhook:5678/webhook/channels/dispatcher/lead-context-upsert',
+      expect.any(Object),
+    );
   });
 });

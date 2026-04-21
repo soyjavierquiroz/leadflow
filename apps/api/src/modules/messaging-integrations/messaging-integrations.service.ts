@@ -162,17 +162,48 @@ export class MessagingIntegrationsService {
       return this.buildDashboardDto(sponsor, null);
     }
 
-    if (
-      !this.evolutionClient.isConfigured() ||
-      !existingConnection.externalInstanceId
-    ) {
+    if (!this.evolutionClient.isConfigured()) {
       return this.buildDashboardDto(sponsor, existingConnection);
     }
 
     try {
+      if (!existingConnection.externalInstanceId) {
+        const healedConnection = await this.runProvisionFlow(
+          scope,
+          sponsor,
+          existingConnection,
+          undefined,
+          {
+            fetchQr: true,
+          },
+        );
+
+        return this.buildDashboardDto(sponsor, healedConnection);
+      }
+
       const statusPayload = await this.evolutionClient.getConnectionState(
         existingConnection.externalInstanceId,
       );
+
+      if (
+        !statusPayload.exists ||
+        this.evolutionClient.shouldRegenerateQrSession({
+          state: statusPayload.state,
+          qrExpiresAt: existingConnection.pairingExpiresAt,
+        })
+      ) {
+        const healedConnection = await this.runProvisionFlow(
+          scope,
+          sponsor,
+          existingConnection,
+          undefined,
+          {
+            fetchQr: true,
+          },
+        );
+
+        return this.buildDashboardDto(sponsor, healedConnection);
+      }
 
       const status = statusPayload.exists
         ? resolveMessagingConnectionStatus({
@@ -388,23 +419,7 @@ export class MessagingIntegrationsService {
       );
     }
 
-    await this.evolutionClient.setWebhook(
-      preparedInput.instanceId,
-      connectionWebhookUrl,
-    );
-    await this.runtimeContextCentralService.markConnectionProvisioned({
-      connectionId: baseConnection.id,
-      tenantId: scope.workspaceId,
-    });
-    await this.runtimeContextCentralService.ensureConnectionReady({
-      id: baseConnection.id,
-      workspaceId: scope.workspaceId,
-      externalInstanceId: preparedInput.instanceId,
-      runtimeContextStatus: MessagingRuntimeContextStatus.PROVISIONED,
-      runtimeContextTenantId: scope.workspaceId,
-    });
-
-    const qrPayload = options.fetchQr
+    let qrPayload = options.fetchQr
       ? await this.fetchQrWithRecovery({
           instanceId: preparedInput.instanceId,
           webhookUrl: connectionWebhookUrl,
@@ -416,10 +431,43 @@ export class MessagingIntegrationsService {
           raw: null,
         };
 
-    const statusPayload = await this.evolutionClient.getConnectionState(
+    const webhookRegistered = await this.evolutionClient.setWebhook(
+      preparedInput.instanceId,
+      connectionWebhookUrl,
+    );
+    await this.runtimeContextCentralService.markConnectionProvisioned({
+      connectionId: baseConnection.id,
+      tenantId: scope.workspaceId,
+    });
+
+    if (webhookRegistered) {
+      await this.runtimeContextCentralService.ensureConnectionReady({
+        id: baseConnection.id,
+        workspaceId: scope.workspaceId,
+        externalInstanceId: preparedInput.instanceId,
+        runtimeContextStatus: MessagingRuntimeContextStatus.PROVISIONED,
+        runtimeContextTenantId: scope.workspaceId,
+      });
+    }
+
+    let statusPayload = await this.evolutionClient.getConnectionState(
       preparedInput.instanceId,
     );
-    const status = statusPayload.exists
+
+    if (!statusPayload.exists) {
+      const healed = await this.selfHealMissingInstance({
+        instanceId: preparedInput.instanceId,
+        webhookUrl: connectionWebhookUrl,
+        fetchQr: options.fetchQr,
+      });
+
+      statusPayload = healed.state;
+      if (healed.qrPayload) {
+        qrPayload = healed.qrPayload;
+      }
+    }
+
+    const resolvedStatus = statusPayload.exists
       ? resolveMessagingConnectionStatus({
           state: statusPayload.state,
           qrCodeData: qrPayload.qrCodeData,
@@ -427,6 +475,13 @@ export class MessagingIntegrationsService {
           assumeProvisioning: true,
         })
       : MessagingConnectionStatus.disconnected;
+    const status =
+      !webhookRegistered && resolvedStatus !== MessagingConnectionStatus.connected
+        ? MessagingConnectionStatus.provisioning
+        : resolvedStatus;
+    const shouldKeepQrPayload =
+      status !== MessagingConnectionStatus.connected &&
+      status !== MessagingConnectionStatus.disconnected;
 
     return await this.prisma.messagingConnection.update({
       where: {
@@ -436,18 +491,10 @@ export class MessagingIntegrationsService {
         status,
         normalizedPhone:
           statusPayload.normalizedPhone ?? preparedInput.normalizedPhone,
-        qrCodeData:
-          status === MessagingConnectionStatus.connected ||
-          status === MessagingConnectionStatus.disconnected
-            ? null
-            : qrPayload.qrCodeData,
-        pairingCode:
-          status === MessagingConnectionStatus.connected ||
-          status === MessagingConnectionStatus.disconnected
-            ? null
-            : qrPayload.pairingCode,
+        qrCodeData: shouldKeepQrPayload ? qrPayload.qrCodeData : null,
+        pairingCode: shouldKeepQrPayload ? qrPayload.pairingCode : null,
         pairingExpiresAt:
-          status === MessagingConnectionStatus.qr_ready
+          shouldKeepQrPayload && (qrPayload.qrCodeData || qrPayload.pairingCode)
             ? (qrPayload.expiresAt ?? this.inFiveMinutes())
             : null,
         metadataJson: this.buildMetadata(baseConnection.metadataJson, {
@@ -455,6 +502,8 @@ export class MessagingIntegrationsService {
           lastConnectResponse: qrPayload.raw,
           lastQrExpiresAt: qrPayload.expiresAt?.toISOString() ?? null,
           lastStatusResponse: statusPayload.raw,
+          webhookRegistered,
+          inboundWebhookUrl: connectionWebhookUrl,
           routingMode: this.evolutionClient.getRoutingMode(),
         }),
         lastSyncedAt: new Date(),
@@ -477,14 +526,19 @@ export class MessagingIntegrationsService {
     existingConnection: MessagingConnection | null,
     dto?: ConnectMemberMessagingDto,
   ): PreparedConnectionInput {
-    const instanceId =
-      existingConnection?.externalInstanceId ??
-      buildEvolutionInstanceId({
-        prefix: this.evolutionClient.getInstancePrefix(),
-        teamCode: sponsor.team.code,
-        sponsorDisplayName: sponsor.displayName,
-        sponsorId: sponsor.id,
-      });
+    const canonicalInstanceId = buildEvolutionInstanceId({
+      prefix: this.evolutionClient.getInstancePrefix(),
+      teamCode: sponsor.team.code,
+      sponsorDisplayName: sponsor.displayName,
+      sponsorId: sponsor.id,
+    });
+    const shouldReuseExistingInstanceId = Boolean(
+      existingConnection?.externalInstanceId &&
+        existingConnection.status === MessagingConnectionStatus.connected,
+    );
+    const instanceId = shouldReuseExistingInstanceId
+      ? existingConnection!.externalInstanceId!
+      : canonicalInstanceId;
     const submittedPhone =
       dto?.phone !== undefined ? sanitizeNullableText(dto.phone) : undefined;
     const phone =
@@ -788,14 +842,45 @@ export class MessagingIntegrationsService {
     } catch (error) {
       if (
         error instanceof EvolutionApiClientError &&
-        error.status === 410
+        (error.status === 404 || error.status === 410)
       ) {
-        await this.recreateQrSession(input.instanceId, input.webhookUrl);
-        return await this.evolutionClient.fetchQr(input.instanceId);
+        const healed = await this.selfHealMissingInstance({
+          instanceId: input.instanceId,
+          webhookUrl: input.webhookUrl,
+          fetchQr: true,
+          recreate: error.status === 410,
+        });
+
+        if (healed.qrPayload) {
+          return healed.qrPayload;
+        }
       }
 
       throw error;
     }
+  }
+
+  private async selfHealMissingInstance(input: {
+    instanceId: string;
+    webhookUrl: string | null;
+    fetchQr: boolean;
+    recreate?: boolean;
+  }) {
+    if (input.recreate) {
+      await this.recreateQrSession(input.instanceId, input.webhookUrl);
+    } else {
+      await this.ensureEvolutionInstanceSession(
+        input.instanceId,
+        input.webhookUrl,
+      );
+    }
+
+    return {
+      qrPayload: input.fetchQr
+        ? await this.evolutionClient.fetchQr(input.instanceId)
+        : null,
+      state: await this.evolutionClient.getConnectionState(input.instanceId),
+    };
   }
 
   private async recreateQrSession(
@@ -803,6 +888,15 @@ export class MessagingIntegrationsService {
     webhookUrl: string | null,
   ) {
     await this.evolutionClient.recreateInstance(instanceId);
+    await this.evolutionClient.setWebhook(instanceId, webhookUrl);
+  }
+
+  private async ensureEvolutionInstanceSession(
+    instanceId: string,
+    webhookUrl: string | null,
+  ) {
+    await this.evolutionClient.createInstance(instanceId);
+    await this.evolutionClient.ensureInstanceExists(instanceId);
     await this.evolutionClient.setWebhook(instanceId, webhookUrl);
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { joinUrlPath } from '../shared/url.utils';
 import {
   isDisconnectedEvolutionState,
   normalizeMessagingPhone,
@@ -35,11 +36,6 @@ type EvolutionRequestCandidate = {
 };
 
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
-const DEFAULT_N8N_WEBHOOK_INTERNAL_BASE =
-  'http://n8n-v2_n8n_v2_webhook:5678/webhook';
-const DEFAULT_N8N_WEBHOOK_ID = '7feee028-e25e-43a3-abac-1a0bf7b0ccf4';
-const DEFAULT_N8N_WEBHOOK_SCHEME = 'https';
-const DEFAULT_N8N_WEBHOOK_BASE_PATH = '/webhook';
 const EVOLUTION_WEBHOOK_EVENTS = [
   'MESSAGES_UPSERT',
   'MESSAGES_UPDATE',
@@ -68,41 +64,6 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
 const delay = async (ms: number) =>
   await new Promise((resolve) => setTimeout(resolve, ms));
 
-const buildPublicN8nWebhookBase = (input: {
-  domain: string | null | undefined;
-  scheme: string | null | undefined;
-  basePath: string | null | undefined;
-}) => {
-  const sanitizedDomain = sanitizeNullableText(input.domain);
-
-  if (!sanitizedDomain) {
-    return null;
-  }
-
-  const normalizedBasePath = `/${
-    (sanitizeNullableText(input.basePath) ?? DEFAULT_N8N_WEBHOOK_BASE_PATH)
-      .replace(/^\/+|\/+$/g, '')
-  }`;
-
-  try {
-    const url = sanitizedDomain.includes('://')
-      ? new URL(sanitizedDomain)
-      : new URL(
-          `${
-            sanitizeNullableText(input.scheme) ?? DEFAULT_N8N_WEBHOOK_SCHEME
-          }://${sanitizedDomain}`,
-        );
-
-    url.pathname = normalizedBasePath;
-    url.search = '';
-    url.hash = '';
-
-    return url.toString().replace(/\/+$/, '');
-  } catch {
-    return null;
-  }
-};
-
 export class EvolutionApiClientError extends Error {
   constructor(
     message: string,
@@ -118,11 +79,10 @@ export class EvolutionApiClient {
   private readonly internalBaseUrl: string | null;
   private readonly publicBaseUrl: string | null;
   private readonly apiKey: string | null;
+  private readonly apiInternalBaseUrl: string;
+  private readonly incomingMessagingWebhookSecret: string | null;
   private readonly instancePrefix: string;
   private readonly automationWebhookBaseUrl: string | null;
-  private readonly n8nWebhookInternalBase: string;
-  private readonly n8nWebhookPublicBase: string | null;
-  private readonly n8nWebhookId: string;
   private readonly requestTimeoutMs: number;
   private readonly requestRetries: number;
   private readonly qrPollAttempts: number;
@@ -142,6 +102,15 @@ export class EvolutionApiClient {
     this.apiKey = sanitizeNullableText(
       this.configService.get<string>('EVOLUTION_API_KEY'),
     );
+    this.apiInternalBaseUrl =
+      sanitizeNullableText(
+        this.configService.get<string>('API_INTERNAL_BASE_URL'),
+      ) ??
+      sanitizeNullableText(process.env.API_INTERNAL_BASE_URL) ??
+      'http://leadflow_api:3001';
+    this.incomingMessagingWebhookSecret = sanitizeNullableText(
+      this.configService.get<string>('INCOMING_MESSAGING_WEBHOOK_SECRET'),
+    );
     this.instancePrefix =
       sanitizeNullableText(
         this.configService.get<string>('EVOLUTION_INSTANCE_PREFIX'),
@@ -149,18 +118,6 @@ export class EvolutionApiClient {
     this.automationWebhookBaseUrl = sanitizeNullableText(
       this.configService.get<string>('N8N_AUTOMATION_WEBHOOK_BASE_URL'),
     );
-    this.n8nWebhookInternalBase =
-      sanitizeNullableText(
-        this.configService.get<string>('N8N_WEBHOOK_INTERNAL_BASE'),
-      ) ?? DEFAULT_N8N_WEBHOOK_INTERNAL_BASE;
-    this.n8nWebhookPublicBase = buildPublicN8nWebhookBase({
-      domain: this.configService.get<string>('N8N_BASE_DOMAIN'),
-      scheme: this.configService.get<string>('N8N_WEBHOOK_SCHEME'),
-      basePath: this.configService.get<string>('N8N_WEBHOOK_BASE_PATH'),
-    });
-    this.n8nWebhookId =
-      sanitizeNullableText(this.configService.get<string>('N8N_WEBHOOK_ID')) ??
-      DEFAULT_N8N_WEBHOOK_ID;
     this.requestTimeoutMs = parsePositiveInt(
       this.configService.get<string>('EVOLUTION_REQUEST_TIMEOUT_MS'),
       15_000,
@@ -225,13 +182,26 @@ export class EvolutionApiClient {
     return [...EVOLUTION_WEBHOOK_EVENTS];
   }
 
-  buildInboundWebhookUrl(instanceId: string) {
-    const normalizedBaseUrl = (
-      this.n8nWebhookPublicBase ?? this.n8nWebhookInternalBase
-    ).replace(/\/+$/, '');
-    const normalizedWebhookId = this.n8nWebhookId.replace(/^\/+|\/+$/g, '');
+  buildInboundWebhookUrl(_instanceId: string) {
+    const finalWebhookUrl = new URL(
+      joinUrlPath(
+        this.apiInternalBaseUrl,
+        '/v1/incoming-webhooks/messaging',
+      ),
+    );
 
-    return `${normalizedBaseUrl}/${normalizedWebhookId}/channels/evolution/${instanceId}/inbound`;
+    if (this.incomingMessagingWebhookSecret) {
+      finalWebhookUrl.searchParams.set(
+        'secret',
+        this.incomingMessagingWebhookSecret,
+      );
+    }
+
+    console.log('EVOLUTION_WEBHOOK_REGISTRATION:', {
+      targetUrl: finalWebhookUrl.toString(),
+    });
+
+    return finalWebhookUrl.toString();
   }
 
   async ensureInstanceExists(instanceId: string) {
@@ -277,12 +247,16 @@ export class EvolutionApiClient {
   }
 
   async setWebhook(instanceId: string, webhookUrl: string | null) {
-    if (!webhookUrl) {
-      return null;
-    }
+    try {
+      if (!webhookUrl) {
+        console.warn('EVOLUTION_WEBHOOK_SET_SKIPPED:', {
+          instanceId,
+          reason: 'Inbound webhook URL is not configured.',
+        });
+        return false;
+      }
 
-    for (let attempt = 1; attempt <= this.qrPollAttempts; attempt += 1) {
-      const response = await this.request(`webhook/set/${instanceId}`, {
+      let response = await this.request(`webhook/set/${instanceId}`, {
         method: 'POST',
         body: JSON.stringify({
           webhook: {
@@ -296,20 +270,62 @@ export class EvolutionApiClient {
       });
 
       if (response.status >= 200 && response.status < 300) {
-        return response;
+        return true;
       }
 
-      if (response.status === 404 && attempt < this.qrPollAttempts) {
-        await delay(this.qrPollDelayMs);
-        continue;
+      if (response.status === 404) {
+        await this.createInstance(instanceId);
+        await delay(2_000);
+
+        response = await this.request(`webhook/set/${instanceId}`, {
+          method: 'POST',
+          body: JSON.stringify({
+            webhook: {
+              enabled: true,
+              url: webhookUrl,
+              webhookByEvents: true,
+              events: this.getWebhookEvents(),
+              webhookBase64: true,
+            },
+          }),
+        });
+
+        if (response.status >= 200 && response.status < 300) {
+          return true;
+        }
       }
 
-      throw this.toError(
-        'EVOLUTION_WEBHOOK_SET_FAILED',
-        response,
-        'No pudimos registrar el webhook operativo de la conexión.',
-      );
+      console.warn('EVOLUTION_WEBHOOK_SET_FAILED:', {
+        instanceId,
+        webhookUrl,
+        error: {
+          message: 'Webhook registration returned a non-success response.',
+          status: response.status,
+          details: response.data ?? null,
+        },
+      });
+    } catch (error) {
+      console.warn('EVOLUTION_WEBHOOK_SET_FAILED:', {
+        instanceId,
+        webhookUrl,
+        error:
+          error instanceof EvolutionApiClientError
+            ? {
+                message: error.message,
+                status: error.status,
+                details: error.details ?? null,
+              }
+            : error instanceof Error
+              ? {
+                  message: error.message,
+                }
+              : {
+                  message: 'Unknown Evolution webhook registration error.',
+                },
+      });
     }
+
+    return false;
   }
 
   async fetchQr(instanceId: string): Promise<EvolutionQrPayload> {
@@ -319,6 +335,17 @@ export class EvolutionApiClient {
       });
 
       if (response.status === 404) {
+        if (attempt === 1) {
+          await this.createInstance(instanceId);
+          await delay(2_000);
+          continue;
+        }
+
+        if (attempt < this.qrPollAttempts) {
+          await delay(this.qrPollDelayMs);
+          continue;
+        }
+
         throw this.toError(
           'EVOLUTION_INSTANCE_NOT_FOUND',
           response,
@@ -572,21 +599,19 @@ export class EvolutionApiClient {
     );
 
     try {
-      const response = await fetch(
-        `${candidate.baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`,
-        {
-          ...init,
-          signal: controller.signal,
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            apikey: this.apiKey!,
-            'x-api-key': this.apiKey!,
-            Authorization: `Bearer ${this.apiKey!}`,
-            ...(init.headers ?? {}),
-          },
+      const requestUrl = joinUrlPath(candidate.baseUrl, path);
+      const response = await fetch(requestUrl, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          apikey: this.apiKey!,
+          'x-api-key': this.apiKey!,
+          Authorization: `Bearer ${this.apiKey!}`,
+          ...(init.headers ?? {}),
         },
-      );
+      });
 
       const raw = await response.text();
       let data: unknown = null;

@@ -5,13 +5,20 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeMessagingPhone } from '../messaging-integrations/messaging-integrations.utils';
 import type { LeadContextUpsertPayload } from './lead-dispatcher.types';
 import { RuntimeContextCentralService } from '../runtime-context/runtime-context-central.service';
+import {
+  joinUrlPath,
+  normalizeBaseUrl,
+  normalizeUrl,
+  normalizeUrlPath,
+  sanitizeNullableText,
+} from '../shared/url.utils';
 
 const DISPATCH_RETRY_DELAYS_MS = [0, 2_000, 5_000] as const;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const DISPATCH_TIMEOUT_MS = 2_500;
 const LEAD_DISPATCHER_SOURCE_VERSION = '1.0.0' as const;
 const DEFAULT_N8N_DISPATCHER_INTERNAL_BASE =
-  'http://n8n-v2_n8n_v2_webhook:5678/webhook';
+  'http://n8n_v2_webhook:5678/webhook';
 
 const assignmentLeadContextInclude = {
   lead: true,
@@ -31,42 +38,6 @@ type AssignmentLeadContextRecord = Prisma.AssignmentGetPayload<{
 const delay = async (ms: number) =>
   await new Promise((resolve) => setTimeout(resolve, ms));
 
-const sanitizeNullableText = (value: string | null | undefined) => {
-  if (value === undefined || value === null) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
-
-const normalizeUrl = (value: string | null | undefined) => {
-  const sanitized = sanitizeNullableText(value);
-
-  if (!sanitized) {
-    return null;
-  }
-
-  try {
-    return new URL(sanitized).toString();
-  } catch {
-    return null;
-  }
-};
-
-const joinUrl = (baseUrl: string, pathname: string) => {
-  const base = new URL(baseUrl);
-  const normalizedBasePath = base.pathname.replace(/\/+$/, '');
-  const normalizedPath = pathname.replace(/^\/+/, '');
-  base.pathname = `${normalizedBasePath}/${normalizedPath}`.replace(
-    /\/{2,}/g,
-    '/',
-  );
-  base.search = '';
-  base.hash = '';
-  return base.toString();
-};
-
 const resolveDispatcherWebhookUrl = (input: {
   explicitUrl: string | null | undefined;
   internalBaseUrl: string | null | undefined;
@@ -78,21 +49,20 @@ const resolveDispatcherWebhookUrl = (input: {
   }
 
   const internalBaseUrl =
-    normalizeUrl(input.internalBaseUrl) ?? DEFAULT_N8N_DISPATCHER_INTERNAL_BASE;
+    normalizeBaseUrl(input.internalBaseUrl) ??
+    DEFAULT_N8N_DISPATCHER_INTERNAL_BASE;
 
   try {
     const explicit = new URL(explicitUrl);
     const internalBase = new URL(internalBaseUrl);
-    const normalizedInternalBasePath = internalBase.pathname.replace(
-      /\/+$/,
-      '',
-    );
-    const explicitPath = explicit.pathname.replace(/\/+$/, '');
+    const normalizedInternalBasePath =
+      normalizeUrlPath(internalBase.pathname) ?? '';
+    const explicitPath = normalizeUrlPath(explicit.pathname) ?? '';
     const relativePath = explicitPath.startsWith(normalizedInternalBasePath)
       ? explicitPath.slice(normalizedInternalBasePath.length)
       : explicitPath;
 
-    return joinUrl(internalBase.toString(), relativePath);
+    return joinUrlPath(internalBase.toString(), relativePath);
   } catch {
     return explicitUrl;
   }

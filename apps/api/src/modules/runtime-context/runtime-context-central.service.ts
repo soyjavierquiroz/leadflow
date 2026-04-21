@@ -4,6 +4,12 @@ import {
   type MessagingConnection,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  joinUrlPath,
+  normalizeBaseUrl,
+  normalizeUrlPath,
+  sanitizeNullableText,
+} from '../shared/url.utils';
 
 type RuntimeContextRegistrationInput = {
   instanceName: string;
@@ -35,35 +41,8 @@ const DEFAULT_RESOLVE_RETRIES = 5;
 const DEFAULT_RESOLVE_DELAY_MS = 1_000;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-const sanitizeNullableText = (value: string | null | undefined) => {
-  if (value === undefined || value === null) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
-
-const normalizeBaseUrl = (value: string | null | undefined) => {
-  const sanitized = sanitizeNullableText(value);
-
-  if (!sanitized) {
-    return null;
-  }
-
-  try {
-    const url = new URL(sanitized);
-    const normalizedPath = url.pathname.replace(/\/+$/, '');
-    url.pathname = normalizedPath.length > 0 ? normalizedPath : '/';
-    return url.toString();
-  } catch {
-    return null;
-  }
-};
-
 const normalizePath = (value: string | null | undefined, fallback: string) => {
-  const sanitized = sanitizeNullableText(value) ?? fallback;
-  return sanitized.replace(/^\/+/, '').replace(/\/+$/, '');
+  return normalizeUrlPath(value) ?? normalizeUrlPath(fallback) ?? '';
 };
 
 const normalizePathCandidates = (
@@ -454,7 +433,7 @@ export class RuntimeContextCentralService {
   ): Promise<RuntimeContextResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
-    const requestUrl = new URL(path, `${this.baseUrl}/`).toString();
+    const requestUrl = joinUrlPath(this.baseUrl!, path);
 
     try {
       const response = await fetch(requestUrl, {

@@ -46,6 +46,61 @@ describe('RuntimeContextCentralService', () => {
     );
   });
 
+  it('sanitizes trailing slashes before calling the register endpoint', async () => {
+    process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL =
+      'http://runtime-context.example/';
+    process.env.RUNTIME_CONTEXT_REGISTER_PATH = '//register//';
+    delete process.env.RUNTIME_CONTEXT_MODE;
+
+    const prisma = {
+      messagingConnection: {
+        update: jest.fn().mockResolvedValue(null),
+      },
+    } as never;
+    const service = new RuntimeContextCentralService(prisma);
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(buildResponse(201, { ok: true }));
+
+    const result = await service.registerInstanceInRuntimeContext({
+      instanceName: 'instance-2',
+      tenantId: 'tenant-2',
+    });
+
+    expect(result.status).toBe(201);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://runtime-context.example/register',
+      expect.any(Object),
+    );
+  });
+
+  it('avoids double slashes when the base url already contains a path prefix', async () => {
+    process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL =
+      'http://runtime-context.example/api/';
+    process.env.RUNTIME_CONTEXT_REGISTER_PATH = '//v1//context//register//';
+    delete process.env.RUNTIME_CONTEXT_MODE;
+
+    const prisma = {
+      messagingConnection: {
+        update: jest.fn().mockResolvedValue(null),
+      },
+    } as never;
+    const service = new RuntimeContextCentralService(prisma);
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(buildResponse(201, { ok: true }));
+
+    await service.registerInstanceInRuntimeContext({
+      instanceName: 'instance-3',
+      tenantId: 'tenant-3',
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://runtime-context.example/api/v1/context/register',
+      expect.any(Object),
+    );
+  });
+
   it('uses local persistence fallback in optional mode when remote register paths return 404', async () => {
     process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL =
       'http://runtime-context.example';
