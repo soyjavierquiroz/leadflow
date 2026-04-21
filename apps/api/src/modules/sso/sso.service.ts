@@ -13,7 +13,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 const BLACKLIST_DASHBOARD_URL =
   'https://blacklist.kuruk.in/dashboard/importaciones';
 const BLACKLIST_ADMIN_DASHBOARD_URL =
-  'https://blacklist.kuruk.in/admin/dashboard';
+  'https://blacklist.kuruk.in/dashboard/reportes';
 const BLACKLIST_JWT_ALGORITHM = 'HS256';
 const BLACKLIST_JWT_TTL_SECONDS = 15 * 60;
 
@@ -26,13 +26,7 @@ type MemberBlacklistJwtPayload = BaseBlacklistJwtPayload & {
   phone: string;
 };
 
-type AdminBlacklistJwtPayload = BaseBlacklistJwtPayload & {
-  adminMode: true;
-  phone: 'ADMIN';
-  role: 'SUPER_ADMIN';
-};
-
-type BlacklistJwtPayload = MemberBlacklistJwtPayload | AdminBlacklistJwtPayload;
+type BlacklistJwtPayload = MemberBlacklistJwtPayload;
 
 const encodeBase64Url = (value: string) =>
   Buffer.from(value).toString('base64url');
@@ -70,22 +64,27 @@ export class SsoService {
   }
 
   buildAdminBlacklistUrl() {
-    const secret = this.getBlacklistSecret();
-    const issuedAt = Math.floor(Date.now() / 1000);
-    const token = signHs256Jwt(
-      {
-        phone: 'ADMIN',
-        role: 'SUPER_ADMIN',
-        adminMode: true,
-        iat: issuedAt,
-        exp: issuedAt + BLACKLIST_JWT_TTL_SECONDS,
-      },
-      secret,
-    );
+    const adminKey = this.getBlacklistAdminKey();
 
     return {
-      url: `${BLACKLIST_ADMIN_DASHBOARD_URL}?token=${token}`,
+      url: `${BLACKLIST_ADMIN_DASHBOARD_URL}?admin_key=${adminKey}`,
     };
+  }
+
+  private getBlacklistAdminKey() {
+    const adminKey = this.configService
+      .get<string>('KURUKIN_BLACKLIST_API_TOKEN')
+      ?.trim();
+
+    if (!adminKey) {
+      throw new ServiceUnavailableException({
+        code: 'KURUKIN_BLACKLIST_API_TOKEN_MISSING',
+        message:
+          'KURUKIN_BLACKLIST_API_TOKEN must be configured before opening the Kurukin Blacklist admin dashboard.',
+      });
+    }
+
+    return adminKey;
   }
 
   private getBlacklistSecret() {

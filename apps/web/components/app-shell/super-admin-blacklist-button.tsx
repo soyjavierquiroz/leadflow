@@ -100,7 +100,7 @@ export function SuperAdminBlacklistButton() {
       setFeedback({
         tone: "success",
         message:
-          "Kurukin Blacklist se abrió en una nueva pestaña con acceso maestro temporal.",
+          "Kurukin Blacklist se abrió en una nueva pestaña con acceso maestro.",
       });
     } catch (error) {
       popup?.close();
@@ -128,9 +128,10 @@ export function SuperAdminBlacklistButton() {
             Acceso Maestro: Kurukin Blacklist
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
-            Entra al dashboard administrativo global de Kurukin Blacklist con un
-            SSO temporal firmado por Leadflow. Este acceso ignora el filtro por
-            asesor y habilita la vista completa para operación de plataforma.
+            Entra al dashboard administrativo global de Kurukin Blacklist con la
+            llave maestra configurada para plataforma. Este acceso ignora el
+            filtro por asesor y habilita la vista completa para operación de
+            plataforma.
           </p>
         </div>
 

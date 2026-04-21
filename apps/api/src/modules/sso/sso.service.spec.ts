@@ -6,24 +6,6 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { SsoService } from './sso.service';
 
 describe('SsoService', () => {
-  const decodePayload = (token: string) => {
-    const [, payloadSegment] = token.split('.');
-
-    if (!payloadSegment) {
-      throw new Error('Token payload segment missing.');
-    }
-
-    return JSON.parse(
-      Buffer.from(payloadSegment, 'base64url').toString('utf8'),
-    ) as {
-      adminMode?: boolean;
-      exp: number;
-      iat: number;
-      phone: string;
-      role?: string;
-    };
-  };
-
   const buildUser = (
     overrides: Partial<AuthenticatedUser> = {},
   ): AuthenticatedUser => ({
@@ -50,14 +32,30 @@ describe('SsoService', () => {
     ...overrides,
   });
 
-  const buildService = (secret = 'secret-123') => {
+  const buildService = ({
+    blacklistSecret = 'secret-123',
+    adminToken = 'kurukin-static-admin-key',
+  }: {
+    blacklistSecret?: string;
+    adminToken?: string;
+  } = {}) => {
     const prisma = {
       user: {
         findFirst: jest.fn(),
       },
     } as unknown as PrismaService;
     const configService = {
-      get: jest.fn().mockReturnValue(secret),
+      get: jest.fn((key: string) => {
+        if (key === 'SSO_BLACKLIST_SECRET') {
+          return blacklistSecret;
+        }
+
+        if (key === 'KURUKIN_BLACKLIST_API_TOKEN') {
+          return adminToken;
+        }
+
+        return undefined;
+      }),
     } as unknown as ConfigService;
 
     return {
@@ -123,22 +121,15 @@ describe('SsoService', () => {
   });
 
   it('builds a God Mode url for SUPER_ADMIN access', () => {
-    const secret = 'secret-god-mode';
-    const { service } = buildService(secret);
+    const adminToken = 'admin-master-key';
+    const { service } = buildService({ adminToken });
     const result = service.buildAdminBlacklistUrl();
     const url = new URL(result.url);
-    const token = url.searchParams.get('token');
+    const adminKey = url.searchParams.get('admin_key');
 
     expect(url.origin + url.pathname).toBe(
-      'https://blacklist.kuruk.in/admin/dashboard',
+      'https://blacklist.kuruk.in/dashboard/reportes',
     );
-    expect(token).toBeTruthy();
-
-    const payload = decodePayload(token!);
-
-    expect(payload.phone).toBe('ADMIN');
-    expect(payload.role).toBe('SUPER_ADMIN');
-    expect(payload.adminMode).toBe(true);
-    expect(payload.exp).toBeGreaterThan(payload.iat);
+    expect(adminKey).toBe(adminToken);
   });
 });
