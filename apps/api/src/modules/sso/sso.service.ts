@@ -12,14 +12,27 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 const BLACKLIST_DASHBOARD_URL =
   'https://blacklist.kuruk.in/dashboard/importaciones';
+const BLACKLIST_ADMIN_DASHBOARD_URL =
+  'https://blacklist.kuruk.in/admin/dashboard';
 const BLACKLIST_JWT_ALGORITHM = 'HS256';
 const BLACKLIST_JWT_TTL_SECONDS = 15 * 60;
 
-type BlacklistJwtPayload = {
-  phone: string;
-  iat: number;
+type BaseBlacklistJwtPayload = {
   exp: number;
+  iat: number;
 };
+
+type MemberBlacklistJwtPayload = BaseBlacklistJwtPayload & {
+  phone: string;
+};
+
+type AdminBlacklistJwtPayload = BaseBlacklistJwtPayload & {
+  adminMode: true;
+  phone: 'ADMIN';
+  role: 'SUPER_ADMIN';
+};
+
+type BlacklistJwtPayload = MemberBlacklistJwtPayload | AdminBlacklistJwtPayload;
 
 const encodeBase64Url = (value: string) =>
   Buffer.from(value).toString('base64url');
@@ -48,6 +61,34 @@ export class SsoService {
   ) {}
 
   async buildBlacklistUrl(user: AuthenticatedUser) {
+    const secret = this.getBlacklistSecret();
+    const token = await this.generateToken(user, secret);
+
+    return {
+      url: `${BLACKLIST_DASHBOARD_URL}?token=${token}`,
+    };
+  }
+
+  buildAdminBlacklistUrl() {
+    const secret = this.getBlacklistSecret();
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = signHs256Jwt(
+      {
+        phone: 'ADMIN',
+        role: 'SUPER_ADMIN',
+        adminMode: true,
+        iat: issuedAt,
+        exp: issuedAt + BLACKLIST_JWT_TTL_SECONDS,
+      },
+      secret,
+    );
+
+    return {
+      url: `${BLACKLIST_ADMIN_DASHBOARD_URL}?token=${token}`,
+    };
+  }
+
+  private getBlacklistSecret() {
     const secret =
       this.configService.get<string>('SSO_BLACKLIST_SECRET')?.trim();
 
@@ -59,11 +100,7 @@ export class SsoService {
       });
     }
 
-    const token = await this.generateToken(user, secret);
-
-    return {
-      url: `${BLACKLIST_DASHBOARD_URL}?token=${token}`,
-    };
+    return secret;
   }
 
   private async generateToken(user: AuthenticatedUser, secret: string) {

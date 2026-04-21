@@ -5,6 +5,7 @@ import { KpiCard } from "@/components/app-shell/kpi-card";
 import { PublicationCard } from "@/components/app-shell/publication-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
+import { SuperAdminBlacklistButton } from "@/components/app-shell/super-admin-blacklist-button";
 import { getAppShellSnapshot } from "@/lib/app-shell/data";
 import { formatCompactNumber } from "@/lib/app-shell/utils";
 
@@ -71,6 +72,8 @@ export default async function AdminPage() {
           hint="Oportunidades activas que validan que la plataforma no está solo configurada: ya está trabajando."
         />
       </section>
+
+      <SuperAdminBlacklistButton />
 
       <section className="grid w-full gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="w-full rounded-[2rem] border border-slate-200 bg-white p-6 text-left shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
