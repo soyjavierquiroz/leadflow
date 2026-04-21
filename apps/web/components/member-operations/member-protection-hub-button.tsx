@@ -22,7 +22,7 @@ export function MemberProtectionHubButton({
     tone: "success" | "error";
     message: string;
   } | null>(null);
-  const isDisabled = isOpening || !isSsoAvailable || !advisorPhone;
+  const isDisabled = isOpening || !isSsoAvailable;
   const title = advisorPhone
     ? `Gestiona tu lista externa para ${advisorPhone}`
     : "Gestiona tu lista externa para tu asesor";

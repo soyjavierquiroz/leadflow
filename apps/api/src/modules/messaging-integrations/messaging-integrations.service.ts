@@ -606,9 +606,7 @@ export class MessagingIntegrationsService {
     const status = this.resolveDashboardStatus(connection);
     const isConnected = status === 'READY';
     const qrExpired = isQrExpired(connection?.pairingExpiresAt);
-    const blacklistSsoAvailable = Boolean(
-      process.env.SSO_BLACKLIST_SECRET?.trim(),
-    );
+    const blacklistSsoAvailable = Boolean(process.env.SSO_BLACKLIST_SECRET);
 
     return new SponsorDashboardDto({
       status,
