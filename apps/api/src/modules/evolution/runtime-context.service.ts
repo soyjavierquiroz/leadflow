@@ -47,7 +47,6 @@ type RuntimeContextRequestInput =
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const ADMIN_BINDINGS_PATH = '/admin/channel-bindings';
-const SERVICE_KEY = 'leadflow-api';
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -181,21 +180,23 @@ export class RuntimeContextService {
         this.resolveAdminApiBaseUrl() ?? this.baseUrl!,
         input.path,
       );
-      const trimmedApiKey = this.apiKey?.trim();
 
       console.log(`[RUNTIME-CONTEXT-API] URL: ${fullUrl}`);
       console.log(
-        `[RUNTIME-CONTEXT-API] Sending Key (first 5): ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY?.substring(0, 5)}...`,
+        `[DEBUG-AUTH] Key Env: ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY ? 'DEFINED' : 'UNDEFINED'}`,
       );
+      console.log(
+        `[DEBUG-AUTH] Key Start: ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY?.substring(0, 5)}`,
+      );
+      console.log('[DEBUG-AUTH] Service Key: leadflow-api');
 
       const response = await fetch(fullUrl, {
         method: input.method,
         signal: controller.signal,
         headers: {
-          Accept: 'application/json',
-          'x-internal-api-key': trimmedApiKey!,
-          'x-service-key': SERVICE_KEY,
-          ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+          'x-internal-api-key': process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY,
+          'x-service-key': 'leadflow-api',
+          'Content-Type': 'application/json',
         },
         ...(hasBody ? { body: JSON.stringify(input.body) } : {}),
       });
