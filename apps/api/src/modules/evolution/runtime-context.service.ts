@@ -181,12 +181,11 @@ export class RuntimeContextService {
         this.resolveAdminApiBaseUrl() ?? this.baseUrl!,
         input.path,
       );
+      const trimmedApiKey = this.apiKey?.trim();
 
+      console.log(`[RUNTIME-CONTEXT-API] URL: ${fullUrl}`);
       console.log(
-        '[RUNTIME-CONTEXT-API] Calling URL:',
-        fullUrl,
-        'Method:',
-        input.method,
+        `[RUNTIME-CONTEXT-API] Sending Key (first 5): ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY?.substring(0, 5)}...`,
       );
 
       const response = await fetch(fullUrl, {
@@ -194,7 +193,7 @@ export class RuntimeContextService {
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
-          'x-internal-api-key': this.apiKey!,
+          'x-internal-api-key': trimmedApiKey!,
           'x-service-key': SERVICE_KEY,
           ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         },
