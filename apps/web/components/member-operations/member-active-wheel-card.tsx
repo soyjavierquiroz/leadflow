@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useState } from "react";
-import { OperationBanner } from "@/components/team-operations/operation-banner";
+import { MemberInlineBanner } from "@/components/member-operations/member-inline-banner";
 import {
   formatAdWheelSeatPrice,
   type MemberActiveAdWheelSnapshot,
@@ -106,72 +106,97 @@ export function MemberActiveWheelCard() {
 
   const toneClassName = snapshot?.wheel
     ? snapshot.isParticipating
-      ? "border-emerald-200 bg-[linear-gradient(180deg,_#ecfdf5_0%,_#ffffff_100%)]"
-      : "border-amber-200 bg-[linear-gradient(180deg,_#fff7ed_0%,_#ffffff_100%)]"
-    : "border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)]";
+      ? "border-emerald-500/20 bg-[linear-gradient(180deg,_rgba(6,78,59,0.34)_0%,_rgba(2,6,23,0.98)_100%)]"
+      : "border-amber-500/20 bg-[linear-gradient(180deg,_rgba(120,53,15,0.24)_0%,_rgba(2,6,23,0.98)_100%)]"
+    : "border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.96)_100%)]";
 
   return (
     <aside
-      className={`rounded-[2rem] border p-6 shadow-[0_20px_55px_rgba(15,23,42,0.06)] ${toneClassName}`}
+      className={`rounded-[1.6rem] border p-4 shadow-[0_18px_45px_rgba(2,6,23,0.28)] ${toneClassName}`}
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
-        Rueda Publicitaria Actual
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+            Rueda Publicitaria
+          </p>
+          <p className="mt-1 text-sm text-slate-400">
+            Espacio rápido para entrar al round activo sin salir del dashboard.
+          </p>
+        </div>
+        <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-medium text-slate-300">
+          CTA compacto
+        </span>
+      </div>
 
       {isLoading && !snapshot ? (
         <div className="mt-4 space-y-3">
-          <div className="h-7 w-3/4 animate-pulse rounded-full bg-slate-200" />
-          <div className="h-20 animate-pulse rounded-[1.5rem] bg-slate-100" />
+          <div className="h-5 w-36 animate-pulse rounded-full bg-slate-800" />
+          <div className="h-24 animate-pulse rounded-[1.25rem] bg-slate-900" />
         </div>
       ) : null}
 
       {!isLoading && !snapshot?.wheel ? (
-        <div className="mt-4">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-            No hay campañas activas en este momento
+        <div className="mt-4 rounded-[1.25rem] border border-slate-800 bg-slate-950/70 p-4">
+          <h2 className="text-lg font-semibold text-white">
+            No hay campañas activas
           </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Cuando el team abra una nueva rueda, aquí verás el buy-in
-            disponible para entrar.
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Cuando el team abra una rueda nueva, aquí verás el buy-in para
+            entrar de inmediato.
           </p>
         </div>
       ) : null}
 
       {snapshot?.wheel ? (
-        <div className="mt-4">
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-            {snapshot.wheel.name}
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Ventana activa hasta {formatDateTime(snapshot.wheel.endDate)}.
-          </p>
+        <div className="mt-4 space-y-3">
+          <div className="rounded-[1.25rem] border border-slate-800 bg-slate-950/70 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-white">
+                {snapshot.wheel.name}
+              </h2>
+              <span
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                  snapshot.isParticipating
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
+                    : "border-amber-500/20 bg-amber-500/10 text-amber-100"
+                }`}
+              >
+                {snapshot.isParticipating ? "Adentro" : "Disponible"}
+              </span>
+            </div>
+
+            <p className="mt-2 text-sm text-slate-400">
+              Ventana activa hasta {formatDateTime(snapshot.wheel.endDate)}.
+            </p>
+          </div>
 
           {snapshot.isParticipating ? (
-            <div className="mt-5 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-sm font-semibold text-emerald-800">
-                ¡Estás en la Rueda! Esperando leads...
+            <div className="rounded-[1.25rem] border border-emerald-500/20 bg-emerald-500/10 p-4">
+              <p className="text-sm font-semibold text-emerald-100">
+                Ya estás en la rueda actual
               </p>
-              <p className="mt-2 text-sm leading-6 text-emerald-700">
-                Tu asiento ya quedó confirmado dentro de la campaña activa.
+              <p className="mt-2 text-sm leading-6 text-emerald-50/85">
+                Tu asiento quedó confirmado y el round robin ya puede
+                considerarte.
               </p>
             </div>
           ) : (
-            <div className="mt-5 rounded-[1.5rem] border border-amber-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-[1.25rem] border border-amber-500/20 bg-slate-950/70 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 Buy-In Disponible
               </p>
-              <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+              <p className="mt-2 text-2xl font-semibold tracking-tight text-white">
                 {formatAdWheelSeatPrice(snapshot.wheel.seatPrice)}
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Compra tu asiento para entrar al round robin condicional de la
-                rueda actual.
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Compra tu asiento para entrar a la rueda activa desde esta
+                misma vista.
               </p>
               <button
                 type="button"
                 onClick={handleJoin}
                 disabled={isJoining}
-                className="mt-5 rounded-full bg-[linear-gradient(135deg,_#f97316_0%,_#dc2626_100%)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_16px_35px_rgba(249,115,22,0.28)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-4 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isJoining ? "Procesando..." : "Comprar Asiento"}
               </button>
@@ -181,8 +206,8 @@ export function MemberActiveWheelCard() {
       ) : null}
 
       {feedback ? (
-        <div className="mt-5">
-          <OperationBanner tone={feedback.tone} message={feedback.message} />
+        <div className="mt-4">
+          <MemberInlineBanner tone={feedback.tone} message={feedback.message} />
         </div>
       ) : null}
     </aside>

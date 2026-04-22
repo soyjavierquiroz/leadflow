@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { SectionHeader } from "@/components/app-shell/section-header";
+import { Activity, Gauge, Sparkles } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 import { MemberActiveWheelCard } from "@/components/member-operations/member-active-wheel-card";
+import { MemberInlineBanner } from "@/components/member-operations/member-inline-banner";
 import { WhatsAppConnectionManager } from "@/components/member-operations/whatsapp-connection-manager";
-import { OperationBanner } from "@/components/team-operations/operation-banner";
 import {
   type MemberDashboardAssignmentStatus,
   type MemberDashboardLead,
@@ -26,41 +26,41 @@ type SponsorKreditsResponse = {
 };
 
 const leadStatusTone: Record<MemberDashboardLeadStatus, string> = {
-  captured: "border-slate-200 bg-slate-100 text-slate-700",
-  qualified: "border-sky-200 bg-sky-50 text-sky-700",
-  assigned: "border-amber-200 bg-amber-50 text-amber-700",
-  nurturing: "border-orange-200 bg-orange-50 text-orange-700",
-  won: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  lost: "border-slate-200 bg-slate-100 text-slate-600",
+  captured: "border-slate-700 bg-slate-900/80 text-slate-200",
+  qualified: "border-sky-500/20 bg-sky-500/10 text-sky-100",
+  assigned: "border-amber-500/20 bg-amber-500/10 text-amber-100",
+  nurturing: "border-orange-500/20 bg-orange-500/10 text-orange-100",
+  won: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+  lost: "border-slate-700 bg-slate-900/70 text-slate-400",
 };
 
 const assignmentStatusTone: Record<MemberDashboardAssignmentStatus, string> = {
-  assigned: "border-amber-200 bg-amber-50 text-amber-700",
-  accepted: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  assigned: "border-amber-500/20 bg-amber-500/10 text-amber-100",
+  accepted: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
 };
 
 const reminderTone = {
-  overdue: "border-rose-200 bg-rose-50 text-rose-700",
-  due_today: "border-amber-200 bg-amber-50 text-amber-700",
-  upcoming: "border-sky-200 bg-sky-50 text-sky-700",
-  unscheduled: "border-slate-200 bg-slate-100 text-slate-700",
-  none: "border-slate-200 bg-white text-slate-600",
+  overdue: "border-rose-500/20 bg-rose-500/10 text-rose-100",
+  due_today: "border-amber-500/20 bg-amber-500/10 text-amber-100",
+  upcoming: "border-sky-500/20 bg-sky-500/10 text-sky-100",
+  unscheduled: "border-slate-700 bg-slate-900/80 text-slate-200",
+  none: "border-slate-700 bg-slate-900/60 text-slate-300",
 } as const;
 
 const availabilityCopy = {
   available: {
     title: "Recibiendo leads nuevos",
     description:
-      "Tu capacidad está abierta. Los handoffs nuevos seguirán entrando a tu bandeja.",
+      "Tu bandeja sigue abierta y puede absorber handoffs nuevos hoy.",
   },
   paused: {
-    title: "Nuevos leads pausados",
+    title: "Entrada de leads pausada",
     description:
-      "Tu bandeja sigue operativa, pero dejamos de asignarte leads nuevos hasta que reactives la disponibilidad.",
+      "Tu bandeja sigue operativa, pero no entrarán handoffs nuevos hasta reactivarla.",
   },
   offline: {
-    title: "Recepción temporalmente detenida",
-    description: "No estás disponible para nuevos handoffs en este momento.",
+    title: "Recepción detenida",
+    description: "Tu sponsor quedó fuera de asignación temporalmente.",
   },
 } as const;
 
@@ -115,52 +115,68 @@ const formatKreditsBalance = (value: string | number) => {
   return typeof value === "string" ? value : String(value);
 };
 
-function MetricCard({
+function SoftBadge({ label, tone }: { label: string; tone: string }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${tone}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function MetricMiniCard({
   label,
   value,
   hint,
+  icon,
   emphasize = false,
 }: {
   label: string;
   value: number;
   hint: string;
+  icon: ReactNode;
   emphasize?: boolean;
 }) {
   return (
     <article
-      className={`rounded-[1.9rem] border p-5 shadow-[0_20px_55px_rgba(15,23,42,0.06)] transition ${
+      className={`rounded-[1.25rem] border p-4 ${
         emphasize
-          ? "border-amber-200 bg-[linear-gradient(180deg,_#fff8eb_0%,_#ffffff_100%)]"
-          : "border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)]"
+          ? "border-amber-500/20 bg-amber-500/10"
+          : "border-slate-800 bg-slate-950/70"
       }`}
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
-        {label}
-      </p>
-      <div className="mt-4 flex items-end justify-between gap-4">
-        <p
-          className={`text-4xl font-semibold tracking-tight ${
-            emphasize ? "text-amber-700" : "text-slate-950"
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+            {label}
+          </p>
+          <p
+            className={`mt-2 text-3xl font-semibold tracking-tight ${
+              emphasize ? "text-amber-100" : "text-slate-50"
+            }`}
+          >
+            {formatCompactNumber(value)}
+          </p>
+        </div>
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${
+            emphasize
+              ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
+              : "border-slate-700 bg-slate-900 text-slate-300"
           }`}
         >
-          {formatCompactNumber(value)}
-        </p>
-        {emphasize && value > 0 ? (
-          <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
-            Prioridad
-          </span>
-        ) : null}
+          {icon}
+        </div>
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{hint}</p>
+      <p className="mt-2 text-sm leading-5 text-slate-400">{hint}</p>
     </article>
   );
 }
 
-function SoftBadge({ label, tone }: { label: string; tone: string }) {
+function MetaChip({ label }: { label: string }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}
-    >
+    <span className="rounded-full border border-slate-800 bg-slate-950/70 px-3 py-1 text-xs font-medium text-slate-300">
       {label}
     </span>
   );
@@ -330,47 +346,228 @@ export function MemberDashboardClient({
   };
 
   return (
-    <div className="space-y-8">
-      <SectionHeader
-        eyebrow="Sponsor / Member"
-        title="Mi jornada comercial"
-        description="Tu bandeja queda resumida en lo que sí mueve trabajo hoy: nuevos handoffs, seguimientos urgentes y la cartera activa que ya depende de ti."
-      />
+    <div className="space-y-4 text-slate-100">
+      <section className="overflow-hidden rounded-[1.75rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.98)_100%)] p-4 shadow-[0_22px_60px_rgba(2,6,23,0.4)]">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-300">
+              Sponsor / Member / Centro de mando
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
+              WhatsApp arriba, operación abajo
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              El dashboard prioriza la conexión del asesor y deja la bandeja
+              operativa visible en el mismo viewport para trabajar sin rodeos.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <MetaChip label={sponsor.displayName} />
+            <MetaChip label={`${inbox.length} lead${inbox.length === 1 ? "" : "s"} en foco`} />
+            <MetaChip
+              label={
+                isReceivingLeads ? "Capacidad abierta" : "Capacidad pausada"
+              }
+            />
+          </div>
+        </div>
+      </section>
 
       {feedback ? (
-        <OperationBanner tone={feedback.tone} message={feedback.message} />
+        <MemberInlineBanner tone={feedback.tone} message={feedback.message} />
       ) : null}
 
-      <section className="grid gap-5 xl:grid-cols-[1.45fr_0.95fr]">
-        <div className="grid gap-4 md:grid-cols-3">
-          <MetricCard
-            label="Atención Inmediata"
-            value={kpis.handoffsNew}
-            hint="Leads nuevos que todavía esperan tu aceptación."
-            emphasize={kpis.handoffsNew > 0}
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
+        <div className="min-w-0 space-y-4">
+          <WhatsAppConnectionManager
+            instanceName={instanceName}
+            title="WhatsApp del asesor"
+            description="Si la sesión está viva, se ve como un banner corto. Si no está conectada, el QR queda primero y sin scroll."
           />
-          <MetricCard
-            label="Acciones Para Hoy"
-            value={kpis.actionsToday}
-            hint="Seguimientos urgentes o pendientes que conviene mover hoy."
-          />
-          <MetricCard
-            label="Cartera Activa"
-            value={kpis.activePortfolio}
-            hint="Total de leads que hoy siguen dentro de tu gestión."
-          />
+
+          <section className="overflow-hidden rounded-[1.75rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.96)_0%,_rgba(2,6,23,0.98)_100%)] shadow-[0_20px_55px_rgba(2,6,23,0.32)]">
+            <div className="flex flex-col gap-3 border-b border-slate-800 px-4 py-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-400">
+                  Bandeja Operativa
+                </p>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
+                  Lo que conviene mover ahora
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-400">
+                  Leads nuevos y seguimientos urgentes con el siguiente paso al
+                  frente, sin adornos que quiten espacio.
+                </p>
+              </div>
+
+              <div className="rounded-full border border-slate-800 bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-slate-300">
+                {inbox.length} lead{inbox.length === 1 ? "" : "s"} en foco
+              </div>
+            </div>
+
+            {inbox.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <h3 className="text-xl font-semibold text-white">
+                  Bandeja vacía
+                </h3>
+                <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  Cuando entre un handoff nuevo o reaparezca un seguimiento
+                  urgente, se verá aquí con prioridad clara.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-800">
+                {inbox.map((lead) => {
+                  const isNewLead = lead.assignmentStatus === "assigned";
+                  const isAccepting = loadingAction === `accept:${lead.id}`;
+
+                  return (
+                    <article
+                      key={lead.id}
+                      className="px-4 py-4 transition hover:bg-slate-900/45"
+                    >
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold text-white">
+                              {lead.leadName}
+                            </h3>
+                            <SoftBadge
+                              label={toSentenceCase(lead.assignmentStatus)}
+                              tone={
+                                assignmentStatusTone[lead.assignmentStatus]
+                              }
+                            />
+                            <SoftBadge
+                              label={toSentenceCase(lead.leadStatus)}
+                              tone={leadStatusTone[lead.leadStatus]}
+                            />
+                            <SoftBadge
+                              label={lead.reminderLabel}
+                              tone={reminderTone[lead.reminderBucket]}
+                            />
+                          </div>
+
+                          <p className="mt-1 text-sm text-slate-300">
+                            {lead.companyName?.trim() || lead.contactLabel}
+                          </p>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                            <span className="rounded-full border border-slate-800 bg-slate-950/70 px-3 py-1">
+                              {buildOriginLabel(lead)}
+                            </span>
+                            <span className="rounded-full border border-slate-800 bg-slate-950/70 px-3 py-1">
+                              Entró: {formatDateTime(lead.assignedAt)}
+                            </span>
+                            {lead.followUpAt ? (
+                              <span className="rounded-full border border-slate-800 bg-slate-950/70 px-3 py-1">
+                                Seguimiento: {formatDateTime(lead.followUpAt)}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div
+                            className={`mt-3 rounded-[1.1rem] border px-4 py-3 ${
+                              lead.needsAttention
+                                ? "border-amber-500/20 bg-amber-500/10"
+                                : "border-slate-800 bg-slate-950/70"
+                            }`}
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              Siguiente paso
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-200">
+                              {lead.nextActionLabel}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex min-w-[190px] flex-col items-start gap-3 lg:items-end">
+                          <p className="text-sm text-slate-400 lg:text-right">
+                            {isNewLead
+                              ? "Todavía espera tu confirmación."
+                              : "Ya forma parte de tu cartera activa."}
+                          </p>
+
+                          {isNewLead ? (
+                            <button
+                              type="button"
+                              onClick={() => handleAcceptLead(lead)}
+                              disabled={isAccepting}
+                              className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {isAccepting ? "Aceptando..." : "Aceptar Lead"}
+                            </button>
+                          ) : (
+                            <Link
+                              href="/member/leads"
+                              className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
+                            >
+                              Gestionar
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
 
-        <div className="space-y-4">
-          <aside className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-6 shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
+        <aside className="min-w-0 space-y-4">
+          <section className="rounded-[1.6rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(2,6,23,0.28)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  Mi jornada comercial
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Lectura rápida de lo que exige atención hoy.
+                </p>
+              </div>
+              <div className="rounded-full border border-slate-800 bg-slate-950 px-3 py-1 text-xs font-medium text-slate-300">
+                Vista compacta
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <MetricMiniCard
+                label="Atención inmediata"
+                value={kpis.handoffsNew}
+                hint="Handoffs nuevos pendientes de aceptación."
+                icon={<Sparkles className="h-4 w-4" />}
+                emphasize={kpis.handoffsNew > 0}
+              />
+              <MetricMiniCard
+                label="Acciones para hoy"
+                value={kpis.actionsToday}
+                hint="Seguimientos urgentes o vencidos."
+                icon={<Activity className="h-4 w-4" />}
+              />
+              <MetricMiniCard
+                label="Cartera activa"
+                value={kpis.activePortfolio}
+                hint="Leads que siguen bajo tu gestión."
+                icon={<Gauge className="h-4 w-4" />}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-[1.6rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(2,6,23,0.28)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
                   Capacidad
                 </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-1 text-lg font-semibold text-white">
                   {availability.title}
                 </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-400">
+                  {availability.description}
+                </p>
               </div>
 
               <button
@@ -381,7 +578,7 @@ export function MemberDashboardClient({
                 disabled={loadingAction === "availability"}
                 onClick={() => handleAvailabilityChange(!isReceivingLeads)}
                 className={`relative inline-flex h-8 w-14 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                  isReceivingLeads ? "bg-emerald-500" : "bg-slate-300"
+                  isReceivingLeads ? "bg-emerald-500" : "bg-slate-700"
                 }`}
               >
                 <span
@@ -392,29 +589,42 @@ export function MemberDashboardClient({
               </button>
             </div>
 
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              {availability.description}
-            </p>
-
-            <div className="mt-5 rounded-[1.6rem] border border-cyan-200 bg-[linear-gradient(135deg,_rgba(236,254,255,0.95)_0%,_rgba(255,255,255,1)_100%)] p-4 shadow-[0_18px_45px_rgba(8,145,178,0.12)]">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="mt-4 rounded-[1.2rem] border border-slate-800 bg-slate-950/80 p-3">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-700">
-                    IA Wallet
+                  <p className="text-sm font-semibold text-white">
+                    Estado del asesor
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-slate-950">
-                    Saldo disponible para automatizaciones con IA
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    Leadflow provisiona tu bono inicial y n8n consumirá desde
-                    esta wallet descentralizada.
+                  <p className="mt-1 text-sm text-slate-400">
+                    {isReceivingLeads
+                      ? "Disponible para nuevos handoffs."
+                      : "Protegiendo la carga actual."}
                   </p>
                 </div>
+                <SoftBadge
+                  label={isReceivingLeads ? "Activo" : "Pausado"}
+                  tone={
+                    isReceivingLeads
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
+                      : "border-slate-700 bg-slate-900 text-slate-300"
+                  }
+                />
+              </div>
+            </div>
 
-                <div className="inline-flex items-center rounded-full border border-cyan-200 bg-white px-4 py-2 text-sm font-semibold text-cyan-900 shadow-sm">
-                  🧠{" "}
+            <div className="mt-3 rounded-[1.2rem] border border-cyan-500/20 bg-cyan-500/10 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+                    IA Wallet
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-white">
+                    Saldo operativo para automatizaciones y n8n
+                  </p>
+                </div>
+                <div className="rounded-full border border-cyan-500/20 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-cyan-100">
                   {loadingKredits
-                    ? "Cargando KREDITs..."
+                    ? "Cargando..."
                     : kreditsBalance !== null
                       ? `${formatKreditsBalance(kreditsBalance)} KREDITs`
                       : "Saldo no disponible"}
@@ -422,177 +632,20 @@ export function MemberDashboardClient({
               </div>
 
               {kreditsError ? (
-                <p className="mt-3 text-xs font-medium text-rose-600">
+                <p className="mt-2 text-xs font-medium text-rose-200">
                   {kreditsError}
                 </p>
-              ) : null}
+              ) : (
+                <p className="mt-2 text-sm leading-6 text-cyan-50/80">
+                  Wallet compacta para supervisar el combustible de tus flujos
+                  sin sacarte de la operación.
+                </p>
+              )}
             </div>
-
-            <div className="mt-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">
-                    Estado del asesor
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {isReceivingLeads
-                      ? "Tu bandeja sigue abierta para nuevos handoffs."
-                      : "Tu carga actual queda protegida sin nuevas entradas."}
-                  </p>
-                </div>
-                <SoftBadge
-                  label={isReceivingLeads ? "Activo" : "Pausado"}
-                  tone={
-                    isReceivingLeads
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-slate-200 bg-white text-slate-700"
-                  }
-                />
-              </div>
-            </div>
-          </aside>
+          </section>
 
           <MemberActiveWheelCard />
-        </div>
-      </section>
-
-      <section className="grid gap-5 md:grid-cols-2">
-        <div className="col-span-1 md:col-span-2">
-          <WhatsAppConnectionManager
-            instanceName={instanceName}
-            title="WhatsApp del asesor"
-            description="Escanea el QR desde tu teléfono para dejar este canal listo. Si la sesión se traba, aquí mismo puedes regenerar o reiniciar la instancia sin cambiar su identificador operativo."
-          />
-        </div>
-      </section>
-
-      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_22px_65px_rgba(15,23,42,0.07)]">
-        <div className="flex flex-col gap-3 border-b border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] px-6 py-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
-              Bandeja Operativa
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Lo que conviene mover ahora
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              La bandeja prioriza handoffs nuevos y seguimientos que necesitan
-              una respuesta clara, sin ruido técnico ni métricas repetidas.
-            </p>
-          </div>
-
-          <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600">
-            {inbox.length} lead{inbox.length === 1 ? "" : "s"} en foco
-          </div>
-        </div>
-
-        {inbox.length === 0 ? (
-          <div className="px-6 py-14 text-center">
-            <h3 className="text-2xl font-semibold text-slate-950">
-              Bandeja vacía
-            </h3>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              No tienes leads activos asignados en este momento. Cuando entre un
-              nuevo handoff o reaparezca un seguimiento urgente, lo verás aquí
-              con prioridad clara.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {inbox.map((lead) => {
-              const isNewLead = lead.assignmentStatus === "assigned";
-              const isAccepting = loadingAction === `accept:${lead.id}`;
-
-              return (
-                <article
-                  key={lead.id}
-                  className="px-6 py-5 transition hover:bg-slate-50/70"
-                >
-                  <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold text-slate-950">
-                          {lead.leadName}
-                        </h3>
-                        <SoftBadge
-                          label={toSentenceCase(lead.assignmentStatus)}
-                          tone={assignmentStatusTone[lead.assignmentStatus]}
-                        />
-                        <SoftBadge
-                          label={toSentenceCase(lead.leadStatus)}
-                          tone={leadStatusTone[lead.leadStatus]}
-                        />
-                        <SoftBadge
-                          label={lead.reminderLabel}
-                          tone={reminderTone[lead.reminderBucket]}
-                        />
-                      </div>
-
-                      <p className="mt-2 text-sm text-slate-700">
-                        {lead.companyName?.trim() || lead.contactLabel}
-                      </p>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                        <span className="rounded-full bg-slate-100 px-3 py-1">
-                          {buildOriginLabel(lead)}
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-3 py-1">
-                          Entró: {formatDateTime(lead.assignedAt)}
-                        </span>
-                        {lead.followUpAt ? (
-                          <span className="rounded-full bg-slate-100 px-3 py-1">
-                            Seguimiento: {formatDateTime(lead.followUpAt)}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div
-                        className={`mt-4 rounded-[1.35rem] border px-4 py-3 ${
-                          lead.needsAttention
-                            ? "border-amber-200 bg-amber-50/70"
-                            : "border-slate-200 bg-slate-50"
-                        }`}
-                      >
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Siguiente paso
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">
-                          {lead.nextActionLabel}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex min-w-[210px] flex-col items-start gap-3 xl:items-end">
-                      <p className="text-sm text-slate-500">
-                        {isNewLead
-                          ? "Este handoff todavía espera tu confirmación."
-                          : "Ya forma parte de tu cartera en seguimiento."}
-                      </p>
-
-                      {isNewLead ? (
-                        <button
-                          type="button"
-                          onClick={() => handleAcceptLead(lead)}
-                          disabled={isAccepting}
-                          className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {isAccepting ? "Aceptando..." : "Aceptar Lead"}
-                        </button>
-                      ) : (
-                        <Link
-                          href="/member/leads"
-                          className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-                        >
-                          Gestionar
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
+        </aside>
       </section>
     </div>
   );

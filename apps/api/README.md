@@ -61,82 +61,29 @@ Variables soportadas:
 
 ## OBSERVACIONES SRE
 
-### Runtime Context local es Resolver-Only
+### Runtime Context admin API activa
 
-La imagen `runtime-context-service:local` usada en este entorno no expone rutas
-de escritura ni administración para crear `channel_bindings`. En consecuencia:
+Leadflow ya administra el ciclo de vida de `channel_bindings` directamente
+contra Runtime Context:
 
-- `POST /v1/admin/channel-bindings/upsert` devuelve `404`
-- `POST /admin/channel-bindings/upsert` también devuelve `404`
-- el módulo `EvolutionModule` hace bypass deliberado del registro y solo emite
-  un `Logger.warn(...)` para no bloquear la entrega del QR
+- `POST /v1/admin/channel-bindings/upsert` durante `connect`
+- `DELETE /v1/admin/channel-bindings/{instanceName}` durante `restart` o
+  desconexión
+
+Contrato aplicado por `EvolutionModule`:
+
+- `provider = evolution`
+- `channel = whatsapp`
+- `service_owner_key = lead-handler`
+- `source_system = leadflow`
+- `vertical_key = user.team.vertical || "unknown"`
+
+Autenticación interna usada por la API:
+
+- `x-internal-api-key: <RUNTIME_CONTEXT_CENTRAL_API_KEY>`
+- `x-service-key: leadflow-api`
 
 Implicación operativa:
 
-- si se necesita que el runtime-context resuelva una nueva instancia en local,
-  el binding debe sembrarse manualmente en Postgres hasta que exista una imagen
-  con API administrativa
-
-### Seed manual recomendado
-
-El tenant operativo validado en Leadflow para este flujo fue:
-
-- `tenant_id = 7b7b2877-3353-4972-ba6f-bc5f1627f24a`
-- `team = DXN - Freddy Ramos Catunta`
-- `instance_name = lf-dxn-freddy`
-
-Ejemplo de `INSERT` manual para el runtime-context local:
-
-```sql
-INSERT INTO platform_tenants (
-  tenant_id,
-  tenant_key,
-  display_name,
-  app_key,
-  platform_key,
-  product_key,
-  status
-)
-VALUES (
-  '7b7b2877-3353-4972-ba6f-bc5f1627f24a',
-  'dxn-freddy-ramos-catunta',
-  'DXN - Freddy Ramos Catunta',
-  'leadflow',
-  'kurukin',
-  'leadflow',
-  'active'
-)
-ON CONFLICT (tenant_id) DO NOTHING;
-
-INSERT INTO channel_bindings (
-  binding_id,
-  provider,
-  channel,
-  instance_name,
-  number_id,
-  tenant_id,
-  vertical_key,
-  service_owner_key,
-  wallet_external_ref,
-  wallet_tenant_id,
-  wallet_owner_login,
-  status
-)
-VALUES (
-  gen_random_uuid(),
-  'evolution',
-  'whatsapp',
-  'lf-dxn-freddy',
-  NULL,
-  '7b7b2877-3353-4972-ba6f-bc5f1627f24a',
-  'mlm',
-  'lead-handler',
-  NULL,
-  NULL,
-  NULL,
-  'active'
-);
-```
-
-Después del seed manual, el resolver ya puede ubicar la instancia usando
-`provider=evolution`, `channel=whatsapp` e `instance_name=lf-dxn-freddy`.
+- ya no se requieren `INSERT` manuales para crear o limpiar bindings de
+  WhatsApp desde Leadflow

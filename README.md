@@ -48,7 +48,7 @@ Secuencia operativa actual:
 
 1. Leadflow crea o reutiliza la instancia en Evolution y configura el webhook inbound.
 2. La conexión se marca en base como `PROVISIONED`.
-3. Leadflow registra la instancia en Runtime Context Central con `provider=evolution`, `channel=whatsapp`, `instance_name`, `tenant_id` y `service_owner_key=lead-handler`.
+3. Leadflow registra o actualiza automáticamente el binding en Runtime Context Central vía `POST /v1/admin/channel-bindings/upsert`, usando `provider=evolution`, `channel=whatsapp`, `instance_name`, `tenant_id`, `service_owner_key=lead-handler`, `source_system=leadflow` y `vertical_key`.
 4. La conexión pasa a `REGISTERED`.
 5. Leadflow hace polling de verificación contra `resolve-full` hasta que Runtime Context Central devuelve `200`.
 6. La conexión pasa a `READY`.
@@ -74,18 +74,24 @@ Flujo de conexión vigente:
    y `qrcode=true`.
 3. Leadflow ejecuta `POST /webhook/set/{instanceName}` como segundo paso
    obligatorio para registrar el webhook de n8n.
-4. Leadflow solicita el QR vía `GET /instance/connect/{instanceName}` y lo
+4. Leadflow hace el `upsert` administrativo del binding en Runtime Context para
+   dejar el canal resoluble sin intervención manual.
+5. Leadflow solicita el QR vía `GET /instance/connect/{instanceName}` y lo
    entrega al frontend del asesor.
 
 Notas operativas:
 
 - La autenticación hacia Evolution se hace siempre con `apikey`, `x-api-key` y
   `Authorization: Bearer <key>`.
+- El binding de Runtime Context se administra automáticamente desde Leadflow
+  usando `x-internal-api-key` y `x-service-key: leadflow-api`.
+- Cuando el asesor reinicia o desconecta la instancia, Leadflow ejecuta
+  `DELETE /v1/admin/channel-bindings/{instanceName}` para marcar el binding
+  como `deleted` y evitar basura técnica.
 - El webhook apunta al formato interno por instancia:
   `http://n8n_v2_webhook:5678/webhook/{webhookId}/channels/evolution/{instanceName}/inbound`
-- En entornos locales con `runtime-context-service:local`, Leadflow no registra
-  bindings por API porque esa imagen es `Resolver-Only`; el módulo hace bypass
-  controlado y el seed debe realizarse manualmente en Postgres.
+- Ya no se requieren `INSERT` manuales en Runtime Context para crear o limpiar
+  bindings de WhatsApp.
 
 ## Fuente de verdad de despliegue
 

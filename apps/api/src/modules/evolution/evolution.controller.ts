@@ -33,6 +33,7 @@ export class EvolutionController {
     this.assertOwnedInstanceName(user, instanceName);
     const tenantId = this.resolveTenantId(user);
     const ownerKey = this.resolveOwnerKey(user);
+    const verticalKey = this.resolveVerticalKey(user);
 
     const connectionState =
       await this.evolutionService.getConnectionState(instanceName);
@@ -42,11 +43,11 @@ export class EvolutionController {
     }
 
     await this.evolutionService.setWebhook(instanceName);
-    await this.runtimeContextService.registerBinding(
-      tenantId,
+    await this.runtimeContextService.registerBinding({
       instanceName,
-      ownerKey,
-    );
+      tenantId,
+      verticalKey,
+    });
 
     const qrCode = await this.evolutionService.getQrCode(instanceName);
 
@@ -97,6 +98,7 @@ export class EvolutionController {
     this.assertOwnedInstanceName(user, normalizedInstanceName);
 
     await this.evolutionService.logoutInstance(normalizedInstanceName);
+    await this.runtimeContextService.deleteBinding(normalizedInstanceName);
 
     return {
       success: true,
@@ -116,6 +118,16 @@ export class EvolutionController {
       message:
         'The authenticated user does not have an operational tenant scope.',
     });
+  }
+
+  private resolveVerticalKey(user: AuthenticatedUser) {
+    const teamWithVertical = user.team as
+      | (NonNullable<AuthenticatedUser['team']> & {
+          vertical?: string | null;
+        })
+      | null;
+
+    return sanitizeNullableText(teamWithVertical?.vertical) ?? 'unknown';
   }
 
   private resolveOwnerKey(user: AuthenticatedUser) {
