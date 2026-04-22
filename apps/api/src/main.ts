@@ -62,7 +62,6 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter({
       bodyLimit: 10_485_760,
-      ajv: { allowUnionTypes: true },
     }),
   );
   const prisma = app.get(PrismaService);
