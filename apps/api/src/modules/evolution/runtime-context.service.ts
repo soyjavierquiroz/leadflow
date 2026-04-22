@@ -46,7 +46,7 @@ type RuntimeContextRequestInput =
     };
 
 const DEFAULT_TIMEOUT_MS = 5_000;
-const UPSERT_PATH = '/v1/admin/channel-bindings/upsert';
+const ADMIN_BINDINGS_PATH = '/admin/channel-bindings';
 const SERVICE_KEY = 'leadflow-api';
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
@@ -77,7 +77,7 @@ export class RuntimeContextService {
     const payload = this.buildPayload(input);
     const response = await this.request({
       method: 'POST',
-      path: UPSERT_PATH,
+      path: `${ADMIN_BINDINGS_PATH}/upsert`,
       body: payload,
     });
 
@@ -96,7 +96,7 @@ export class RuntimeContextService {
     const normalizedInstanceName = this.requireText(instanceName, 'instanceName');
     const response = await this.request({
       method: 'DELETE',
-      path: `/v1/admin/channel-bindings/${encodeURIComponent(normalizedInstanceName)}`,
+      path: `${ADMIN_BINDINGS_PATH}/${encodeURIComponent(normalizedInstanceName)}`,
     });
 
     if (
@@ -141,6 +141,28 @@ export class RuntimeContextService {
     this.requireText(payload.service_owner_key, 'service_owner_key');
   }
 
+  private resolveAdminApiBaseUrl() {
+    const baseUrl = this.baseUrl;
+
+    if (!baseUrl) {
+      return null;
+    }
+
+    try {
+      const url = new URL(baseUrl);
+      const pathname = url.pathname.replace(/\/+$/, '');
+      url.pathname = pathname.endsWith('/v1')
+        ? pathname || '/v1'
+        : `${pathname}/v1`;
+      url.search = '';
+      url.hash = '';
+
+      return url.toString();
+    } catch {
+      return null;
+    }
+  }
+
   private async request(
     input: RuntimeContextRequestInput,
   ): Promise<RuntimeContextResponse> {
@@ -155,7 +177,19 @@ export class RuntimeContextService {
 
     try {
       const hasBody = input.method === 'POST';
-      const response = await fetch(joinUrlPath(this.baseUrl!, input.path), {
+      const fullUrl = joinUrlPath(
+        this.resolveAdminApiBaseUrl() ?? this.baseUrl!,
+        input.path,
+      );
+
+      console.log(
+        '[RUNTIME-CONTEXT-API] Calling URL:',
+        fullUrl,
+        'Method:',
+        input.method,
+      );
+
+      const response = await fetch(fullUrl, {
         method: input.method,
         signal: controller.signal,
         headers: {

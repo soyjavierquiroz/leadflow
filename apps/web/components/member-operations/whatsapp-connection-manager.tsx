@@ -283,6 +283,7 @@ export function WhatsAppConnectionManager({
         `/evolution/restart?instanceName=${encodeURIComponent(instanceName)}`,
         {
           method: "DELETE",
+          body: JSON.stringify({}),
         },
       );
 

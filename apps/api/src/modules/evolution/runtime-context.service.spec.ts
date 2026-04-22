@@ -56,6 +56,30 @@ describe('RuntimeContextService', () => {
     );
   });
 
+  it('avoids duplicating the v1 prefix when the runtime-context base url already includes it', async () => {
+    process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL =
+      'http://runtime-context.example/v1';
+    process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY = 'secret-key';
+
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(buildResponse(201, { ok: true }));
+    const service = new RuntimeContextService();
+
+    await service.registerBinding({
+      instanceName: 'lf-dxn-freddy',
+      tenantId: 'team-123',
+      verticalKey: 'mlm',
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://runtime-context.example/v1/admin/channel-bindings/upsert',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+  });
+
   it('deletes the admin binding and treats 404 as an idempotent success', async () => {
     process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL =
       'http://runtime-context.example';

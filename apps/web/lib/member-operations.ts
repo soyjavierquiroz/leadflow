@@ -66,13 +66,19 @@ export const memberOperationRequest = async <T>(
   path: string,
   init: RequestInit,
 ): Promise<T> => {
+  const headers = new Headers(init.headers ?? {});
+  const hasBody = init.body !== undefined && init.body !== null;
+  const isFormDataRequest =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+
+  if (hasBody && !isFormDataRequest && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const response = await fetch(`${webPublicConfig.urls.api}/v1${path}`, {
     ...init,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
+    headers,
   });
 
   const payload = (await response.json().catch(() => null)) as unknown;
