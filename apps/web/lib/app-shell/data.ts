@@ -1,5 +1,9 @@
 import { unstable_noStore as noStore } from "next/cache";
-import { apiFetchWithSession, getSessionUser } from "@/lib/auth";
+import {
+  apiFetchWithSession,
+  canAccessOperationalView,
+  getSessionUser,
+} from "@/lib/auth";
 import {
   mockAssignments,
   mockDomains,
@@ -525,7 +529,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           data: mockDomains,
           source: "mock" as const,
         }),
-    currentUser?.role === "MEMBER"
+    canAccessOperationalView(currentUser)
       ? fetchSingleton<SponsorRecord>(
           "/sponsors/me",
           memberSponsorFallback,

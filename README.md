@@ -280,3 +280,56 @@ Validar el stack:
 pnpm docker:stack:validate
 pnpm docker:stack:validate:local
 ```
+
+## Reglas Arquitectónicas Actuales
+
+### Modelo Híbrido de Usuarios y Operación
+Leadflow opera con un modelo híbrido entre gestión administrativa y operación comercial.
+
+- `SUPER_ADMIN` accede a superficies `system/*` únicamente mediante sesión autenticada.
+- `TEAM_ADMIN` y `MEMBER` participan en la operación comercial del tenant según su contexto, sponsor vinculado, disponibilidad y estado de licencia/asiento.
+- Las integraciones técnicas no comparten privilegios con usuarios humanos. Los webhooks de automatización usan endpoints dedicados y no pueden reutilizar guards administrativos.
+
+### Seguridad de Webhooks y Endpoints de Sistema
+La separación de privilegios es obligatoria:
+
+- `SystemTenantAccessGuard` protege endpoints administrativos y solo acepta sesión autenticada de `SUPER_ADMIN`.
+- `SystemApiGuard` protege exclusivamente `webhooks/n8n/*` mediante `N8N_WEBHOOK_SECRET`.
+- Ningún secreto de integración debe otorgar acceso a endpoints administrativos.
+- Las respuestas públicas del runtime no deben exponer secretos server-side como `metaCapiToken` o `tiktokAccessToken`.
+- Todo log operativo que procese payloads de webhooks o SSO debe pasar por redacción de datos sensibles antes de serializarse.
+
+### Concurrencia e Idempotencia en Leads
+El motor de leads está diseñado para resistir submits concurrentes y carreras entre asignación, reasignación y aceptación.
+
+#### Captura de leads
+- `Lead.visitorId` es la clave de idempotencia funcional.
+- La creación sigue el patrón `create -> catch P2002 -> find existing -> merge/update`.
+- Esto evita errores 500 por doble submit y garantiza que dos requests simultáneas no creen dos leads para el mismo visitante.
+
+#### Asignación y ownership
+- Antes de modificar `Assignment.status` o `Lead.currentAssignmentId`, se debe bloquear la fila del `Lead` con `SELECT ... FOR UPDATE`.
+- Este lock aplica al menos a:
+  - auto-assign público
+  - reasignación manual
+  - aceptación manual por sponsor
+  - auto-accept por webhook
+- La aplicación debe releer el estado del lead y su assignment dentro de la misma transacción protegida por lock.
+
+#### Invariante de base de datos
+Además del lock transaccional, la base de datos impone el siguiente invariante:
+
+- Un `Lead` solo puede tener un assignment activo a la vez.
+- Se considera “activo” cualquier assignment con estado `pending`, `assigned` o `accepted`.
+
+Este invariante se refuerza con un índice único parcial sobre `Assignment(leadId)` filtrado por esos estados.
+
+### Regla de Evolución
+Toda nueva feature que:
+- cree leads,
+- cambie ownership,
+- reasigne sponsors,
+- acepte handoffs,
+- o introduzca nuevos webhooks,
+
+debe respetar estas reglas de seguridad y concurrencia antes de considerarse lista para producción.

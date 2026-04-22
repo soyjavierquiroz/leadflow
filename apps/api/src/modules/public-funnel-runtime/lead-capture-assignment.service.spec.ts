@@ -311,7 +311,9 @@ describe('LeadCaptureAssignmentService', () => {
       where: {
         workspaceId: publication.workspaceId,
         teamId: publication.teamId,
-        role: 'MEMBER',
+        role: {
+          in: ['MEMBER', 'TEAM_ADMIN'],
+        },
         status: 'active',
         sponsor: {
           is: {
@@ -337,6 +339,69 @@ describe('LeadCaptureAssignmentService', () => {
       reason: 'rotation',
       user: {
         id: 'advisor-2',
+      },
+    });
+  });
+
+  it('includes active team admins in the round-robin pool', async () => {
+    const { service } = buildService();
+    const publication = buildPublication();
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          id: publication.teamId,
+          lastAssignedUserId: 'advisor-1',
+        },
+      ]),
+      user: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'advisor-1',
+            fullName: 'Advisor Uno',
+            role: 'MEMBER',
+            sponsor: {
+              id: 'sponsor-1',
+              displayName: 'Advisor Uno',
+              phone: '+57 300 000 0001',
+              avatarUrl: 'https://cdn.example.com/a1.png',
+            },
+          },
+          {
+            id: 'admin-1',
+            fullName: 'Freddy',
+            role: 'TEAM_ADMIN',
+            sponsor: {
+              id: 'sponsor-admin-1',
+              displayName: 'Freddy',
+              phone: '+57 300 000 0099',
+              avatarUrl: 'https://cdn.example.com/admin.png',
+            },
+          },
+        ]),
+      },
+      team: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    const result = await (service as any).resolveRoundRobinAssigneeOrThrow(
+      tx,
+      publication,
+    );
+
+    expect(tx.team.update).toHaveBeenCalledWith({
+      where: {
+        id: publication.teamId,
+      },
+      data: {
+        lastAssignedUserId: 'admin-1',
+      },
+    });
+    expect(result).toMatchObject({
+      reason: 'rotation',
+      user: {
+        id: 'admin-1',
+        role: 'TEAM_ADMIN',
       },
     });
   });

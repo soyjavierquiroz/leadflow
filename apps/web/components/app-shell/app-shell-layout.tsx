@@ -4,7 +4,19 @@ import type { ReactNode } from "react";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { TopBar } from "@/components/app-shell/top-bar";
 import type { AuthenticatedAppUser } from "@/lib/auth.types";
-import type { DataSourceMode, ShellNavItem } from "@/lib/app-shell/types";
+import type {
+  DataSourceMode,
+  ShellNavItem,
+  ShellNavSection,
+  SidebarStatusBadge,
+  WorkspaceViewSwitcherOption,
+  WorkspaceViewMode,
+} from "@/lib/app-shell/types";
+
+export type AppShellWorkspaceSwitcher = {
+  activeMode: WorkspaceViewMode;
+  options: WorkspaceViewSwitcherOption[];
+};
 
 export type AppShellLayoutProps = {
   areaLabel: string;
@@ -15,6 +27,9 @@ export type AppShellLayoutProps = {
   sourceMode?: DataSourceMode;
   currentUser: AuthenticatedAppUser | null;
   nav: ShellNavItem[];
+  navSections?: ShellNavSection[];
+  sidebarStatusBadge?: SidebarStatusBadge;
+  workspaceSwitcher?: AppShellWorkspaceSwitcher;
   children: ReactNode;
 };
 
@@ -27,6 +42,9 @@ export function AppShellLayout({
   sourceMode,
   currentUser,
   nav,
+  navSections,
+  sidebarStatusBadge,
+  workspaceSwitcher,
   children,
 }: AppShellLayoutProps) {
   return (
@@ -36,6 +54,8 @@ export function AppShellLayout({
           areaLabel={areaLabel}
           areaDescription={areaDescription}
           nav={nav}
+          navSections={navSections}
+          statusBadge={sidebarStatusBadge}
         />
         <div className="min-w-0">
           <TopBar
@@ -44,6 +64,7 @@ export function AppShellLayout({
             personaLabel={personaLabel}
             sourceMode={sourceMode}
             currentUser={currentUser}
+            workspaceSwitcher={workspaceSwitcher}
           />
           <main className="flex w-full flex-col items-start px-5 py-6 text-left md:px-8 md:py-8">
             {children}

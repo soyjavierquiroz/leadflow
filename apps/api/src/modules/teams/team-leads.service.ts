@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
+import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
 import type { ReassignTeamLeadDto } from './dto/reassign-team-lead.dto';
 
 const teamLeadInboxInclude = {
@@ -212,6 +213,18 @@ export class TeamLeadsService {
     }
 
     const { assignmentId } = await this.prisma.$transaction(async (tx) => {
+      const lockedLead = await lockLeadRowForUpdate(tx, {
+        leadId,
+        workspaceId: scope.workspaceId,
+      });
+
+      if (!lockedLead) {
+        throw new NotFoundException({
+          code: 'TEAM_LEAD_NOT_FOUND',
+          message: 'The requested lead was not found for this team.',
+        });
+      }
+
       const lead = await tx.lead.findFirst({
         where: this.buildTeamLeadWhere(scope, leadId),
         include: {

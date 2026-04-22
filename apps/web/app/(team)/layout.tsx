@@ -1,6 +1,7 @@
 import { AppShellLayout } from "@/components/app-shell/app-shell-layout";
-import { requireRole } from "@/lib/auth";
+import { isHybridOperationalAdmin, requireRole } from "@/lib/auth";
 import { getAppShellSnapshot } from "@/lib/app-shell/data";
+import type { WorkspaceViewSwitcherOption } from "@/lib/app-shell/types";
 
 const teamNav = [
   {
@@ -40,13 +41,29 @@ const teamNav = [
   },
 ];
 
+const workspaceSwitcherOptions: WorkspaceViewSwitcherOption[] = [
+  {
+    href: "/team",
+    label: "Vista de Gestión",
+    description: "Capacidad, licencias, equipo y métricas globales.",
+    mode: "management",
+  },
+  {
+    href: "/member",
+    label: "Vista de Operación",
+    description: "Tus métricas comerciales, leads y sponsor personal.",
+    mode: "operations",
+  },
+];
+
 export default async function TeamLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  await requireRole("TEAM_ADMIN");
+  const user = await requireRole("TEAM_ADMIN");
   const snapshot = await getAppShellSnapshot();
+  const canOpenOperationalView = isHybridOperationalAdmin(user);
 
   return (
     <AppShellLayout
@@ -58,6 +75,14 @@ export default async function TeamLayout({
       sourceMode={snapshot.sourceMode}
       currentUser={snapshot.currentUser}
       nav={teamNav}
+      workspaceSwitcher={
+        canOpenOperationalView
+          ? {
+              activeMode: "management",
+              options: workspaceSwitcherOptions,
+            }
+          : undefined
+      }
     >
       {children}
     </AppShellLayout>

@@ -41,7 +41,7 @@ import {
   type VslSocialProofGridItem,
 } from "@/components/public-funnel/vsl-core-sections";
 import { StickyConversionBar } from "@/components/public-funnel/sticky-conversion-bar";
-import { WhatsappHandoffCta } from "@/components/public-funnel/whatsapp-handoff-cta";
+import { HandoffCta } from "@/components/public-funnel/handoff-cta";
 import type {
   PublicFunnelRuntimePayload,
   RuntimeBlock,
@@ -1958,13 +1958,13 @@ function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
   );
 }
 
-function WhatsappHandoffCtaBlockAdapter({
+function HandoffCtaBlockAdapter({
   block,
   runtime,
   surfaceProps,
 }: PublicBlockAdapterProps) {
   return (
-    <WhatsappHandoffCta
+    <HandoffCta
       isBoxed={surfaceProps?.isBoxed}
       runtime={runtime}
       headline={asString(
@@ -2356,7 +2356,7 @@ export function PublicBlockAdapter({
         );
       case "whatsapp_handoff_cta":
         return (
-          <WhatsappHandoffCtaBlockAdapter
+          <HandoffCtaBlockAdapter
             block={block}
             runtime={runtime}
             blocks={blocks}

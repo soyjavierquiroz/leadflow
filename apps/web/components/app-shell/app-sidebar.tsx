@@ -2,20 +2,88 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ShellNavItem } from "@/lib/app-shell/types";
+import type {
+  ShellNavItem,
+  ShellNavSection,
+  SidebarStatusBadge,
+} from "@/lib/app-shell/types";
 
 type AppSidebarProps = {
   areaLabel: string;
   areaDescription: string;
   nav: ShellNavItem[];
+  navSections?: ShellNavSection[];
+  statusBadge?: SidebarStatusBadge;
 };
 
 export function AppSidebar({
   areaLabel,
   areaDescription,
   nav,
+  navSections,
+  statusBadge,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const sections =
+    navSections && navSections.length > 0
+      ? navSections
+      : [
+          {
+            title: "Modulos",
+            description: "Lo importante de esta superficie, ordenado para trabajo diario.",
+            items: nav,
+          },
+        ];
+
+  const renderNavItem = (item: ShellNavItem) => {
+    const match = item.match ?? item.href;
+    const isActive =
+      pathname === item.href ||
+      (pathname.startsWith(`${match}/`) && match !== "/");
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={isActive ? "page" : undefined}
+        className={`block rounded-[1.35rem] border px-4 py-3 transition ${
+          isActive
+            ? "border-teal-300/40 bg-white text-slate-950 shadow-[0_16px_40px_rgba(15,23,42,0.2)]"
+            : "border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span
+              className={`h-8 w-1 rounded-full ${
+                isActive ? "bg-slate-950" : "bg-white/10"
+              }`}
+            />
+            <p className="text-sm font-semibold">{item.label}</p>
+          </div>
+          {isActive ? (
+            <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
+              Actual
+            </span>
+          ) : null}
+        </div>
+        <p
+          className={`mt-1 text-xs leading-5 ${
+            isActive ? "text-slate-600" : "text-slate-400"
+          }`}
+        >
+          {item.description}
+        </p>
+      </Link>
+    );
+  };
+
+  const statusBadgeClassName =
+    statusBadge?.tone === "amber"
+      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      : statusBadge?.tone === "teal"
+        ? "border-teal-300/40 bg-teal-400/15 text-teal-100"
+        : "border-white/15 bg-white/10 text-slate-100";
 
   return (
     <aside className="border-b border-white/60 bg-[linear-gradient(180deg,_#020617_0%,_#0f172a_42%,_#111827_100%)] px-5 py-6 text-slate-100 lg:min-h-screen lg:border-b-0 lg:border-r lg:border-r-white/10">
@@ -38,61 +106,36 @@ export function AppSidebar({
             Usa esta navegación para entender el estado actual, detectar bloqueos y mover la operación al siguiente paso.
           </p>
         </div>
+
+        {statusBadge ? (
+          <div
+            className={`mt-4 inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ${statusBadgeClassName}`}
+          >
+            {statusBadge.label}
+          </div>
+        ) : null}
       </div>
 
-      <div className="mt-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-          Modulos
-        </p>
-        <p className="mt-2 text-sm text-slate-400">
-          Lo importante de esta superficie, ordenado para trabajo diario.
-        </p>
-      </div>
-
-      <nav className="mt-4 space-y-2">
-        {nav.map((item) => {
-          const match = item.match ?? item.href;
-          const isActive =
-            pathname === item.href ||
-            (pathname.startsWith(`${match}/`) && match !== "/");
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={isActive ? "page" : undefined}
-              className={`block rounded-[1.35rem] border px-4 py-3 transition ${
-                isActive
-                  ? "border-teal-300/40 bg-white text-slate-950 shadow-[0_16px_40px_rgba(15,23,42,0.2)]"
-                  : "border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`h-8 w-1 rounded-full ${
-                      isActive ? "bg-slate-950" : "bg-white/10"
-                    }`}
-                  />
-                  <p className="text-sm font-semibold">{item.label}</p>
-                </div>
-                {isActive ? (
-                  <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
-                    Actual
-                  </span>
-                ) : null}
-              </div>
-              <p
-                className={`mt-1 text-xs leading-5 ${
-                  isActive ? "text-slate-600" : "text-slate-400"
-                }`}
-              >
-                {item.description}
+      <div className="mt-6 space-y-6">
+        {sections.map((section, index) => (
+          <section
+            key={section.title}
+            className={index === 0 ? undefined : "border-t border-white/10 pt-6"}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+              {section.title}
+            </p>
+            {section.description ? (
+              <p className="mt-2 text-sm text-slate-400">
+                {section.description}
               </p>
-            </Link>
-          );
-        })}
-      </nav>
+            ) : null}
+            <nav className="mt-4 space-y-2">
+              {section.items.map((item) => renderNavItem(item))}
+            </nav>
+          </section>
+        ))}
+      </div>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 px-4 py-4 text-sm leading-6 text-slate-300">
         La navegacion lateral ya no habla solo de modulos tecnicos: busca orientar la operacion, la capacidad y el seguimiento del rol.

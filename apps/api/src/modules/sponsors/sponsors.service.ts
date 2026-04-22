@@ -15,10 +15,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { buildLeadWorkflow } from '../leads/leads-workflows';
 import { N8nAutomationClient } from '../messaging-automation/n8n-automation.client';
+import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
 import {
   normalizeMessagingPhone,
-  sanitizeNullableText,
-} from '../messaging-integrations/messaging-integrations.utils';
+} from '../shared/messaging-channel.utils';
+import { sanitizeNullableText } from '../shared/url.utils';
 import type { CreateSponsorDto } from './dto/create-sponsor.dto';
 import {
   MemberDashboardDto,
@@ -250,72 +251,87 @@ export class SponsorsService {
     },
     leadId: string,
   ): Promise<MemberLeadAcceptResult> {
-    const lead = await this.prisma.lead.findFirst({
-      where: {
-        id: leadId,
+    const { lead, result } = await this.prisma.$transaction(async (tx) => {
+      const lockedLead = await lockLeadRowForUpdate(tx, {
+        leadId,
         workspaceId: scope.workspaceId,
-        currentAssignment: {
-          is: {
-            sponsorId: scope.sponsorId,
-            teamId: scope.teamId,
+      });
+
+      if (!lockedLead) {
+        throw new NotFoundException({
+          code: 'LEAD_NOT_FOUND',
+          message: 'The requested lead was not found for this sponsor.',
+        });
+      }
+
+      const lead = await tx.lead.findFirst({
+        where: {
+          id: leadId,
+          workspaceId: scope.workspaceId,
+          currentAssignment: {
+            is: {
+              sponsorId: scope.sponsorId,
+              teamId: scope.teamId,
+            },
           },
         },
-      },
-      include: memberLeadAcceptInclude,
-    });
-
-    if (!lead) {
-      throw new NotFoundException({
-        code: 'LEAD_NOT_FOUND',
-        message: 'The requested lead was not found for this sponsor.',
+        include: memberLeadAcceptInclude,
       });
-    }
 
-    const assignment = lead.currentAssignment;
+      if (!lead) {
+        throw new NotFoundException({
+          code: 'LEAD_NOT_FOUND',
+          message: 'The requested lead was not found for this sponsor.',
+        });
+      }
 
-    if (!assignment) {
-      throw new BadRequestException({
-        code: 'LEAD_ASSIGNMENT_REQUIRED',
-        message: 'The lead does not have an active assignment to accept.',
-      });
-    }
+      const assignment = lead.currentAssignment;
 
-    if (lead.status === 'won' || lead.status === 'lost') {
-      throw new BadRequestException({
-        code: 'LEAD_NOT_ACCEPTABLE',
-        message: 'Terminal leads cannot be accepted manually.',
-      });
-    }
+      if (!assignment) {
+        throw new BadRequestException({
+          code: 'LEAD_ASSIGNMENT_REQUIRED',
+          message: 'The lead does not have an active assignment to accept.',
+        });
+      }
 
-    if (assignment.status === 'accepted') {
-      return {
-        ok: true,
-        leadId: lead.id,
-        sponsorId: assignment.sponsorId,
-        assignmentId: assignment.id,
-        assignmentStatus: 'accepted',
-        leadStatus: lead.status,
-        acceptedAt:
-          assignment.acceptedAt?.toISOString() ??
-          assignment.updatedAt.toISOString(),
-        alreadyAccepted: true,
-      };
-    }
+      if (lead.status === 'won' || lead.status === 'lost') {
+        throw new BadRequestException({
+          code: 'LEAD_NOT_ACCEPTABLE',
+          message: 'Terminal leads cannot be accepted manually.',
+        });
+      }
 
-    if (assignment.status !== 'pending' && assignment.status !== 'assigned') {
-      throw new BadRequestException({
-        code: 'ASSIGNMENT_NOT_ACCEPTABLE',
-        message: 'Only pending or assigned leads can be accepted manually.',
-      });
-    }
+      if (assignment.status === 'accepted') {
+        return {
+          lead,
+          result: {
+            ok: true,
+            leadId: lead.id,
+            sponsorId: assignment.sponsorId,
+            assignmentId: assignment.id,
+            assignmentStatus: 'accepted',
+            leadStatus: lead.status,
+            acceptedAt:
+              assignment.acceptedAt?.toISOString() ??
+              assignment.updatedAt.toISOString(),
+            alreadyAccepted: true,
+          } satisfies MemberLeadAcceptResult,
+        };
+      }
 
-    const acceptedAt = new Date();
-    const nextLeadStatus =
-      lead.status === 'captured' || lead.status === 'assigned'
-        ? 'nurturing'
-        : lead.status;
+      if (assignment.status !== 'pending' && assignment.status !== 'assigned') {
+        throw new BadRequestException({
+          code: 'ASSIGNMENT_NOT_ACCEPTABLE',
+          message: 'Only pending or assigned leads can be accepted manually.',
+        });
+      }
 
-    await this.prisma.$transaction(async (tx) => {
+      const acceptedAt = new Date();
+      const nextLeadStatus =
+        lead.status === 'captured' || lead.status === 'assigned'
+          ? 'nurturing'
+          : lead.status;
+
       await tx.assignment.update({
         where: {
           id: assignment.id,
@@ -336,18 +352,25 @@ export class SponsorsService {
           },
         });
       }
+
+      return {
+        lead,
+        result: {
+          ok: true,
+          leadId: lead.id,
+          sponsorId: assignment.sponsorId,
+          assignmentId: assignment.id,
+          assignmentStatus: 'accepted',
+          leadStatus: nextLeadStatus,
+          acceptedAt: acceptedAt.toISOString(),
+          alreadyAccepted: false,
+        } satisfies MemberLeadAcceptResult,
+      };
     });
 
-    const result: MemberLeadAcceptResult = {
-      ok: true,
-      leadId: lead.id,
-      sponsorId: assignment.sponsorId,
-      assignmentId: assignment.id,
-      assignmentStatus: 'accepted',
-      leadStatus: nextLeadStatus,
-      acceptedAt: acceptedAt.toISOString(),
-      alreadyAccepted: false,
-    };
+    if (result.alreadyAccepted) {
+      return result;
+    }
 
     const outboundWebhookUrl = this.getOutboundWebhookUrl();
 

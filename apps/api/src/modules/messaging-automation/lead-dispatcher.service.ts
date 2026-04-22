@@ -1,10 +1,9 @@
 import { randomUUID } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { MessagingRuntimeContextStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { normalizeMessagingPhone } from '../messaging-integrations/messaging-integrations.utils';
+import { normalizeMessagingPhone } from '../shared/messaging-channel.utils';
 import type { LeadContextUpsertPayload } from './lead-dispatcher.types';
-import { RuntimeContextCentralService } from '../runtime-context/runtime-context-central.service';
 import {
   joinUrlPath,
   normalizeBaseUrl,
@@ -96,7 +95,6 @@ export class LeadDispatcherService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly runtimeContextCentralService: RuntimeContextCentralService,
   ) {
     this.logger.log(
       `Dispatcher URL resolved to internal route: configured=${this.configuredDispatcherWebhookUrl} effective=${this.dispatcherWebhookUrl}`,
@@ -126,23 +124,6 @@ export class LeadDispatcherService {
     const connection = assignment.sponsor.messagingConnection;
 
     if (!connection?.externalInstanceId) {
-      return null;
-    }
-
-    const readiness =
-      connection.runtimeContextStatus === MessagingRuntimeContextStatus.READY
-        ? {
-            ready: true,
-          }
-        : await this.runtimeContextCentralService.ensureConnectionReady({
-            id: connection.id,
-            workspaceId: connection.workspaceId,
-            externalInstanceId: connection.externalInstanceId,
-            runtimeContextStatus: connection.runtimeContextStatus,
-            runtimeContextTenantId: connection.runtimeContextTenantId,
-          });
-
-    if (!readiness.ready) {
       return null;
     }
 

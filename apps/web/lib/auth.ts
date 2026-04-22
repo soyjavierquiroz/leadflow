@@ -366,6 +366,16 @@ export const getHomePathForRole = (role: AppUserRole) => {
   }
 };
 
+export const isHybridOperationalAdmin = (
+  user: AuthenticatedAppUser | null | undefined,
+) => user?.role === "TEAM_ADMIN" && user.sponsor?.isActive === true;
+
+export const canAccessOperationalView = (
+  user: AuthenticatedAppUser | null | undefined,
+) =>
+  user?.role === "MEMBER" ||
+  (user?.role === "TEAM_ADMIN" && user.sponsor?.isActive === true);
+
 export const isLoginApiResponse = (value: unknown): value is LoginApiResponse =>
   isObjectRecord(value) &&
   typeof value.redirectPath === "string" &&
@@ -717,6 +727,32 @@ export const requireRole = async (requiredRole: AppUserRole) => {
   }
 
   if (user.role !== requiredRole) {
+    redirect(resolveAuthRedirectTarget(getHomePathForRole(user.role)));
+  }
+
+  return user;
+};
+
+export const requireOperationalViewUser = async () => {
+  const requestHeaders = await headers();
+
+  if (isPublicCanvasRequest(requestHeaders)) {
+    if (publicCanvasBypassUser.role !== "MEMBER") {
+      redirect(
+        resolveAuthRedirectTarget(getHomePathForRole(publicCanvasBypassUser.role)),
+      );
+    }
+
+    return publicCanvasBypassUser;
+  }
+
+  const user = await getSessionUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (!canAccessOperationalView(user)) {
     redirect(resolveAuthRedirectTarget(getHomePathForRole(user.role)));
   }
 

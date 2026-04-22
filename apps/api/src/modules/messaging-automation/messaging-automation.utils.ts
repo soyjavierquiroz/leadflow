@@ -1,5 +1,5 @@
 import type { MessagingConnectionStatus } from '@prisma/client';
-import { buildAutomationWebhookUrl } from '../messaging-integrations/messaging-integrations.utils';
+import { buildAutomationWebhookUrl } from '../shared/messaging-channel.utils';
 
 export const resolveAutomationDispatchTargetUrl = (input: {
   explicitWebhookUrl?: string | null;

@@ -14,6 +14,7 @@ import { TrackingEventsService } from '../events/tracking-events.service';
 import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
 import { MessagingAutomationService } from '../messaging-automation/messaging-automation.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
 import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto';
 import type { CapturePublicLeadDto } from './dto/capture-public-lead.dto';
 import type { AutoAssignPublicLeadDto } from './dto/auto-assign-public-lead.dto';
@@ -717,45 +718,65 @@ export class LeadCaptureAssignmentService {
       });
     }
 
-    const existing = await tx.lead.findFirst({
-      where: {
-        visitorId: visitor.id,
-      },
-    });
-
     const tags = Array.from(new Set(input.tags ?? []));
-    const lead = existing
-      ? await tx.lead.update({
-          where: { id: existing.id },
-          data: {
-            funnelId: legacyFunnelId,
-            funnelInstanceId: publication.funnelInstanceId,
-            funnelPublicationId: publication.id,
-            sourceChannel: this.toDbSource(input.sourceChannel ?? 'form'),
-            fullName: input.fullName ?? existing.fullName,
-            email: input.email ?? existing.email,
-            phone: input.phone ?? existing.phone,
-            companyName: input.companyName ?? existing.companyName,
-            tags: tags.length > 0 ? tags : existing.tags,
-          },
-        })
-      : await tx.lead.create({
-          data: {
-            workspaceId: publication.workspaceId,
-            funnelId: legacyFunnelId,
-            funnelInstanceId: publication.funnelInstanceId,
-            funnelPublicationId: publication.id,
-            visitorId: visitor.id,
-            sourceChannel: this.toDbSource(input.sourceChannel ?? 'form'),
-            fullName: input.fullName ?? null,
-            email: input.email ?? null,
-            phone: input.phone ?? null,
-            companyName: input.companyName ?? null,
-            status: 'captured',
-            currentAssignmentId: null,
-            tags,
-          },
-        });
+    const sourceChannel = this.toDbSource(input.sourceChannel ?? 'form');
+    let wasCreated = false;
+    let lead: Prisma.LeadGetPayload<Record<string, never>>;
+
+    try {
+      lead = await tx.lead.create({
+        data: {
+          workspaceId: publication.workspaceId,
+          funnelId: legacyFunnelId,
+          funnelInstanceId: publication.funnelInstanceId,
+          funnelPublicationId: publication.id,
+          visitorId: visitor.id,
+          sourceChannel,
+          fullName: input.fullName ?? null,
+          email: input.email ?? null,
+          phone: input.phone ?? null,
+          companyName: input.companyName ?? null,
+          status: 'captured',
+          currentAssignmentId: null,
+          tags,
+        },
+      });
+      wasCreated = true;
+    } catch (error) {
+      if (
+        !(
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        )
+      ) {
+        throw error;
+      }
+
+      const existing = await tx.lead.findUnique({
+        where: {
+          visitorId: visitor.id,
+        },
+      });
+
+      if (!existing) {
+        throw error;
+      }
+
+      lead = await tx.lead.update({
+        where: { id: existing.id },
+        data: {
+          funnelId: legacyFunnelId,
+          funnelInstanceId: publication.funnelInstanceId,
+          funnelPublicationId: publication.id,
+          sourceChannel,
+          fullName: input.fullName ?? existing.fullName,
+          email: input.email ?? existing.email,
+          phone: input.phone ?? existing.phone,
+          companyName: input.companyName ?? existing.companyName,
+          tags: tags.length > 0 ? tags : existing.tags,
+        },
+      });
+    }
 
     await tx.visitor.update({
       where: { id: visitor.id },
@@ -771,7 +792,7 @@ export class LeadCaptureAssignmentService {
         eventId: randomUUID(),
         aggregateType: 'lead',
         aggregateId: lead.id,
-        eventName: existing ? 'lead_updated' : 'lead_captured',
+        eventName: wasCreated ? 'lead_captured' : 'lead_updated',
         actorType: 'visitor',
         payload: {
           publicationId: publication.id,
@@ -787,7 +808,7 @@ export class LeadCaptureAssignmentService {
       },
     });
 
-    if (!existing) {
+    if (wasCreated) {
       await this.trackingEventsService.recordTrackingEventInTransaction(tx, {
         workspaceId: publication.workspaceId,
         eventId: input.triggerEventId ?? undefined,
@@ -811,7 +832,7 @@ export class LeadCaptureAssignmentService {
 
     return {
       lead,
-      wasCreated: !existing,
+      wasCreated,
     };
   }
 
@@ -842,11 +863,23 @@ export class LeadCaptureAssignmentService {
       entryContext?: PublicRuntimeEntryContext;
     },
   ): Promise<AssignmentResolution> {
+    const lockedLead = await lockLeadRowForUpdate(tx, {
+      leadId: lead.id,
+      workspaceId: publication.workspaceId,
+    });
+
+    if (!lockedLead) {
+      throw new NotFoundException({
+        code: 'LEAD_NOT_FOUND',
+        message: `Lead ${lead.id} was not found for publication ${publication.id}.`,
+      });
+    }
+
     const existingOpenAssignment = await tx.assignment.findFirst({
       where: {
         leadId: lead.id,
         status: {
-          in: ['pending', 'assigned'],
+          in: ['pending', 'assigned', 'accepted'],
         },
       },
       include: {
@@ -1303,7 +1336,9 @@ export class LeadCaptureAssignmentService {
       where: {
         workspaceId: publication.workspaceId,
         teamId: publication.teamId,
-        role: 'MEMBER',
+        role: {
+          in: ['MEMBER', 'TEAM_ADMIN'],
+        },
         status: 'active',
         sponsor: {
           is: {

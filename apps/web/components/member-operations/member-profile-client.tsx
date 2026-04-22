@@ -13,6 +13,7 @@ import {
   optimizeUiIdentityImage,
 } from "@/lib/media-optimizer";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
+import { MemberProtectionHubButton } from "@/components/member-operations/member-protection-hub-button";
 import type { MemberDashboardKpis } from "@/lib/member-dashboard";
 import type { MemberProfileSponsor } from "@/lib/member-profile";
 import { memberOperationRequest } from "@/lib/member-operations";
@@ -265,26 +266,36 @@ export function MemberProfileClient({
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+          <section
+            id="blacklist-access"
+            className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.05)]"
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-slate-950">
-                  Canal de mensajeria
+                  Blacklist
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  La conexion real de WhatsApp vive en una vista separada para
-                  que puedas gestionarla sin mezclarla con el resto del perfil.
+                  Accede a tu lista de protección sin salir del workspace del
+                  member.
                 </p>
               </div>
 
               <Link
-                href="/member/channel"
+                href="/member/profile#blacklist-access"
                 className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                Gestionar canal
+                Ir al Blacklist
               </Link>
             </div>
-          </div>
+
+            <div className="mt-5">
+              <MemberProtectionHubButton
+                advisorPhone={currentSponsor.phone ?? null}
+                isSsoAvailable
+              />
+            </div>
+          </section>
 
           <form
             onSubmit={handleSubmit}

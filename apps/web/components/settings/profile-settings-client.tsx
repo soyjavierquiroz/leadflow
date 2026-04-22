@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, ShieldCheck, UserRound } from "lucide-react";
+import { MemberProtectionHubButton } from "@/components/member-operations/member-protection-hub-button";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { buildInitials } from "@/lib/app-shell/utils";
@@ -489,6 +490,15 @@ export function ProfileSettingsClient({
               {isSavingPassword ? "Actualizando..." : "Actualizar contraseña"}
             </button>
           </form>
+
+          {scope === "member" ? (
+            <div id="blacklist-access">
+              <MemberProtectionHubButton
+                advisorPhone={phone.trim() || profile.phone}
+                isSsoAvailable
+              />
+            </div>
+          ) : null}
         </div>
       </section>
     </div>

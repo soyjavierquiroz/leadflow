@@ -23,6 +23,9 @@ const slugify = (value: string) =>
     .replace(/^-+|-+$/g, '')
     .replace(/-{2,}/g, '-');
 
+const shouldKeepLoginEnabled = (role: UserRole) =>
+  role === UserRole.TEAM_ADMIN || role === UserRole.SUPER_ADMIN;
+
 type TeamMemberScope = {
   workspaceId: string;
   teamId: string;
@@ -203,70 +206,92 @@ export class TeamMembersService {
       });
     }
 
-    const mutation = await this.prisma.$transaction(async (tx) => {
-      const member = await tx.user.findFirst({
-        where: {
-          id: memberId,
-          workspaceId: scope.workspaceId,
-          teamId: scope.teamId,
-        },
-        include: teamMemberInclude,
-      });
+    const mutation = await this.prisma.$transaction(
+      async (tx) => {
+        await this.lockTeamSeatCounter(scope, tx);
 
-      if (!member) {
-        throw new NotFoundException({
-          code: 'TEAM_MEMBER_NOT_FOUND',
-          message: 'The requested team member was not found.',
+        const member = await tx.user.findFirst({
+          where: {
+            id: memberId,
+            workspaceId: scope.workspaceId,
+            teamId: scope.teamId,
+          },
+          include: teamMemberInclude,
         });
-      }
 
-      if (!member.sponsor) {
-        throw new ConflictException({
-          code: 'TEAM_MEMBER_SPONSOR_MISSING',
-          message:
-            'The requested team member does not have an operational sponsor profile.',
+        if (!member) {
+          throw new NotFoundException({
+            code: 'TEAM_MEMBER_NOT_FOUND',
+            message: 'The requested team member was not found.',
+          });
+        }
+
+        if (!member.sponsor) {
+          throw new ConflictException({
+            code: 'TEAM_MEMBER_SPONSOR_MISSING',
+            message:
+              'The requested team member does not have an operational sponsor profile.',
+          });
+        }
+
+        const team = await this.requireTeam(scope, tx);
+        const shouldActivate = dto.isActive && !member.sponsor.isActive;
+
+        if (shouldActivate) {
+          await this.assertSeatAvailability(
+            scope,
+            team.maxSeats,
+            tx,
+            member.sponsor.id,
+          );
+        }
+
+        const sponsor = await tx.sponsor.update({
+          where: {
+            id: member.sponsor.id,
+          },
+          data: {
+            isActive: dto.isActive,
+          },
         });
-      }
+        const nextUserStatus = shouldKeepLoginEnabled(member.role)
+          ? UserStatus.active
+          : dto.isActive
+            ? UserStatus.active
+            : UserStatus.disabled;
 
-      const team = await this.requireTeam(scope, tx);
-      const shouldActivate = dto.isActive && !member.sponsor.isActive;
+        const user = await tx.user.update({
+          where: {
+            id: member.id,
+          },
+          data: {
+            status: nextUserStatus,
+          },
+        });
 
-      if (shouldActivate) {
-        await this.assertSeatAvailability(
-          scope,
-          team.maxSeats,
-          tx,
-          member.sponsor.id,
-        );
-      }
+        const activeSeats = await this.countActiveSeats(scope, tx);
 
-      const sponsor = await tx.sponsor.update({
-        where: {
-          id: member.sponsor.id,
-        },
-        data: {
-          isActive: dto.isActive,
-        },
-      });
-
-      const activeSeats = await this.countActiveSeats(scope, tx);
-
-      return {
-        team: this.buildSeatSummary(team, activeSeats),
-        member: this.mapTeamMember({
-          ...member,
-          sponsor,
-        }),
-        activationEmail:
-          shouldActivate && member.email
-            ? {
-                email: member.email,
-                teamName: team.name,
-                publicSlug: sponsor.publicSlug,
-              }
-            : null,
-      };
-    });
+        return {
+          team: this.buildSeatSummary(team, activeSeats),
+          member: this.mapTeamMember({
+            ...member,
+            status: user.status,
+            sponsor,
+          }),
+          activationEmail:
+            shouldActivate && member.email
+              ? {
+                  email: member.email,
+                  teamName: team.name,
+                  publicSlug: sponsor.publicSlug,
+                }
+              : null,
+        };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
 
     if (mutation.activationEmail) {
       void this.dispatchAdvisorActivationEmail({
@@ -326,7 +351,7 @@ export class TeamMembersService {
           email,
           passwordHash: hashPassword(temporaryPassword),
           role: UserRole.MEMBER,
-          status: UserStatus.active,
+          status: UserStatus.disabled,
         },
         include: teamMemberInclude,
       });
@@ -412,7 +437,7 @@ export class TeamMembersService {
         throw new BadRequestException({
           code: 'TEAM_MEMBER_DELETE_FORBIDDEN',
           message:
-            'Only advisor accounts with MEMBER role can be hard deleted from this panel.',
+            'Only advisor accounts with MEMBER role can be archived from this panel.',
         });
       }
 
@@ -426,15 +451,21 @@ export class TeamMembersService {
 
       const team = await this.requireTeam(scope, tx);
 
-      await tx.user.delete({
+      await tx.sponsor.update({
         where: {
-          id: member.id,
+          id: member.sponsor.id,
+        },
+        data: {
+          isActive: false,
         },
       });
 
-      await tx.sponsor.delete({
+      await tx.user.update({
         where: {
-          id: member.sponsor.id,
+          id: member.id,
+        },
+        data: {
+          status: UserStatus.disabled,
         },
       });
 
@@ -476,12 +507,25 @@ export class TeamMembersService {
   private async countActiveSeats(
     scope: TeamMemberScope,
     tx: Prisma.TransactionClient | PrismaService = this.prisma,
+    excludedSponsorId?: string,
   ) {
     return tx.sponsor.count({
       where: {
         workspaceId: scope.workspaceId,
         teamId: scope.teamId,
         isActive: true,
+        user: {
+          is: {
+            role: UserRole.MEMBER,
+          },
+        },
+        ...(excludedSponsorId
+          ? {
+              id: {
+                not: excludedSponsorId,
+              },
+            }
+          : {}),
       },
     });
   }
@@ -492,25 +536,41 @@ export class TeamMembersService {
     tx: Prisma.TransactionClient | PrismaService = this.prisma,
     excludedSponsorId?: string,
   ) {
-    const activeSeats = await tx.sponsor.count({
-      where: {
-        workspaceId: scope.workspaceId,
-        teamId: scope.teamId,
-        isActive: true,
-        ...(excludedSponsorId
-          ? {
-              id: {
-                not: excludedSponsorId,
-              },
-            }
-          : {}),
-      },
-    });
+    const activeSeats = await this.countActiveSeats(
+      scope,
+      tx,
+      excludedSponsorId,
+    );
 
     if (activeSeats >= maxSeats) {
-      throw new BadRequestException({
+      throw new ConflictException({
         code: 'TEAM_SEAT_LIMIT_REACHED',
-        message: `Has alcanzado el limite de ${maxSeats} licencias activas. Desactiva un usuario primero.`,
+        message: 'Límite de licencias alcanzado',
+        details: {
+          maxSeats,
+          activeSeats,
+          requiresMemberExemption: true,
+        },
+      });
+    }
+  }
+
+  private async lockTeamSeatCounter(
+    scope: TeamMemberScope,
+    tx: Prisma.TransactionClient,
+  ) {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id"
+      FROM "Team"
+      WHERE "id" = ${scope.teamId}
+        AND "workspaceId" = ${scope.workspaceId}
+      FOR UPDATE
+    `);
+
+    if (rows.length === 0) {
+      throw new NotFoundException({
+        code: 'TEAM_NOT_FOUND',
+        message: 'The requested team was not found.',
       });
     }
   }

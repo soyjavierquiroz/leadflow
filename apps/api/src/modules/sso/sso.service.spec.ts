@@ -81,7 +81,9 @@ describe('SsoService', () => {
     expect(prisma.user.findFirst).toHaveBeenCalledWith({
       where: {
         id: 'member-1',
-        role: UserRole.MEMBER,
+        role: {
+          in: [UserRole.MEMBER, UserRole.TEAM_ADMIN],
+        },
         workspaceId: 'workspace-1',
         teamId: 'team-1',
       },
@@ -103,6 +105,55 @@ describe('SsoService', () => {
     });
 
     logSpy.mockRestore();
+  });
+
+  it('allows team admins with a linked sponsor to open Kurukin Hub', async () => {
+    const { prisma, service } = buildService();
+
+    prisma.user.findFirst = jest.fn().mockResolvedValue({
+      sponsorId: 'sponsor-admin-1',
+      sponsor: {
+        phone: '+591 79790873',
+      },
+    });
+
+    const result = await service.buildBlacklistUrl(
+      buildUser({
+        id: 'team-admin-1',
+        role: UserRole.TEAM_ADMIN,
+        homePath: '/team',
+        sponsorId: 'sponsor-admin-1',
+        sponsor: {
+          id: 'sponsor-admin-1',
+          displayName: 'Freddy',
+          email: 'freddy@example.com',
+          isActive: true,
+          availabilityStatus: 'available',
+        },
+      }),
+    );
+
+    expect(prisma.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'team-admin-1',
+        role: {
+          in: [UserRole.MEMBER, UserRole.TEAM_ADMIN],
+        },
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+      },
+      select: {
+        sponsorId: true,
+        sponsor: {
+          select: {
+            phone: true,
+          },
+        },
+      },
+    });
+    expect(result.url).toMatch(
+      /^https:\/\/blacklist\.kuruk\.in\/dashboard\/importaciones\?token=/,
+    );
   });
 
   it('fails when the advisor phone is still missing in the database', async () => {

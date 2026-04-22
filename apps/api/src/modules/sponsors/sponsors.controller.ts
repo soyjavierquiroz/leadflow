@@ -10,7 +10,10 @@ import {
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { RequireRoles } from '../auth/roles.decorator';
+import {
+  RequireOperationalMemberAccess,
+  RequireRoles,
+} from '../auth/roles.decorator';
 import { MemberDashboardDto } from './dto/member-dashboard.dto';
 import type { UpdateMemberSponsorDto } from './dto/update-member-sponsor.dto';
 import type { UpdateTeamSponsorDto } from './dto/update-team-sponsor.dto';
@@ -45,7 +48,7 @@ export class SponsorsController {
   }
 
   @Get('me/dashboard')
-  @RequireRoles(UserRole.MEMBER)
+  @RequireOperationalMemberAccess()
   getMemberDashboard(
     @CurrentAuthUser() user: AuthenticatedUser,
   ): Promise<MemberDashboardDto> {
@@ -57,7 +60,7 @@ export class SponsorsController {
   }
 
   @Get('me/kredits')
-  @RequireRoles(UserRole.MEMBER)
+  @RequireOperationalMemberAccess()
   getMemberKredits(@CurrentAuthUser() user: AuthenticatedUser) {
     return this.sponsorsService.getKreditsForMember({
       workspaceId: user.workspaceId!,
@@ -67,7 +70,7 @@ export class SponsorsController {
   }
 
   @Get('me')
-  @RequireRoles(UserRole.MEMBER)
+  @RequireOperationalMemberAccess()
   findMe(@CurrentAuthUser() user: AuthenticatedUser) {
     return this.sponsorsService.findForMember({
       workspaceId: user.workspaceId!,
@@ -77,7 +80,7 @@ export class SponsorsController {
   }
 
   @Patch('me')
-  @RequireRoles(UserRole.MEMBER, UserRole.TEAM_ADMIN)
+  @RequireOperationalMemberAccess()
   updateMe(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Body() dto: UpdateMemberSponsorDto,
@@ -93,7 +96,7 @@ export class SponsorsController {
   }
 
   @Post('me/leads/:id/accept')
-  @RequireRoles(UserRole.MEMBER)
+  @RequireOperationalMemberAccess()
   acceptLead(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Param('id') leadId: string,
@@ -109,7 +112,7 @@ export class SponsorsController {
   }
 
   @Patch('me/leads/:id/status')
-  @RequireRoles(UserRole.MEMBER)
+  @RequireOperationalMemberAccess()
   updateLeadStatus(
     @CurrentAuthUser() user: AuthenticatedUser,
     @Param('id') leadId: string,

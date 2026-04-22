@@ -2,11 +2,13 @@ import { createHmac } from 'crypto';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UserRole } from '@prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { redactSensitiveData } from '../shared/redact-sensitive-data';
 import { sanitizeToKurukinFormat } from '../shared/phone-utils';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -49,6 +51,8 @@ const signHs256Jwt = (payload: BlacklistJwtPayload, secret: string) => {
 
 @Injectable()
 export class SsoService {
+  private readonly logger = new Logger(SsoService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
@@ -106,7 +110,9 @@ export class SsoService {
     const member = await this.prisma.user.findFirst({
       where: {
         id: user.id,
-        role: UserRole.MEMBER,
+        role: {
+          in: [UserRole.MEMBER, UserRole.TEAM_ADMIN],
+        },
         workspaceId: user.workspaceId ?? undefined,
         teamId: user.teamId ?? undefined,
       },
@@ -124,7 +130,7 @@ export class SsoService {
       throw new BadRequestException({
         code: 'SSO_BLACKLIST_MEMBER_REQUIRED',
         message:
-          'Only authenticated members with a linked sponsor can open Kurukin Hub.',
+          'Only authenticated members or active team admins with a linked sponsor can open Kurukin Hub.',
       });
     }
 
@@ -138,10 +144,14 @@ export class SsoService {
       });
     }
 
-    console.log('SSO_FLOW_DIAGNOSTIC:', {
-      hasSecret: !!process.env.SSO_BLACKLIST_SECRET,
-      phoneFound: phone,
-    });
+    this.logger.log(
+      `SSO_FLOW_DIAGNOSTIC: ${JSON.stringify(
+        redactSensitiveData({
+          hasSecret: !!process.env.SSO_BLACKLIST_SECRET,
+          phoneFound: phone,
+        }),
+      )}`,
+    );
 
     const advisorPhone = sanitizeToKurukinFormat(phone);
     const issuedAt = Math.floor(Date.now() / 1000);

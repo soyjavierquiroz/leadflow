@@ -12,6 +12,7 @@ import { mapLeadRecord } from '../../prisma/prisma.mappers';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildEntity } from '../shared/domain.factory';
 import { LEAD_REPOSITORY } from '../shared/domain.tokens';
+import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
 import type { CreateLeadNoteDto } from './dto/create-lead-note.dto';
 import type { CreateLeadDto } from './dto/create-lead.dto';
 import type { UpdateLeadFollowUpDto } from './dto/update-lead-follow-up.dto';
@@ -449,66 +450,88 @@ export class LeadsService {
   }
 
   async autoAcceptLeadFromWebhook(leadId: string) {
-    const lead = await this.prisma.lead.findUnique({
-      where: {
-        id: leadId,
-      },
-      include: {
-        currentAssignment: true,
-      },
-    });
-
-    if (!lead) {
-      throw new NotFoundException({
-        code: 'LEAD_NOT_FOUND',
-        message: 'The requested lead was not found.',
+    return this.prisma.$transaction(async (tx) => {
+      const leadRecord = await tx.lead.findUnique({
+        where: {
+          id: leadId,
+        },
+        select: {
+          id: true,
+          workspaceId: true,
+        },
       });
-    }
 
-    const assignment = lead.currentAssignment;
+      if (!leadRecord) {
+        throw new NotFoundException({
+          code: 'LEAD_NOT_FOUND',
+          message: 'The requested lead was not found.',
+        });
+      }
 
-    if (!assignment) {
-      throw new BadRequestException({
-        code: 'LEAD_ASSIGNMENT_REQUIRED',
-        message: 'The lead does not have an active assignment to accept.',
+      await lockLeadRowForUpdate(tx, {
+        leadId: leadRecord.id,
+        workspaceId: leadRecord.workspaceId,
       });
-    }
 
-    if (lead.status === 'won' || lead.status === 'lost') {
-      throw new BadRequestException({
-        code: 'LEAD_NOT_ACCEPTABLE',
-        message: 'Terminal leads cannot be auto-accepted.',
+      const lead = await tx.lead.findUnique({
+        where: {
+          id: leadId,
+        },
+        include: {
+          currentAssignment: true,
+        },
       });
-    }
 
-    if (assignment.status === 'accepted') {
-      return {
-        ok: true,
-        leadId: lead.id,
-        assignmentId: assignment.id,
-        assignmentStatus: assignment.status,
-        leadStatus: lead.status,
-        acceptedAt:
-          assignment.acceptedAt?.toISOString() ??
-          assignment.updatedAt.toISOString(),
-        alreadyAccepted: true,
-      };
-    }
+      if (!lead) {
+        throw new NotFoundException({
+          code: 'LEAD_NOT_FOUND',
+          message: 'The requested lead was not found.',
+        });
+      }
 
-    if (assignment.status !== 'pending' && assignment.status !== 'assigned') {
-      throw new BadRequestException({
-        code: 'ASSIGNMENT_NOT_ACCEPTABLE',
-        message: 'Only pending or assigned leads can be auto-accepted.',
-      });
-    }
+      const assignment = lead.currentAssignment;
 
-    const now = new Date();
-    const nextLeadStatus =
-      lead.status === 'captured' || lead.status === 'assigned'
-        ? 'nurturing'
-        : lead.status;
+      if (!assignment) {
+        throw new BadRequestException({
+          code: 'LEAD_ASSIGNMENT_REQUIRED',
+          message: 'The lead does not have an active assignment to accept.',
+        });
+      }
 
-    const result = await this.prisma.$transaction(async (tx) => {
+      if (lead.status === 'won' || lead.status === 'lost') {
+        throw new BadRequestException({
+          code: 'LEAD_NOT_ACCEPTABLE',
+          message: 'Terminal leads cannot be auto-accepted.',
+        });
+      }
+
+      if (assignment.status === 'accepted') {
+        return {
+          ok: true,
+          leadId: lead.id,
+          assignmentId: assignment.id,
+          assignmentStatus: assignment.status,
+          leadStatus: lead.status,
+          acceptedAt:
+            assignment.acceptedAt?.toISOString() ??
+            assignment.updatedAt.toISOString(),
+          alreadyAccepted: true,
+        };
+      }
+
+      if (assignment.status !== 'pending' && assignment.status !== 'assigned') {
+        throw new BadRequestException({
+          code: 'ASSIGNMENT_NOT_ACCEPTABLE',
+          message: 'Only pending or assigned leads can be auto-accepted.',
+        });
+      }
+
+      const now = new Date();
+      const nextLeadStatus =
+        lead.status === 'captured' || lead.status === 'assigned'
+          ? 'nurturing'
+          : lead.status;
+
       const updatedAssignment = await tx.assignment.update({
         where: {
           id: assignment.id,
@@ -568,20 +591,16 @@ export class LeadsService {
       });
 
       return {
+        ok: true,
         leadId: lead.id,
         assignmentId: assignment.id,
         assignmentStatus: updatedAssignment.status,
         leadStatus: nextLeadStatus,
         acceptedAt:
           updatedAssignment.acceptedAt?.toISOString() ?? now.toISOString(),
+        alreadyAccepted: false,
       };
     });
-
-    return {
-      ok: true,
-      ...result,
-      alreadyAccepted: false,
-    };
   }
 
   async getTimelineDetail(

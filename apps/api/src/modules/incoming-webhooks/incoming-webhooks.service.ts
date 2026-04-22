@@ -11,7 +11,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   normalizeMessagingPhone,
   resolveMessagingConnectionStatus,
-} from '../messaging-integrations/messaging-integrations.utils';
+} from '../shared/messaging-channel.utils';
+import { redactSensitiveData } from '../shared/redact-sensitive-data';
 import {
   detectOptOutKeyword,
   extractInboundMessagePhone,
@@ -33,7 +34,7 @@ const readString = (value: unknown): string | null =>
 
 const stringifyForLogs = (value: unknown) => {
   try {
-    return JSON.stringify(value);
+    return JSON.stringify(redactSensitiveData(value));
   } catch {
     return '[unserializable payload]';
   }
@@ -415,9 +416,12 @@ export class IncomingWebhooksService {
       !matchesIncomingWebhookSecret(this.incomingWebhookSecret, providedSecret)
     ) {
       this.logger.warn(
-        `Rejecting inbound messaging webhook because the provided secret is invalid. headersSecret=${stringifyForLogs(
-          readIncomingWebhookSecret(headers),
-        )} querySecret=${querySecret ?? null}`,
+        `Rejecting inbound messaging webhook because the provided secret is invalid. details=${stringifyForLogs(
+          {
+            headersSecret: readIncomingWebhookSecret(headers),
+            querySecret: querySecret ?? null,
+          },
+        )}`,
       );
       throw new UnauthorizedException({
         code: 'WEBHOOK_SECRET_INVALID',

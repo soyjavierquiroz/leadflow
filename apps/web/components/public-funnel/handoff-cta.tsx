@@ -18,7 +18,7 @@ import {
   markRuntimeEventTracked,
 } from "@/lib/public-runtime-tracking";
 
-type WhatsappHandoffCtaProps = {
+type HandoffCtaProps = {
   isBoxed?: boolean;
   runtime: PublicFunnelRuntimePayload;
   headline: string;
@@ -35,7 +35,7 @@ const buildHandoffMarker = (
   assignmentId: string,
 ) => [eventName, publicationId, stepId, assignmentId, "standalone"].join(":");
 
-export function WhatsappHandoffCta({
+export function HandoffCta({
   isBoxed = false,
   runtime,
   headline,
@@ -43,19 +43,19 @@ export function WhatsappHandoffCta({
   buttonText,
   helperText,
   variant,
-}: WhatsappHandoffCtaProps) {
+}: HandoffCtaProps) {
   const context = useMemo(
     () => readSubmissionContext(runtime.publication.id),
     [runtime.publication.id],
   );
   const sponsor =
     context?.handoff?.sponsor ?? context?.assignment?.sponsor ?? null;
-  const whatsappPhone =
+  const handoffPhone =
     context?.handoff?.whatsappPhone ??
     normalizeWhatsappPhone(sponsor?.phone ?? null);
-  const whatsappUrl =
+  const handoffUrl =
     context?.handoff?.whatsappUrl ??
-    buildWhatsappUrl(whatsappPhone, context?.handoff?.whatsappMessage ?? null);
+    buildWhatsappUrl(handoffPhone, context?.handoff?.whatsappMessage ?? null);
   const handoffMode = context?.handoff?.mode ?? runtime.handoff.mode;
   const handoffButtonLabel =
     buttonText ??
@@ -64,7 +64,7 @@ export function WhatsappHandoffCta({
     "Continuar por WhatsApp";
 
   const trackHandoff = useCallback(() => {
-    if (!context?.assignment || !whatsappUrl) {
+    if (!context?.assignment || !handoffUrl) {
       return;
     }
 
@@ -86,7 +86,7 @@ export function WhatsappHandoffCta({
         assignmentId: context.assignment.id,
         currentPath: runtime.request.path,
         ctaLabel: handoffButtonLabel,
-        ctaHref: whatsappUrl,
+        ctaHref: handoffUrl,
         ctaAction: "whatsapp_handoff",
         metadata: {
           sessionId: getOrCreateRuntimeSessionId(),
@@ -114,7 +114,7 @@ export function WhatsappHandoffCta({
         assignmentId: context.assignment.id,
         currentPath: runtime.request.path,
         ctaLabel: handoffButtonLabel,
-        ctaHref: whatsappUrl,
+        ctaHref: handoffUrl,
         ctaAction: "whatsapp_handoff",
         metadata: {
           sessionId: getOrCreateRuntimeSessionId(),
@@ -127,28 +127,28 @@ export function WhatsappHandoffCta({
     context,
     handoffButtonLabel,
     handoffMode,
+    handoffUrl,
     runtime.currentStep.id,
     runtime.publication.id,
     runtime.request.path,
-    whatsappUrl,
   ]);
 
   return (
     <PublicSectionSurface isBoxed={isBoxed} tone="success">
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <div>
-          <PublicEyebrow tone="success">WhatsApp handoff CTA</PublicEyebrow>
+          <PublicEyebrow tone="success">Handoff CTA</PublicEyebrow>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
             <RichHeadline text={headline} />
           </h2>
           <p className="font-subheadline mt-4 max-w-2xl text-base leading-7 text-slate-700">
             {subheadline ||
-              "Bloque declarativo para continuar el handoff por WhatsApp usando el contexto real de la sesión."}
+              "Bloque declarativo para continuar el handoff usando el contexto real de la sesión."}
           </p>
         </div>
 
         <div className="p-1">
-          {whatsappUrl && sponsor ? (
+          {handoffUrl && sponsor ? (
             <>
               <p className="text-sm leading-6 text-slate-700">
                 Continuarás con {sponsor.displayName} por el canal definido en
@@ -156,7 +156,7 @@ export function WhatsappHandoffCta({
               </p>
               <div className="mt-5">
                 <a
-                  href={whatsappUrl}
+                  href={handoffUrl}
                   onClick={trackHandoff}
                   className={cx(
                     buildCtaClassName("primary"),
@@ -175,7 +175,7 @@ export function WhatsappHandoffCta({
             </>
           ) : (
             <p className="text-sm leading-6 text-slate-700">
-              Todavía no hay contexto de sponsor o WhatsApp disponible en esta
+              Todavía no hay contexto de sponsor o canal disponible en esta
               sesión.
             </p>
           )}

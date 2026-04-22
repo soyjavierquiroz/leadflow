@@ -16,7 +16,6 @@ import { HybridFunnelPublicationsModule } from '../hybrid-funnel-publications/hy
 import { IncomingWebhooksModule } from '../incoming-webhooks/incoming-webhooks.module';
 import { LeadsModule } from '../leads/leads.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
-import { MessagingIntegrationsModule } from '../messaging-integrations/messaging-integrations.module';
 import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
 import { RotationPoolsModule } from '../rotation-pools/rotation-pools.module';
 import { SsoModule } from '../sso/sso.module';
@@ -56,7 +55,6 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     LeadsModule,
     WalletEngineModule,
     MessagingAutomationModule,
-    MessagingIntegrationsModule,
     SsoModule,
     AssignmentsModule,
     EventsModule,
@@ -87,7 +85,6 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     LeadsModule,
     WalletEngineModule,
     MessagingAutomationModule,
-    MessagingIntegrationsModule,
     SsoModule,
     AssignmentsModule,
     EventsModule,

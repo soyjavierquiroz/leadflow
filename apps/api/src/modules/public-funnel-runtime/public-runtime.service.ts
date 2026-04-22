@@ -98,8 +98,6 @@ export class PublicRuntimeService {
         isActive: true,
         metaPixelId: runtime.publication.metaPixelId,
         tiktokPixelId: runtime.publication.tiktokPixelId,
-        metaCapiToken: runtime.publication.metaCapiToken,
-        tiktokAccessToken: runtime.publication.tiktokAccessToken,
       },
       domain: {
         id: publication.domain.id,

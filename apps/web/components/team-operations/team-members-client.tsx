@@ -52,6 +52,9 @@ const formatRoleLabel = (role: TeamMemberRecord["role"]) => {
   }
 };
 
+const isOperationalAdmin = (member: TeamMemberRecord) =>
+  member.role === "TEAM_ADMIN" || member.role === "SUPER_ADMIN";
+
 const formatDateLabel = (value: string | null) => {
   if (!value) {
     return "Nunca";
@@ -168,8 +171,12 @@ export function TeamMembersClient({
         setFeedback({
           tone: "success",
           message: nextIsActive
-            ? "Licencia activada correctamente."
-            : "Licencia liberada correctamente.",
+            ? isOperationalAdmin(member)
+              ? "Modo operador activado correctamente."
+              : "Licencia activada correctamente."
+            : isOperationalAdmin(member)
+              ? "Modo operador desactivado correctamente."
+              : "Licencia liberada correctamente.",
         });
       } catch (error) {
         setMembers(previousMembers);
@@ -524,20 +531,39 @@ export function TeamMembersClient({
                           ) : null}
                           <div className="text-right">
                             <p className="font-semibold text-slate-950">
-                              {member.isActive ? "Activa" : "Inactiva"}
+                              {isOperationalAdmin(member)
+                                ? member.isActive
+                                  ? "Modo operador activo"
+                                  : "Modo operador inactivo"
+                                : member.isActive
+                                  ? "Activa"
+                                  : "Inactiva"}
                             </p>
                             <p className="text-xs text-slate-500">
                               {!isSeatControlAvailable
                                 ? "Necesita perfil sponsor"
-                                : member.isActive
-                                  ? "Consume una licencia"
-                                  : "No consume asiento"}
+                                : isOperationalAdmin(member)
+                                  ? member.isActive
+                                    ? "Opera WhatsApp y Blacklist con 1 licencia en uso"
+                                    : "Activar modo operador (Consume 1 licencia)"
+                                  : member.isActive
+                                    ? "Consume una licencia"
+                                    : "No consume asiento"}
                             </p>
                           </div>
                           <button
                             type="button"
                             role="switch"
                             aria-checked={member.isActive}
+                            aria-label={
+                              isOperationalAdmin(member)
+                                ? member.isActive
+                                  ? "Desactivar modo operador"
+                                  : "Activar modo operador"
+                                : member.isActive
+                                  ? "Desactivar licencia"
+                                  : "Activar licencia"
+                            }
                             onClick={() => handleSeatToggle(member)}
                             disabled={
                               isPending ||

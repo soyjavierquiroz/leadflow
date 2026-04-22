@@ -1,12 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { RequireRoles } from '../auth/roles.decorator';
+import { RequireOperationalMemberAccess } from '../auth/roles.decorator';
 import { MessagingAutomationService } from './messaging-automation.service';
 
 @Controller('messaging-automation')
-@RequireRoles(UserRole.MEMBER)
+@RequireOperationalMemberAccess()
 export class MessagingAutomationController {
   constructor(
     private readonly messagingAutomationService: MessagingAutomationService,

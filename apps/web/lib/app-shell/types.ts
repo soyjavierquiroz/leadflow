@@ -349,6 +349,26 @@ export type ShellNavItem = {
   match?: string;
 };
 
+export type ShellNavSection = {
+  title: string;
+  description?: string;
+  items: ShellNavItem[];
+};
+
+export type SidebarStatusBadge = {
+  label: string;
+  tone?: "neutral" | "teal" | "amber";
+};
+
+export type WorkspaceViewMode = "management" | "operations";
+
+export type WorkspaceViewSwitcherOption = {
+  href: string;
+  label: string;
+  description: string;
+  mode: WorkspaceViewMode;
+};
+
 export type AppShellSnapshot = {
   currentUser: AuthenticatedAppUserRecord | null;
   sourceMode: DataSourceMode;

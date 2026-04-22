@@ -8,6 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { IncomingWebhooksService } from './incoming-webhooks.service';
+import { redactSensitiveData } from '../shared/redact-sensitive-data';
 
 @Controller('incoming-webhooks')
 export class IncomingWebhooksController {
@@ -73,7 +74,7 @@ export class IncomingWebhooksController {
 
   private stringifyForLogs(value: unknown) {
     try {
-      return JSON.stringify(value);
+      return JSON.stringify(redactSensitiveData(value));
     } catch {
       return '[unserializable payload]';
     }
