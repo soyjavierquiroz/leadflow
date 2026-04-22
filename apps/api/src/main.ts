@@ -61,10 +61,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
-      bodyLimit: 1_048_576,
+      bodyLimit: 10_485_760,
+      ajv: { allowUnionTypes: true },
     }),
   );
-  const fastify = app.getHttpAdapter().getInstance();
   const prisma = app.get(PrismaService);
   const explicitOrigins = new Set(
     runtimeConfig.corsAllowedOrigins.map((origin) => normalizeOrigin(origin)),
@@ -76,24 +76,6 @@ async function bootstrap() {
       expiresAt: number;
     }
   >();
-
-  fastify.removeContentTypeParser('application/json');
-  fastify.addContentTypeParser(
-    'application/json',
-    { parseAs: 'string' },
-    (request: unknown, body: string, done: (error: Error | null, value?: unknown) => void) => {
-      if (typeof body !== 'string' || body.trim().length === 0) {
-        done(null, {});
-        return;
-      }
-
-      try {
-        done(null, JSON.parse(body) as unknown);
-      } catch (error) {
-        done(error instanceof Error ? error : new Error('Invalid JSON body.'));
-      }
-    },
-  );
 
   await app.register(cookie);
 
