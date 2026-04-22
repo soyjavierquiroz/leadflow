@@ -112,7 +112,7 @@ export function MemberActiveWheelCard() {
 
   return (
     <aside
-      className={`rounded-[1.6rem] border p-4 shadow-[0_18px_45px_rgba(2,6,23,0.28)] ${toneClassName}`}
+      className={`rounded-[1.35rem] border p-4 shadow-[0_18px_45px_rgba(2,6,23,0.24)] ${toneClassName}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -136,8 +136,8 @@ export function MemberActiveWheelCard() {
       ) : null}
 
       {!isLoading && !snapshot?.wheel ? (
-        <div className="mt-4 rounded-[1.25rem] border border-slate-800 bg-slate-950/70 p-4">
-          <h2 className="text-lg font-semibold text-white">
+        <div className="mt-4 rounded-[1rem] border border-slate-800 bg-slate-950/70 p-4">
+          <h2 className="text-base font-semibold text-white">
             No hay campañas activas
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -149,9 +149,9 @@ export function MemberActiveWheelCard() {
 
       {snapshot?.wheel ? (
         <div className="mt-4 space-y-3">
-          <div className="rounded-[1.25rem] border border-slate-800 bg-slate-950/70 p-4">
+          <div className="rounded-[1rem] border border-slate-800 bg-slate-950/70 p-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-base font-semibold text-white">
                 {snapshot.wheel.name}
               </h2>
               <span
@@ -171,7 +171,7 @@ export function MemberActiveWheelCard() {
           </div>
 
           {snapshot.isParticipating ? (
-            <div className="rounded-[1.25rem] border border-emerald-500/20 bg-emerald-500/10 p-4">
+            <div className="rounded-[1rem] border border-emerald-500/20 bg-emerald-500/10 p-4">
               <p className="text-sm font-semibold text-emerald-100">
                 Ya estás en la rueda actual
               </p>
@@ -181,11 +181,11 @@ export function MemberActiveWheelCard() {
               </p>
             </div>
           ) : (
-            <div className="rounded-[1.25rem] border border-amber-500/20 bg-slate-950/70 p-4">
+            <div className="rounded-[1rem] border border-amber-500/20 bg-slate-950/70 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 Buy-In Disponible
               </p>
-              <p className="mt-2 text-2xl font-semibold tracking-tight text-white">
+              <p className="mt-2 text-xl font-semibold tracking-tight text-white">
                 {formatAdWheelSeatPrice(snapshot.wheel.seatPrice)}
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-400">

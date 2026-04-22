@@ -79,12 +79,35 @@ describe('RuntimeContextService', () => {
         signal: expect.any(AbortSignal),
         headers: {
           Accept: 'application/json',
-          'Content-Type': 'application/json',
           'x-internal-api-key': 'secret-key',
           'x-service-key': 'leadflow-api',
         },
       },
     );
+  });
+
+  it('rejects admin upserts before sending a POST without a payload', async () => {
+    process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL =
+      'http://runtime-context.example/';
+    process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY = 'secret-key';
+
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const service = new RuntimeContextService();
+    jest.spyOn(service as any, 'buildPayload').mockReturnValue(undefined);
+
+    await expect(
+      service.registerBinding({
+        instanceName: 'lf-dxn-freddy',
+        tenantId: 'team-123',
+        verticalKey: 'mlm',
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'RUNTIME_CONTEXT_UPSERT_PAYLOAD_REQUIRED',
+      }),
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('requires runtime context admin configuration before calling the service', async () => {

@@ -53,9 +53,11 @@ export default async function MemberPage() {
   });
 
   return (
-    <MemberDashboardClient
-      initialDashboard={dashboard}
-      instanceName={instanceName}
-    />
+    <div className="w-full">
+      <MemberDashboardClient
+        initialDashboard={dashboard}
+        instanceName={instanceName}
+      />
+    </div>
   );
 }

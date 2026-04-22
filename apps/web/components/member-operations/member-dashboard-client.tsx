@@ -140,36 +140,38 @@ function MetricMiniCard({
 }) {
   return (
     <article
-      className={`rounded-[1.25rem] border p-4 ${
+      className={`rounded-[1.1rem] border p-4 ${
         emphasize
           ? "border-amber-500/20 bg-amber-500/10"
           : "border-slate-800 bg-slate-950/70"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-            {label}
-          </p>
-          <p
-            className={`mt-2 text-3xl font-semibold tracking-tight ${
-              emphasize ? "text-amber-100" : "text-slate-50"
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${
+              emphasize
+                ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
+                : "border-slate-700 bg-slate-900 text-slate-300"
             }`}
           >
-            {formatCompactNumber(value)}
-          </p>
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+              {label}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">{hint}</p>
+          </div>
         </div>
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${
-            emphasize
-              ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
-              : "border-slate-700 bg-slate-900 text-slate-300"
+        <p
+          className={`shrink-0 text-2xl font-semibold tracking-tight ${
+            emphasize ? "text-amber-100" : "text-slate-50"
           }`}
         >
-          {icon}
-        </div>
+          {formatCompactNumber(value)}
+        </p>
       </div>
-      <p className="mt-2 text-sm leading-5 text-slate-400">{hint}</p>
     </article>
   );
 }
@@ -346,78 +348,85 @@ export function MemberDashboardClient({
   };
 
   return (
-    <div className="space-y-4 text-slate-100">
-      <section className="overflow-hidden rounded-[1.75rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.98)_100%)] p-4 shadow-[0_22px_60px_rgba(2,6,23,0.4)]">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan-300">
-              Sponsor / Member / Centro de mando
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">
-              WhatsApp arriba, operación abajo
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              El dashboard prioriza la conexión del asesor y deja la bandeja
-              operativa visible en el mismo viewport para trabajar sin rodeos.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <MetaChip label={sponsor.displayName} />
-            <MetaChip label={`${inbox.length} lead${inbox.length === 1 ? "" : "s"} en foco`} />
-            <MetaChip
-              label={
-                isReceivingLeads ? "Capacidad abierta" : "Capacidad pausada"
-              }
-            />
-          </div>
-        </div>
-      </section>
-
+    <div className="w-full space-y-4 text-slate-100">
       {feedback ? (
         <MemberInlineBanner tone={feedback.tone} message={feedback.message} />
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(280px,3fr)]">
         <div className="min-w-0 space-y-4">
-          <WhatsAppConnectionManager
-            instanceName={instanceName}
-            title="WhatsApp del asesor"
-            description="Si la sesión está viva, se ve como un banner corto. Si no está conectada, el QR queda primero y sin scroll."
-          />
-
-          <section className="overflow-hidden rounded-[1.75rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.96)_0%,_rgba(2,6,23,0.98)_100%)] shadow-[0_20px_55px_rgba(2,6,23,0.32)]">
-            <div className="flex flex-col gap-3 border-b border-slate-800 px-4 py-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-400">
-                  Bandeja Operativa
+          <section className="overflow-hidden rounded-[1.5rem] border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.98)_100%)] p-4 shadow-[0_22px_60px_rgba(2,6,23,0.32)]">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan-300">
+                  Sponsor / Member / Operación
                 </p>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
-                  Lo que conviene mover ahora
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-slate-400">
-                  Leads nuevos y seguimientos urgentes con el siguiente paso al
-                  frente, sin adornos que quiten espacio.
+                <h1 className="mt-1 text-xl font-semibold tracking-tight text-white">
+                  WhatsApp primero, bandeja debajo
+                </h1>
+                <p className="mt-1 text-sm text-slate-400">
+                  La vista prioriza conexión, handoffs y capacidad sin bloques
+                  decorativos ni altura desperdiciada.
                 </p>
               </div>
 
-              <div className="rounded-full border border-slate-800 bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-slate-300">
-                {inbox.length} lead{inbox.length === 1 ? "" : "s"} en foco
+              <div className="flex flex-wrap gap-2">
+                <MetaChip label={sponsor.displayName} />
+                <MetaChip
+                  label={`${inbox.length} lead${inbox.length === 1 ? "" : "s"} en foco`}
+                />
+                <MetaChip
+                  label={
+                    isReceivingLeads ? "Capacidad abierta" : "Capacidad pausada"
+                  }
+                />
+              </div>
+            </div>
+          </section>
+
+          <WhatsAppConnectionManager
+            instanceName={instanceName}
+            title="WhatsApp"
+            description="Sesión operativa del asesor. Si está conectada, queda resumida; si no, el QR toma prioridad inmediata."
+            compactWhenConnected
+          />
+
+          <section className="overflow-hidden rounded-[1.5rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.96)_0%,_rgba(2,6,23,0.98)_100%)] shadow-[0_20px_55px_rgba(2,6,23,0.28)]">
+            <div className="flex flex-col gap-3 border-b border-slate-800 p-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  Bandeja Operativa
+                </p>
+                <h2 className="mt-1 text-lg font-semibold tracking-tight text-white">
+                  Leads visibles para actuar sin cambiar de pantalla
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Handoffs nuevos, seguimiento y siguiente paso en la misma
+                  superficie.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <MetaChip label={`${kpis.handoffsNew} nuevos`} />
+                <MetaChip label={`${kpis.actionsToday} urgentes`} />
+                <MetaChip label={`${kpis.activePortfolio} activos`} />
               </div>
             </div>
 
             {inbox.length === 0 ? (
-              <div className="px-4 py-10 text-center">
-                <h3 className="text-xl font-semibold text-white">
-                  Bandeja vacía
-                </h3>
-                <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  Cuando entre un handoff nuevo o reaparezca un seguimiento
-                  urgente, se verá aquí con prioridad clara.
-                </p>
+              <div className="p-4">
+                <div className="rounded-[1.1rem] border border-slate-800 bg-slate-950/70 p-4 text-center">
+                  <h3 className="text-lg font-semibold text-white">
+                    Bandeja vacía
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    Cuando entre un handoff nuevo o reaparezca un seguimiento
+                    urgente, quedará visible aquí sin cambiar de módulo.
+                  </p>
+                </div>
               </div>
             ) : (
-              <div className="divide-y divide-slate-800">
+              <div className="divide-y divide-slate-800 xl:max-h-[calc(100vh-21rem)] xl:overflow-auto">
                 {inbox.map((lead) => {
                   const isNewLead = lead.assignmentStatus === "assigned";
                   const isAccepting = loadingAction === `accept:${lead.id}`;
@@ -425,10 +434,10 @@ export function MemberDashboardClient({
                   return (
                     <article
                       key={lead.id}
-                      className="px-4 py-4 transition hover:bg-slate-900/45"
+                      className="p-4 transition hover:bg-slate-900/45"
                     >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 flex-1">
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_190px]">
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-base font-semibold text-white">
                               {lead.leadName}
@@ -453,7 +462,7 @@ export function MemberDashboardClient({
                             {lead.companyName?.trim() || lead.contactLabel}
                           </p>
 
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
                             <span className="rounded-full border border-slate-800 bg-slate-950/70 px-3 py-1">
                               {buildOriginLabel(lead)}
                             </span>
@@ -468,7 +477,7 @@ export function MemberDashboardClient({
                           </div>
 
                           <div
-                            className={`mt-3 rounded-[1.1rem] border px-4 py-3 ${
+                            className={`mt-3 rounded-[1rem] border px-4 py-3 ${
                               lead.needsAttention
                                 ? "border-amber-500/20 bg-amber-500/10"
                                 : "border-slate-800 bg-slate-950/70"
@@ -483,10 +492,10 @@ export function MemberDashboardClient({
                           </div>
                         </div>
 
-                        <div className="flex min-w-[190px] flex-col items-start gap-3 lg:items-end">
+                        <div className="flex min-w-[190px] flex-col items-start justify-between gap-3 lg:items-end">
                           <p className="text-sm text-slate-400 lg:text-right">
                             {isNewLead
-                              ? "Todavía espera tu confirmación."
+                              ? "Espera tu confirmación para entrar a cartera."
                               : "Ya forma parte de tu cartera activa."}
                           </p>
 
@@ -518,22 +527,22 @@ export function MemberDashboardClient({
         </div>
 
         <aside className="min-w-0 space-y-4">
-          <section className="rounded-[1.6rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(2,6,23,0.28)]">
-            <div className="flex items-center justify-between gap-3">
+          <section className="rounded-[1.35rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(2,6,23,0.24)]">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
                   Mi jornada comercial
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
-                  Lectura rápida de lo que exige atención hoy.
+                  Lectura rápida de la carga del día.
                 </p>
               </div>
-              <div className="rounded-full border border-slate-800 bg-slate-950 px-3 py-1 text-xs font-medium text-slate-300">
-                Vista compacta
-              </div>
+              <span className="rounded-full border border-slate-800 bg-slate-950 px-3 py-1 text-xs font-medium text-slate-300">
+                Vista densa
+              </span>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="mt-4 space-y-4">
               <MetricMiniCard
                 label="Atención inmediata"
                 value={kpis.handoffsNew}
@@ -550,19 +559,19 @@ export function MemberDashboardClient({
               <MetricMiniCard
                 label="Cartera activa"
                 value={kpis.activePortfolio}
-                hint="Leads que siguen bajo tu gestión."
+                hint="Leads ya aceptados bajo tu gestión."
                 icon={<Gauge className="h-4 w-4" />}
               />
             </div>
           </section>
 
-          <section className="rounded-[1.6rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(2,6,23,0.28)]">
+          <section className="rounded-[1.35rem] border border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(2,6,23,0.24)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
                   Capacidad
                 </p>
-                <h2 className="mt-1 text-lg font-semibold text-white">
+                <h2 className="mt-1 text-base font-semibold text-white">
                   {availability.title}
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-slate-400">
@@ -589,64 +598,61 @@ export function MemberDashboardClient({
               </button>
             </div>
 
-            <div className="mt-4 rounded-[1.2rem] border border-slate-800 bg-slate-950/80 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-white">
-                    Estado del asesor
-                  </p>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {isReceivingLeads
-                      ? "Disponible para nuevos handoffs."
-                      : "Protegiendo la carga actual."}
-                  </p>
-                </div>
-                <SoftBadge
-                  label={isReceivingLeads ? "Activo" : "Pausado"}
-                  tone={
-                    isReceivingLeads
-                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
-                      : "border-slate-700 bg-slate-900 text-slate-300"
-                  }
-                />
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-[1rem] border border-slate-800 bg-slate-950/80 p-4">
+              <div>
+                <p className="text-sm font-semibold text-white">
+                  Estado del asesor
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  {isReceivingLeads
+                    ? "Disponible para nuevos handoffs."
+                    : "Protegiendo la carga actual."}
+                </p>
+              </div>
+              <SoftBadge
+                label={isReceivingLeads ? "Activo" : "Pausado"}
+                tone={
+                  isReceivingLeads
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
+                    : "border-slate-700 bg-slate-900 text-slate-300"
+                }
+              />
+            </div>
+          </section>
+
+          <section className="rounded-[1.35rem] border border-cyan-500/20 bg-[linear-gradient(180deg,_rgba(8,47,73,0.88)_0%,_rgba(2,6,23,0.96)_100%)] p-4 shadow-[0_18px_45px_rgba(2,6,23,0.24)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+                  IA Wallet
+                </p>
+                <p className="mt-1 text-sm font-medium text-white">
+                  Saldo operativo para automatizaciones y n8n
+                </p>
+              </div>
+              <div className="rounded-full border border-cyan-500/20 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-cyan-100">
+                {loadingKredits
+                  ? "Cargando..."
+                  : kreditsBalance !== null
+                    ? `${formatKreditsBalance(kreditsBalance)} KREDITs`
+                    : "Saldo no disponible"}
               </div>
             </div>
 
-            <div className="mt-3 rounded-[1.2rem] border border-cyan-500/20 bg-cyan-500/10 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
-                    IA Wallet
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-white">
-                    Saldo operativo para automatizaciones y n8n
-                  </p>
-                </div>
-                <div className="rounded-full border border-cyan-500/20 bg-slate-950/80 px-3 py-1.5 text-xs font-semibold text-cyan-100">
-                  {loadingKredits
-                    ? "Cargando..."
-                    : kreditsBalance !== null
-                      ? `${formatKreditsBalance(kreditsBalance)} KREDITs`
-                      : "Saldo no disponible"}
-                </div>
-              </div>
-
-              {kreditsError ? (
-                <p className="mt-2 text-xs font-medium text-rose-200">
-                  {kreditsError}
-                </p>
-              ) : (
-                <p className="mt-2 text-sm leading-6 text-cyan-50/80">
-                  Wallet compacta para supervisar el combustible de tus flujos
-                  sin sacarte de la operación.
-                </p>
-              )}
-            </div>
+            {kreditsError ? (
+              <p className="mt-3 text-sm font-medium text-rose-200">
+                {kreditsError}
+              </p>
+            ) : (
+              <p className="mt-3 text-sm leading-6 text-cyan-50/80">
+                Monitoreo rápido del combustible disponible para tus flujos.
+              </p>
+            )}
           </section>
 
           <MemberActiveWheelCard />
         </aside>
-      </section>
+      </div>
     </div>
   );
 }

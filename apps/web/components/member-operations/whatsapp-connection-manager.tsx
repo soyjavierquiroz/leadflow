@@ -28,6 +28,7 @@ type WhatsAppConnectionManagerProps = {
   description?: string;
   qrTtlSeconds?: number;
   pollingIntervalMs?: number;
+  compactWhenConnected?: boolean;
 };
 
 type UiState =
@@ -123,6 +124,7 @@ export function WhatsAppConnectionManager({
   description = "Genera, supervisa y reinicia el QR operativo de tu instancia sin cambiar el nombre con el que Leadflow la reconoce.",
   qrTtlSeconds = DEFAULT_QR_TTL_SECONDS,
   pollingIntervalMs = DEFAULT_POLLING_INTERVAL_MS,
+  compactWhenConnected = false,
 }: WhatsAppConnectionManagerProps) {
   const [uiState, setUiState] = useState<UiState>("disconnected");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
@@ -136,6 +138,8 @@ export function WhatsAppConnectionManager({
   const qrImageSrc = useMemo(() => toQrImageSrc(qrBase64), [qrBase64]);
   const qrExpired = uiState === "qr_ready" && secondsRemaining <= 0;
   const statusCopy = STATUS_COPY[uiState];
+  const isCompactConnected =
+    compactWhenConnected && !isBootstrapping && uiState === "connected";
   const progressPercent = Math.max(
     0,
     Math.min(100, Math.round((secondsRemaining / qrTtlSeconds) * 100)),
@@ -354,14 +358,14 @@ export function WhatsAppConnectionManager({
     );
 
   return (
-    <section className="overflow-hidden rounded-[1.75rem] border border-slate-800 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.10),_transparent_30%),linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.98)_100%)] p-4 shadow-[0_22px_60px_rgba(2,6,23,0.36)]">
+    <section className="overflow-hidden rounded-[1.5rem] border border-slate-800 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.10),_transparent_30%),linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.98)_100%)] p-4 shadow-[0_22px_60px_rgba(2,6,23,0.3)]">
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan-300">
               Canal / WhatsApp / Evolution
             </p>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight text-white md:text-2xl">
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-white md:text-xl">
               {title}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-400">
@@ -385,7 +389,11 @@ export function WhatsAppConnectionManager({
           </div>
         </div>
 
-        <p className="text-sm leading-6 text-slate-400">{statusCopy.description}</p>
+        {!isCompactConnected ? (
+          <p className="text-sm leading-6 text-slate-400">
+            {statusCopy.description}
+          </p>
+        ) : null}
       </div>
 
       {feedback ? (
@@ -402,14 +410,26 @@ export function WhatsAppConnectionManager({
       ) : null}
 
       {!isBootstrapping && uiState === "connected" ? (
-        <div className="mt-4 rounded-[1.4rem] border border-emerald-500/20 bg-emerald-500/10 p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mt-4 rounded-[1.25rem] border border-emerald-500/20 bg-emerald-500/10 p-4">
+          <div
+            className={`flex gap-4 ${
+              isCompactConnected
+                ? "flex-col xl:flex-row xl:items-center xl:justify-between"
+                : "flex-col lg:flex-row lg:items-center lg:justify-between"
+            }`}
+          >
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-500/20 bg-slate-950/80 text-emerald-200">
-                <CheckCircle2 className="h-6 w-6" />
+              <div
+                className={`flex items-center justify-center rounded-2xl border border-emerald-500/20 bg-slate-950/80 text-emerald-200 ${
+                  isCompactConnected ? "h-10 w-10" : "h-12 w-12"
+                }`}
+              >
+                <CheckCircle2
+                  className={isCompactConnected ? "h-5 w-5" : "h-6 w-6"}
+                />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-base font-semibold text-white">
                   WhatsApp listo para operar
                 </h3>
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-emerald-50/85">
@@ -420,17 +440,22 @@ export function WhatsAppConnectionManager({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                void restartInstance();
-              }}
-              disabled={isSubmitting}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/25 bg-slate-950/90 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              Reiniciar instancia
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-emerald-500/20 bg-slate-950/80 px-3 py-1.5 text-xs font-medium text-emerald-100">
+                Handoff habilitado
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  void restartInstance();
+                }}
+                disabled={isSubmitting}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/25 bg-slate-950/90 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCcw className="h-4 w-4" />
+                Reiniciar instancia
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

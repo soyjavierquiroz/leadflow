@@ -33,6 +33,18 @@ type RuntimeContextResponse = {
   data: unknown;
 };
 
+type RuntimeContextRequestInput =
+  | {
+      method: 'POST';
+      path: string;
+      body: RuntimeContextUpsertPayload;
+    }
+  | {
+      method: 'DELETE';
+      path: string;
+      body?: undefined;
+    };
+
 const DEFAULT_TIMEOUT_MS = 5_000;
 const UPSERT_PATH = '/v1/admin/channel-bindings/upsert';
 const SERVICE_KEY = 'leadflow-api';
@@ -114,27 +126,45 @@ export class RuntimeContextService {
     };
   }
 
-  private async request(input: {
-    method: 'POST' | 'DELETE';
-    path: string;
-    body?: RuntimeContextUpsertPayload;
-  }): Promise<RuntimeContextResponse> {
+  private validateUpsertPayload(payload: RuntimeContextUpsertPayload | undefined) {
+    if (payload === undefined) {
+      throw new InternalServerErrorException({
+        code: 'RUNTIME_CONTEXT_UPSERT_PAYLOAD_REQUIRED',
+        message: 'Runtime Context upsert payload is required.',
+      });
+    }
+
+    this.requireText(payload.provider, 'provider');
+    this.requireText(payload.channel, 'channel');
+    this.requireText(payload.instance_name, 'instance_name');
+    this.requireText(payload.tenant_id, 'tenant_id');
+    this.requireText(payload.service_owner_key, 'service_owner_key');
+  }
+
+  private async request(
+    input: RuntimeContextRequestInput,
+  ): Promise<RuntimeContextResponse> {
     this.ensureConfigured();
+
+    if (input.method === 'POST') {
+      this.validateUpsertPayload(input.body);
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
+      const hasBody = input.method === 'POST';
       const response = await fetch(joinUrlPath(this.baseUrl!, input.path), {
         method: input.method,
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
-          'Content-Type': 'application/json',
           'x-internal-api-key': this.apiKey!,
           'x-service-key': SERVICE_KEY,
+          ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         },
-        ...(input.body ? { body: JSON.stringify(input.body) } : {}),
+        ...(hasBody ? { body: JSON.stringify(input.body) } : {}),
       });
 
       const raw = await response.text();
