@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { MemberActiveWheelCard } from "@/components/member-operations/member-active-wheel-card";
+import { WhatsAppConnectionManager } from "@/components/member-operations/whatsapp-connection-manager";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import {
   type MemberDashboardAssignmentStatus,
@@ -17,6 +18,7 @@ import { memberOperationRequest } from "@/lib/member-operations";
 
 type MemberDashboardClientProps = {
   initialDashboard: MemberDashboardSnapshot;
+  instanceName: string;
 };
 
 type SponsorKreditsResponse = {
@@ -166,6 +168,7 @@ function SoftBadge({ label, tone }: { label: string; tone: string }) {
 
 export function MemberDashboardClient({
   initialDashboard,
+  instanceName,
 }: MemberDashboardClientProps) {
   const [sponsor, setSponsor] = useState(initialDashboard.sponsor);
   const [inbox, setInbox] = useState(initialDashboard.inbox);
@@ -450,6 +453,16 @@ export function MemberDashboardClient({
           </aside>
 
           <MemberActiveWheelCard />
+        </div>
+      </section>
+
+      <section className="grid gap-5 md:grid-cols-2">
+        <div className="col-span-1 md:col-span-2">
+          <WhatsAppConnectionManager
+            instanceName={instanceName}
+            title="WhatsApp del asesor"
+            description="Escanea el QR desde tu teléfono para dejar este canal listo. Si la sesión se traba, aquí mismo puedes regenerar o reiniciar la instancia sin cambiar su identificador operativo."
+          />
         </div>
       </section>
 

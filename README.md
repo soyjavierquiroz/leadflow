@@ -54,6 +54,39 @@ Secuencia operativa actual:
 6. La conexión pasa a `READY`.
 7. `LeadDispatcherService` queda habilitado para despachar el contexto estructurado hacia n8n.
 
+## Integración WhatsApp (Evolution API)
+
+Leadflow expone una integración operativa para que cada asesor vincule su propio
+WhatsApp desde el panel `member` sin ingresar nombres manualmente.
+
+Contrato actual:
+
+- Formato de instancia: `lf-{equipo}-{usuario}`
+- Ejemplo real: `lf-dxn-freddy`
+- El nombre se genera de forma determinística a partir del equipo operativo y
+  el primer nombre del asesor, sanitizado a minúsculas alfanuméricas.
+
+Flujo de conexión vigente:
+
+1. Leadflow consulta `connectionState` en Evolution.
+2. Si la instancia no existe, ejecuta `POST /instance/create` con el payload
+   mínimo aceptado por el clúster: `instanceName`, `integration=WHATSAPP-BAILEYS`
+   y `qrcode=true`.
+3. Leadflow ejecuta `POST /webhook/set/{instanceName}` como segundo paso
+   obligatorio para registrar el webhook de n8n.
+4. Leadflow solicita el QR vía `GET /instance/connect/{instanceName}` y lo
+   entrega al frontend del asesor.
+
+Notas operativas:
+
+- La autenticación hacia Evolution se hace siempre con `apikey`, `x-api-key` y
+  `Authorization: Bearer <key>`.
+- El webhook apunta al formato interno por instancia:
+  `http://n8n_v2_webhook:5678/webhook/{webhookId}/channels/evolution/{instanceName}/inbound`
+- En entornos locales con `runtime-context-service:local`, Leadflow no registra
+  bindings por API porque esa imagen es `Resolver-Only`; el módulo hace bypass
+  controlado y el seed debe realizarse manualmente en Postgres.
+
 ## Fuente de verdad de despliegue
 
 Usa solo estos archivos:

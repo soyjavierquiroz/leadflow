@@ -88,6 +88,14 @@ services:
       AWS_REGION: "${AWS_REGION:-us-east-1}"
       AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
       AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
+      # --- NUEVAS VARIABLES INYECTADAS PARA EVOLUTION MODULE ---
+      EVOLUTION_API_URL: "${EVOLUTION_API_URL:-http://evolution_evolution_api:8080}"
+      EVOLUTION_GLOBAL_KEY: "${EVOLUTION_GLOBAL_KEY}"
+      N8N_WEBHOOK_BASE_URL: "${N8N_WEBHOOK_BASE_URL:-http://n8n_v2_webhook:5678}"
+      N8N_EVOLUTION_WEBHOOK_ID: "${N8N_EVOLUTION_WEBHOOK_ID:-7feee028-e25e-43a3-abac-1a0bf7b0ccf4}"
+      RUNTIME_CONTEXT_URL: "${RUNTIME_CONTEXT_CENTRAL_BASE_URL:-http://runtime_context_service:8080}"
+      RUNTIME_CONTEXT_INTERNAL_KEY: "${RUNTIME_CONTEXT_CENTRAL_API_KEY}"
+      # ---------------------------------------------------------
     networks:
       - traefik_public
       - general_network

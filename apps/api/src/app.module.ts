@@ -4,6 +4,7 @@ import { validateApiEnvironment } from './config/runtime';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DomainModule } from './modules/domain/domain.module';
+import { EvolutionModule } from './modules/evolution/evolution.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
     HealthModule,
     AuthModule,
     DomainModule,
+    EvolutionModule,
   ],
 })
 export class AppModule {}

@@ -43,6 +43,25 @@ export type MemberSponsorDashboard = {
   blacklistSsoAvailable: boolean;
 };
 
+export type EvolutionConnectResponse = {
+  instanceName: string;
+  tenantId: string;
+  ownerKey: string;
+  connectionState: string;
+  base64: string | null;
+  pairingCode: string | null;
+  attempts: number | null;
+  raw: Record<string, unknown> | null;
+};
+
+export type EvolutionStatusResponse = {
+  instanceName: string;
+  exists: boolean;
+  state: string;
+  connected: boolean;
+  raw: Record<string, unknown> | null;
+};
+
 export const memberOperationRequest = async <T>(
   path: string,
   init: RequestInit,
