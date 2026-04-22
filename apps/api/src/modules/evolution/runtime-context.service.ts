@@ -61,7 +61,7 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
 @Injectable()
 export class RuntimeContextService {
   private readonly baseUrl = normalizeBaseUrl(
-    process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL ?? process.env.RUNTIME_CONTEXT_URL,
+    process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL,
   );
   private readonly apiKey = sanitizeNullableText(
     process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY ??
@@ -140,28 +140,6 @@ export class RuntimeContextService {
     this.requireText(payload.service_owner_key, 'service_owner_key');
   }
 
-  private resolveAdminApiBaseUrl() {
-    const baseUrl = this.baseUrl;
-
-    if (!baseUrl) {
-      return null;
-    }
-
-    try {
-      const url = new URL(baseUrl);
-      const pathname = url.pathname.replace(/\/+$/, '');
-      url.pathname = pathname.endsWith('/v1')
-        ? pathname || '/v1'
-        : `${pathname}/v1`;
-      url.search = '';
-      url.hash = '';
-
-      return url.toString();
-    } catch {
-      return null;
-    }
-  }
-
   private async request(
     input: RuntimeContextRequestInput,
   ): Promise<RuntimeContextResponse> {
@@ -176,10 +154,7 @@ export class RuntimeContextService {
 
     try {
       const hasBody = input.method === 'POST';
-      const fullUrl = joinUrlPath(
-        this.resolveAdminApiBaseUrl() ?? this.baseUrl!,
-        input.path,
-      );
+      const fullUrl = joinUrlPath(this.baseUrl!, input.path);
 
       console.log(`[RUNTIME-CONTEXT-API] URL: ${fullUrl}`);
       console.log(
