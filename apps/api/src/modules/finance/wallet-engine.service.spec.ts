@@ -38,6 +38,22 @@ describe('WalletEngineService', () => {
     };
   };
 
+  const createServiceWithBaseUrl = () => {
+    const httpService = {
+      get: jest.fn(),
+      post: jest.fn(),
+    };
+    const configService = new ConfigService({
+      WALLET_ENGINE_BASE_URL: 'http://wallet-api:3000',
+      WALLET_ENGINE_API_KEY: 'wallet-secret',
+    });
+
+    return {
+      httpService,
+      service: new WalletEngineService(httpService as never, configService),
+    };
+  };
+
   it('injects Authorization on GET requests', async () => {
     const { service, httpService } = createService();
 
@@ -111,15 +127,15 @@ describe('WalletEngineService', () => {
     );
   });
 
-  it('upserts sponsor wallet accounts for the ai assistant product', async () => {
+  it('upserts KREDIT accounts for the Leadflow product', async () => {
     const { service, httpService } = createService();
 
     httpService.post.mockReturnValue(
       of(
         buildAxiosResponse({
           account_id: 'account-kredit-1',
-          platform_key: 'leadflow',
-          product_key: 'ai_assistant',
+          platform_key: 'kurukin',
+          product_key: 'leadflow',
           tenant_id: 'sponsor-1',
           status: 'active',
           created_at: '2026-04-01T00:00:00.000Z',
@@ -136,8 +152,11 @@ describe('WalletEngineService', () => {
       'http://wallet-engine:3000/accounts/upsert',
       {
         tenant_id: 'sponsor-1',
-        platform_key: 'leadflow',
-        product_key: 'ai_assistant',
+        external_ref: 'sponsor-1',
+        platform_key: 'kurukin',
+        product_key: 'leadflow',
+        unit_code: 'KREDIT',
+        unit_scale: 6,
       },
       expect.objectContaining({
         headers: expect.objectContaining({
@@ -159,8 +178,9 @@ describe('WalletEngineService', () => {
       'http://wallet-engine:3000/wallets/credit',
       {
         account_id: 'account-kredit-1',
-        amount: '5000000',
+        amount: '5.000000',
         unit_code: 'KREDIT',
+        unit_scale: 6,
         reference_type: 'welcome_bonus',
         reference_id: 'sponsor-1',
       },
@@ -168,6 +188,36 @@ describe('WalletEngineService', () => {
         headers: expect.objectContaining({
           Authorization: 'Bearer wallet-secret',
           'Idempotency-Key': 'welcome_bonus_kredit_sponsor-1',
+        }),
+      }),
+    );
+  });
+
+  it('prefers WALLET_ENGINE_BASE_URL when building wallet requests', async () => {
+    const { service, httpService } = createServiceWithBaseUrl();
+
+    httpService.post.mockReturnValue(
+      of(
+        buildAxiosResponse({
+          account_id: 'account-kredit-1',
+          platform_key: 'kurukin',
+          product_key: 'leadflow',
+          tenant_id: 'sponsor-1',
+        }),
+      ),
+    );
+
+    await service.upsertAccount('sponsor-1');
+
+    expect(httpService.post).toHaveBeenCalledWith(
+      'http://wallet-api:3000/accounts/upsert',
+      expect.objectContaining({
+        platform_key: 'kurukin',
+        product_key: 'leadflow',
+      }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer wallet-secret',
         }),
       }),
     );
@@ -289,14 +339,9 @@ describe('WalletEngineService', () => {
       ),
     );
 
-    await service.debitSeat(
-      'account-1',
-      '25.00',
-      'join_wheel-1_sponsor-1',
-      {
-        idempotencyKey: 'join_wheel-1_sponsor-1',
-      },
-    );
+    await service.debitSeat('account-1', '25.00', 'join_wheel-1_sponsor-1', {
+      idempotencyKey: 'join_wheel-1_sponsor-1',
+    });
 
     expect(
       httpService.post.mock.calls[0]?.[2]?.headers?.['Idempotency-Key'],

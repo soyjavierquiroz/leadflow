@@ -65,19 +65,21 @@ const normalizeUrl = (value: string | undefined, field: string) => {
 };
 
 export const validateApiEnvironment = (env: NodeJS.ProcessEnv) => {
-  const walletEngineInternalUrl = normalizeUrl(
-    env.WALLET_ENGINE_INTERNAL_URL,
-    'WALLET_ENGINE_INTERNAL_URL',
-  );
+  const walletEngineBaseUrl =
+    normalizeUrl(env.WALLET_ENGINE_BASE_URL, 'WALLET_ENGINE_BASE_URL') ??
+    normalizeUrl(env.WALLET_ENGINE_INTERNAL_URL, 'WALLET_ENGINE_INTERNAL_URL');
   const walletEngineApiKey = sanitizeEnv(env.WALLET_ENGINE_API_KEY);
   const walletEngineConfigured = Boolean(
-    walletEngineInternalUrl && walletEngineApiKey,
+    walletEngineBaseUrl && walletEngineApiKey,
   );
 
   return {
     ...env,
+    WALLET_ENGINE_BASE_URL: walletEngineConfigured
+      ? walletEngineBaseUrl
+      : undefined,
     WALLET_ENGINE_INTERNAL_URL: walletEngineConfigured
-      ? walletEngineInternalUrl
+      ? walletEngineBaseUrl
       : undefined,
     WALLET_ENGINE_API_KEY: walletEngineConfigured
       ? walletEngineApiKey
@@ -110,10 +112,12 @@ export const getApiRuntimeConfig = (
   const n8nDispatcherApiKey = sanitizeEnv(env.N8N_DISPATCHER_API_KEY);
   const n8nOutboundWebhookUrl = sanitizeEnv(env.N8N_OUTBOUND_WEBHOOK_URL);
   const walletEngineInternalUrl =
+    normalizeUrl(env.WALLET_ENGINE_BASE_URL, 'WALLET_ENGINE_BASE_URL') ??
     normalizeUrl(
       env.WALLET_ENGINE_INTERNAL_URL,
       'WALLET_ENGINE_INTERNAL_URL',
-    ) ?? null;
+    ) ??
+    null;
 
   return {
     appName: env.API_NAME ?? 'leadflow-api',

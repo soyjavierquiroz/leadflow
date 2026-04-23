@@ -85,13 +85,15 @@ type WalletEngineExceptionResponse = {
 };
 
 const PLATFORM_KEY = 'leadflow';
+const KREDIT_PLATFORM_KEY = 'kurukin';
+const KREDIT_PRODUCT_KEY = 'leadflow';
 const TEAM_PRODUCT_KEY = 'ads_wheel';
-const SPONSOR_PRODUCT_KEY = 'ai_assistant';
 const UNIT_CODE = 'USD';
 const UNIT_SCALE = 2;
 const SEAT_DEBIT_FEATURE_KEY = 'ads_wheel.seat';
 const KREDIT_UNIT_CODE = 'KREDIT';
-const WELCOME_BONUS_AMOUNT = '5000000';
+const KREDIT_UNIT_SCALE = 6;
+const INITIAL_WELCOME_CREDITS = 5;
 
 const sanitizeNullableText = (value: string | null | undefined) => {
   if (value === undefined || value === null) {
@@ -127,7 +129,8 @@ export class WalletEngineService {
     private readonly configService: ConfigService,
   ) {
     this.internalUrl = normalizeBaseUrl(
-      this.configService.get<string>('WALLET_ENGINE_INTERNAL_URL'),
+      this.configService.get<string>('WALLET_ENGINE_BASE_URL') ??
+        this.configService.get<string>('WALLET_ENGINE_INTERNAL_URL'),
     );
     this.apiKey = sanitizeNullableText(
       this.configService.get<string>('WALLET_ENGINE_API_KEY'),
@@ -166,28 +169,42 @@ export class WalletEngineService {
     return response;
   }
 
-  async upsertSponsorAccount(sponsorId: string): Promise<WalletEngineAccountRef> {
-    const normalizedSponsorId = this.requireText(sponsorId, 'sponsorId');
+  async upsertAccount(tenantId: string): Promise<WalletEngineAccountRef> {
+    const normalizedTenantId = this.requireText(tenantId, 'tenantId');
     const response = await this.post<WalletEngineAccountUpsertResponse>(
       '/accounts/upsert',
       {
-        tenant_id: normalizedSponsorId,
-        platform_key: PLATFORM_KEY,
-        product_key: SPONSOR_PRODUCT_KEY,
+        platform_key: KREDIT_PLATFORM_KEY,
+        product_key: KREDIT_PRODUCT_KEY,
+        tenant_id: normalizedTenantId,
+        external_ref: normalizedTenantId,
+        unit_code: KREDIT_UNIT_CODE,
+        unit_scale: KREDIT_UNIT_SCALE,
       },
-      this.buildIdempotencyKey('sponsor-account-upsert', normalizedSponsorId),
+      this.buildIdempotencyKey('leadflow-kredit-account-upsert', [
+        KREDIT_PLATFORM_KEY,
+        KREDIT_PRODUCT_KEY,
+        normalizedTenantId,
+      ]),
     );
     const accountId = this.readAccountId(response);
 
     if (!accountId) {
       throw new BadGatewayException(
-        'Wallet engine did not return an account id for the sponsor account.',
+        'Wallet engine did not return an account id for the KREDIT account.',
       );
     }
 
     return {
       accountId,
     };
+  }
+
+  async upsertSponsorAccount(
+    sponsorId: string,
+  ): Promise<WalletEngineAccountRef> {
+    const normalizedSponsorId = this.requireText(sponsorId, 'sponsorId');
+    return await this.upsertAccount(normalizedSponsorId);
   }
 
   async getTeamBalance(accountId: string): Promise<WalletEngineBalance> {
@@ -206,8 +223,9 @@ export class WalletEngineService {
       '/wallets/credit',
       {
         account_id: normalizedAccountId,
-        amount: WELCOME_BONUS_AMOUNT,
+        amount: INITIAL_WELCOME_CREDITS.toFixed(KREDIT_UNIT_SCALE),
         unit_code: KREDIT_UNIT_CODE,
+        unit_scale: KREDIT_UNIT_SCALE,
         reference_type: 'welcome_bonus',
         reference_id: normalizedSponsorId,
       },
