@@ -6,7 +6,6 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
-  joinUrlPath,
   normalizeBaseUrl,
   sanitizeNullableText,
 } from '../shared/url.utils';
@@ -154,9 +153,19 @@ export class RuntimeContextService {
 
     try {
       const hasBody = input.method === 'POST';
-      const fullUrl = joinUrlPath(this.baseUrl!, input.path);
+      const finalUrl =
+        input.method === 'POST'
+          ? `${process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL}/v1/admin/channel-bindings/upsert`.replace(
+              /([^:]\/)\/+/g,
+              '$1',
+            )
+          : `${process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL}${input.path}`.replace(
+              /([^:]\/)\/+/g,
+              '$1',
+            );
 
-      console.log(`[RUNTIME-CONTEXT-API] URL: ${fullUrl}`);
+      console.log(`[RUNTIME-CONTEXT-API] URL: ${finalUrl}`);
+      console.log(`[NUCLEAR-CHECK] TARGET_URL: "${finalUrl}"`);
       console.log(
         `[DEBUG-AUTH] Key Env: ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY ? 'DEFINED' : 'UNDEFINED'}`,
       );
@@ -172,7 +181,7 @@ export class RuntimeContextService {
         'x-service-key': 'leadflow-api',
       };
 
-      const response = await fetch(fullUrl, {
+      const response = await fetch(finalUrl, {
         method: input.method,
         signal: controller.signal,
         headers,
