@@ -47,6 +47,17 @@ type RuntimeContextRequestInput =
 const DEFAULT_TIMEOUT_MS = 5_000;
 const ADMIN_BINDINGS_PATH = '/admin/channel-bindings';
 
+class RuntimeContextError extends BadGatewayException {
+  constructor(status: number, errorBody: string) {
+    super({
+      code: 'RUNTIME_CONTEXT_UPSTREAM_ERROR',
+      message: `RuntimeContextError: ${status} - ${errorBody}`,
+      details: errorBody,
+      upstreamStatus: status,
+    });
+  }
+}
+
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
 
@@ -73,42 +84,23 @@ export class RuntimeContextService {
 
   async registerBinding(input: RegisterBindingInput): Promise<{ success: true }> {
     const payload = this.buildPayload(input);
-    const response = await this.request({
+    await this.request({
       method: 'POST',
       path: `${ADMIN_BINDINGS_PATH}/upsert`,
       body: payload,
     });
 
-    if (response.status >= 200 && response.status < 300) {
-      return { success: true };
-    }
-
-    throw new InternalServerErrorException({
-      code: 'RUNTIME_CONTEXT_UPSERT_FAILED',
-      message: `Runtime Context upsert failed with HTTP ${response.status}.`,
-      details: response.data,
-    });
+    return { success: true };
   }
 
   async deleteBinding(instanceName: string): Promise<{ success: true }> {
     const normalizedInstanceName = this.requireText(instanceName, 'instanceName');
-    const response = await this.request({
+    await this.request({
       method: 'DELETE',
       path: `${ADMIN_BINDINGS_PATH}/${encodeURIComponent(normalizedInstanceName)}`,
     });
 
-    if (
-      (response.status >= 200 && response.status < 300) ||
-      response.status === 404
-    ) {
-      return { success: true };
-    }
-
-    throw new InternalServerErrorException({
-      code: 'RUNTIME_CONTEXT_DELETE_FAILED',
-      message: `Runtime Context delete failed with HTTP ${response.status}.`,
-      details: response.data,
-    });
+    return { success: true };
   }
 
   private buildPayload(input: RegisterBindingInput): RuntimeContextUpsertPayload {
@@ -153,40 +145,18 @@ export class RuntimeContextService {
 
     try {
       const hasBody = input.method === 'POST';
-      const finalUrl =
-        input.method === 'POST'
-          ? `${process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL}/v1/admin/channel-bindings/upsert`.replace(
-              /([^:]\/)\/+/g,
-              '$1',
-            )
-          : `${process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL}/v1${input.path}`.replace(
-              /([^:]\/)\/+/g,
-              '$1',
-            );
+      const apiBasePath = this.baseUrl.endsWith('/v1')
+        ? this.baseUrl
+        : `${this.baseUrl}/v1`;
+      const finalUrl = `${apiBasePath}${
+        input.method === 'POST' ? `${ADMIN_BINDINGS_PATH}/upsert` : input.path
+      }`.replace(/([^:]\/)\/+/g, '$1');
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'x-internal-api-key': String(
-          process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY || '',
-        ),
+        'x-internal-api-key': this.apiKey ?? '',
         'x-service-key': 'leadflow_api',
       };
-
-      console.log('>>> [DEBUG-STEP-1] Iniciando Fetch al Runtime Context');
-      console.log(`>>> [DEBUG-STEP-2] URL Final: "${finalUrl}"`);
-      console.log('>>> [DEBUG-STEP-3] Headers Enviados:', {
-        'x-internal-api-key': `${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY?.substring(0, 5)}...`,
-        'x-service-key': headers['x-service-key'],
-      });
-      console.log(`[RUNTIME-CONTEXT-API] URL: ${finalUrl}`);
-      console.log(`[NUCLEAR-CHECK] TARGET_URL: "${finalUrl}"`);
-      console.log(
-        `[DEBUG-AUTH] Key Env: ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY ? 'DEFINED' : 'UNDEFINED'}`,
-      );
-      console.log(
-        `[DEBUG-AUTH] Key Start: ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY?.substring(0, 5)}`,
-      );
-      console.log('[DEBUG-AUTH] Service Key: leadflow_api');
 
       const response = await fetch(finalUrl, {
         method: input.method,
@@ -195,9 +165,7 @@ export class RuntimeContextService {
         ...(hasBody ? { body: JSON.stringify(input.body) } : {}),
       });
 
-      console.log(`>>> [DEBUG-STEP-4] Status recibido: ${response.status}`);
       const errorBody = await response.text();
-      console.log(`>>> [DEBUG-STEP-5] Body recibido: ${errorBody}`);
       let data: unknown = null;
 
       if (errorBody) {
@@ -206,6 +174,13 @@ export class RuntimeContextService {
         } catch {
           data = errorBody;
         }
+      }
+
+      if (response.status < 200 || response.status >= 300) {
+        throw new RuntimeContextError(
+          response.status,
+          errorBody || 'Empty response body',
+        );
       }
 
       return {
@@ -223,6 +198,10 @@ export class RuntimeContextService {
           code: 'RUNTIME_CONTEXT_TIMEOUT',
           message: 'Runtime Context admin API timed out.',
         });
+      }
+
+      if (error instanceof RuntimeContextError) {
+        throw error;
       }
 
       throw new BadGatewayException({

@@ -39,7 +39,7 @@ describe('RuntimeContextService', () => {
         headers: {
           'Content-Type': 'application/json',
           'x-internal-api-key': 'secret-key',
-          'x-service-key': 'leadflow-api',
+          'x-service-key': 'leadflow_api',
         },
         body: JSON.stringify({
           provider: 'evolution',
@@ -79,14 +79,14 @@ describe('RuntimeContextService', () => {
     );
   });
 
-  it('deletes the admin binding and treats 404 as an idempotent success', async () => {
+  it('deletes the admin binding with internal auth headers', async () => {
     process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL =
       'http://runtime-context.example';
     process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY = 'secret-key';
 
     const fetchSpy = jest
       .spyOn(global, 'fetch')
-      .mockResolvedValue(buildResponse(404, { code: 'NOT_FOUND' }));
+      .mockResolvedValue(buildResponse(204, null));
     const service = new RuntimeContextService();
 
     await expect(
@@ -103,10 +103,30 @@ describe('RuntimeContextService', () => {
         headers: {
           'Content-Type': 'application/json',
           'x-internal-api-key': 'secret-key',
-          'x-service-key': 'leadflow-api',
+          'x-service-key': 'leadflow_api',
         },
       },
     );
+  });
+
+  it('raises a clear runtime context error when the upstream responds with a non-2xx status', async () => {
+    process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL =
+      'http://runtime-context.example';
+    process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY = 'secret-key';
+
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(buildResponse(404, { code: 'NOT_FOUND' }));
+    const service = new RuntimeContextService();
+
+    await expect(service.deleteBinding('lf-dxn-freddy')).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'RUNTIME_CONTEXT_UPSTREAM_ERROR',
+        message: 'RuntimeContextError: 404 - {"code":"NOT_FOUND"}',
+        details: '{"code":"NOT_FOUND"}',
+        upstreamStatus: 404,
+      }),
+    });
   });
 
   it('rejects admin upserts before sending a POST without a payload', async () => {

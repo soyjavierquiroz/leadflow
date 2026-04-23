@@ -84,7 +84,7 @@ Notas operativas:
 - La autenticación hacia Evolution se hace siempre con `apikey`, `x-api-key` y
   `Authorization: Bearer <key>`.
 - El binding de Runtime Context se administra automáticamente desde Leadflow
-  usando `x-internal-api-key` y `x-service-key: leadflow-api`.
+  usando `x-internal-api-key` y `x-service-key: leadflow_api`.
 - Cuando el asesor reinicia o desconecta la instancia, Leadflow ejecuta
   `DELETE /v1/admin/channel-bindings/{instanceName}` para marcar el binding
   como `deleted` y evitar basura técnica.

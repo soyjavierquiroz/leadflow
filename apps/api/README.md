@@ -81,7 +81,7 @@ Contrato aplicado por `EvolutionModule`:
 Autenticación interna usada por la API:
 
 - `x-internal-api-key: <RUNTIME_CONTEXT_CENTRAL_API_KEY>`
-- `x-service-key: leadflow-api`
+- `x-service-key: leadflow_api`
 
 Implicación operativa:
 
