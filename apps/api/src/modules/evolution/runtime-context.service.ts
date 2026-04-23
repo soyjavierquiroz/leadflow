@@ -145,9 +145,10 @@ export class RuntimeContextService {
 
     try {
       const hasBody = input.method === 'POST';
-      const apiBasePath = this.baseUrl.endsWith('/v1')
-        ? this.baseUrl
-        : `${this.baseUrl}/v1`;
+      const baseUrl = this.baseUrl ?? '';
+      const apiBasePath = baseUrl.endsWith('/v1')
+        ? baseUrl
+        : `${baseUrl}/v1`;
       const finalUrl = `${apiBasePath}${
         input.method === 'POST' ? `${ADMIN_BINDINGS_PATH}/upsert` : input.path
       }`.replace(/([^:]\/)\/+/g, '$1');
