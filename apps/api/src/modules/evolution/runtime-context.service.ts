@@ -169,7 +169,7 @@ export class RuntimeContextService {
         'x-internal-api-key': String(
           process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY || '',
         ),
-        'x-service-key': 'leadflow-api',
+        'x-service-key': 'leadflow_api',
       };
 
       console.log('>>> [DEBUG-STEP-1] Iniciando Fetch al Runtime Context');
@@ -186,7 +186,7 @@ export class RuntimeContextService {
       console.log(
         `[DEBUG-AUTH] Key Start: ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY?.substring(0, 5)}`,
       );
-      console.log('[DEBUG-AUTH] Service Key: leadflow-api');
+      console.log('[DEBUG-AUTH] Service Key: leadflow_api');
 
       const response = await fetch(finalUrl, {
         method: input.method,
