@@ -37,7 +37,6 @@ describe('RuntimeContextService', () => {
         method: 'POST',
         signal: expect.any(AbortSignal),
         headers: {
-          Accept: 'application/json',
           'Content-Type': 'application/json',
           'x-internal-api-key': 'secret-key',
           'x-service-key': 'leadflow-api',
@@ -102,7 +101,7 @@ describe('RuntimeContextService', () => {
         method: 'DELETE',
         signal: expect.any(AbortSignal),
         headers: {
-          Accept: 'application/json',
+          'Content-Type': 'application/json',
           'x-internal-api-key': 'secret-key',
           'x-service-key': 'leadflow-api',
         },

@@ -159,11 +159,25 @@ export class RuntimeContextService {
               /([^:]\/)\/+/g,
               '$1',
             )
-          : `${process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL}${input.path}`.replace(
+          : `${process.env.RUNTIME_CONTEXT_CENTRAL_BASE_URL}/v1${input.path}`.replace(
               /([^:]\/)\/+/g,
               '$1',
             );
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-internal-api-key': String(
+          process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY || '',
+        ),
+        'x-service-key': 'leadflow-api',
+      };
+
+      console.log('>>> [DEBUG-STEP-1] Iniciando Fetch al Runtime Context');
+      console.log(`>>> [DEBUG-STEP-2] URL Final: "${finalUrl}"`);
+      console.log('>>> [DEBUG-STEP-3] Headers Enviados:', {
+        'x-internal-api-key': `${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY?.substring(0, 5)}...`,
+        'x-service-key': headers['x-service-key'],
+      });
       console.log(`[RUNTIME-CONTEXT-API] URL: ${finalUrl}`);
       console.log(`[NUCLEAR-CHECK] TARGET_URL: "${finalUrl}"`);
       console.log(
@@ -173,13 +187,6 @@ export class RuntimeContextService {
         `[DEBUG-AUTH] Key Start: ${process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY?.substring(0, 5)}`,
       );
       console.log('[DEBUG-AUTH] Service Key: leadflow-api');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'x-internal-api-key': String(
-          process.env.RUNTIME_CONTEXT_CENTRAL_API_KEY || '',
-        ),
-        'x-service-key': 'leadflow-api',
-      };
 
       const response = await fetch(finalUrl, {
         method: input.method,
@@ -188,14 +195,16 @@ export class RuntimeContextService {
         ...(hasBody ? { body: JSON.stringify(input.body) } : {}),
       });
 
-      const raw = await response.text();
+      console.log(`>>> [DEBUG-STEP-4] Status recibido: ${response.status}`);
+      const errorBody = await response.text();
+      console.log(`>>> [DEBUG-STEP-5] Body recibido: ${errorBody}`);
       let data: unknown = null;
 
-      if (raw) {
+      if (errorBody) {
         try {
-          data = JSON.parse(raw) as unknown;
+          data = JSON.parse(errorBody) as unknown;
         } catch {
-          data = raw;
+          data = errorBody;
         }
       }
 
