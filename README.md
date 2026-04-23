@@ -93,6 +93,19 @@ Notas operativas:
 - Ya no se requieren `INSERT` manuales en Runtime Context para crear o limpiar
   bindings de WhatsApp.
 
+## Troubleshooting: Runtime Context
+
+Si el `POST /v1/admin/channel-bindings/upsert` responde `500`, valida primero lo siguiente:
+
+- El microservicio `Runtime Context Central` debe responder `200` en `/health`.
+- `RUNTIME_CONTEXT_CENTRAL_BASE_URL` y `RUNTIME_CONTEXT_CENTRAL_API_KEY` deben estar configuradas en la API.
+- Leadflow envía siempre `x-service-key: leadflow_api` y el binding administrativo se crea desde el backend, sin intervención manual.
+- Si el `500` ocurre durante el onboarding de WhatsApp, la causa más probable es que falte el `Tenant` correspondiente en la base de datos del servicio central.
+
+Nota operativa:
+
+- Aunque el flujo ya intenta automatizar este onboarding desde el service, un `Tenant` inexistente o inconsistente en la DB del Runtime Context puede seguir provocando errores upstream hasta que el registro maestro quede alineado.
+
 ## Fuente de verdad de despliegue
 
 Usa solo estos archivos:

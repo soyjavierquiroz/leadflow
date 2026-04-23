@@ -46,6 +46,7 @@ type RuntimeContextRequestInput =
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const ADMIN_BINDINGS_PATH = '/admin/channel-bindings';
+const RUNTIME_CONTEXT_SERVICE_KEY = 'leadflow_api' as const;
 
 class RuntimeContextError extends BadGatewayException {
   constructor(status: number, errorBody: string) {
@@ -145,18 +146,16 @@ export class RuntimeContextService {
 
     try {
       const hasBody = input.method === 'POST';
-      const baseUrl = this.baseUrl ?? '';
-      const apiBasePath = baseUrl.endsWith('/v1')
-        ? baseUrl
-        : `${baseUrl}/v1`;
-      const finalUrl = `${apiBasePath}${
-        input.method === 'POST' ? `${ADMIN_BINDINGS_PATH}/upsert` : input.path
-      }`.replace(/([^:]\/)\/+/g, '$1');
+      const apiBasePath = this.getApiBasePath();
+      const finalUrl = `${apiBasePath}${input.path}`.replace(
+        /([^:]\/)\/+/g,
+        '$1',
+      );
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'x-internal-api-key': this.apiKey ?? '',
-        'x-service-key': 'leadflow_api',
+        'x-service-key': RUNTIME_CONTEXT_SERVICE_KEY,
       };
 
       const response = await fetch(finalUrl, {
@@ -225,6 +224,12 @@ export class RuntimeContextService {
       message:
         'Runtime Context admin API is not configured. Set RUNTIME_CONTEXT_CENTRAL_BASE_URL and RUNTIME_CONTEXT_CENTRAL_API_KEY.',
     });
+  }
+
+  private getApiBasePath() {
+    const baseUrl = this.baseUrl ?? '';
+
+    return baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
   }
 
   private requireText(value: string | null | undefined, field: string) {
