@@ -20,6 +20,25 @@ Piezas principales:
 - `Runtime Context Central`: registro y resolución del contexto operativo antes de habilitar dispatch downstream.
 - `n8n`: recibe eventos del dispatcher y automatizaciones complementarias.
 
+## Base de conocimiento RAG
+
+La arquitectura RAG end-to-end queda dividida entre Leadflow, n8n y Runtime Context Central:
+
+- La web permite cargar PDFs desde el centro de entrenamiento neuronal y calcula localmente caracteres, costo estimado y validacion de saldo antes de abrir la ingesta.
+- `POST /v1/knowledge/upload` recibe `multipart/form-data`, valida el tenant contra la sesion operativa y reenvia el PDF al webhook interno de n8n.
+- El webhook de n8n es multi-stack. El cliente que construye el multipart debe inyectar dinamicamente `platform_key` y `product_key`, ademas de `tenant_id`, `file_name`, el archivo `file` y los metadatos de costo como `training_cost_kredits`.
+- `KnowledgeService.forwardUploadToN8n()` conserva y reenvia los metadatos no reservados, incluyendo `platform_key`, `product_key`, `vertical_key` u otras claves de ruteo que n8n necesite para resolver el stack correcto.
+- La web mantiene la experiencia inmersiva de entrenamiento visible por un minimo de 15 segundos antes de refrescar documentos y auditoria, incluso si el webhook responde antes.
+- Las operaciones de carga y eliminacion quedan registradas en `KnowledgeAudit` con usuario, tenant, documento, archivo y costo en Kredits.
+
+El borrado fisico de conocimiento ya no depende del endpoint legacy de soft delete. Para documentos con `document_id`, Leadflow llama Runtime Context Central asi:
+
+```http
+DELETE /v1/knowledge/:document_id?tenant_id=<uuid>
+```
+
+Ese request sale desde `apps/api/src/modules/knowledge/knowledge.service.ts` con headers internos (`x-internal-api-key` y `x-service-key: leadflow_api`) y sin body JSON. El frontend invoca `DELETE /v1/knowledge/:id?tenant_id=<uuid>` en Leadflow; la API valida el alcance del tenant, ejecuta el hard delete upstream y registra auditoria con costo `0.000000`.
+
 ## Onboarding central y dispatcher
 
 `RuntimeContextCentralService` centraliza el onboarding de cada `MessagingConnection` contra el servicio Runtime Context Central.
@@ -196,6 +215,8 @@ La web publica y consume:
 - `NEXT_PUBLIC_MEMBERS_URL`
 - `NEXT_PUBLIC_ADMIN_URL`
 - `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_PLATFORM_KEY`
+- `NEXT_PUBLIC_PRODUCT_KEY`
 - `NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET`
 - `NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN`
 

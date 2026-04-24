@@ -12,6 +12,7 @@ import { UserRole, UserStatus, type Prisma } from '@prisma/client';
 import type { FastifyReply } from 'fastify';
 import { getApiRuntimeConfig } from '../../config/runtime';
 import { PrismaService } from '../../prisma/prisma.service';
+import { WalletEngineService } from '../finance/wallet-engine.service';
 import { hashPassword, verifyPassword } from './password-hash.util';
 import type { AuthRequest, AuthenticatedUser } from './auth.types';
 
@@ -24,6 +25,15 @@ const authUserInclude = {
 type AuthUserRecord = Prisma.UserGetPayload<{
   include: typeof authUserInclude;
 }>;
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
 
 export type MyProfileSnapshot = {
   id: string;
@@ -40,7 +50,10 @@ export type MyProfileSnapshot = {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly walletEngineService: WalletEngineService,
+  ) {}
 
   async authenticate(input: {
     email: string;
@@ -247,7 +260,10 @@ export class AuthService {
       },
     });
 
-    return this.toAuthenticatedUser(session.user);
+    const normalizedUser =
+      await this.ensureOperationalSponsorForTeamAdmin(session.user);
+
+    return this.toAuthenticatedUser(normalizedUser);
   }
 
   async invalidateSession(sessionToken: string | null | undefined) {
@@ -431,6 +447,10 @@ export class AuthService {
       ipAddress?: string | null;
     },
   ) {
+    const normalizedUser =
+      await this.ensureOperationalSponsorForTeamAdmin(user, {
+        provisionWallet: true,
+      });
     const sessionToken = this.generateSessionToken();
     const sessionTokenHash = this.hashSessionToken(sessionToken);
     const runtimeConfig = getApiRuntimeConfig();
@@ -440,7 +460,7 @@ export class AuthService {
 
     await this.prisma.authSession.create({
       data: {
-        userId: user.id,
+        userId: normalizedUser.id,
         sessionTokenHash,
         expiresAt,
         lastSeenAt: new Date(),
@@ -450,7 +470,7 @@ export class AuthService {
     });
 
     await this.prisma.user.update({
-      where: { id: user.id },
+      where: { id: normalizedUser.id },
       data: {
         lastLoginAt: new Date(),
       },
@@ -458,8 +478,142 @@ export class AuthService {
 
     return {
       sessionToken,
-      user: this.toAuthenticatedUser(user),
+      user: this.toAuthenticatedUser(normalizedUser),
     };
+  }
+
+  private async ensureOperationalSponsorForTeamAdmin(
+    user: AuthUserRecord,
+    options?: {
+      provisionWallet?: boolean;
+    },
+  ): Promise<AuthUserRecord> {
+    if (
+      user.role !== UserRole.TEAM_ADMIN ||
+      !user.workspaceId ||
+      !user.teamId
+    ) {
+      return user;
+    }
+
+    let normalizedUser = user;
+    let sponsorWasCreated = false;
+
+    if (!normalizedUser.sponsor) {
+      normalizedUser = await this.prisma.$transaction(async (tx) => {
+        const publicSlug = await this.generateAvailablePublicSlug(
+          tx,
+          normalizedUser.fullName,
+        );
+        const sponsor = await tx.sponsor.create({
+          data: {
+            workspaceId: normalizedUser.workspaceId!,
+            teamId: normalizedUser.teamId!,
+            displayName: normalizedUser.fullName,
+            publicSlug,
+            status: 'active',
+            isActive: normalizedUser.status === UserStatus.active,
+            email: normalizedUser.email,
+            phone: null,
+            availabilityStatus: 'available',
+            routingWeight: 1,
+            memberPortalEnabled: true,
+          },
+        });
+
+        return tx.user.update({
+          where: {
+            id: normalizedUser.id,
+          },
+          data: {
+            sponsorId: sponsor.id,
+          },
+          include: authUserInclude,
+        });
+      });
+      sponsorWasCreated = true;
+    } else {
+      const sponsorUpdates: Prisma.SponsorUpdateInput = {};
+
+      if (!normalizedUser.sponsor.memberPortalEnabled) {
+        sponsorUpdates.memberPortalEnabled = true;
+      }
+
+      if (!normalizedUser.sponsor.publicSlug) {
+        sponsorUpdates.publicSlug = await this.generateAvailablePublicSlug(
+          this.prisma,
+          normalizedUser.sponsor.displayName || normalizedUser.fullName,
+        );
+      }
+
+      if (!normalizedUser.sponsor.email) {
+        sponsorUpdates.email = normalizedUser.email;
+      }
+
+      if (Object.keys(sponsorUpdates).length > 0) {
+        normalizedUser = await this.prisma.user.update({
+          where: {
+            id: normalizedUser.id,
+          },
+          data: {
+            sponsor: {
+              update: sponsorUpdates,
+            },
+          },
+          include: authUserInclude,
+        });
+      }
+    }
+
+    if (options?.provisionWallet && normalizedUser.sponsorId) {
+      try {
+        const account = await this.walletEngineService.upsertSponsorAccount(
+          normalizedUser.sponsorId,
+        );
+
+        if (sponsorWasCreated) {
+          await this.walletEngineService.creditInitialKredits(
+            account.accountId,
+            normalizedUser.sponsorId,
+          );
+        }
+      } catch (error) {
+        this.logger.error(
+          `Sponsor ${normalizedUser.sponsorId} wallet normalization failed during auth: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
+    }
+
+    return normalizedUser;
+  }
+
+  private async generateAvailablePublicSlug(
+    tx:
+      | Prisma.TransactionClient
+      | Pick<PrismaService, 'sponsor'>,
+    fullName: string,
+  ) {
+    const baseSlug = slugify(fullName) || 'asesor';
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
+      const existing = await tx.sponsor.findFirst({
+        where: {
+          publicSlug: candidate,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+    }
+
+    return `${baseSlug}-${randomBytes(4).toString('hex')}`;
   }
 
   private toAuthenticatedUser(user: AuthUserRecord): AuthenticatedUser {

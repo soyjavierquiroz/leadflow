@@ -46,38 +46,39 @@ const fieldDefinitions: Array<{
 const variantStyles = {
   team: {
     section:
-      "rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4",
+      "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4",
     header: "",
-    title: "text-xs font-semibold uppercase tracking-[0.22em] text-slate-500",
-    description: "mt-2 text-sm text-slate-600",
+    title: "text-xs font-semibold uppercase tracking-[0.22em] text-[var(--app-text-soft)]",
+    description: "mt-2 text-sm text-[var(--app-muted)]",
     fields: "mt-4 grid gap-4 md:grid-cols-2",
     label: "block",
-    labelText: "text-sm font-medium text-slate-700",
+    labelText: "text-sm font-medium text-[var(--app-text)]",
     input:
-      "mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-slate-950",
+      "mt-2 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 font-mono text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]",
   },
   system: {
-    section: "rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4",
+    section:
+      "rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4",
     header: "",
-    title: "text-xs font-semibold uppercase tracking-[0.22em] text-slate-500",
-    description: "mt-2 text-sm text-slate-600",
+    title: "text-xs font-semibold uppercase tracking-[0.22em] text-[var(--app-text-soft)]",
+    description: "mt-2 text-sm text-[var(--app-muted)]",
     fields: "mt-4 grid gap-5 md:grid-cols-2",
-    label: "space-y-2 text-sm text-slate-700",
-    labelText: "font-semibold text-slate-900",
+    label: "space-y-2 text-sm text-[var(--app-muted)]",
+    labelText: "font-semibold text-[var(--app-text)]",
     input:
-      "w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-500",
+      "w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 font-mono text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]",
   },
   vsl: {
     section:
-      "grid gap-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 md:col-span-2",
+      "grid gap-5 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] p-4 md:col-span-2",
     header: "md:col-span-2",
-    title: "text-xs font-semibold uppercase tracking-[0.22em] text-slate-500",
-    description: "mt-2 text-sm text-slate-600",
+    title: "text-xs font-semibold uppercase tracking-[0.22em] text-[var(--app-text-soft)]",
+    description: "mt-2 text-sm text-[var(--app-muted)]",
     fields: "grid gap-5 md:col-span-2 md:grid-cols-2",
     label: "grid gap-2",
-    labelText: "text-sm font-medium text-slate-700",
+    labelText: "text-sm font-medium text-[var(--app-text)]",
     input:
-      "rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm text-slate-950 outline-none transition focus:border-slate-950",
+      "rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 font-mono text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]",
   },
 } as const;
 

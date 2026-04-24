@@ -34,9 +34,11 @@ type ToastState = {
 };
 
 const primaryButtonClassName =
-  "rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full bg-[var(--app-text)] px-4 py-2.5 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
-  "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
+const fieldClassName =
+  "mt-2 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)] disabled:cursor-not-allowed disabled:bg-[var(--app-surface-muted)]";
 
 const sortRows = (rows: SystemTemplateRecord[]) =>
   [...rows].sort(
@@ -193,10 +195,10 @@ export function SystemTemplatesClient({
       ) : null}
 
       {toast ? (
-        <div className="fixed right-4 top-4 z-50 w-full max-w-sm rounded-[1.5rem] border border-emerald-200 bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
-          <p className="text-sm font-semibold text-slate-950">{toast.title}</p>
+        <div className="fixed right-4 top-4 z-50 w-full max-w-sm rounded-[1.5rem] border border-[var(--app-success-border)] bg-[var(--app-surface)] p-4 shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+          <p className="text-sm font-semibold text-[var(--app-text)]">{toast.title}</p>
           {toast.description ? (
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
               {toast.description}
             </p>
           ) : null}
@@ -230,53 +232,53 @@ export function SystemTemplatesClient({
         {AVAILABLE_TEMPLATE_STYLES.map((template) => (
           <article
             key={template.id}
-            className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]"
+            className="rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
                   Core Template Asset
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                <h2 className="mt-2 text-2xl font-semibold text-[var(--app-text)]">
                   {template.name}
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--app-muted)]">
                   {template.description}
                 </p>
               </div>
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+              <span className="rounded-full border border-[var(--app-success-border)] bg-[var(--app-success-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--app-success)]">
                 Oficial
               </span>
             </div>
 
             <div className="mt-5 grid gap-3 md:grid-cols-3">
-              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              <div className="rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--app-text-soft)]">
                   Template ID
                 </p>
-                <code className="mt-2 block text-sm font-semibold text-slate-950">
+                <code className="mt-2 block text-sm font-semibold text-[var(--app-text)]">
                   {template.id}
                 </code>
               </div>
-              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              <div className="rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--app-text-soft)]">
                   Variables
                 </p>
-                <p className="mt-2 text-sm font-semibold text-slate-950">
+                <p className="mt-2 text-sm font-semibold text-[var(--app-text)]">
                   {Object.keys(template.themeStyle).length} tokens CSS
                 </p>
               </div>
-              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+              <div className="rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--app-text-soft)]">
                   Utilidades
                 </p>
-                <p className="mt-2 text-sm font-semibold text-slate-950">
+                <p className="mt-2 text-sm font-semibold text-[var(--app-text)]">
                   {Object.keys(template.classNames).length} clases compartidas
                 </p>
               </div>
             </div>
 
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--app-text-soft)]">
               {template.styleModulePath}
             </p>
           </article>
@@ -292,11 +294,11 @@ export function SystemTemplatesClient({
               <div>
                 <Link
                   href={getTemplateEditHref(row.id)}
-                  className="font-semibold text-slate-950 transition hover:text-teal-700 hover:underline"
+                  className="font-semibold text-[var(--app-text)] transition hover:text-[var(--app-accent)] hover:underline"
                 >
                   {row.name}
                 </Link>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--app-text-soft)]">
                   {row.code}
                 </p>
               </div>
@@ -306,7 +308,7 @@ export function SystemTemplatesClient({
             key: "description",
             header: "Descripción",
             render: (row) => (
-              <p className="max-w-md text-sm leading-6 text-slate-600">
+              <p className="max-w-md text-sm leading-6 text-[var(--app-muted)]">
                 {row.description?.trim() || "Sin descripción operativa."}
               </p>
             ),
@@ -317,7 +319,7 @@ export function SystemTemplatesClient({
             render: (row) => (
               <div className="space-y-1">
                 <p>{Array.isArray(row.blocks) ? row.blocks.length : 0} bloques</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[var(--app-text-soft)]">
                   {Object.keys(
                     row.mediaMap && typeof row.mediaMap === "object" && !Array.isArray(row.mediaMap)
                       ? row.mediaMap
@@ -374,14 +376,14 @@ export function SystemTemplatesClient({
         >
           <form className="space-y-5" onSubmit={handleDeploySubmit}>
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-[var(--app-text)]">
                 Agencia destino
               </span>
               <select
                 value={selectedTeamId}
                 onChange={(event) => setSelectedTeamId(event.target.value)}
                 disabled={isPending}
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
+                className={fieldClassName}
               >
                 <option value="">Selecciona una agencia</option>
                 {sortedTeams.map((team) => (
@@ -392,7 +394,7 @@ export function SystemTemplatesClient({
               </select>
             </label>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+            <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm leading-6 text-[var(--app-muted)]">
               Este despliegue crea un nuevo funnel del tenant usando el contrato
               <code> POST /v1/system/templates/:templateId/deploy</code> con el
               <code> teamId</code> seleccionado.

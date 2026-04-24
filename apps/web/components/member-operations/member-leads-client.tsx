@@ -179,6 +179,19 @@ export function MemberLeadsClient({
   initialRows,
   remindersSummary,
 }: MemberLeadsClientProps) {
+  const panelClassName =
+    "rounded-[1.75rem] border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]";
+  const filterFieldClassName =
+    "w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]";
+  const detailButtonClassName =
+    "rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-3 py-1.5 text-xs font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-muted)]";
+  const primaryActionClassName =
+    "rounded-full bg-[var(--app-text)] px-4 py-2 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
+  const secondaryActionClassName =
+    "rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
+  const dangerActionClassName =
+    "rounded-full border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] px-4 py-2 text-sm font-semibold text-[var(--app-danger)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60";
+
   const [rows, setRows] = useState(initialRows);
   const [search, setSearch] = useState("");
   const [leadStatus, setLeadStatus] =
@@ -446,55 +459,55 @@ export function MemberLeadsClient({
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+        <div className={panelClassName}>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--app-text-soft)]">
             Bandeja filtrada
           </p>
-          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-[var(--app-text)]">
             {formatCompactNumber(filteredRows.length)} leads visibles
           </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+          <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
             Ajusta filtros para quedarte solo con la carga que vas a mover hoy.
           </p>
         </div>
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+        <div className={panelClassName}>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--app-text-soft)]">
             Handoffs por tomar
           </p>
-          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-[var(--app-text)]">
             {formatCompactNumber(pendingAcceptanceCount)} esperando respuesta
           </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+          <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
             Tómalos primero si quieres bajar fricción entre assignment y
             seguimiento.
           </p>
         </div>
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+        <div className={panelClassName}>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--app-text-soft)]">
             Prioridad comercial
           </p>
-          <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+          <p className="mt-3 text-2xl font-semibold tracking-tight text-[var(--app-text)]">
             {formatCompactNumber(hotLeadCount + attentionCount)} leads calientes
             o en riesgo
           </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+          <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
             Mezcla intención alta y necesidad de atención para ordenar tu foco.
           </p>
         </div>
       </section>
 
-      <section className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)] md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)] md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-2 text-sm">
-          <span className="font-medium text-slate-700">Buscar lead</span>
+          <span className="font-medium text-[var(--app-text)]">Buscar lead</span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Nombre, email, telefono o funnel"
-            className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+            className={filterFieldClassName}
           />
         </label>
         <label className="space-y-2 text-sm">
-          <span className="font-medium text-slate-700">Estado del lead</span>
+          <span className="font-medium text-[var(--app-text)]">Estado del lead</span>
           <select
             value={leadStatus}
             onChange={(event) =>
@@ -502,7 +515,7 @@ export function MemberLeadsClient({
                 event.target.value as (typeof leadStatusOptions)[number],
               )
             }
-            className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+            className={filterFieldClassName}
           >
             {leadStatusOptions.map((option) => (
               <option key={option} value={option}>
@@ -512,7 +525,7 @@ export function MemberLeadsClient({
           </select>
         </label>
         <label className="space-y-2 text-sm">
-          <span className="font-medium text-slate-700">
+          <span className="font-medium text-[var(--app-text)]">
             Estado del assignment
           </span>
           <select
@@ -522,7 +535,7 @@ export function MemberLeadsClient({
                 event.target.value as (typeof assignmentStatusOptions)[number],
               )
             }
-            className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+            className={filterFieldClassName}
           >
             {assignmentStatusOptions.map((option) => (
               <option key={option} value={option}>
@@ -532,7 +545,7 @@ export function MemberLeadsClient({
           </select>
         </label>
         <label className="space-y-2 text-sm">
-          <span className="font-medium text-slate-700">Seguimiento</span>
+          <span className="font-medium text-[var(--app-text)]">Seguimiento</span>
           <select
             value={reminderBucket}
             onChange={(event) =>
@@ -540,7 +553,7 @@ export function MemberLeadsClient({
                 event.target.value as (typeof reminderBucketOptions)[number],
               )
             }
-            className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+            className={filterFieldClassName}
           >
             {reminderBucketOptions.map((option) => (
               <option key={option} value={option}>
@@ -558,10 +571,10 @@ export function MemberLeadsClient({
             header: "Lead",
             render: (row: LeadView) => (
               <div>
-                <p className="font-semibold text-slate-950">
+                <p className="font-semibold text-[var(--app-text)]">
                   {row.fullName ?? "Lead sin nombre"}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[var(--app-text-soft)]">
                   {row.companyName ?? row.email ?? row.phone ?? "Sin contacto"}
                 </p>
               </div>
@@ -573,7 +586,7 @@ export function MemberLeadsClient({
             render: (row: LeadView) => (
               <div>
                 <p>{row.publicationPath ?? "Sin publicación"}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[var(--app-text-soft)]">
                   {row.domainHost ?? "Host pendiente"}
                 </p>
               </div>
@@ -616,7 +629,7 @@ export function MemberLeadsClient({
             render: (row: LeadView) => (
               <div>
                 <p>{row.reminderLabel ?? "Sin seguimiento"}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[var(--app-text-soft)]">
                   {row.followUpAt
                     ? formatDateTime(row.followUpAt)
                     : "Sin fecha"}
@@ -636,7 +649,7 @@ export function MemberLeadsClient({
             render: (row: LeadView) => (
               <button
                 type="button"
-                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                className={detailButtonClassName}
                 onClick={() => setSelectedLeadId(row.id)}
               >
                 Ver detalle
@@ -657,21 +670,21 @@ export function MemberLeadsClient({
         >
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                <p className="text-slate-500">Contacto</p>
-                <p className="mt-2 font-medium text-slate-950">
+              <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm">
+                <p className="text-[var(--app-text-soft)]">Contacto</p>
+                <p className="mt-2 font-medium text-[var(--app-text)]">
                   {selectedLead.email ?? "Sin email"}
                 </p>
-                <p className="mt-1 text-slate-700">
+                <p className="mt-1 text-[var(--app-muted)]">
                   {selectedLead.phone ?? "Sin teléfono"}
                 </p>
               </div>
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                <p className="text-slate-500">Contexto</p>
-                <p className="mt-2 font-medium text-slate-950">
+              <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm">
+                <p className="text-[var(--app-text-soft)]">Contexto</p>
+                <p className="mt-2 font-medium text-[var(--app-text)]">
                   {selectedLead.funnelName ?? "Funnel pendiente"}
                 </p>
-                <p className="mt-1 text-slate-700">
+                <p className="mt-1 text-[var(--app-muted)]">
                   {selectedLead.domainHost ?? "Host pendiente"}
                   {selectedLead.publicationPath ?? ""}
                 </p>
@@ -693,47 +706,47 @@ export function MemberLeadsClient({
 
             <dl className="grid gap-3 text-sm md:grid-cols-2">
               <div>
-                <dt className="text-slate-500">Empresa</dt>
-                <dd className="mt-1 font-medium text-slate-900">
+                <dt className="text-[var(--app-text-soft)]">Empresa</dt>
+                <dd className="mt-1 font-medium text-[var(--app-text)]">
                   {selectedLead.companyName ?? "Sin empresa"}
                 </dd>
               </div>
               <div>
-                <dt className="text-slate-500">Canal</dt>
-                <dd className="mt-1 font-medium text-slate-900">
+                <dt className="text-[var(--app-text-soft)]">Canal</dt>
+                <dd className="mt-1 font-medium text-[var(--app-text)]">
                   {selectedLead.sourceChannel}
                 </dd>
               </div>
               <div>
-                <dt className="text-slate-500">Creado</dt>
-                <dd className="mt-1 font-medium text-slate-900">
+                <dt className="text-[var(--app-text-soft)]">Creado</dt>
+                <dd className="mt-1 font-medium text-[var(--app-text)]">
                   {formatDateTime(selectedLead.createdAt)}
                 </dd>
               </div>
               <div>
-                <dt className="text-slate-500">Asignado</dt>
-                <dd className="mt-1 font-medium text-slate-900">
+                <dt className="text-[var(--app-text-soft)]">Asignado</dt>
+                <dd className="mt-1 font-medium text-[var(--app-text)]">
                   {selectedLead.assignedAt
                     ? formatDateTime(selectedLead.assignedAt)
                     : "Pendiente"}
                 </dd>
               </div>
               <div>
-                <dt className="text-slate-500">Playbook recomendado</dt>
-                <dd className="mt-1 font-medium text-slate-900">
+                <dt className="text-[var(--app-text-soft)]">Playbook recomendado</dt>
+                <dd className="mt-1 font-medium text-[var(--app-text)]">
                   {selectedLead.playbookTitle ?? "Sin recomendación"}
                 </dd>
               </div>
               <div>
-                <dt className="text-slate-500">Próxima acción efectiva</dt>
-                <dd className="mt-1 font-medium text-slate-900">
+                <dt className="text-[var(--app-text-soft)]">Próxima acción efectiva</dt>
+                <dd className="mt-1 font-medium text-[var(--app-text)]">
                   {selectedLead.effectiveNextAction ?? "Pendiente de definir"}
                 </dd>
               </div>
             </dl>
 
-            <div className="space-y-3 rounded-2xl border border-slate-200 p-4">
-              <p className="text-sm font-semibold text-slate-900">
+            <div className="space-y-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+              <p className="text-sm font-semibold text-[var(--app-text)]">
                 Acciones de seguimiento
               </p>
               <div className="flex flex-wrap gap-2">
@@ -741,7 +754,7 @@ export function MemberLeadsClient({
                 selectedLead.currentAssignmentId ? (
                   <button
                     type="button"
-                    className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className={primaryActionClassName}
                     disabled={
                       loadingAction ===
                       `accept:${selectedLead.currentAssignmentId}`
@@ -756,7 +769,7 @@ export function MemberLeadsClient({
                   <button
                     key={status}
                     type="button"
-                    className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className={secondaryActionClassName}
                     disabled={
                       loadingAction === `lead:${selectedLead.id}:${status}` ||
                       selectedLead.status === status
@@ -770,7 +783,7 @@ export function MemberLeadsClient({
                 {selectedLead.currentAssignmentId ? (
                   <button
                     type="button"
-                    className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className={dangerActionClassName}
                     disabled={
                       loadingAction ===
                       `close:${selectedLead.currentAssignmentId}`

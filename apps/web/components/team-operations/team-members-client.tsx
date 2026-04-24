@@ -37,9 +37,11 @@ type TeamMemberDeletionResponse = {
 };
 
 const primaryButtonClassName =
-  "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full bg-[var(--app-text)] px-4 py-2 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
-  "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
+const fieldClassName =
+  "w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-accent)] focus:ring-2 focus:ring-[var(--app-accent-soft)]";
 
 const formatRoleLabel = (role: TeamMemberRecord["role"]) => {
   switch (role) {
@@ -351,22 +353,22 @@ export function TeamMembersClient({
       ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
-        <article className="rounded-[2rem] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(20,184,166,0.12),_transparent_38%),linear-gradient(180deg,_rgba(255,255,255,1)_0%,_rgba(248,250,252,0.96)_100%)] p-6 shadow-[0_20px_50px_rgba(15,23,42,0.07)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+        <article className="rounded-[2rem] border border-[var(--app-border)] bg-[radial-gradient(circle_at_top_left,_var(--app-accent-soft),_transparent_38%),linear-gradient(180deg,_var(--app-surface)_0%,_var(--app-card)_100%)] p-6 shadow-[0_20px_50px_rgba(15,23,42,0.07)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
             Licencias activas
           </p>
           <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-4xl font-semibold tracking-tight text-slate-950">
+              <p className="text-4xl font-semibold tracking-tight text-[var(--app-text)]">
                 {team.activeSeats} de {team.maxSeats}
               </p>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--app-muted)]">
                 Cada asesor activo consume una licencia. El backend bloquea
                 cualquier activacion que intente superar el limite contratado.
               </p>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-700">
-              <p className="font-semibold text-slate-950">
+            <div className="rounded-3xl border border-[var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_86%,transparent)] px-4 py-3 text-sm text-[var(--app-muted)]">
+              <p className="font-semibold text-[var(--app-text)]">
                 {team.availableSeats} licencias disponibles
               </p>
               <p className="mt-1">
@@ -376,7 +378,7 @@ export function TeamMembersClient({
               </p>
             </div>
           </div>
-          <div className="mt-6 h-4 overflow-hidden rounded-full bg-slate-200">
+          <div className="mt-6 h-4 overflow-hidden rounded-full bg-[var(--app-surface-muted)]">
             <div
               className="h-full rounded-full bg-[linear-gradient(90deg,_#0f172a_0%,_#14b8a6_60%,_#f59e0b_100%)] transition-[width] duration-300"
               style={{
@@ -405,12 +407,12 @@ export function TeamMembersClient({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-        <div className="border-b border-slate-200 px-6 py-5">
-          <h2 className="text-xl font-semibold text-slate-950">
+      <section className="overflow-hidden rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+        <div className="border-b border-[var(--app-border)] px-6 py-5">
+          <h2 className="text-xl font-semibold text-[var(--app-text)]">
             Escuadron del team
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+          <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
             Activa o desactiva licencias sin perder visibilidad sobre rol,
             disponibilidad comercial y ultimo acceso.
           </p>
@@ -418,8 +420,8 @@ export function TeamMembersClient({
 
         {members.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50/80 text-left text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <table className="min-w-full divide-y divide-[var(--app-border)] text-sm">
+              <thead className="bg-[var(--app-card)] text-left text-xs font-semibold uppercase tracking-[0.2em] text-[var(--app-text-soft)]">
                 <tr>
                   <th className="px-6 py-4">Usuario</th>
                   <th className="px-4 py-4">Rol</th>
@@ -428,7 +430,7 @@ export function TeamMembersClient({
                   <th className="px-6 py-4 text-right">Licencia</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--app-border)]">
                 {members.map((member) => {
                   const isMemberPending = pendingMemberIds.includes(member.id);
                   const isSeatControlAvailable = Boolean(member.sponsorId);
@@ -448,20 +450,20 @@ export function TeamMembersClient({
                               className="h-12 w-12 rounded-2xl object-cover"
                             />
                           ) : (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--app-text)] text-sm font-semibold text-[var(--app-bg)]">
                               {buildInitials(
                                 member.displayName ?? member.fullName,
                               )}
                             </div>
                           )}
                           <div>
-                            <p className="font-semibold text-slate-950">
+                            <p className="font-semibold text-[var(--app-text)]">
                               {member.displayName ?? member.fullName}
                             </p>
-                            <p className="mt-1 text-slate-600">
+                            <p className="mt-1 text-[var(--app-muted)]">
                               {member.email}
                             </p>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-xs text-[var(--app-text-soft)]">
                               WhatsApp: {member.phone ?? "Sin cargar"} ·{" "}
                               {member.memberPortalEnabled
                                 ? "Portal listo"
@@ -473,7 +475,7 @@ export function TeamMembersClient({
                       <td className="px-4 py-5">
                         <div className="space-y-2">
                           <StatusBadge value={member.role.toLowerCase()} />
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-[var(--app-text-soft)]">
                             {formatRoleLabel(member.role)}
                           </p>
                         </div>
@@ -483,13 +485,13 @@ export function TeamMembersClient({
                           <StatusBadge
                             value={member.availabilityStatus ?? "offline"}
                           />
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-[var(--app-text-soft)]">
                             Sponsor:{" "}
                             {member.sponsorStatus ?? "Perfil pendiente"}
                           </p>
                         </div>
                       </td>
-                      <td className="px-4 py-5 text-slate-600">
+                      <td className="px-4 py-5 text-[var(--app-muted)]">
                         {formatDateLabel(member.lastLoginAt)}
                       </td>
                       <td className="px-6 py-5">
@@ -504,7 +506,7 @@ export function TeamMembersClient({
                                   isMemberPending ||
                                   isImpersonatingThisMember
                                 }
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-accent-soft)] bg-[var(--app-accent-soft)] text-[var(--app-accent)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                                 aria-label={`Entrar como ${member.displayName ?? member.fullName}`}
                                 title={
                                   isImpersonatingThisMember
@@ -521,7 +523,7 @@ export function TeamMembersClient({
                                   setMemberPendingDeletion(member);
                                 }}
                                 disabled={isPending || isMemberPending}
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] text-[var(--app-danger)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                                 aria-label={`Eliminar a ${member.displayName ?? member.fullName}`}
                                 title="Eliminar asesor"
                               >
@@ -530,7 +532,7 @@ export function TeamMembersClient({
                             </>
                           ) : null}
                           <div className="text-right">
-                            <p className="font-semibold text-slate-950">
+                            <p className="font-semibold text-[var(--app-text)]">
                               {isOperationalAdmin(member)
                                 ? member.isActive
                                   ? "Modo operador activo"
@@ -539,7 +541,7 @@ export function TeamMembersClient({
                                   ? "Activa"
                                   : "Inactiva"}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-[var(--app-text-soft)]">
                               {!isSeatControlAvailable
                                 ? "Necesita perfil sponsor"
                                 : isOperationalAdmin(member)
@@ -572,12 +574,12 @@ export function TeamMembersClient({
                             }
                             className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full transition ${
                               member.isActive
-                                ? "bg-emerald-500"
-                                : "bg-slate-300"
+                                ? "bg-[var(--app-success)]"
+                                : "bg-[var(--app-surface-muted)]"
                             } disabled:cursor-not-allowed disabled:opacity-60`}
                           >
                             <span
-                              className={`inline-block h-6 w-6 rounded-full bg-white shadow transition ${
+                              className={`inline-block h-6 w-6 rounded-full bg-[var(--app-bg)] shadow transition ${
                                 member.isActive
                                   ? "translate-x-9"
                                   : "translate-x-1"
@@ -617,7 +619,7 @@ export function TeamMembersClient({
         >
           <form className="space-y-5" onSubmit={handleInvite}>
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-[var(--app-text)]">
                 Nombre
               </span>
               <input
@@ -631,14 +633,14 @@ export function TeamMembersClient({
                 }}
                 placeholder="Nombre del asesor"
                 aria-invalid={inviteErrors.fullName ? "true" : "false"}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                className={fieldClassName}
               />
               {inviteErrors.fullName ? (
-                <p className="text-xs text-red-600">{inviteErrors.fullName}</p>
+                <p className="text-xs text-[var(--app-danger)]">{inviteErrors.fullName}</p>
               ) : null}
             </label>
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-[var(--app-text)]">
                 Email
               </span>
               <input
@@ -653,14 +655,14 @@ export function TeamMembersClient({
                 }}
                 placeholder="asesor@cliente.com"
                 aria-invalid={inviteErrors.email ? "true" : "false"}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                className={fieldClassName}
               />
               {inviteErrors.email ? (
-                <p className="text-xs text-red-600">{inviteErrors.email}</p>
+                <p className="text-xs text-[var(--app-danger)]">{inviteErrors.email}</p>
               ) : null}
             </label>
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-[var(--app-text)]">
                 Numero de WhatsApp
               </span>
               <input
@@ -675,14 +677,14 @@ export function TeamMembersClient({
                 }}
                 placeholder="+57 300 123 4567"
                 aria-invalid={inviteErrors.whatsappNumber ? "true" : "false"}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                className={fieldClassName}
               />
               {inviteErrors.whatsappNumber ? (
-                <p className="text-xs text-red-600">
+                <p className="text-xs text-[var(--app-danger)]">
                   {inviteErrors.whatsappNumber}
                 </p>
               ) : null}
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[var(--app-text-soft)]">
                 Este numero se usara como WhatsApp operativo del asesor.
               </p>
             </label>
@@ -724,7 +726,7 @@ export function TeamMembersClient({
           }}
         >
           <div className="space-y-5">
-            <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-900">
+            <div className="rounded-3xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] px-4 py-4 text-sm leading-6 text-[var(--app-danger)]">
               Esto ejecutara un hard delete en Prisma sobre el usuario asesor y
               su sponsor asociado.
             </div>
@@ -741,7 +743,7 @@ export function TeamMembersClient({
                 type="button"
                 onClick={handleDeleteMember}
                 disabled={isPending}
-                className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full bg-[var(--app-danger)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPending ? "Eliminando..." : "Eliminar definitivamente"}
               </button>

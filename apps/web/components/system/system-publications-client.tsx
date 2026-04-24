@@ -67,11 +67,13 @@ export type PublicationFormState = {
 };
 
 const primaryButtonClassName =
-  "rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full bg-[var(--app-text)] px-4 py-2.5 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
-  "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
 const dangerButtonClassName =
-  "rounded-full border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--app-danger)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60";
+const fieldClassName =
+  "w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]";
 
 const sortRows = (rows: SystemPublicationRecord[]) =>
   [...rows].sort((left, right) => {
@@ -458,32 +460,32 @@ export function SystemPublicationsClient({
         {rows.slice(0, 6).map((row) => (
           <article
             key={row.id}
-            className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.06)]"
+            className="rounded-[1.75rem] border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-[0_20px_50px_rgba(15,23,42,0.06)]"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-teal-700">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--app-accent)]">
                   {row.team.name}
                 </p>
-                <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                <h3 className="mt-2 text-lg font-semibold text-[var(--app-text)]">
                   {row.domain.host}
-                  <span className="text-slate-400">{row.path}</span>
+                  <span className="text-[var(--app-text-soft)]">{row.path}</span>
                 </h3>
               </div>
               <StatusBadge value={row.isRoutable ? "active" : "draft"} />
             </div>
-            <p className="mt-4 text-sm font-medium text-slate-800">
+            <p className="mt-4 text-sm font-medium text-[var(--app-text)]">
               {row.funnel.name}
             </p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-[var(--app-text-soft)]">
               {row.funnel.template.name} · {row.funnel.code}
             </p>
-            <div className="mt-5 flex items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="mt-5 flex items-center justify-between gap-3 text-xs text-[var(--app-text-soft)]">
               <span>{formatDateTime(row.updatedAt)}</span>
               <button
                 type="button"
                 onClick={() => openEditModal(row)}
-                className="font-semibold text-slate-800 underline-offset-4 hover:underline"
+                className="font-semibold text-[var(--app-text)] underline-offset-4 hover:underline"
               >
                 Editar
               </button>
@@ -499,11 +501,11 @@ export function SystemPublicationsClient({
             header: "Host / Path",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">
+                <p className="font-semibold text-[var(--app-text)]">
                   {row.domain.host}
-                  <span className="text-slate-400">{row.path}</span>
+                  <span className="text-[var(--app-text-soft)]">{row.path}</span>
                 </p>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--app-text-soft)]">
                   {row.workspace.name}
                 </p>
               </div>
@@ -515,7 +517,7 @@ export function SystemPublicationsClient({
             render: (row) => (
               <div>
                 <p>{row.funnel.name}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[var(--app-text-soft)]">
                   {row.funnel.template.name} · {row.funnel.code}
                 </p>
               </div>
@@ -527,7 +529,7 @@ export function SystemPublicationsClient({
             render: (row) => (
               <div>
                 <p>{row.team.name}</p>
-                <p className="text-xs text-slate-500">{row.team.code}</p>
+                <p className="text-xs text-[var(--app-text-soft)]">{row.team.code}</p>
               </div>
             ),
           },
@@ -537,7 +539,7 @@ export function SystemPublicationsClient({
             render: (row) => (
               <div className="space-y-2">
                 <StatusBadge value={row.isActive ? "active" : "paused"} />
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[var(--app-text-soft)]">
                   {row.isRoutable
                     ? "Resolviendo tráfico"
                     : "Sin salida pública"}
@@ -586,8 +588,8 @@ export function SystemPublicationsClient({
         >
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="grid gap-5 md:grid-cols-2">
-              <label className="space-y-2 text-sm text-slate-700">
-                <span className="font-semibold text-slate-900">Team</span>
+              <label className="space-y-2 text-sm text-[var(--app-muted)]">
+                <span className="font-semibold text-[var(--app-text)]">Team</span>
                 <select
                   value={formState.teamId}
                   onChange={(event) =>
@@ -599,7 +601,7 @@ export function SystemPublicationsClient({
                     }))
                   }
                   disabled={editorState.mode === "edit" || isPending}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  className={fieldClassName}
                 >
                   {teams.map((team) => (
                     <option key={team.id} value={team.id}>
@@ -609,8 +611,8 @@ export function SystemPublicationsClient({
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm text-slate-700">
-                <span className="font-semibold text-slate-900">Dominio</span>
+              <label className="space-y-2 text-sm text-[var(--app-muted)]">
+                <span className="font-semibold text-[var(--app-text)]">Dominio</span>
                 <select
                   value={formState.domainId}
                   onChange={(event) =>
@@ -622,7 +624,7 @@ export function SystemPublicationsClient({
                   disabled={
                     isLoadingAssets || isPending || currentDomains.length === 0
                   }
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  className={fieldClassName}
                 >
                   {currentDomains.length === 0 ? (
                     <option value="">
@@ -639,8 +641,8 @@ export function SystemPublicationsClient({
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm text-slate-700">
-                <span className="font-semibold text-slate-900">Funnel</span>
+              <label className="space-y-2 text-sm text-[var(--app-muted)]">
+                <span className="font-semibold text-[var(--app-text)]">Funnel</span>
                 <select
                   value={formState.funnelId}
                   onChange={(event) =>
@@ -652,7 +654,7 @@ export function SystemPublicationsClient({
                   disabled={
                     isLoadingAssets || isPending || currentFunnels.length === 0
                   }
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  className={fieldClassName}
                 >
                   {currentFunnels.length === 0 ? (
                     <option value="">
@@ -669,8 +671,8 @@ export function SystemPublicationsClient({
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm text-slate-700">
-                <span className="font-semibold text-slate-900">Path</span>
+              <label className="space-y-2 text-sm text-[var(--app-muted)]">
+                <span className="font-semibold text-[var(--app-text)]">Path</span>
                 <input
                   value={formState.path}
                   onChange={(event) =>
@@ -681,7 +683,7 @@ export function SystemPublicationsClient({
                   }
                   placeholder="/ o /promo"
                   disabled={isPending}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  className={fieldClassName}
                 />
               </label>
             </div>
@@ -699,24 +701,24 @@ export function SystemPublicationsClient({
               variant="system"
             />
 
-            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--app-text-soft)]">
                 Preview Operativo
               </p>
-              <p className="mt-2 text-base font-semibold text-slate-950">
+              <p className="mt-2 text-base font-semibold text-[var(--app-text)]">
                 {currentDomain?.host ?? "Dominio pendiente"}
-                <span className="text-slate-400">
+                <span className="text-[var(--app-text-soft)]">
                   {formState.path.trim() || "/"}
                 </span>
               </p>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-[var(--app-muted)]">
                 {currentFunnel
                   ? `${currentFunnel.name} · ${currentFunnel.code}`
                   : "Selecciona un funnel del tenant para completar el binding."}
               </p>
             </div>
 
-            <label className="flex items-start gap-3 rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
+            <label className="flex items-start gap-3 rounded-[1.5rem] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 text-sm text-[var(--app-muted)]">
               <input
                 type="checkbox"
                 checked={formState.isActive}
@@ -727,10 +729,10 @@ export function SystemPublicationsClient({
                   }))
                 }
                 disabled={isPending}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                className="mt-1 h-4 w-4 rounded border-[var(--app-border)] bg-[var(--app-card)] text-[var(--app-accent)] focus:ring-[var(--app-accent-soft)]"
               />
               <span>
-                <strong className="block text-slate-900">Binding activo</strong>
+                <strong className="block text-[var(--app-text)]">Binding activo</strong>
                 Si queda apagado, el registro persiste pero no resolverá tráfico
                 público hasta reactivarlo.
               </span>
@@ -769,10 +771,10 @@ export function SystemPublicationsClient({
           onClose={() => setDeleteTarget(null)}
         >
           <div className="space-y-6">
-            <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800">
+            <div className="rounded-[1.5rem] border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] px-4 py-4 text-sm text-[var(--app-danger)]">
               <p className="font-semibold">
                 {deleteTarget.domain.host}
-                <span className="text-rose-500">{deleteTarget.path}</span>
+                <span className="text-[var(--app-danger)]/70">{deleteTarget.path}</span>
               </p>
               <p className="mt-1">
                 {deleteTarget.funnel.name} · {deleteTarget.team.name}

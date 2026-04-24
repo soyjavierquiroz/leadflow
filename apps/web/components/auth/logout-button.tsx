@@ -15,7 +15,7 @@ function LogoutSubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className="whitespace-nowrap rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-semibold text-app-text-muted transition hover:border-app-border-strong hover:bg-app-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Saliendo..." : "Cerrar sesión"}
     </button>
@@ -29,12 +29,12 @@ export function LogoutButton() {
   );
 
   return (
-    <form action={formAction} className="flex flex-col items-end gap-2">
+    <form action={formAction} className="flex shrink-0 flex-col items-end gap-2">
       <LogoutSubmitButton />
       {state.errorMessage ? (
         <div
           aria-live="polite"
-          className="max-w-72 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-right text-xs font-medium text-rose-700"
+          className="max-w-72 rounded-2xl border border-app-danger-border bg-app-danger-bg px-3 py-2 text-right text-xs font-medium text-app-danger-text"
         >
           {state.errorMessage}
         </div>

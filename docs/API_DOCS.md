@@ -274,7 +274,58 @@ Tambien util para la pantalla de confirmacion:
 - `advisor.bio` hoy es texto hardcodeado: `Especialista en Protocolos de Recuperacion`.
 - El telefono visible sale de `Sponsor.phone`.
 
-## 5. Guia de operaciones de emergencia
+## 5. Base de conocimiento RAG
+
+### Ingesta multipart hacia n8n
+
+Endpoint Leadflow:
+
+- `POST /v1/knowledge/upload`
+- Autenticacion: sesion operativa de `TEAM_ADMIN` o `MEMBER`
+- Content-Type: `multipart/form-data`
+
+Campos requeridos del multipart:
+
+- `file`: PDF a vectorizar.
+- `tenant_id`: UUID del equipo operativo. Debe coincidir con `user.teamId`.
+- `file_name`: nombre visible del archivo.
+- `platform_key`: clave dinamica del stack/plataforma que procesara la ingesta.
+- `product_key`: clave dinamica del producto que procesara la ingesta.
+
+Campos recomendados:
+
+- `training_cost_kredits` o `cost_kredits`: costo calculado para auditoria y cobro.
+- `character_count`: caracteres extraidos del PDF.
+- `vertical_key`: vertical o tenant code cuando el workflow lo requiera.
+
+El webhook de n8n usado por RAG es multi-stack. Por esa razon el cliente que arma el `multipart/form-data` debe inyectar `platform_key` y `product_key` en cada request, en lugar de depender de constantes quemadas en el workflow. `KnowledgeService` reenvia al webhook todos los metadatos no reservados, de modo que n8n pueda seleccionar el stack correcto junto con el PDF.
+
+En la web oficial, esas claves salen de `NEXT_PUBLIC_PLATFORM_KEY` y `NEXT_PUBLIC_PRODUCT_KEY`, con defaults `kurukin` y `leadflow`.
+
+### Experiencia frontend y refresco
+
+El centro de entrenamiento neuronal de `apps/web/components/management/AiSettingsForm.tsx` mantiene la animacion inmersiva por un minimo de 15 segundos antes de refrescar documentos y auditoria. Esto evita que una respuesta rapida del webhook corte la experiencia de entrenamiento y mantiene alineados los estados visuales con la vectorizacion.
+
+### Hard delete de documentos
+
+Endpoint Leadflow para el frontend:
+
+- `DELETE /v1/knowledge/:id?tenant_id=<uuid>`
+
+Contrato interno hacia Runtime Context Central:
+
+```http
+DELETE /v1/knowledge/:document_id?tenant_id=<uuid>
+```
+
+La llamada interna no envia body. La autenticacion se hace con:
+
+- `x-internal-api-key: <RUNTIME_CONTEXT_CENTRAL_API_KEY>`
+- `x-service-key: leadflow_api`
+
+Despues del borrado fisico, Leadflow registra una auditoria `delete` con costo `0.000000`. El endpoint legacy `DELETE /v1/knowledge/delete` queda solo como compatibilidad para payloads antiguos por nombre de archivo.
+
+## 6. Guia de operaciones de emergencia
 
 ### Estado actual de CRUD
 

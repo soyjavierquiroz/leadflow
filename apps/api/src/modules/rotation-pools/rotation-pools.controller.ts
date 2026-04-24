@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Query,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -56,6 +64,21 @@ export class RotationPoolsController {
       },
       memberId,
       dto,
+    );
+  }
+
+  @Delete('members/:memberId')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  removeMember(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('memberId') memberId: string,
+  ) {
+    return this.rotationPoolsService.deleteMemberForTeam(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+      },
+      memberId,
     );
   }
 }

@@ -75,6 +75,18 @@ export function LeadQualificationTimelinePanel({
   leadId,
   onLeadChange,
 }: LeadQualificationTimelinePanelProps) {
+  const surfaceCardClassName =
+    "rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm";
+  const panelClassName =
+    "space-y-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4";
+  const fieldClassName =
+    "w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2.5 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]";
+  const textAreaClassName =
+    "w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]";
+  const primaryButtonClassName =
+    "rounded-full bg-[var(--app-text)] px-4 py-2 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
+  const secondaryButtonClassName =
+    "rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
   const [detail, setDetail] = useState<LeadTimelineDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -239,7 +251,7 @@ export function LeadQualificationTimelinePanel({
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+      <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] p-4 text-sm text-[var(--app-muted)]">
         Cargando resumen operativo y timeline del lead...
       </div>
     );
@@ -247,7 +259,7 @@ export function LeadQualificationTimelinePanel({
 
   if (error || !detail) {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+      <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] p-4 text-sm text-[var(--app-danger)]">
         {error ?? "No pudimos resolver el detalle del lead."}
       </div>
     );
@@ -260,8 +272,8 @@ export function LeadQualificationTimelinePanel({
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-          <p className="text-slate-500">Calificación</p>
+        <div className={surfaceCardClassName}>
+          <p className="text-[var(--app-text-soft)]">Calificación</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <StatusBadge value={detail.lead.status} />
             <StatusBadge
@@ -271,64 +283,64 @@ export function LeadQualificationTimelinePanel({
               <StatusBadge value={detail.lead.qualificationGrade} />
             ) : null}
           </div>
-          <p className="mt-3 text-slate-700">
+          <p className="mt-3 text-[var(--app-muted)]">
             {detail.lead.summaryText ??
               "Todavía no hay resumen operativo manual."}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-          <p className="text-slate-500">Siguiente acción</p>
-          <p className="mt-2 font-medium text-slate-950">
+        <div className={surfaceCardClassName}>
+          <p className="text-[var(--app-text-soft)]">Siguiente acción</p>
+          <p className="mt-2 font-medium text-[var(--app-text)]">
             {detail.workflow.effectiveNextAction}
           </p>
-          <p className="mt-1 text-slate-700">
+          <p className="mt-1 text-[var(--app-muted)]">
             {detail.workflow.reminder.label} ·{" "}
             {formatMaybeDate(detail.lead.followUpAt, "Sin follow-up agendado")}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-          <p className="text-slate-500">Último contacto</p>
-          <p className="mt-2 font-medium text-slate-950">
+        <div className={surfaceCardClassName}>
+          <p className="text-[var(--app-text-soft)]">Último contacto</p>
+          <p className="mt-2 font-medium text-[var(--app-text)]">
             {formatMaybeDate(
               detail.lead.lastContactedAt,
               "Todavía sin contacto registrado",
             )}
           </p>
-          <p className="mt-1 text-slate-700">
+          <p className="mt-1 text-[var(--app-muted)]">
             Sponsor: {detail.lead.sponsorName ?? "Pendiente"}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-          <p className="text-slate-500">Última calificación</p>
-          <p className="mt-2 font-medium text-slate-950">
+        <div className={surfaceCardClassName}>
+          <p className="text-[var(--app-text-soft)]">Última calificación</p>
+          <p className="mt-2 font-medium text-[var(--app-text)]">
             {formatMaybeDate(
               detail.lead.lastQualifiedAt,
               "Sin señal o actualización manual",
             )}
           </p>
-          <p className="mt-1 text-slate-700">
+          <p className="mt-1 text-[var(--app-muted)]">
             Team: {detail.lead.teamName ?? "Sin team"}
           </p>
         </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+        <div className={panelClassName}>
+          <div className="rounded-2xl border border-[var(--app-success-border)] bg-[var(--app-success-soft)] p-4 text-sm">
             <div className="flex flex-wrap gap-2">
               <StatusBadge value={detail.workflow.reminder.bucket} />
               <StatusBadge value={detail.workflow.playbook.key} />
             </div>
-            <p className="mt-3 font-semibold text-slate-950">
+            <p className="mt-3 font-semibold text-[var(--app-text)]">
               {detail.workflow.playbook.title}
             </p>
-            <p className="mt-1 text-slate-700">
+            <p className="mt-1 text-[var(--app-muted)]">
               {detail.workflow.playbook.description}
             </p>
-            <ul className="mt-3 space-y-2 text-slate-700">
+            <ul className="mt-3 space-y-2 text-[var(--app-muted)]">
               {detail.workflow.playbook.checklist.map((item) => (
                 <li key={item}>- {item}</li>
               ))}
@@ -336,16 +348,16 @@ export function LeadQualificationTimelinePanel({
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-slate-900">
+            <p className="text-sm font-semibold text-[var(--app-text)]">
               Calificación rápida
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[var(--app-text-soft)]">
               Resumen corto, temperatura comercial y siguiente movimiento.
             </p>
           </div>
 
           <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Temperatura</span>
+            <span className="font-medium text-[var(--app-text)]">Temperatura</span>
             <select
               value={qualificationGrade}
               onChange={(event) =>
@@ -353,7 +365,7 @@ export function LeadQualificationTimelinePanel({
                   event.target.value as LeadQualificationGrade | "none",
                 )
               }
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              className={fieldClassName}
             >
               {qualificationOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -364,7 +376,7 @@ export function LeadQualificationTimelinePanel({
           </label>
 
           <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">
+            <span className="font-medium text-[var(--app-text)]">
               Resumen operativo
             </span>
             <textarea
@@ -372,44 +384,44 @@ export function LeadQualificationTimelinePanel({
               onChange={(event) => setSummaryText(event.target.value)}
               rows={4}
               placeholder="Qué sabemos del lead y por qué vale la pena seguirlo."
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              className={textAreaClassName}
             />
           </label>
 
           <button
             type="button"
-            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className={primaryButtonClassName}
             disabled={pendingAction === "qualification"}
             onClick={() => void handleQualificationSubmit()}
           >
             Guardar calificación
           </button>
 
-          <div className="h-px bg-slate-200" />
+          <div className="h-px bg-[var(--app-border)]" />
 
           <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Siguiente acción</span>
+            <span className="font-medium text-[var(--app-text)]">Siguiente acción</span>
             <input
               value={nextActionLabel}
               onChange={(event) => setNextActionLabel(event.target.value)}
               placeholder="Ej. enviar voice note o reagendar llamada"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              className={fieldClassName}
             />
           </label>
 
           <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Follow-up</span>
+            <span className="font-medium text-[var(--app-text)]">Follow-up</span>
             <input
               type="datetime-local"
               value={followUpAt}
               onChange={(event) => setFollowUpAt(event.target.value)}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              className={fieldClassName}
             />
           </label>
 
           <button
             type="button"
-            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className={secondaryButtonClassName}
             disabled={pendingAction === "followUp"}
             onClick={() => void handleFollowUpSubmit()}
           >
@@ -417,30 +429,30 @@ export function LeadQualificationTimelinePanel({
           </button>
         </div>
 
-        <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
+        <div className={panelClassName}>
           <div>
-            <p className="text-sm font-semibold text-slate-900">
+            <p className="text-sm font-semibold text-[var(--app-text)]">
               Timeline del lead
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[var(--app-text-soft)]">
               Notas internas y eventos operativos del gateway en una sola vista.
             </p>
           </div>
 
           <label className="space-y-2 text-sm">
-            <span className="font-medium text-slate-700">Agregar nota</span>
+            <span className="font-medium text-[var(--app-text)]">Agregar nota</span>
             <textarea
               value={noteBody}
               onChange={(event) => setNoteBody(event.target.value)}
               rows={3}
               placeholder="Ej. respondió que revisa la propuesta mañana a las 9."
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              className={textAreaClassName}
             />
           </label>
 
           <button
             type="button"
-            className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className={secondaryButtonClassName}
             disabled={pendingAction === "note" || noteBody.trim().length === 0}
             onClick={() => void handleNoteSubmit()}
           >
@@ -448,7 +460,7 @@ export function LeadQualificationTimelinePanel({
           </button>
 
           {detail.timeline.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-muted)]">
               Todavía no hay actividad registrada en este lead.
             </div>
           ) : (
@@ -456,7 +468,7 @@ export function LeadQualificationTimelinePanel({
               {detail.timeline.map((item) => (
                 <article
                   key={`${item.itemType}:${item.id}`}
-                  className="rounded-2xl bg-slate-50 px-4 py-3 text-sm"
+                  className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge value={item.itemType} />
@@ -464,11 +476,11 @@ export function LeadQualificationTimelinePanel({
                       <StatusBadge value={item.statusLabel} />
                     ) : null}
                   </div>
-                  <p className="mt-3 font-semibold text-slate-950">
+                  <p className="mt-3 font-semibold text-[var(--app-text)]">
                     {item.title}
                   </p>
-                  <p className="mt-1 text-slate-600">{item.description}</p>
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-1 text-[var(--app-muted)]">{item.description}</p>
+                  <p className="mt-2 text-xs text-[var(--app-text-soft)]">
                     {item.actorLabel} · {formatDateTime(item.occurredAt)}
                   </p>
                 </article>

@@ -23,9 +23,6 @@ export function MemberProtectionHubButton({
     message: string;
   } | null>(null);
   const isDisabled = isOpening || !isSsoAvailable;
-  const title = advisorPhone
-    ? `Gestiona tu lista externa para ${advisorPhone}`
-    : "Gestiona tu lista externa para tu asesor";
 
   const handleOpen = async () => {
     if (isDisabled) {
@@ -82,23 +79,22 @@ export function MemberProtectionHubButton({
   };
 
   return (
-    <section className="space-y-5 rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <section className="space-y-5 rounded-[2rem] border border-app-border bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_42%),linear-gradient(180deg,var(--app-surface)_0%,var(--app-surface-strong)_100%)] p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-col gap-5">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-accent">
             Lista de Protección
           </p>
-          <h2 className="mt-3 text-2xl font-semibold text-slate-950">
-            {title}
+          <h2 className="mt-3 text-2xl font-semibold text-app-text">
+            Protege tu canal sin salir del dashboard
           </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Leadflow ya no administra esta lista localmente. Usa este acceso
-            directo para entrar a Kurukin Hub con un token temporal firmado y
-            continuar la gestión desde allá.
+          <p className="mt-3 text-sm leading-6 text-app-text-muted">
+            Abre Kurukin Hub con acceso temporal y sigue la revisión de números
+            protegidos sin perder el contexto de tu operación diaria.
           </p>
           {advisorPhone ? (
-            <p className="mt-3 text-sm font-medium text-slate-700">
-              Identidad del asesor: {advisorPhone}
+            <p className="mt-3 text-sm font-medium text-app-text">
+              Canal vinculado: {advisorPhone}
             </p>
           ) : null}
         </div>
@@ -107,11 +103,11 @@ export function MemberProtectionHubButton({
           type="button"
           onClick={() => void handleOpen()}
           disabled={isDisabled}
-          className="inline-flex min-h-16 items-center justify-center rounded-[1.5rem] bg-slate-950 px-8 py-4 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 lg:min-w-[24rem]"
+          className="inline-flex min-h-14 items-center justify-center rounded-[1.35rem] bg-app-text px-5 py-3 text-sm font-semibold text-app-bg transition hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60 sm:self-start"
         >
           {isOpening
             ? "Abriendo Kurukin Hub..."
-            : "Gestionar Lista de Protección (Kurukin Hub)"}
+            : "Abrir Lista de Protección"}
         </button>
       </div>
 

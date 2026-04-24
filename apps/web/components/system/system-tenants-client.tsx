@@ -36,9 +36,9 @@ type ImpersonateUserResponse = {
 };
 
 const primaryButtonClassName =
-  "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full bg-app-text px-4 py-2 text-sm font-semibold text-app-bg transition hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
-  "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-app-border bg-app-card px-4 py-2 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 
 const buildInitialFormState = (): TenantProvisionFormState => ({
   tenantName: "",
@@ -207,10 +207,10 @@ export function SystemTenantsClient({
       ) : null}
 
       {toast ? (
-        <div className="fixed right-4 top-4 z-50 w-full max-w-sm rounded-[1.5rem] border border-emerald-200 bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
-          <p className="text-sm font-semibold text-slate-950">{toast.title}</p>
+        <div className="fixed right-4 top-4 z-50 w-full max-w-sm rounded-[1.5rem] border border-app-success-border bg-app-card p-4 shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+          <p className="text-sm font-semibold text-app-text">{toast.title}</p>
           {toast.description ? (
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-sm leading-6 text-app-text-muted">
               {toast.description}
             </p>
           ) : null}
@@ -268,7 +268,8 @@ export function SystemTenantsClient({
             render: (row) => (
               <div className="space-y-1">
                 <p className="font-medium text-slate-900">{row.workspaceName}</p>
-                <p className="text-xs text-slate-500">{row.workspaceSlug}</p>
+                <p className="font-medium text-app-text">{row.workspaceName}</p>
+                <p className="text-xs text-app-text-soft">{row.workspaceSlug}</p>
               </div>
             ),
           },
@@ -283,7 +284,7 @@ export function SystemTenantsClient({
             render: (row) => (
               <div className="space-y-1">
                 <p>{formatCompactNumber(row.occupiedSeats)}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-app-text-soft">
                   {row.activeSponsorsCount} sponsor
                   {row.activeSponsorsCount === 1 ? "" : "s"} activo
                   {row.activeSponsorsCount === 1 ? "" : "s"}
@@ -304,7 +305,7 @@ export function SystemTenantsClient({
               <div className="flex flex-col items-start gap-2">
                 <Link
                   href={`/admin/tenants/${row.id}`}
-                  className="text-sm font-semibold text-slate-700 transition hover:text-teal-700 hover:underline"
+                  className="text-sm font-semibold text-app-text-muted transition hover:text-app-accent hover:underline"
                 >
                   Ver operación
                 </Link>
@@ -336,7 +337,7 @@ export function SystemTenantsClient({
         >
           <form className="space-y-5" onSubmit={handleSubmit}>
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Nombre de la agencia
               </span>
               <input
@@ -349,13 +350,13 @@ export function SystemTenantsClient({
                   }))
                 }
                 placeholder="Agencia Inmobiliaria Sur"
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
                 required
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Correo del administrador
               </span>
               <input
@@ -368,12 +369,12 @@ export function SystemTenantsClient({
                   }))
                 }
                 placeholder="carlos@agencia.com"
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
                 required
               />
             </label>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+            <div className="rounded-3xl border border-app-border bg-app-surface-muted px-4 py-4 text-sm leading-6 text-app-text-muted">
               El backend genera la password, crea el Team Admin inicial y, si no
               hay proveedor de correo configurado, deja las credenciales visibles
               en los logs del servidor para no perder el acceso.

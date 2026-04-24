@@ -22,7 +22,7 @@ export function SponsorCard({
   actions,
 }: SponsorCardProps) {
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
+    <article className="rounded-3xl border border-app-border bg-app-card p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           {sponsor.avatarUrl ? (
@@ -32,15 +32,15 @@ export function SponsorCard({
               className="h-12 w-12 rounded-2xl object-cover"
             />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-app-text text-sm font-semibold text-app-bg">
               {buildInitials(sponsor.displayName)}
             </div>
           )}
           <div>
-            <h3 className="text-base font-semibold text-slate-950">
+            <h3 className="text-base font-semibold text-app-text">
               {sponsor.displayName}
             </h3>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-app-text-muted">
               {sponsor.email ?? "Sin email"} · {sponsor.phone ?? "Sin teléfono"}
             </p>
           </div>
@@ -48,15 +48,15 @@ export function SponsorCard({
         <StatusBadge value={sponsor.availabilityStatus} />
       </div>
       <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <dt className="text-slate-500">Leads activos</dt>
-          <dd className="mt-1 text-lg font-semibold text-slate-950">
+        <div className="rounded-2xl bg-app-surface-muted p-3">
+          <dt className="text-app-text-soft">Leads activos</dt>
+          <dd className="mt-1 text-lg font-semibold text-app-text">
             {leadCount}
           </dd>
         </div>
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <dt className="text-slate-500">Assignments</dt>
-          <dd className="mt-1 text-lg font-semibold text-slate-950">
+        <div className="rounded-2xl bg-app-surface-muted p-3">
+          <dt className="text-app-text-soft">Assignments</dt>
+          <dd className="mt-1 text-lg font-semibold text-app-text">
             {assignmentCount}
           </dd>
         </div>

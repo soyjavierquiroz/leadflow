@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserRole, UserStatus } from '@prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
+import { WalletEngineService } from '../finance/wallet-engine.service';
 import { hashPassword } from './password-hash.util';
 import { AuthService } from './auth.service';
 
@@ -14,11 +15,19 @@ describe('AuthService', () => {
       authSession: {
         create: jest.fn(),
       },
+      $transaction: jest.fn(),
     } as unknown as PrismaService;
+    const walletEngineService = {
+      upsertSponsorAccount: jest.fn().mockResolvedValue({
+        accountId: 'account-kredit-1',
+      }),
+      creditInitialKredits: jest.fn(),
+    } as unknown as WalletEngineService;
 
     return {
       prisma,
-      service: new AuthService(prisma),
+      walletEngineService,
+      service: new AuthService(prisma, walletEngineService),
     };
   };
 
@@ -50,6 +59,8 @@ describe('AuthService', () => {
       email: 'tenant-admin@example.com',
       isActive: true,
       availabilityStatus: 'available',
+      memberPortalEnabled: true,
+      publicSlug: 'sponsor-uno',
     },
   };
 
@@ -66,11 +77,13 @@ describe('AuthService', () => {
       email: 'advisor@example.com',
       isActive: true,
       availabilityStatus: 'available',
+      memberPortalEnabled: true,
+      publicSlug: 'advisor-uno',
     },
   };
 
   it('creates a normal session for valid credentials', async () => {
-    const { prisma, service } = buildService();
+    const { prisma, walletEngineService, service } = buildService();
 
     prisma.user.findUnique = jest.fn().mockResolvedValue(activeTeamAdminUser);
     prisma.authSession.create = jest.fn().mockResolvedValue({});
@@ -98,10 +111,14 @@ describe('AuthService', () => {
         lastLoginAt: expect.any(Date),
       },
     });
+    expect(walletEngineService.upsertSponsorAccount).toHaveBeenCalledWith(
+      activeTeamAdminUser.sponsorId,
+    );
+    expect(walletEngineService.creditInitialKredits).not.toHaveBeenCalled();
   });
 
   it('creates a tenant session for a super admin impersonation target', async () => {
-    const { prisma, service } = buildService();
+    const { prisma, walletEngineService, service } = buildService();
 
     prisma.user.findUnique = jest.fn().mockResolvedValue(activeTeamAdminUser);
     prisma.authSession.create = jest.fn().mockResolvedValue({});
@@ -134,10 +151,14 @@ describe('AuthService', () => {
         userId: activeTeamAdminUser.id,
       }),
     });
+    expect(walletEngineService.upsertSponsorAccount).toHaveBeenCalledWith(
+      activeTeamAdminUser.sponsorId,
+    );
+    expect(walletEngineService.creditInitialKredits).not.toHaveBeenCalled();
   });
 
   it('creates an advisor session for a team admin impersonation target in the same team', async () => {
-    const { prisma, service } = buildService();
+    const { prisma, walletEngineService, service } = buildService();
 
     prisma.user.findUnique = jest.fn().mockResolvedValue(activeMemberUser);
     prisma.authSession.create = jest.fn().mockResolvedValue({});
@@ -173,6 +194,59 @@ describe('AuthService', () => {
         userId: activeMemberUser.id,
       }),
     });
+    expect(walletEngineService.upsertSponsorAccount).not.toHaveBeenCalled();
+    expect(walletEngineService.creditInitialKredits).not.toHaveBeenCalled();
+  });
+
+  it('creates and links an operational sponsor for team admins missing sponsor data', async () => {
+    const { prisma, walletEngineService, service } = buildService();
+    const teamAdminWithoutSponsor = {
+      ...activeTeamAdminUser,
+      sponsorId: null,
+      sponsor: null,
+    };
+    const repairedTeamAdmin = {
+      ...activeTeamAdminUser,
+      sponsorId: 'sponsor-repaired-1',
+      sponsor: {
+        ...activeTeamAdminUser.sponsor,
+        id: 'sponsor-repaired-1',
+      },
+    };
+    const tx = {
+      sponsor: {
+        create: jest.fn().mockResolvedValue({
+          id: 'sponsor-repaired-1',
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      user: {
+        update: jest.fn().mockResolvedValue(repairedTeamAdmin),
+      },
+    };
+
+    prisma.user.findUnique = jest.fn().mockResolvedValue(teamAdminWithoutSponsor);
+    prisma.authSession.create = jest.fn().mockResolvedValue({});
+    prisma.user.update = jest.fn().mockResolvedValue({});
+    prisma.$transaction = jest
+      .fn()
+      .mockImplementation((callback: (client: typeof tx) => Promise<unknown>) =>
+        callback(tx),
+      );
+
+    const result = await service.authenticate({
+      email: teamAdminWithoutSponsor.email,
+      password: 'Tenant123!',
+    });
+
+    expect(result.user.sponsorId).toBe('sponsor-repaired-1');
+    expect(walletEngineService.upsertSponsorAccount).toHaveBeenCalledWith(
+      'sponsor-repaired-1',
+    );
+    expect(walletEngineService.creditInitialKredits).toHaveBeenCalledWith(
+      'account-kredit-1',
+      'sponsor-repaired-1',
+    );
   });
 
   it('rejects targets that are not active tenant users', async () => {

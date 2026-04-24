@@ -222,6 +222,11 @@ enum UserStatus {
   disabled
 }
 
+enum KnowledgeAuditOperation {
+  upload
+  delete
+}
+
 enum MessagingProvider {
   EVOLUTION
 }
@@ -337,8 +342,11 @@ model Team {
   assignments           Assignment[]
   users                 User[]
   messagingConnections  MessagingConnection[]
+  aiAgentConfigs        AiAgentConfig[]
+  channelInstances      ChannelInstance[]
   automationDispatches  AutomationDispatch[]
   leadNotes             LeadNote[]
+  knowledgeAudits       KnowledgeAudit[]
 
   @@unique([workspaceId, code])
 }
@@ -366,6 +374,8 @@ model Sponsor {
   assignments          Assignment[]
   user                 User?
   messagingConnection  MessagingConnection?
+  aiAgentConfigs       AiAgentConfig[]
+  channelInstances     ChannelInstance[]
   automationDispatches AutomationDispatch[]
   leadNotes            LeadNote[]
 }
@@ -416,6 +426,7 @@ model User {
   sponsor      Sponsor?      @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
   sessions     AuthSession[]
   leadNotes    LeadNote[]
+  knowledgeAudits KnowledgeAudit[]
 
   @@index([workspaceId, role])
   @@index([teamId, role])
@@ -475,6 +486,57 @@ model MessagingConnection {
   @@index([workspaceId, provider, status])
   @@index([teamId, provider, status])
   @@index([workspaceId, runtimeContextStatus])
+}
+
+model AiAgentConfig {
+  id            String   @id @default(uuid())
+  tenantId      String
+  memberId      String?
+  basePrompt    String
+  routeContexts Json?
+  ctaPolicy     Json?
+  aiPolicy      Json?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tenant        Team     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member        Sponsor? @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, memberId])
+  @@index([tenantId, isActive])
+  @@index([memberId, isActive])
+}
+
+model ChannelInstance {
+  id           String   @id @default(uuid())
+  instanceName String   @unique
+  tenantId     String
+  memberId     String
+  provider     String   @default("evolution")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Team     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member       Sponsor  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, provider])
+  @@index([tenantId, memberId])
+}
+
+model KnowledgeAudit {
+  id          String                  @id @default(uuid())
+  tenantId    String
+  userId      String?
+  userName    String
+  operation   KnowledgeAuditOperation
+  documentId  String?
+  fileName    String
+  costKredits Decimal                 @default(0) @db.Decimal(18, 6)
+  createdAt   DateTime                @default(now())
+  tenant      Team                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Funnel {

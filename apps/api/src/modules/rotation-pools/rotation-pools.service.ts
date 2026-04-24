@@ -30,6 +30,11 @@ export type RotationPoolMemberView = {
   updatedAt: string;
 };
 
+export type RotationPoolMemberDeletionResult = {
+  id: string;
+  deleted: true;
+};
+
 @Injectable()
 export class RotationPoolsService {
   constructor(
@@ -278,5 +283,71 @@ export class RotationPoolsService {
       createdAt: updatedMember.createdAt.toISOString(),
       updatedAt: updatedMember.updatedAt.toISOString(),
     };
+  }
+
+  async deleteMemberForTeam(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+    },
+    memberId: string,
+  ): Promise<RotationPoolMemberDeletionResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const member = await tx.rotationMember.findFirst({
+        where: {
+          id: memberId,
+          rotationPool: {
+            workspaceId: scope.workspaceId,
+            teamId: scope.teamId,
+          },
+        },
+        select: {
+          id: true,
+          rotationPoolId: true,
+          position: true,
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundException({
+          code: 'ROTATION_MEMBER_NOT_FOUND',
+          message: 'The requested rotation member was not found for this team.',
+        });
+      }
+
+      await tx.rotationMember.delete({
+        where: { id: member.id },
+      });
+
+      const siblings = await tx.rotationMember.findMany({
+        where: {
+          rotationPoolId: member.rotationPoolId,
+          position: {
+            gt: member.position,
+          },
+        },
+        orderBy: {
+          position: 'asc',
+        },
+        select: {
+          id: true,
+          position: true,
+        },
+      });
+
+      for (const sibling of siblings) {
+        await tx.rotationMember.update({
+          where: { id: sibling.id },
+          data: {
+            position: sibling.position - 1,
+          },
+        });
+      }
+
+      return {
+        id: member.id,
+        deleted: true as const,
+      };
+    });
   }
 }

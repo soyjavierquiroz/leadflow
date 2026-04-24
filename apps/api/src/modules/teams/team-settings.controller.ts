@@ -26,6 +26,14 @@ export class TeamSettingsController {
     return this.teamsService.getTeamSettings(this.resolveScope(user, teamId));
   }
 
+  @Get('kredits')
+  getKredits(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Query('teamId') teamId?: string,
+  ) {
+    return this.teamsService.getTeamKredits(this.resolveScope(user, teamId));
+  }
+
   @Patch()
   updateSettings(
     @CurrentAuthUser() user: AuthenticatedUser,

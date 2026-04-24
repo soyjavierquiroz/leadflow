@@ -6,8 +6,8 @@ type OperationBannerProps = {
 };
 
 const toneClassName = {
-  success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  error: "border-rose-200 bg-rose-50 text-rose-700",
+  success: "border-app-success-border bg-app-success-bg text-app-success-text",
+  error: "border-app-danger-border bg-app-danger-bg text-app-danger-text",
 } satisfies Record<OperationBannerProps["tone"], string>;
 
 export function OperationBanner({ tone, message }: OperationBannerProps) {

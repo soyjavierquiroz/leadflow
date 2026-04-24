@@ -43,14 +43,14 @@ export default async function AdminTeamsPage() {
         columns={[
           {
             key: "team",
-            header: "Team",
-            render: (row) => (
-              <div>
-                <p className="font-semibold text-slate-950">{row.name}</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  {row.code}
-                </p>
-              </div>
+                header: "Team",
+                render: (row) => (
+                  <div>
+                    <p className="font-semibold text-app-text">{row.name}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
+                      {row.code}
+                    </p>
+                  </div>
             ),
           },
           {

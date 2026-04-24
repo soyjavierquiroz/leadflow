@@ -229,6 +229,17 @@ export class TeamsService {
     return this.mapTeamSettings(record);
   }
 
+  async getTeamKredits(scope: TeamScope): Promise<{ balance: string }> {
+    await this.requireScopedTeam(scope);
+
+    const account = await this.walletEngineService.upsertAccount(scope.teamId);
+    const balance = await this.walletEngineService.getSponsorKredits(
+      account.accountId,
+    );
+
+    return { balance };
+  }
+
   async updateTeamSettings(
     scope: TeamScope,
     dto: {

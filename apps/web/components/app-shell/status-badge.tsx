@@ -10,7 +10,7 @@ const toneByValue = (value: string) => {
     case "available":
     case "upcoming":
     case "won_handoff":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      return "border-app-success-border bg-app-success-bg text-app-success-text";
     case "draft":
     case "captured":
     case "pending":
@@ -20,35 +20,35 @@ const toneByValue = (value: string) => {
     case "due_today":
     case "first_contact":
     case "high_intent_close":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "border-app-warning-border bg-app-warning-bg text-app-warning-text";
     case "paused":
     case "archived":
     case "lost":
     case "unscheduled":
     case "lost_recycle":
-      return "border-slate-200 bg-slate-100 text-slate-600";
+      return "border-app-border bg-app-surface-muted text-app-text-muted";
     case "reassigned":
     case "active_nurture":
-      return "border-sky-200 bg-sky-50 text-sky-700";
+      return "border-app-accent bg-app-accent-soft text-app-accent";
     case "stagnant":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "border-app-warning-border bg-app-warning-bg text-app-warning-text";
     case "orphaned":
-      return "border-rose-200 bg-rose-50 text-rose-700";
+      return "border-app-danger-border bg-app-danger-bg text-app-danger-text";
     case "cold":
     case "cold_reengage":
     case "overdue":
     case "error":
     case "failed":
     case "legacy":
-      return "border-rose-200 bg-rose-50 text-rose-700";
+      return "border-app-danger-border bg-app-danger-bg text-app-danger-text";
     case "primary":
-      return "border-indigo-200 bg-indigo-50 text-indigo-700";
+      return "border-app-border bg-app-surface text-app-text";
     case "warm":
-      return "border-orange-200 bg-orange-50 text-orange-700";
+      return "border-app-warning-border bg-app-warning-bg text-app-warning-text";
     case "hot":
-      return "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700";
+      return "border-app-accent bg-app-accent-soft text-app-accent";
     default:
-      return "border-slate-200 bg-white text-slate-700";
+      return "border-app-border bg-app-surface-muted text-app-text-muted";
   }
 };
 

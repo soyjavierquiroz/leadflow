@@ -106,9 +106,9 @@ export function MemberActiveWheelCard() {
 
   const toneClassName = snapshot?.wheel
     ? snapshot.isParticipating
-      ? "border-emerald-500/20 bg-[linear-gradient(180deg,_rgba(6,78,59,0.34)_0%,_rgba(2,6,23,0.98)_100%)]"
-      : "border-amber-500/20 bg-[linear-gradient(180deg,_rgba(120,53,15,0.24)_0%,_rgba(2,6,23,0.98)_100%)]"
-    : "border-slate-800 bg-[linear-gradient(180deg,_rgba(15,23,42,0.98)_0%,_rgba(2,6,23,0.96)_100%)]";
+      ? "border-app-success-border bg-[linear-gradient(180deg,var(--app-success-bg)_0%,var(--app-surface-strong)_100%)]"
+      : "border-app-warning-border bg-[linear-gradient(180deg,var(--app-warning-bg)_0%,var(--app-surface-strong)_100%)]"
+    : "border-app-border bg-[linear-gradient(180deg,var(--app-surface)_0%,var(--app-surface-strong)_100%)]";
 
   return (
     <aside
@@ -116,31 +116,31 @@ export function MemberActiveWheelCard() {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-app-text-soft">
             Rueda Publicitaria
           </p>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-app-text-muted">
             Espacio rápido para entrar al round activo sin salir del dashboard.
           </p>
         </div>
-        <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-medium text-slate-300">
-          CTA compacto
+        <span className="rounded-full border border-app-border bg-app-surface-muted px-3 py-1 text-xs font-medium text-app-text-soft">
+          Acción rápida
         </span>
       </div>
 
       {isLoading && !snapshot ? (
         <div className="mt-4 space-y-3">
-          <div className="h-5 w-36 animate-pulse rounded-full bg-slate-800" />
-          <div className="h-24 animate-pulse rounded-[1.25rem] bg-slate-900" />
+          <div className="h-5 w-36 animate-pulse rounded-full bg-app-border" />
+          <div className="h-24 animate-pulse rounded-[1.25rem] bg-app-surface-muted" />
         </div>
       ) : null}
 
       {!isLoading && !snapshot?.wheel ? (
-        <div className="mt-4 rounded-[1rem] border border-slate-800 bg-slate-950/70 p-4">
-          <h2 className="text-base font-semibold text-white">
+        <div className="mt-4 rounded-[1rem] border border-app-border bg-app-surface-muted p-4">
+          <h2 className="text-base font-semibold text-app-text">
             No hay campañas activas
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
+          <p className="mt-2 text-sm leading-6 text-app-text-muted">
             Cuando el team abra una rueda nueva, aquí verás el buy-in para
             entrar de inmediato.
           </p>
@@ -149,46 +149,46 @@ export function MemberActiveWheelCard() {
 
       {snapshot?.wheel ? (
         <div className="mt-4 space-y-3">
-          <div className="rounded-[1rem] border border-slate-800 bg-slate-950/70 p-4">
+          <div className="rounded-[1rem] border border-app-border bg-app-surface-muted p-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-white">
+              <h2 className="text-base font-semibold text-app-text">
                 {snapshot.wheel.name}
               </h2>
               <span
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
                   snapshot.isParticipating
-                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
-                    : "border-amber-500/20 bg-amber-500/10 text-amber-100"
+                    ? "border-app-success-border bg-app-success-bg text-app-success-text"
+                    : "border-app-warning-border bg-app-warning-bg text-app-warning-text"
                 }`}
               >
                 {snapshot.isParticipating ? "Adentro" : "Disponible"}
               </span>
             </div>
 
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-app-text-muted">
               Ventana activa hasta {formatDateTime(snapshot.wheel.endDate)}.
             </p>
           </div>
 
           {snapshot.isParticipating ? (
-            <div className="rounded-[1rem] border border-emerald-500/20 bg-emerald-500/10 p-4">
-              <p className="text-sm font-semibold text-emerald-100">
+            <div className="rounded-[1rem] border border-app-success-border bg-app-success-bg p-4">
+              <p className="text-sm font-semibold text-app-success-text">
                 Ya estás en la rueda actual
               </p>
-              <p className="mt-2 text-sm leading-6 text-emerald-50/85">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 Tu asiento quedó confirmado y el round robin ya puede
                 considerarte.
               </p>
             </div>
           ) : (
-            <div className="rounded-[1rem] border border-amber-500/20 bg-slate-950/70 p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <div className="rounded-[1rem] border border-app-warning-border bg-app-surface-muted p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-soft">
                 Buy-In Disponible
               </p>
-              <p className="mt-2 text-xl font-semibold tracking-tight text-white">
+              <p className="mt-2 text-xl font-semibold tracking-tight text-app-text">
                 {formatAdWheelSeatPrice(snapshot.wheel.seatPrice)}
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 Compra tu asiento para entrar a la rueda activa desde esta
                 misma vista.
               </p>
@@ -196,7 +196,7 @@ export function MemberActiveWheelCard() {
                 type="button"
                 onClick={handleJoin}
                 disabled={isJoining}
-                className="mt-4 rounded-full bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-4 rounded-full bg-app-text px-4 py-2 text-sm font-semibold text-app-bg transition hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isJoining ? "Procesando..." : "Comprar Asiento"}
               </button>

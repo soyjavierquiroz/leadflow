@@ -65,6 +65,7 @@ async function bootstrap() {
     }),
   );
   const prisma = app.get(PrismaService);
+  const fastify = app.getHttpAdapter().getInstance();
   const explicitOrigins = new Set(
     runtimeConfig.corsAllowedOrigins.map((origin) => normalizeOrigin(origin)),
   );
@@ -77,6 +78,13 @@ async function bootstrap() {
   >();
 
   await app.register(cookie);
+  fastify.addContentTypeParser(
+    /^multipart\/form-data(?:;.*)?$/i,
+    { parseAs: 'buffer', bodyLimit: 10_485_760 },
+    (_request, body, done) => {
+      done(null, body);
+    },
+  );
 
   app.setGlobalPrefix(runtimeConfig.globalPrefix, {
     exclude: [{ path: 'health', method: RequestMethod.GET }],

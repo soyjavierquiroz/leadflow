@@ -347,6 +347,7 @@ export type ShellNavItem = {
   label: string;
   description: string;
   match?: string;
+  icon?: string;
 };
 
 export type ShellNavSection = {

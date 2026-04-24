@@ -6,8 +6,8 @@ type MemberInlineBannerProps = {
 };
 
 const toneClassName = {
-  success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-100",
-  error: "border-rose-500/25 bg-rose-500/10 text-rose-100",
+  success: "border-app-success-border bg-app-success-bg text-app-success-text",
+  error: "border-app-danger-border bg-app-danger-bg text-app-danger-text",
 } satisfies Record<MemberInlineBannerProps["tone"], string>;
 
 export function MemberInlineBanner({

@@ -93,7 +93,7 @@ const UNIT_SCALE = 2;
 const SEAT_DEBIT_FEATURE_KEY = 'ads_wheel.seat';
 const KREDIT_UNIT_CODE = 'KREDIT';
 const KREDIT_UNIT_SCALE = 6;
-const INITIAL_WELCOME_CREDITS = 5;
+const INITIAL_WELCOME_CREDITS_AMOUNT = '5000000';
 
 const sanitizeNullableText = (value: string | null | undefined) => {
   if (value === undefined || value === null) {
@@ -223,7 +223,7 @@ export class WalletEngineService {
       '/wallets/credit',
       {
         account_id: normalizedAccountId,
-        amount: INITIAL_WELCOME_CREDITS.toFixed(KREDIT_UNIT_SCALE),
+        amount: INITIAL_WELCOME_CREDITS_AMOUNT,
         unit_code: KREDIT_UNIT_CODE,
         unit_scale: KREDIT_UNIT_SCALE,
         reference_type: 'welcome_bonus',

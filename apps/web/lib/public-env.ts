@@ -7,6 +7,11 @@ type WebPublicConfig = {
     members: string;
     admin: string;
     api: string;
+    knowledgeUploadWebhook: string | null;
+  };
+  runtime: {
+    platformKey: string;
+    productKey: string;
   };
   saas: {
     customerCnameTarget: string | null;
@@ -66,6 +71,12 @@ export const webPublicConfig: WebPublicConfig = {
         baseDomain ? toHttpsUrl(`api.${baseDomain}`) : "http://localhost:3001",
       ),
     ),
+    knowledgeUploadWebhook:
+      sanitizeEnv(process.env.NEXT_PUBLIC_KNOWLEDGE_UPLOAD_WEBHOOK_URL) ?? null,
+  },
+  runtime: {
+    platformKey: withFallback(process.env.NEXT_PUBLIC_PLATFORM_KEY, "kurukin"),
+    productKey: withFallback(process.env.NEXT_PUBLIC_PRODUCT_KEY, "leadflow"),
   },
   saas: {
     customerCnameTarget,

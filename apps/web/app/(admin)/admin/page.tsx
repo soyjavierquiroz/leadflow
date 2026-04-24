@@ -34,13 +34,13 @@ export default async function AdminPage() {
           <>
             <Link
               href="/admin/templates"
-              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className="rounded-full bg-app-text px-4 py-2 text-sm font-semibold text-app-bg transition hover:opacity-92"
             >
               Revisar templates
             </Link>
             <Link
               href="/admin/publications"
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+              className="rounded-full border border-app-border bg-app-card px-4 py-2 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted"
             >
               Ver publicaciones activas
             </Link>
@@ -76,49 +76,49 @@ export default async function AdminPage() {
       <SuperAdminBlacklistButton />
 
       <section className="grid w-full gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="w-full rounded-[2rem] border border-slate-200 bg-white p-6 text-left shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+        <div className="w-full rounded-[2rem] border border-app-border bg-app-card p-6 text-left shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
             Lectura rapida de plataforma
           </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-text">
             Lo que conviene mirar primero
           </h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">
+            <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+              <p className="text-sm font-semibold text-app-text">
                 Catálogo y estructura
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 {formatCompactNumber(data.templates.length)} templates listos y{" "}
                 {formatCompactNumber(data.workspaces.length)} workspace visible
                 para seguir escalando sin tocar el modelo base.
               </p>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">
+            <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+              <p className="text-sm font-semibold text-app-text">
                 Captación activa
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 {formatCompactNumber(data.leadViews.length)} leads ya entraron
                 por el runtime y {formatCompactNumber(data.assignments.length)}{" "}
                 assignments validan el handoff.
               </p>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">
+            <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+              <p className="text-sm font-semibold text-app-text">
                 Señal de datos
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 {liveCollectionCount}/{Object.keys(data.sources).length} colecciones
                 están sobre fuente real. El resto sigue visible para no frenar
                 lectura de producto.
               </p>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">
+            <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+              <p className="text-sm font-semibold text-app-text">
                 Prioridad de plataforma
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 Mantener claridad entre catálogo, equipos y publicaciones para
                 que el rollout se entienda como operación y no como setup
                 abstracto.
@@ -140,8 +140,8 @@ export default async function AdminPage() {
                 header: "Team",
                 render: (row) => (
                   <div>
-                    <p className="font-semibold text-slate-950">{row.name}</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    <p className="font-semibold text-app-text">{row.name}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
                       {row.code}
                     </p>
                   </div>
@@ -189,8 +189,8 @@ export default async function AdminPage() {
                 header: "Template",
                 render: (row) => (
                   <div>
-                    <p className="font-semibold text-slate-950">{row.name}</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    <p className="font-semibold text-app-text">{row.name}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
                       {row.code}
                     </p>
                   </div>

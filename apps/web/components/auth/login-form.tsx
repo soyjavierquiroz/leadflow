@@ -24,7 +24,7 @@ function LoginSubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex w-full items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex w-full items-center justify-center rounded-full bg-[var(--app-text)] px-5 py-3 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {pending ? "Ingresando..." : "Entrar a Leadflow"}
     </button>
@@ -41,16 +41,16 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
     <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
       <form
         action={formAction}
-        className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_28px_90px_rgba(15,23,42,0.08)]"
+        className="rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-surface)] p-8 shadow-[0_28px_90px_rgba(15,23,42,0.08)]"
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--app-text-soft)]">
             Roles & Auth v1
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--app-text)]">
             Iniciar sesión
           </h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
+          <p className="mt-3 text-sm leading-6 text-[var(--app-muted)]">
             Login real con sesión segura, redirects por rol y protección de las
             superficies privadas de Leadflow.
           </p>
@@ -58,9 +58,9 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
 
         <div className="mt-8 space-y-5">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Email</span>
+            <span className="text-sm font-medium text-[var(--app-text)]">Email</span>
             <input
-              className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+              className="mt-2 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]"
               type="email"
               name="email"
               defaultValue={demoAccounts[0]?.email ?? ""}
@@ -70,9 +70,9 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Password</span>
+            <span className="text-sm font-medium text-[var(--app-text)]">Password</span>
             <input
-              className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+              className="mt-2 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]"
               type="password"
               name="password"
               defaultValue={demoAccounts[0]?.password ?? ""}
@@ -82,7 +82,7 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
           </label>
 
           {state.errorMessage ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="rounded-2xl border border-[var(--app-danger-border)] bg-[var(--app-danger-soft)] px-4 py-3 text-sm text-[var(--app-danger)]">
               {state.errorMessage}
             </div>
           ) : null}
@@ -91,14 +91,14 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
         </div>
       </form>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white/80 p-8 shadow-[0_28px_90px_rgba(15,23,42,0.05)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+      <section className="rounded-[2rem] border border-[var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface)_88%,transparent)] p-8 shadow-[0_28px_90px_rgba(15,23,42,0.05)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--app-text-soft)]">
           Usuarios demo
         </p>
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--app-text)]">
           Accesos listos para validación
         </h2>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
+        <p className="mt-3 text-sm leading-6 text-[var(--app-muted)]">
           Estos accesos vienen desde el seed y permiten validar rápidamente cada
           superficie.
         </p>
@@ -107,21 +107,21 @@ export function LoginForm({ demoAccounts }: LoginFormProps) {
           {demoAccounts.map((account) => (
             <div
               key={account.email}
-              className="block w-full rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4 text-left"
+              className="block w-full rounded-3xl border border-[var(--app-border)] bg-[var(--app-card)] px-5 py-4 text-left"
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-base font-semibold text-slate-950">
+                  <p className="text-base font-semibold text-[var(--app-text)]">
                     {account.label}
                   </p>
-                  <p className="text-sm text-slate-600">{account.role}</p>
+                  <p className="text-sm text-[var(--app-muted)]">{account.role}</p>
                 </div>
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                <span className="rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-1 text-xs font-semibold text-[var(--app-muted)]">
                   Demo
                 </span>
               </div>
-              <p className="mt-3 text-sm text-slate-700">{account.email}</p>
-              <p className="text-sm text-slate-500">{account.password}</p>
+              <p className="mt-3 text-sm text-[var(--app-text)]">{account.email}</p>
+              <p className="text-sm text-[var(--app-text-soft)]">{account.password}</p>
             </div>
           ))}
         </div>

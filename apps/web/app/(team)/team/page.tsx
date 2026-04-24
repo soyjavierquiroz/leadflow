@@ -24,6 +24,10 @@ export default async function TeamPage() {
   );
   const leadsNeedingAttention = teamLeads.filter((item) => item.needsAttention);
   const teamReadyFunnels = teamFunnels.filter((item) => item.trackingReady);
+  const primaryActionClassName =
+    "rounded-full bg-[var(--app-text)] px-4 py-2 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90";
+  const secondaryActionClassName =
+    "rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-muted)]";
 
   return (
     <div className="space-y-8">
@@ -35,13 +39,13 @@ export default async function TeamPage() {
           <>
             <Link
               href="/team/leads"
-              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className={primaryActionClassName}
             >
               Revisar leads
             </Link>
             <Link
               href="/team/members"
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+              className={secondaryActionClassName}
             >
               Gestionar equipo
             </Link>
@@ -81,19 +85,19 @@ export default async function TeamPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+        <div className="rounded-[2rem] border border-[var(--app-border)] bg-[var(--app-surface)] p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
             Prioridades del team
           </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--app-text)]">
             Lo que conviene mover hoy
           </h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">
+            <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+              <p className="text-sm font-semibold text-[var(--app-text)]">
                 Capacidad comercial
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
                 {formatCompactNumber(
                   teamSponsors.filter(
                     (item) =>
@@ -103,30 +107,30 @@ export default async function TeamPage() {
                 sponsors disponibles para tomar leads ahora mismo.
               </p>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">
+            <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+              <p className="text-sm font-semibold text-[var(--app-text)]">
                 Seguimiento con riesgo
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
                 {formatCompactNumber(leadsNeedingAttention.length)} leads ya
                 requieren atención para que la oportunidad no se enfríe.
               </p>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">
+            <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+              <p className="text-sm font-semibold text-[var(--app-text)]">
                 Readiness de funnels
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
                 {formatCompactNumber(teamReadyFunnels.length)} de{" "}
                 {formatCompactNumber(teamFunnels.length)} funnels ya tienen
                 tracking resuelto para salir con mejor lectura.
               </p>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">
+            <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-card)] p-4">
+              <p className="text-sm font-semibold text-[var(--app-text)]">
                 Siguiente superficie
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
                 La bandeja de leads ya concentra reminders, próxima acción y
                 playbook para ordenar la operación diaria.
               </p>
@@ -179,10 +183,10 @@ export default async function TeamPage() {
                 header: "Lead",
                 render: (row) => (
                   <div>
-                    <p className="font-semibold text-slate-950">
+                    <p className="font-semibold text-[var(--app-text)]">
                       {row.fullName ?? "Lead sin nombre"}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-[var(--app-text-soft)]">
                       {row.companyName ?? row.email ?? "Sin compañía"}
                     </p>
                   </div>
@@ -194,7 +198,7 @@ export default async function TeamPage() {
                 render: (row) => (
                   <div>
                     <p>{row.sourceChannel}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-[var(--app-text-soft)]">
                       {row.publicationPath ?? "Sin publicación"}
                     </p>
                   </div>
@@ -207,7 +211,7 @@ export default async function TeamPage() {
                   row.sponsorName ? (
                     <div>
                       <p>{row.sponsorName}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-[var(--app-text-soft)]">
                         {formatDateTime(row.assignedAt)}
                       </p>
                     </div>
@@ -228,7 +232,7 @@ export default async function TeamPage() {
             emptyAction={
               <Link
                 href="/team/publications/new-vsl"
-                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className={primaryActionClassName}
               >
                 Crear mi primer funnel
               </Link>

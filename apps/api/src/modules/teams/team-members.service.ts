@@ -152,6 +152,23 @@ type TeamMemberUserRecord = Prisma.UserGetPayload<{
   include: typeof teamMemberInclude;
 }>;
 
+const legacyPermissionTableNames = ['service_permissions', 'ServicePermission'];
+const legacyPermissionColumnNames = [
+  'user_id',
+  'userId',
+  'sponsor_id',
+  'sponsorId',
+  'member_id',
+  'memberId',
+  'advisor_id',
+  'advisorId',
+];
+
+type LegacyPermissionColumn = {
+  tableName: string;
+  columnName: string;
+};
+
 @Injectable()
 export class TeamMembersService {
   private readonly logger = new Logger(TeamMembersService.name);
@@ -163,6 +180,8 @@ export class TeamMembersService {
   ) {}
 
   async list(scope: TeamMemberScope): Promise<TeamMembersSnapshot> {
+    await this.reconcileOperationalTeamAdmins(scope);
+
     const [team, members] = await Promise.all([
       this.requireTeam(scope),
       this.prisma.user.findMany({
@@ -205,6 +224,8 @@ export class TeamMembersService {
         message: 'isActive must be provided as a boolean value.',
       });
     }
+
+    await this.ensureOperationalTeamAdminSponsor(scope, memberId);
 
     const mutation = await this.prisma.$transaction(
       async (tx) => {
@@ -437,37 +458,48 @@ export class TeamMembersService {
         throw new BadRequestException({
           code: 'TEAM_MEMBER_DELETE_FORBIDDEN',
           message:
-            'Only advisor accounts with MEMBER role can be archived from this panel.',
-        });
-      }
-
-      if (!member.sponsor) {
-        throw new ConflictException({
-          code: 'TEAM_MEMBER_SPONSOR_MISSING',
-          message:
-            'The requested team member does not have an operational sponsor profile.',
+            'Only advisor accounts with MEMBER role can be deleted from this panel.',
         });
       }
 
       const team = await this.requireTeam(scope, tx);
+      const sponsorId = member.sponsor?.id ?? null;
 
-      await tx.sponsor.update({
+      await this.deleteLegacyServicePermissions(tx, {
+        userId: member.id,
+        sponsorId,
+      });
+
+      await tx.team.updateMany({
         where: {
-          id: member.sponsor.id,
+          id: scope.teamId,
+          workspaceId: scope.workspaceId,
+          lastAssignedUserId: member.id,
         },
         data: {
-          isActive: false,
+          lastAssignedUserId: null,
         },
       });
 
-      await tx.user.update({
+      await tx.authSession.deleteMany({
+        where: {
+          userId: member.id,
+        },
+      });
+
+      await tx.user.delete({
         where: {
           id: member.id,
         },
-        data: {
-          status: UserStatus.disabled,
-        },
       });
+
+      if (sponsorId) {
+        await tx.sponsor.delete({
+          where: {
+            id: sponsorId,
+          },
+        });
+      }
 
       const activeSeats = await this.countActiveSeats(scope, tx);
 
@@ -516,7 +548,9 @@ export class TeamMembersService {
         isActive: true,
         user: {
           is: {
-            role: UserRole.MEMBER,
+            role: {
+              in: [UserRole.MEMBER, UserRole.TEAM_ADMIN],
+            },
           },
         },
         ...(excludedSponsorId
@@ -549,7 +583,7 @@ export class TeamMembersService {
         details: {
           maxSeats,
           activeSeats,
-          requiresMemberExemption: true,
+          requiresMemberExemption: false,
         },
       });
     }
@@ -640,6 +674,206 @@ export class TeamMembersService {
     return `Leadflow-${randomBytes(9).toString('base64url')}`;
   }
 
+  private async deleteLegacyServicePermissions(
+    tx: Prisma.TransactionClient,
+    input: {
+      userId: string;
+      sponsorId: string | null;
+    },
+  ) {
+    const targetIds = [input.userId, input.sponsorId].filter(
+      (value): value is string => Boolean(value),
+    );
+
+    if (targetIds.length === 0) {
+      return;
+    }
+
+    const columns = await tx.$queryRaw<LegacyPermissionColumn[]>(Prisma.sql`
+      SELECT
+        table_name AS "tableName",
+        column_name AS "columnName"
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name IN (${Prisma.join(legacyPermissionTableNames)})
+        AND column_name IN (${Prisma.join(legacyPermissionColumnNames)})
+    `);
+
+    const columnsByTable = new Map<string, string[]>();
+
+    for (const column of columns) {
+      if (
+        !legacyPermissionTableNames.includes(column.tableName) ||
+        !legacyPermissionColumnNames.includes(column.columnName)
+      ) {
+        continue;
+      }
+
+      const tableColumns = columnsByTable.get(column.tableName) ?? [];
+      tableColumns.push(column.columnName);
+      columnsByTable.set(column.tableName, tableColumns);
+    }
+
+    for (const [tableName, tableColumns] of columnsByTable.entries()) {
+      if (tableColumns.length === 0) {
+        continue;
+      }
+
+      const conditions = tableColumns.map((columnName) => Prisma.sql`
+        ${Prisma.raw(this.quotePgIdentifier(columnName))} IN (${Prisma.join(
+          targetIds,
+        )})
+      `);
+
+      await tx.$executeRaw(Prisma.sql`
+        DELETE FROM ${Prisma.raw(this.quotePgIdentifier(tableName))}
+        WHERE ${Prisma.join(conditions, ' OR ')}
+      `);
+    }
+  }
+
+  private quotePgIdentifier(value: string) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+
+  private async reconcileOperationalTeamAdmins(scope: TeamMemberScope) {
+    const teamAdmins = await this.prisma.user.findMany({
+      where: {
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        role: UserRole.TEAM_ADMIN,
+      },
+      include: teamMemberInclude,
+      orderBy: [{ createdAt: 'asc' }],
+    });
+
+    for (const teamAdmin of teamAdmins) {
+      await this.ensureOperationalSponsorProfile(teamAdmin, {
+        provisionWallet: true,
+      });
+    }
+  }
+
+  private async ensureOperationalTeamAdminSponsor(
+    scope: TeamMemberScope,
+    memberId: string,
+  ) {
+    const member = await this.prisma.user.findFirst({
+      where: {
+        id: memberId,
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        role: UserRole.TEAM_ADMIN,
+      },
+      include: teamMemberInclude,
+    });
+
+    if (!member) {
+      return;
+    }
+
+    await this.ensureOperationalSponsorProfile(member, {
+      provisionWallet: true,
+    });
+  }
+
+  private async ensureOperationalSponsorProfile(
+    member: TeamMemberUserRecord,
+    options?: {
+      provisionWallet?: boolean;
+    },
+  ) {
+    if (
+      member.role !== UserRole.TEAM_ADMIN ||
+      !member.workspaceId ||
+      !member.teamId
+    ) {
+      return member;
+    }
+
+    let normalizedMember = member;
+
+    if (!normalizedMember.sponsor) {
+      normalizedMember = await this.prisma.$transaction(async (tx) => {
+        const sponsor = await tx.sponsor.create({
+          data: {
+            workspaceId: normalizedMember.workspaceId!,
+            teamId: normalizedMember.teamId!,
+            displayName: normalizedMember.fullName,
+            publicSlug: await this.generateAvailablePublicSlug(
+              tx,
+              normalizedMember.fullName,
+            ),
+            status: 'active',
+            isActive: normalizedMember.status === UserStatus.active,
+            email: normalizedMember.email,
+            phone: null,
+            availabilityStatus: 'available',
+            routingWeight: 1,
+            memberPortalEnabled: true,
+          },
+        });
+
+        return tx.user.update({
+          where: {
+            id: normalizedMember.id,
+          },
+          data: {
+            sponsorId: sponsor.id,
+          },
+          include: teamMemberInclude,
+        });
+      });
+    } else {
+      const sponsorUpdates: Prisma.SponsorUpdateInput = {};
+
+      if (!normalizedMember.sponsor.memberPortalEnabled) {
+        sponsorUpdates.memberPortalEnabled = true;
+      }
+
+      if (!normalizedMember.sponsor.publicSlug) {
+        sponsorUpdates.publicSlug = await this.generateAvailablePublicSlug(
+          this.prisma,
+          normalizedMember.sponsor.displayName || normalizedMember.fullName,
+        );
+      }
+
+      if (!normalizedMember.sponsor.email) {
+        sponsorUpdates.email = normalizedMember.email;
+      }
+
+      if (Object.keys(sponsorUpdates).length > 0) {
+        normalizedMember = await this.prisma.user.update({
+          where: {
+            id: normalizedMember.id,
+          },
+          data: {
+            sponsor: {
+              update: sponsorUpdates,
+            },
+          },
+          include: teamMemberInclude,
+        });
+      }
+    }
+
+    if (options?.provisionWallet && normalizedMember.sponsorId) {
+      try {
+        await this.walletEngineService.upsertSponsorAccount(
+          normalizedMember.sponsorId,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Sponsor ${normalizedMember.sponsorId} wallet normalization failed: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
+    }
+
+    return normalizedMember;
+  }
+
   private async provisionSponsorWelcomeKredits(sponsorId: string) {
     try {
       const account = await this.walletEngineService.upsertSponsorAccount(
@@ -702,7 +936,9 @@ export class TeamMembersService {
   }
 
   private async generateAvailablePublicSlug(
-    tx: Prisma.TransactionClient,
+    tx:
+      | Prisma.TransactionClient
+      | Pick<PrismaService, 'sponsor'>,
     fullName: string,
   ) {
     const baseSlug = slugify(fullName) || 'asesor';

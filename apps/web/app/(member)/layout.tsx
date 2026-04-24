@@ -27,24 +27,19 @@ const memberNav: ShellNavItem[] = [
     label: "Perfil",
     description: "Datos de trabajo y configuracion del sponsor.",
   },
-  {
-    href: "/member/profile#blacklist-access",
-    label: "Blacklist",
-    description: "Acceso a la lista de proteccion desde Kurukin Hub.",
-  },
 ];
 
 const workspaceSwitcherOptions: WorkspaceViewSwitcherOption[] = [
   {
     href: "/team",
     label: "Vista de Gestión",
-    description: "Capacidad, equipo y operación global del tenant.",
+    description: "",
     mode: "management",
   },
   {
     href: "/member",
     label: "Vista de Operación",
-    description: "Tus leads, tu sponsor y tu jornada comercial.",
+    description: "",
     mode: "operations",
   },
 ];

@@ -178,7 +178,7 @@ describe('WalletEngineService', () => {
       'http://wallet-engine:3000/wallets/credit',
       {
         account_id: 'account-kredit-1',
-        amount: '5.000000',
+        amount: '5000000',
         unit_code: 'KREDIT',
         unit_scale: 6,
         reference_type: 'welcome_bonus',

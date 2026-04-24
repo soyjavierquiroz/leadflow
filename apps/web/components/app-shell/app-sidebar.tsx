@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Bot } from "lucide-react";
 import type {
   ShellNavItem,
   ShellNavSection,
@@ -23,6 +24,9 @@ export function AppSidebar({
   navSections,
   statusBadge,
 }: AppSidebarProps) {
+  const iconMap: Record<string, typeof Bot> = {
+    bot: Bot,
+  };
   const pathname = usePathname();
   const sections =
     navSections && navSections.length > 0
@@ -40,6 +44,7 @@ export function AppSidebar({
     const isActive =
       pathname === item.href ||
       (pathname.startsWith(`${match}/`) && match !== "/");
+    const Icon = item.icon ? iconMap[item.icon] ?? null : null;
 
     return (
       <Link
@@ -48,28 +53,35 @@ export function AppSidebar({
         aria-current={isActive ? "page" : undefined}
         className={`block rounded-[1.35rem] border px-4 py-3 transition ${
           isActive
-            ? "border-teal-300/40 bg-white text-slate-950 shadow-[0_16px_40px_rgba(15,23,42,0.2)]"
-            : "border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/10"
+            ? "border-app-accent bg-app-surface-strong text-app-text shadow-[0_16px_40px_rgba(15,23,42,0.16)]"
+            : "border-app-shell-border bg-app-shell-surface text-app-shell-text hover:border-white/20 hover:bg-white/10"
         }`}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span
               className={`h-8 w-1 rounded-full ${
-                isActive ? "bg-slate-950" : "bg-white/10"
+                isActive ? "bg-app-accent" : "bg-white/12"
               }`}
             />
+            {Icon ? (
+              <Icon
+                className={`h-4 w-4 shrink-0 ${
+                  isActive ? "text-app-accent" : "text-app-shell-muted"
+                }`}
+              />
+            ) : null}
             <p className="text-sm font-semibold">{item.label}</p>
           </div>
           {isActive ? (
-            <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
+            <span className="rounded-full bg-app-accent px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-app-accent-contrast">
               Actual
             </span>
           ) : null}
         </div>
         <p
           className={`mt-1 text-xs leading-5 ${
-            isActive ? "text-slate-600" : "text-slate-400"
+            isActive ? "text-app-text-muted" : "text-app-shell-muted"
           }`}
         >
           {item.description}
@@ -80,29 +92,29 @@ export function AppSidebar({
 
   const statusBadgeClassName =
     statusBadge?.tone === "amber"
-      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      ? "border-amber-300/30 bg-amber-400/12 text-amber-100"
       : statusBadge?.tone === "teal"
-        ? "border-teal-300/40 bg-teal-400/15 text-teal-100"
-        : "border-white/15 bg-white/10 text-slate-100";
+        ? "border-app-accent bg-app-accent-soft text-teal-100"
+        : "border-app-shell-border bg-white/8 text-app-shell-text";
 
   return (
-    <aside className="border-b border-white/60 bg-[linear-gradient(180deg,_#020617_0%,_#0f172a_42%,_#111827_100%)] px-5 py-6 text-slate-100 lg:min-h-screen lg:border-b-0 lg:border-r lg:border-r-white/10">
-      <div className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.08)_0%,_rgba(255,255,255,0.03)_100%)] p-5 shadow-[0_24px_60px_rgba(2,6,23,0.32)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.32em] text-teal-300">
+    <aside className="border-b border-app-shell-border bg-[linear-gradient(180deg,var(--app-shell-bg)_0%,var(--app-shell-bg-strong)_100%)] px-5 py-6 text-app-shell-text lg:min-h-screen lg:border-b-0 lg:border-r">
+      <div className="rounded-[2rem] border border-app-shell-border bg-[radial-gradient(circle_at_top_left,_rgba(67,198,172,0.18),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.08)_0%,_rgba(255,255,255,0.03)_100%)] p-5 shadow-[0_24px_60px_rgba(2,6,23,0.32)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.32em] text-app-accent">
           Leadflow OS
         </p>
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-shell-text">
           {areaLabel}
         </h2>
-        <p className="mt-3 text-sm leading-6 text-slate-300">
+        <p className="mt-3 text-sm leading-6 text-app-shell-muted">
           {areaDescription}
         </p>
 
-        <div className="mt-5 rounded-3xl border border-white/10 bg-slate-950/40 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        <div className="mt-5 rounded-3xl border border-app-shell-border bg-black/18 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-shell-muted">
             Objetivo del rol
           </p>
-          <p className="mt-2 text-sm leading-6 text-slate-200">
+          <p className="mt-2 text-sm leading-6 text-app-shell-text">
             Usa esta navegación para entender el estado actual, detectar bloqueos y mover la operación al siguiente paso.
           </p>
         </div>
@@ -120,13 +132,13 @@ export function AppSidebar({
         {sections.map((section, index) => (
           <section
             key={section.title}
-            className={index === 0 ? undefined : "border-t border-white/10 pt-6"}
+            className={index === 0 ? undefined : "border-t border-app-shell-border pt-6"}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-app-shell-muted">
               {section.title}
             </p>
             {section.description ? (
-              <p className="mt-2 text-sm text-slate-400">
+              <p className="mt-2 text-sm text-app-shell-muted">
                 {section.description}
               </p>
             ) : null}
@@ -137,7 +149,7 @@ export function AppSidebar({
         ))}
       </div>
 
-      <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 px-4 py-4 text-sm leading-6 text-slate-300">
+      <div className="mt-6 rounded-3xl border border-app-shell-border bg-app-shell-surface px-4 py-4 text-sm leading-6 text-app-shell-muted">
         La navegacion lateral ya no habla solo de modulos tecnicos: busca orientar la operacion, la capacidad y el seguimiento del rol.
       </div>
     </aside>

@@ -38,9 +38,9 @@ type DomainFormState = {
 };
 
 const primaryButtonClassName =
-  "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full bg-app-text px-4 py-2 text-sm font-semibold text-app-bg transition hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
-  "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-app-border bg-app-card px-4 py-2 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 
 const buildInitialCloneFormState = (): CloneFormState => ({
   templateFunnelId: "",
@@ -76,13 +76,13 @@ const tabs: Array<{
 
 const buildTenantStatusBadgeClassName = (isActive: boolean) =>
   isActive
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-slate-200 bg-slate-100 text-slate-600";
+    ? "border-app-success-border bg-app-success-bg text-app-success-text"
+    : "border-app-border bg-app-surface-muted text-app-text-muted";
 
 const buildVerificationBadgeClassName = (isVerified: boolean) =>
   isVerified
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-amber-200 bg-amber-50 text-amber-700";
+    ? "border-app-success-border bg-app-success-bg text-app-success-text"
+    : "border-app-warning-border bg-app-warning-bg text-app-warning-text";
 
 const isTemplateEngineFunnel = (config: unknown) =>
   Boolean(
@@ -384,7 +384,7 @@ export function TenantImmersionClient({
         <OperationBanner tone={feedback.tone} message={feedback.message} />
       ) : null}
 
-      <div className="rounded-[1.85rem] border border-slate-200 bg-white p-3 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+      <div className="rounded-[1.85rem] border border-app-border bg-app-card p-3 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
         <div className="grid gap-2 md:grid-cols-3">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -396,14 +396,14 @@ export function TenantImmersionClient({
                 onClick={() => setActiveTab(tab.id)}
                 className={`rounded-[1.35rem] border px-4 py-4 text-left transition ${
                   isActive
-                    ? "border-slate-950 bg-slate-950 text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
+                    ? "border-app-text bg-app-text text-app-bg shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
+                    : "border-app-border bg-app-surface-muted text-app-text-muted hover:border-app-border-strong hover:bg-app-card"
                 }`}
               >
                 <p className="text-sm font-semibold">{tab.label}</p>
                 <p
                   className={`mt-2 text-sm leading-6 ${
-                    isActive ? "text-slate-200" : "text-slate-500"
+                    isActive ? "text-app-bg" : "text-app-text-soft"
                   }`}
                 >
                   {tab.description}
@@ -440,98 +440,98 @@ export function TenantImmersionClient({
           </section>
 
           <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+            <div className="rounded-[2rem] border border-app-border bg-app-card p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
                 Resumen operativo
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-text">
                 Datos base del tenant
               </h2>
               <dl className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <dt className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Workspace
                   </dt>
-                  <dd className="mt-3 text-lg font-semibold text-slate-950">
+                  <dd className="mt-3 text-lg font-semibold text-app-text">
                     {tenant.workspace.name}
                   </dd>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-app-text-muted">
                     {tenant.workspace.slug}
                   </p>
                 </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <dt className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Estado del team
                   </dt>
                   <dd className="mt-3">
                     <StatusBadge value={tenant.status} />
                   </dd>
-                  <p className="mt-3 text-sm text-slate-600">
+                  <p className="mt-3 text-sm text-app-text-muted">
                     Operación {tenant.isActive ? "activa" : "inactiva"}.
                   </p>
                 </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <dt className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Suscripción
                   </dt>
-                  <dd className="mt-3 text-lg font-semibold text-slate-950">
+                  <dd className="mt-3 text-lg font-semibold text-app-text">
                     {formatDateTime(tenant.subscriptionExpiresAt)}
                   </dd>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-app-text-muted">
                     Si no hay fecha, el tenant sigue sin vencimiento cargado.
                   </p>
                 </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <dt className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+                  <dt className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Capacidad disponible
                   </dt>
-                  <dd className="mt-3 text-lg font-semibold text-slate-950">
+                  <dd className="mt-3 text-lg font-semibold text-app-text">
                     {formatCompactNumber(tenant.availableSeats)}
                   </dd>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-app-text-muted">
                     Asientos restantes antes de nuevas activaciones.
                   </p>
                 </div>
               </dl>
             </div>
 
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+            <div className="rounded-[2rem] border border-app-border bg-app-card p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
                 Identidad y rollout
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-text">
                 Señales visibles
               </h2>
               <div className="mt-6 space-y-4">
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Zona horaria
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-slate-950">
+                  <p className="mt-2 text-sm font-semibold text-app-text">
                     {tenant.workspace.timezone}
                   </p>
                 </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Moneda / locale
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-slate-950">
+                  <p className="mt-2 text-sm font-semibold text-app-text">
                     {tenant.workspace.defaultCurrency} / {tenant.workspace.primaryLocale}
                   </p>
                 </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Dominio principal del workspace
                   </p>
-                  <p className="mt-2 text-sm font-semibold text-slate-950">
+                  <p className="mt-2 text-sm font-semibold text-app-text">
                     {tenant.workspace.primaryDomain ?? "Sin dominio principal"}
                   </p>
                 </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Descripción interna
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-app-text-muted">
                     {tenant.description ??
                       "Todavía no hay una descripción operativa para este tenant."}
                   </p>
@@ -544,15 +544,15 @@ export function TenantImmersionClient({
 
       {activeTab === "funnels" ? (
         <div className="space-y-6">
-          <div className="flex flex-col gap-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)] md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-4 rounded-[2rem] border border-app-border bg-app-card p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)] md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
                 Funnels del tenant
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-text">
                 Biblioteca asignada a {tenant.name}
               </h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
+              <p className="mt-3 text-sm leading-7 text-app-text-muted">
                 Aquí solo aparecen funnels propios del tenant. Desde la librería
                 puedes clonar una plantilla base y dejarla lista en este mismo
                 equipo.
@@ -613,8 +613,8 @@ export function TenantImmersionClient({
                 header: "Funnel",
                 render: (row) => (
                   <div>
-                    <p className="font-semibold text-slate-950">{row.name}</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    <p className="font-semibold text-app-text">{row.name}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
                       {row.code}
                     </p>
                   </div>
@@ -624,7 +624,7 @@ export function TenantImmersionClient({
                 key: "description",
                 header: "Descripcion",
                 render: (row) => (
-                  <p className="max-w-md text-sm leading-6 text-slate-600">
+                  <p className="max-w-md text-sm leading-6 text-app-text-muted">
                     {row.description?.trim() || "Sin descripcion operativa."}
                   </p>
                 ),
@@ -683,15 +683,15 @@ export function TenantImmersionClient({
 
       {activeTab === "domains" ? (
         <div className="space-y-6">
-          <div className="flex flex-col gap-4 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)] md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-4 rounded-[2rem] border border-app-border bg-app-card p-6 shadow-[0_20px_50px_rgba(15,23,42,0.06)] md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
                 Dominios del tenant
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-text">
                 Inventario publico de {tenant.name}
               </h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
+              <p className="mt-3 text-sm leading-7 text-app-text-muted">
                 Registra el hostname del cliente, enlaza uno de los funnels que
                 ya pertenece al tenant y deja lista la salida publica desde el
                 control plane.
@@ -752,8 +752,8 @@ export function TenantImmersionClient({
                 header: "Hostname",
                 render: (row) => (
                   <div>
-                    <p className="font-semibold text-slate-950">{row.host}</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                    <p className="font-semibold text-app-text">{row.host}</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
                       {row.normalizedHost}
                     </p>
                   </div>
@@ -788,12 +788,12 @@ export function TenantImmersionClient({
                     return "Sin funnel enlazado";
                   }
 
-                  return (
-                    <div>
-                      <p className="font-semibold text-slate-950">
+                    return (
+                      <div>
+                      <p className="font-semibold text-app-text">
                         {linkedFunnel.name}
                       </p>
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
                         {linkedFunnel.code}
                       </p>
                     </div>
@@ -822,7 +822,7 @@ export function TenantImmersionClient({
         >
           <form className="space-y-5" onSubmit={handleCloneSubmit}>
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Plantilla base
               </span>
               <select
@@ -834,7 +834,7 @@ export function TenantImmersionClient({
                   }))
                 }
                 disabled={isLoadingTemplates || isPending}
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
+                className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted"
               >
                 <option value="">
                   {isLoadingTemplates
@@ -850,7 +850,7 @@ export function TenantImmersionClient({
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Nombre del clon (opcional)
               </span>
               <input
@@ -864,11 +864,11 @@ export function TenantImmersionClient({
                 }
                 placeholder="Copia de Funnel Base Premium"
                 disabled={isPending}
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
+                className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted"
               />
             </label>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+            <div className="rounded-3xl border border-app-border bg-app-surface-muted px-4 py-4 text-sm leading-6 text-app-text-muted">
               El backend recibirá `targetTeamId={teamId}` para clonar la
               plantilla sobre este tenant y luego refrescar la tabla sin salir
               de la vista de inmersión.
@@ -908,7 +908,7 @@ export function TenantImmersionClient({
         >
           <form className="space-y-5" onSubmit={handleCreateDomainSubmit}>
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Hostname
               </span>
               <input
@@ -922,12 +922,12 @@ export function TenantImmersionClient({
                 }
                 placeholder="campana.agencia.com"
                 disabled={isPending}
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
+                className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted"
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Enlazar a Funnel
               </span>
               <select
@@ -939,7 +939,7 @@ export function TenantImmersionClient({
                   }))
                 }
                 disabled={isPending || isLoadingFunnels}
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 disabled:cursor-not-allowed disabled:bg-slate-100"
+                className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted"
               >
                 <option value="">
                   {isLoadingFunnels
@@ -954,7 +954,7 @@ export function TenantImmersionClient({
               </select>
             </label>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+            <div className="rounded-3xl border border-app-border bg-app-surface-muted px-4 py-4 text-sm leading-6 text-app-text-muted">
               El backend registrará el dominio directamente sobre este
               `teamId`, y si eliges un funnel verificará que también pertenezca
               al tenant antes de persistir el enlace.

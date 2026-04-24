@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdWheelsModule } from '../ad-wheels/ad-wheels.module';
+import { AiConfigModule } from '../ai-config/ai-config.module';
 import { BlockDefinitionsModule } from '../block-definitions/block-definitions.module';
 import { AssignmentsModule } from '../assignments/assignments.module';
 import { ConversionEventMappingsModule } from '../conversion-event-mappings/conversion-event-mappings.module';
@@ -14,6 +15,7 @@ import { FunnelsModule } from '../funnels/funnels.module';
 import { HandoffStrategiesModule } from '../handoff-strategies/handoff-strategies.module';
 import { HybridFunnelPublicationsModule } from '../hybrid-funnel-publications/hybrid-funnel-publications.module';
 import { IncomingWebhooksModule } from '../incoming-webhooks/incoming-webhooks.module';
+import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { LeadsModule } from '../leads/leads.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
@@ -30,6 +32,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
 
 @Module({
   imports: [
+    AiConfigModule,
     AdWheelsModule,
     BlockDefinitionsModule,
     WorkspacesModule,
@@ -48,6 +51,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     HybridFunnelPublicationsModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
+    KnowledgeModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,
@@ -60,6 +64,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     EventsModule,
   ],
   exports: [
+    AiConfigModule,
     AdWheelsModule,
     BlockDefinitionsModule,
     WorkspacesModule,
@@ -78,6 +83,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     HybridFunnelPublicationsModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
+    KnowledgeModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,

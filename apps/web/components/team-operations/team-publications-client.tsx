@@ -68,10 +68,12 @@ type PublicationMutationRecord = {
 };
 
 const buttonClassName =
-  "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-2 text-sm font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60";
 
 const primaryButtonClassName =
-  "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full bg-[var(--app-text)] px-4 py-2 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
+const fieldClassName =
+  "mt-2 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-text)] outline-none transition placeholder:text-[var(--app-text-soft)] focus:border-[var(--app-border-strong)] focus:ring-2 focus:ring-[var(--app-accent-soft)]";
 
 const buildCreateState = (
   domains: DomainRecord[],
@@ -472,8 +474,8 @@ export function TeamPublicationsClient({
             header: "Path",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">{row.pathPrefix}</p>
-                <p className="text-xs text-slate-500">{row.domainHost}</p>
+                <p className="font-semibold text-[var(--app-text)]">{row.pathPrefix}</p>
+                <p className="text-xs text-[var(--app-text-soft)]">{row.domainHost}</p>
               </div>
             ),
           },
@@ -665,7 +667,7 @@ function PublicationForm({
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">Dominio</span>
+          <span className="text-sm font-medium text-[var(--app-text)]">Dominio</span>
           <select
             value={state.domainId}
             onChange={(event) =>
@@ -674,7 +676,7 @@ function PublicationForm({
                 domainId: event.target.value,
               }))
             }
-            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+            className={fieldClassName}
           >
             {domains.map((domain) => (
               <option key={domain.id} value={domain.id}>
@@ -684,7 +686,7 @@ function PublicationForm({
           </select>
         </label>
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">Funnel</span>
+          <span className="text-sm font-medium text-[var(--app-text)]">Funnel</span>
           <select
             value={state.funnelInstanceId}
             onChange={(event) =>
@@ -693,7 +695,7 @@ function PublicationForm({
                 funnelInstanceId: event.target.value,
               }))
             }
-            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+            className={fieldClassName}
           >
             {funnels.map((funnel) => (
               <option key={funnel.id} value={funnel.id}>
@@ -703,7 +705,7 @@ function PublicationForm({
           </select>
         </label>
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">Path</span>
+          <span className="text-sm font-medium text-[var(--app-text)]">Path</span>
           <input
             value={state.pathPrefix}
             onChange={(event) =>
@@ -712,11 +714,11 @@ function PublicationForm({
                 pathPrefix: event.target.value,
               }))
             }
-            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+            className={fieldClassName}
           />
         </label>
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">Tracking</span>
+          <span className="text-sm font-medium text-[var(--app-text)]">Tracking</span>
           <select
             value={state.trackingProfileId}
             onChange={(event) =>
@@ -725,7 +727,7 @@ function PublicationForm({
                 trackingProfileId: event.target.value,
               }))
             }
-            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+            className={fieldClassName}
           >
             <option value="">Sin tracking</option>
             {trackingProfiles.map((profile) => (
@@ -736,7 +738,7 @@ function PublicationForm({
           </select>
         </label>
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">Handoff</span>
+          <span className="text-sm font-medium text-[var(--app-text)]">Handoff</span>
           <select
             value={state.handoffStrategyId}
             onChange={(event) =>
@@ -745,7 +747,7 @@ function PublicationForm({
                 handoffStrategyId: event.target.value,
               }))
             }
-            className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+            className={fieldClassName}
           >
             <option value="">Sin handoff</option>
             {handoffStrategies.map((strategy) => (
@@ -755,7 +757,7 @@ function PublicationForm({
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <label className="flex items-center gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-3 text-sm text-[var(--app-muted)]">
           <input
             checked={state.isPrimary}
             onChange={(event) =>

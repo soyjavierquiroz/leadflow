@@ -152,8 +152,8 @@ export function SuperAdminBlacklistButton() {
         <div
           className={`mt-5 rounded-[1.5rem] border px-4 py-3 text-sm ${
             feedback.tone === "success"
-              ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
-              : "border-rose-300/40 bg-rose-400/10 text-rose-100"
+              ? "border-app-success-border bg-app-success-bg text-app-success-text"
+              : "border-app-danger-border bg-app-danger-bg text-app-danger-text"
           }`}
         >
           {feedback.message}

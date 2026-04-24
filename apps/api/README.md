@@ -41,6 +41,19 @@ Backend base de Leadflow con NestJS + Fastify.
 - `GET /v1/funnel-instances`
 - `GET /v1/funnel-publications`
 
+## Knowledge / RAG
+
+Endpoints operativos:
+
+- `GET /v1/knowledge/list?tenant_id=<uuid>`
+- `GET /v1/knowledge/audit?tenant_id=<uuid>`
+- `POST /v1/knowledge/upload`
+- `DELETE /v1/knowledge/:id?tenant_id=<uuid>`
+
+La ingesta RAG acepta `multipart/form-data` y reenvia el PDF al webhook interno de n8n. Como ese webhook ahora es multi-stack, el cliente debe enviar `platform_key` y `product_key` en el multipart junto con `tenant_id`, `file_name`, `file` y metadatos de costo como `training_cost_kredits`.
+
+`KnowledgeService` conserva los metadatos no reservados y los pasa a n8n para que el workflow resuelva el stack correcto. Para borrado fisico, `deleteDocumentById()` llama Runtime Context Central con `DELETE /v1/knowledge/:document_id?tenant_id=<uuid>` y sin body JSON.
+
 ## Configuracion por entorno
 Definida en `src/config/runtime.ts`.
 

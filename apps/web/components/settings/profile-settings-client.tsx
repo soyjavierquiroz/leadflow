@@ -10,7 +10,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, ShieldCheck, UserRound } from "lucide-react";
-import { MemberProtectionHubButton } from "@/components/member-operations/member-protection-hub-button";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { buildInitials } from "@/lib/app-shell/utils";
@@ -29,11 +28,11 @@ type ProfileSettingsClientProps = {
 };
 
 const inputClassName =
-  "w-full rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950 focus:ring-4 focus:ring-slate-950/5 disabled:bg-slate-50 disabled:text-slate-500";
+  "w-full rounded-[1.35rem] border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-4 focus:ring-app-accent-soft disabled:bg-app-surface-muted disabled:text-app-text-soft";
 const primaryButtonClassName =
-  "inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center rounded-full bg-app-text px-5 py-2.5 text-sm font-semibold text-app-bg transition hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
-  "inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center rounded-full border border-app-border bg-app-card px-5 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 
 const roleLabel: Record<MyProfileSnapshot["role"], string> = {
   SUPER_ADMIN: "Super Admin",
@@ -246,47 +245,47 @@ export function ProfileSettingsClient({
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[0.84fr_1.16fr]">
-        <article className="rounded-[2rem] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.15),_transparent_42%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
+        <article className="rounded-[2rem] border border-app-border bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),_transparent_42%),linear-gradient(180deg,var(--app-surface)_0%,var(--app-card)_100%)] p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
                 Cuenta autenticada
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-text">
                 Identidad personal
               </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 text-app-text-muted">
                 Este bloque resume cómo te ve la plataforma cuando entras al
                 shell y operas.
               </p>
             </div>
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span className="rounded-full border border-app-border bg-app-card px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-soft">
               {roleLabel[profile.role]}
             </span>
           </div>
 
-          <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white/90 p-5">
+          <div className="mt-6 rounded-[1.75rem] border border-app-border bg-app-card p-5">
             <div className="flex items-center gap-4">
               {profile.avatarUrl ? (
                 <img
                   src={profile.avatarUrl}
                   alt={`Avatar de ${profile.fullName}`}
-                  className="h-20 w-20 rounded-[1.4rem] border border-slate-200 object-cover shadow-[0_18px_30px_rgba(15,23,42,0.1)]"
+                  className="h-20 w-20 rounded-[1.4rem] border border-app-border object-cover shadow-[0_18px_30px_rgba(15,23,42,0.1)]"
                 />
               ) : (
-                <div className="flex h-20 w-20 items-center justify-center rounded-[1.4rem] bg-slate-950 text-xl font-semibold text-white shadow-[0_18px_30px_rgba(15,23,42,0.12)]">
+                <div className="flex h-20 w-20 items-center justify-center rounded-[1.4rem] bg-app-text text-xl font-semibold text-app-bg shadow-[0_18px_30px_rgba(15,23,42,0.12)]">
                   {initials}
                 </div>
               )}
 
               <div className="min-w-0">
-                <p className="text-lg font-semibold text-slate-950">
+                <p className="text-lg font-semibold text-app-text">
                   {profile.fullName}
                 </p>
-                <p className="mt-1 truncate text-sm text-slate-600">
+                <p className="mt-1 truncate text-sm text-app-text-muted">
                   {profile.email}
                 </p>
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-app-text-soft">
                   {profile.sponsorDisplayName
                     ? `Perfil operativo: ${profile.sponsorDisplayName}`
                     : "Sin sponsor operativo vinculado"}
@@ -295,13 +294,13 @@ export function ProfileSettingsClient({
             </div>
           </div>
 
-          <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white/85 p-5">
+          <div className="mt-6 rounded-[1.75rem] border border-app-border bg-app-surface p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
                   Avatar del asesor
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-app-text-muted">
                   Esta foto alimenta el advisor del handoff y el bloque
                   conversion_page_config, así que la optimizamos antes de
                   subirla.
@@ -331,7 +330,7 @@ export function ProfileSettingsClient({
                     ? "Optimizando y subiendo..."
                     : "Cambiar foto operativa"}
                 </button>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-app-text-soft">
                   {UI_IDENTITY_UPLOAD_HINT}
                 </span>
               </div>
@@ -339,21 +338,21 @@ export function ProfileSettingsClient({
           </div>
 
           <div className="mt-6 grid gap-3">
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white/80 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <UserRound className="h-4 w-4 text-sky-700" />
+            <div className="rounded-[1.5rem] border border-app-border bg-app-surface p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-app-text">
+                <UserRound className="h-4 w-4 text-app-accent" />
                 Perfil base
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 Nombre personal, email de acceso y teléfono de contacto.
               </p>
             </div>
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white/80 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <ShieldCheck className="h-4 w-4 text-sky-700" />
+            <div className="rounded-[1.5rem] border border-app-border bg-app-surface p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-app-text">
+                <ShieldCheck className="h-4 w-4 text-app-accent" />
                 Seguridad
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 Para cambiar la contraseña pedimos la actual antes de aceptar la
                 nueva.
               </p>
@@ -364,19 +363,19 @@ export function ProfileSettingsClient({
         <div className="grid gap-6">
           <form
             onSubmit={handleProfileSubmit}
-            className="space-y-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.06)]"
+            className="space-y-6 rounded-[2rem] border border-app-border bg-app-card p-6 shadow-[0_24px_70px_rgba(15,23,42,0.06)]"
           >
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
                 Datos personales
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-text">
                 Perfil
               </h2>
             </div>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">Nombre</span>
+              <span className="text-sm font-medium text-app-text-muted">Nombre</span>
               <input
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
@@ -386,12 +385,12 @@ export function ProfileSettingsClient({
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">Email</span>
+              <span className="text-sm font-medium text-app-text-muted">Email</span>
               <input value={profile.email} disabled className={inputClassName} />
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Teléfono / móvil
               </span>
               <input
@@ -427,24 +426,24 @@ export function ProfileSettingsClient({
 
           <form
             onSubmit={handlePasswordSubmit}
-            className="space-y-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.06)]"
+            className="space-y-6 rounded-[2rem] border border-app-border bg-app-card p-6 shadow-[0_24px_70px_rgba(15,23,42,0.06)]"
           >
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
                 Seguridad
               </p>
-              <h2 className="mt-3 flex items-center gap-3 text-2xl font-semibold tracking-tight text-slate-950">
-                <KeyRound className="h-5 w-5 text-slate-700" />
+              <h2 className="mt-3 flex items-center gap-3 text-2xl font-semibold tracking-tight text-app-text">
+                <KeyRound className="h-5 w-5 text-app-text-muted" />
                 Cambiar contraseña
               </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 text-app-text-muted">
                 La nueva contraseña se valida solo si primero confirmas la
                 actual.
               </p>
             </div>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Contraseña actual
               </span>
               <input
@@ -457,7 +456,7 @@ export function ProfileSettingsClient({
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Nueva contraseña
               </span>
               <input
@@ -470,7 +469,7 @@ export function ProfileSettingsClient({
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-app-text-muted">
                 Confirmar nueva contraseña
               </span>
               <input
@@ -491,14 +490,6 @@ export function ProfileSettingsClient({
             </button>
           </form>
 
-          {scope === "member" ? (
-            <div id="blacklist-access">
-              <MemberProtectionHubButton
-                advisorPhone={phone.trim() || profile.phone}
-                isSsoAvailable
-              />
-            </div>
-          ) : null}
         </div>
       </section>
     </div>

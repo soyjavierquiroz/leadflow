@@ -25,6 +25,13 @@ const teamNav = [
     description: "Bolsa comun activa, buy-ins y ocupacion de asientos.",
   },
   {
+    href: "/management/ai-config",
+    label: "Configuración de IA",
+    description: "Prompt maestro, contextos y cierre del agente del equipo.",
+    icon: "bot",
+    match: "/management/ai-config",
+  },
+  {
     href: "/team/pools",
     label: "Pools",
     description: "Cobertura de rotación y fallback de handoff.",
