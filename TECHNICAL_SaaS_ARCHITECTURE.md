@@ -79,6 +79,45 @@ Variables operativas críticas:
 - `N8N_AUTOMATION_WEBHOOK_BASE_URL`
 - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
 
+### 3.1 Infraestructura de Correos / Notificaciones
+
+La infraestructura de correos transaccionales y notificaciones técnicas queda
+estandarizada sobre AWS SES mediante el SDK oficial `@aws-sdk/client-ses`.
+
+Decisión arquitectónica vigente:
+
+- Se completa la migración total a AWS SES como proveedor único de envío.
+- Se eliminan proveedores legacy del flujo operativo: Sendgrid, SMTP genérico y
+  Resend.
+- El backend debe usar `@aws-sdk/client-ses` para emitir correos desde el
+  servicio de mailer compartido.
+
+Domain Alignment:
+
+- Los envíos técnicos salen desde el subdominio alineado
+  `soporte@mail.kurukin.com`.
+- Las respuestas de clientes se enrutan a `soporte@kurukin.com`, administrado
+  en Workspace.
+- Esta separación protege la reputación del dominio principal y mantiene los
+  rebotes/respuestas humanas fuera del canal técnico de envío.
+
+Seguridad:
+
+- SES opera con credenciales IAM permanentes con formato `AKIA...`.
+- La política activa para esas credenciales es `AmazonSESFullAccess`.
+- Las credenciales deben inyectarse por entorno y no deben versionarse en el
+  repositorio.
+
+Resiliencia:
+
+- El flujo de creación de tenants queda blindado con `try/catch` alrededor del
+  envío de correos.
+- Si AWS SES responde con error transitorio o `500`, el fallo se captura y no
+  debe corromper la base de datos ni bloquear la experiencia de creación del
+  tenant.
+- El envío de notificaciones es un efecto secundario posterior al cambio de
+  estado principal; la consistencia del tenant tiene prioridad sobre el correo.
+
 ### 4. Datos y Prisma
 
 Leadflow usa PostgreSQL vía Prisma.
