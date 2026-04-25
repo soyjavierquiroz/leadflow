@@ -1034,11 +1034,19 @@ export class TeamsService {
         );
       }
 
-      await this.mailService.sendWelcomeEmail(
-        provisionedTenant.adminUser.email,
-        adminPassword,
-        provisionedTenant.team.name,
-      );
+      try {
+        await this.mailService.sendWelcomeEmail(
+          provisionedTenant.adminUser.email,
+          adminPassword,
+          provisionedTenant.team.name,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Team admin welcome email failed for ${provisionedTenant.adminUser.email}: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
       void this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
 
       return provisionedTenant;
