@@ -15,7 +15,9 @@ enum WorkspaceStatus {
 
 enum TeamStatus {
   draft
+  pending
   active
+  suspended
   archived
 }
 
@@ -48,6 +50,12 @@ enum AdWheelStatus {
   DRAFT
   ACTIVE
   COMPLETED
+}
+
+enum TrafficLayer {
+  DIRECT
+  PAID_WHEEL
+  ORGANIC
 }
 
 enum FunnelStatus {
@@ -168,6 +176,8 @@ enum LeadSourceChannel {
   api
   import
   automation
+  ORGANIC
+  PAID
 }
 
 enum VisitorKind {
@@ -371,6 +381,7 @@ model Sponsor {
   team                 Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
   rotationMembers      RotationMember[]
   adWheelParticipants  AdWheelParticipant[]
+  adWheelTurns         AdWheelTurn[]
   assignments          Assignment[]
   user                 User?
   messagingConnection  MessagingConnection?
@@ -392,6 +403,9 @@ model AdWheel {
   updatedAt    DateTime             @updatedAt
   team         Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
   participants AdWheelParticipant[]
+  turns        AdWheelTurn[]
+  originLeads  Lead[]               @relation("LeadOriginAdWheel")
+  originAssignments Assignment[]     @relation("AssignmentOriginAdWheel")
 
   @@index([teamId, status])
   @@index([teamId, startDate, endDate])
@@ -400,12 +414,29 @@ model AdWheel {
 model AdWheelParticipant {
   adWheelId String
   sponsorId String
+  seatCount Int      @default(1)
   joinedAt  DateTime @default(now())
   adWheel   AdWheel  @relation(fields: [adWheelId], references: [id], onDelete: Cascade)
   sponsor   Sponsor  @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
 
   @@id([adWheelId, sponsorId])
   @@index([sponsorId, joinedAt])
+}
+
+model AdWheelTurn {
+  id           String   @id @default(uuid())
+  adWheelId    String
+  sponsorId    String
+  position     Int
+  isConsumed   Boolean  @default(false)
+  assignmentId String?
+  createdAt    DateTime @default(now())
+  adWheel      AdWheel  @relation(fields: [adWheelId], references: [id], onDelete: Cascade)
+  sponsor      Sponsor  @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  @@unique([adWheelId, position])
+  @@index([adWheelId, isConsumed, position])
+  @@index([sponsorId, isConsumed])
 }
 
 model User {
@@ -416,6 +447,8 @@ model User {
   fullName     String
   email        String        @unique
   passwordHash String
+  resetToken        String?       @unique
+  resetTokenExpires DateTime?
   role         UserRole
   status       UserStatus
   lastLoginAt  DateTime?
@@ -850,6 +883,8 @@ model Lead {
   funnelId             String
   funnelInstanceId     String?
   funnelPublicationId  String?
+  trafficLayer         String?
+  originAdWheelId      String?
   visitorId            String?                 @unique
   sourceChannel        LeadSourceChannel
   fullName             String?
@@ -871,6 +906,7 @@ model Lead {
   funnel               Funnel                  @relation(fields: [funnelId], references: [id], onDelete: Cascade)
   funnelInstance       FunnelInstance?         @relation(fields: [funnelInstanceId], references: [id], onDelete: SetNull)
   funnelPublication    FunnelPublication?      @relation(fields: [funnelPublicationId], references: [id], onDelete: SetNull)
+  originAdWheel        AdWheel?                @relation("LeadOriginAdWheel", fields: [originAdWheelId], references: [id], onDelete: SetNull)
   visitor              Visitor?                @relation(fields: [visitorId], references: [id], onDelete: SetNull)
   assignments          Assignment[]            @relation("LeadAssignments")
   currentAssignment    Assignment?             @relation("CurrentLeadAssignment", fields: [currentAssignmentId], references: [id], onDelete: SetNull)
@@ -889,6 +925,8 @@ model Assignment {
   funnelInstanceId     String?
   funnelPublicationId  String?
   rotationPoolId       String?
+  trafficLayer         String?
+  originAdWheelId      String?
   status               AssignmentStatus
   reason               AssignmentReason
   assignedAt           DateTime
@@ -904,6 +942,7 @@ model Assignment {
   funnelInstance       FunnelInstance?      @relation(fields: [funnelInstanceId], references: [id], onDelete: SetNull)
   funnelPublication    FunnelPublication?   @relation(fields: [funnelPublicationId], references: [id], onDelete: SetNull)
   rotationPool         RotationPool?        @relation(fields: [rotationPoolId], references: [id], onDelete: SetNull)
+  originAdWheel        AdWheel?             @relation("AssignmentOriginAdWheel", fields: [originAdWheelId], references: [id], onDelete: SetNull)
   currentForLead       Lead?                @relation("CurrentLeadAssignment")
   events               DomainEvent[]
   automationDispatches AutomationDispatch[]

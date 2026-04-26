@@ -22,6 +22,7 @@ const toneByValue = (value: string) => {
     case "high_intent_close":
       return "border-app-warning-border bg-app-warning-bg text-app-warning-text";
     case "paused":
+    case "suspended":
     case "archived":
     case "lost":
     case "unscheduled":

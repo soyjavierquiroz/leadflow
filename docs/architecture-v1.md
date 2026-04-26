@@ -257,9 +257,8 @@ Dejar Leadflow listo para ejecutar su shell web, una API con dominio de negocio 
 
 ### Shared packages
 
-- `packages/config`: helpers simples de configuracion (`splitCsv`, `normalizeUrl`, `toNumber`).
-- `packages/types`: tipos base de dominio y de configuracion.
-- `packages/ui`: placeholder de componentes compartidos.
+- `packages/shared/mail`: cliente compartido de correo transaccional sobre AWS SES.
+- `packages/kurukin-video-player-pkg`: reproductor de video reutilizable para el runtime publico.
 
 ## Capa de dominio actual
 

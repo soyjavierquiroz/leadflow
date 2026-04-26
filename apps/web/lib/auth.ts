@@ -115,6 +115,7 @@ const publicCanvasBypassUser: AuthenticatedAppUser = {
 export const LOGIN_REQUEST_TIMEOUT_MS = 10_000;
 export const LOGOUT_REQUEST_TIMEOUT_MS = 10_000;
 export const IMPERSONATE_REQUEST_TIMEOUT_MS = 10_000;
+const REMEMBER_ME_SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 const buildCookieHeader = async () => {
   const cookieStore = await cookies();
@@ -339,6 +340,31 @@ const setAuthSessionCookie = async (sessionCookie: AuthSessionCookie) => {
   );
 };
 
+const configureLoginSessionCookie = (
+  sessionCookie: AuthSessionCookie,
+  input: {
+    rememberMe: boolean;
+  },
+): AuthSessionCookie => {
+  const sessionOptions = { ...sessionCookie.options };
+
+  delete sessionOptions.expires;
+  delete sessionOptions.maxAge;
+
+  return {
+    ...sessionCookie,
+    options: {
+      ...sessionOptions,
+      httpOnly: true,
+      ...(input.rememberMe
+        ? { maxAge: REMEMBER_ME_SESSION_MAX_AGE_SECONDS }
+        : {}),
+      sameSite: "lax",
+      secure: true,
+    },
+  };
+};
+
 const clearAuthSessionCookie = async (
   sessionCookieOptions?: Partial<AuthSessionCookie["options"]>,
 ) => {
@@ -431,9 +457,11 @@ export const getAuthLoginApiUrl = () => `${authApiBaseUrl}/auth/login`;
 export const loginWithServerSession = async (input: {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }) => {
   const email = input.email.trim().toLowerCase();
   const password = input.password;
+  const rememberMe = input.rememberMe ?? false;
   const loginUrl = getAuthLoginApiUrl();
 
   if (!email || !password) {
@@ -515,7 +543,9 @@ export const loginWithServerSession = async (input: {
       };
     }
 
-    await setAuthSessionCookie(sessionCookie);
+    await setAuthSessionCookie(
+      configureLoginSessionCookie(sessionCookie, { rememberMe }),
+    );
 
     return {
       ok: true as const,

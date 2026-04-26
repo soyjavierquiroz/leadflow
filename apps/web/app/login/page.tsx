@@ -2,33 +2,6 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/login-form";
 import { getSessionUser } from "@/lib/auth";
 
-const demoAccounts = [
-  {
-    label: "Platform Admin",
-    role: "SUPER_ADMIN",
-    email: "admin@leadflow.local",
-    password: "Admin123!",
-  },
-  {
-    label: "Team Ops",
-    role: "TEAM_ADMIN",
-    email: "team@leadflow.local",
-    password: "Team123!",
-  },
-  {
-    label: "Ana Sponsor",
-    role: "MEMBER",
-    email: "ana.member@leadflow.local",
-    password: "Member123!",
-  },
-  {
-    label: "Bruno Sponsor",
-    role: "MEMBER",
-    email: "bruno.member@leadflow.local",
-    password: "Member456!",
-  },
-];
-
 export default async function LoginPage() {
   const user = await getSessionUser();
 
@@ -37,9 +10,13 @@ export default async function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(148,163,184,0.14),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#eef2f7_100%)] px-5 py-10 md:px-8">
-      <div className="mx-auto w-full max-w-6xl">
-        <LoginForm demoAccounts={demoAccounts} />
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#020617] px-5 py-10 text-white md:px-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,212,191,0.20),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(59,130,246,0.14),transparent_32%),linear-gradient(180deg,#020617_0%,#07111f_52%,#020617_100%)]" />
+      <div className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:56px_56px]" />
+      <div className="absolute inset-0 opacity-[0.16] [background-image:radial-gradient(rgba(255,255,255,0.42)_0.7px,transparent_0.7px)] [background-size:5px_5px]" />
+
+      <div className="relative z-10 w-full max-w-[480px]">
+        <LoginForm />
       </div>
     </main>
   );

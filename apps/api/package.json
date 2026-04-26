@@ -5,7 +5,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "postinstall": "prisma generate",
+    "predev": "pnpm --filter @leadflow/mail build",
     "dev": "nest start --watch",
+    "prebuild": "pnpm --filter @leadflow/mail build",
     "build": "rm -rf dist && prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main",
@@ -13,6 +15,7 @@
     "funnel:doctor:immunotec": "node scripts/immunotec-template-doctor.js",
     "funnel:inject:thank-you": "node scripts/inject-thank-you-page.js",
     "blocks:register:sticky": "node scripts/register-sticky-conversion-bar.js",
+    "prestart:dev": "pnpm --filter @leadflow/mail build",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint \"{src,test}/**/*.ts\"",
@@ -24,10 +27,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "pretypecheck": "pnpm --filter @leadflow/mail build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.1021.0",
     "@aws-sdk/client-s3": "^3.1021.0",
     "@aws-sdk/s3-request-presigner": "^3.1021.0",
     "@nestjs/axios": "^4.0.1",
@@ -36,6 +39,7 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.8",
     "@nestjs/platform-fastify": "^11.1.8",
+    "@leadflow/mail": "workspace:*",
     "@prisma/client": "^6.16.3",
     "axios": "^1.13.1",
     "class-transformer": "^0.5.1",

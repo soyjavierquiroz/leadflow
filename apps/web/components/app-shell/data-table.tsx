@@ -11,6 +11,7 @@ type DataTableColumn<T> = {
 type DataTableProps<T> = {
   columns: DataTableColumn<T>[];
   rows: T[];
+  getRowClassName?: (row: T) => string;
   emptyEyebrow?: string;
   emptyTitle: string;
   emptyDescription: string;
@@ -20,6 +21,7 @@ type DataTableProps<T> = {
 export function DataTable<T>({
   columns,
   rows,
+  getRowClassName,
   emptyEyebrow,
   emptyTitle,
   emptyDescription,
@@ -46,8 +48,8 @@ export function DataTable<T>({
           {rows.length} registro{rows.length === 1 ? "" : "s"}
         </p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-app-border text-sm">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[920px] divide-y divide-app-border text-sm">
           <thead className="bg-app-surface-muted">
             <tr>
               {columns.map((column) => (
@@ -62,7 +64,12 @@ export function DataTable<T>({
           </thead>
           <tbody className="divide-y divide-app-border">
             {rows.map((row, index) => (
-              <tr key={index} className="align-top transition hover:bg-app-surface-muted">
+              <tr
+                key={index}
+                className={`align-top transition hover:bg-app-surface-muted ${
+                  getRowClassName?.(row) ?? ""
+                }`}
+              >
                 {columns.map((column) => (
                   <td
                     key={column.key}

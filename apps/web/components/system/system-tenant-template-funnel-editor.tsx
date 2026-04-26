@@ -33,15 +33,15 @@ import type {
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 const primaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-full bg-app-text px-4 py-2.5 text-sm font-semibold text-app-bg transition hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60";
 
 const secondaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
+  "rounded-[2rem] border border-app-border bg-app-card p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
 
-const fieldLabelClassName = "text-sm font-medium text-slate-700";
+const fieldLabelClassName = "text-sm font-medium text-app-text-muted";
 
 const editorStepDefinitions = [
   {
@@ -565,10 +565,10 @@ export function SystemTenantTemplateFunnelEditor({
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 Funnel asignado
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {tenant.name}
               </p>
             </div>
@@ -580,10 +580,10 @@ export function SystemTenantTemplateFunnelEditor({
               <FileJson className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 Bloques válidos
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {parsedBlocks.value
                   ? `${parsedBlocks.value.length} bloques listos`
                   : "Corrige el JSON"}
@@ -597,10 +597,10 @@ export function SystemTenantTemplateFunnelEditor({
               <Check className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 Paso activo
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {activeStep ? activeStepLabel : "Sin paso disponible"}
               </p>
             </div>
@@ -611,13 +611,13 @@ export function SystemTenantTemplateFunnelEditor({
       <details open className={sectionClassName}>
         <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
               Configuración
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+            <h2 className="mt-2 text-2xl font-semibold text-app-text">
               Identidad del funnel
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-app-text-muted">
               Ordena nombre, descripción y tema del funnel antes de bajar al
               detalle operativo por paso.
             </p>
@@ -630,7 +630,7 @@ export function SystemTenantTemplateFunnelEditor({
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className="rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent"
             />
           </label>
 
@@ -640,7 +640,7 @@ export function SystemTenantTemplateFunnelEditor({
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={4}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className="rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent"
             />
           </label>
 
@@ -651,7 +651,7 @@ export function SystemTenantTemplateFunnelEditor({
               onChange={(event) =>
                 setSelectedThemeId(event.target.value as FunnelThemeId)
               }
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className="rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent"
             >
               {availableFunnelThemes.map((theme) => (
                 <option key={theme.id} value={theme.id}>
@@ -659,7 +659,7 @@ export function SystemTenantTemplateFunnelEditor({
                 </option>
               ))}
             </select>
-            <span className="text-xs leading-5 text-slate-500">
+            <span className="text-xs leading-5 text-app-text-soft">
               Se guarda en `funnelInstance.settingsJson.theme` y aplica al funnel
               completo, no al paso activo.
             </span>
@@ -694,16 +694,16 @@ export function SystemTenantTemplateFunnelEditor({
         previewTheme={selectedThemeId}
         previewSettingsJson={activeDraft.settingsJson}
         stepSpecificSettingsPanel={
-          <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+          <article className="rounded-[1.5rem] border border-app-border bg-app-surface-muted p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-2xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
                   Configuración específica del paso
                 </p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                <h3 className="mt-2 text-xl font-semibold text-app-text">
                   Layout del paso
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-app-text-muted">
                   Ajusta cómo se renderiza este paso en runtime sin tocar el
                   layout global del funnel. Ideal para que el handoff o la
                   confirmación salgan del split sticky cuando haga falta.
@@ -722,7 +722,7 @@ export function SystemTenantTemplateFunnelEditor({
                       ),
                     })
                   }
-                  className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+                  className="rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent"
                 >
                   <option value="inherit">Heredar del Funnel (Por defecto)</option>
                   <option value="full-page">Estructura Centrada / Full Page</option>

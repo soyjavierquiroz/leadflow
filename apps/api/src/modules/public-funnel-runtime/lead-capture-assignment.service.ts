@@ -149,6 +149,8 @@ const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
   'ROTATION_POOL_NOT_FOUND',
   'NO_ELIGIBLE_SPONSORS',
   'ROTATION_MEMBER_NOT_FOUND',
+  'NO_AVAILABLE_AD_WHEEL_TURNS',
+  'AD_WHEEL_TURN_ALREADY_CONSUMED',
 ]);
 
 const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
@@ -156,6 +158,8 @@ const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
   'NO_FALLBACK_SPONSOR_AVAILABLE',
   'NO_ACTIVE_AD_WHEEL',
   'NO_ACTIVE_AD_WHEEL_PARTICIPANTS',
+  'NO_AVAILABLE_AD_WHEEL_TURNS',
+  'AD_WHEEL_TURN_ALREADY_CONSUMED',
 ]);
 
 type DirectEligibleSponsor = Prisma.SponsorGetPayload<Record<string, never>>;
@@ -323,6 +327,14 @@ export class LeadCaptureAssignmentService {
           publication,
           dto.sourceUrl ?? null,
         );
+        const captureTags = Array.from(
+          new Set([
+            ...(dto.tags ?? []),
+            ...(entryContext.trafficLayer === 'DIRECT'
+              ? ['source: organic']
+              : []),
+          ]),
+        );
 
         const visitor = await this.registerVisitorInTransaction(
           tx,
@@ -366,7 +378,7 @@ export class LeadCaptureAssignmentService {
             fbclid: dto.fbclid ?? null,
             gclid: dto.gclid ?? null,
             ttclid: dto.ttclid ?? null,
-            tags: dto.tags ?? [],
+            tags: captureTags,
             triggerEventId: dto.submissionEventId ?? null,
           },
         );
@@ -905,11 +917,13 @@ export class LeadCaptureAssignmentService {
             avatarUrl: existingOpenAssignment.sponsor.avatarUrl,
           },
         },
-        advisor: await this.resolveAssignedAdvisorBySponsorId(
-          tx,
-          publication,
-          existingOpenAssignment.sponsor.id,
-        ),
+        advisor:
+          (await this.resolveAssignedAdvisorBySponsorId(
+            tx,
+            publication,
+            existingOpenAssignment.sponsor.id,
+          )) ??
+          this.toPublicAssignedAdvisorFromSponsor(existingOpenAssignment.sponsor),
         wasCreated: false,
       };
     }
@@ -921,6 +935,31 @@ export class LeadCaptureAssignmentService {
         lead,
         input,
       );
+    }
+
+    if (
+      input?.entryContext?.trafficLayer === 'PAID_WHEEL' &&
+      input.entryContext.adWheelId
+    ) {
+      try {
+        return await this.assignLeadToAdWheelTurnInTransaction(
+          tx,
+          publication,
+          lead,
+          input.entryContext.adWheelId,
+          input,
+        );
+      } catch (error) {
+        const { code, message } = this.getConflictErrorDetails(error);
+
+        if (!code || !ASSIGNMENT_FALLBACK_ERROR_CODES.has(code)) {
+          throw error;
+        }
+
+        this.logger.warn(
+          `Ad wheel assignment failed for lead ${lead.id}; falling back to organic. adWheelId=${input.entryContext.adWheelId} code=${code ?? 'UNKNOWN'} message=${message ?? 'Unable to consume ad wheel turn.'}`,
+        );
+      }
     }
 
     const assignee = await this.resolveRoundRobinAssigneeOrThrow(tx, publication);
@@ -959,6 +998,8 @@ export class LeadCaptureAssignmentService {
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         rotationPoolId: assignmentRotationPoolId,
+        trafficLayer: 'ORGANIC',
+        originAdWheelId: null,
         status: 'assigned',
         reason: assignmentReason,
         assignedAt,
@@ -975,6 +1016,8 @@ export class LeadCaptureAssignmentService {
       data: {
         status: 'assigned',
         currentAssignmentId: assignment.id,
+        trafficLayer: 'ORGANIC',
+        originAdWheelId: null,
       },
     });
 
@@ -991,6 +1034,8 @@ export class LeadCaptureAssignmentService {
           sponsorId: assignment.sponsor.id,
           rotationPoolId: assignmentRotationPoolId,
           funnelPublicationId: publication.id,
+          trafficLayer: 'ORGANIC',
+          adWheelId: null,
         },
         occurredAt: assignedAt,
         funnelInstanceId: publication.funnelInstanceId,
@@ -1019,6 +1064,8 @@ export class LeadCaptureAssignmentService {
         sponsorId: assignment.sponsor.id,
         rotationPoolId: assignmentRotationPoolId,
         assignmentReason,
+        trafficLayer: 'ORGANIC',
+        adWheelId: null,
       },
     });
 
@@ -1039,6 +1086,8 @@ export class LeadCaptureAssignmentService {
         triggerEventId: input?.triggerEventId ?? null,
         sponsorId: assignment.sponsor.id,
         handoffStrategyId: effectiveHandoffStrategy?.id ?? null,
+        trafficLayer: 'ORGANIC',
+        adWheelId: null,
       },
     });
 
@@ -1344,6 +1393,7 @@ export class LeadCaptureAssignmentService {
           is: {
             isActive: true,
             status: 'active',
+            availabilityStatus: 'available',
           },
         },
       },
@@ -1368,6 +1418,7 @@ export class LeadCaptureAssignmentService {
           is: {
             isActive: true,
             status: 'active',
+            availabilityStatus: 'available',
           },
         },
       },
@@ -1437,10 +1488,226 @@ export class LeadCaptureAssignmentService {
     const trimmed = sourceUrl.trim();
 
     try {
-      return new URL(trimmed).pathname;
+      const url = new URL(trimmed);
+      return `${url.pathname}${url.search}`;
     } catch {
       return trimmed.startsWith('/') ? trimmed : null;
     }
+  }
+
+  private async assignLeadToAdWheelTurnInTransaction(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+    lead: {
+      id: string;
+      currentAssignmentId: string | null;
+    },
+    adWheelId: string,
+    input: {
+      triggerEventId?: string | null;
+      funnelStepId?: string | null;
+      entryContext?: PublicRuntimeEntryContext;
+    },
+  ): Promise<AssignmentResolution> {
+    const now = new Date();
+    const turn = await tx.adWheelTurn.findFirst({
+      where: {
+        adWheelId,
+        isConsumed: false,
+        adWheel: {
+          teamId: publication.teamId,
+          status: 'ACTIVE',
+          startDate: {
+            lte: now,
+          },
+          endDate: {
+            gte: now,
+          },
+        },
+        sponsor: {
+          isActive: true,
+          status: 'active',
+          availabilityStatus: 'available',
+        },
+      },
+      include: {
+        sponsor: true,
+      },
+      orderBy: {
+        position: 'asc',
+      },
+    });
+
+    if (!turn) {
+      throw new ConflictException({
+        code: 'NO_AVAILABLE_AD_WHEEL_TURNS',
+        message: `Ad wheel ${adWheelId} does not have an available turn for publication ${publication.id}.`,
+      });
+    }
+
+    const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
+
+    if (!legacyFunnelId) {
+      throw new ConflictException({
+        code: 'LEGACY_FUNNEL_REQUIRED',
+        message:
+          'The current funnel instance is not yet linked to a legacy funnel, so assignment persistence cannot proceed in v1.',
+      });
+    }
+
+    const assignedAt = now;
+    const effectiveHandoffStrategy =
+      publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
+    const assignmentId = randomUUID();
+    const consumedTurn = await tx.adWheelTurn.updateMany({
+      where: {
+        id: turn.id,
+        isConsumed: false,
+      },
+      data: {
+        isConsumed: true,
+        assignmentId,
+      },
+    });
+
+    if (consumedTurn.count !== 1) {
+      throw new ConflictException({
+        code: 'AD_WHEEL_TURN_ALREADY_CONSUMED',
+        message: `Ad wheel turn ${turn.id} was already consumed.`,
+      });
+    }
+
+    const assignment = await tx.assignment.create({
+      data: {
+        id: assignmentId,
+        workspaceId: publication.workspaceId,
+        leadId: lead.id,
+        sponsorId: turn.sponsorId,
+        teamId: publication.teamId,
+        funnelId: legacyFunnelId,
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
+        rotationPoolId: null,
+        trafficLayer: 'PAID_WHEEL',
+        originAdWheelId: adWheelId,
+        status: 'assigned',
+        reason: 'rotation',
+        assignedAt,
+        acceptedAt: null,
+        resolvedAt: null,
+      },
+      include: {
+        sponsor: true,
+      },
+    });
+
+    await tx.lead.update({
+      where: { id: lead.id },
+      data: {
+        status: 'assigned',
+        currentAssignmentId: assignment.id,
+        trafficLayer: 'PAID_WHEEL',
+        originAdWheelId: adWheelId,
+      },
+    });
+
+    await tx.domainEvent.create({
+      data: {
+        workspaceId: publication.workspaceId,
+        eventId: randomUUID(),
+        aggregateType: 'lead',
+        aggregateId: lead.id,
+        eventName: 'lead_assigned',
+        actorType: 'system',
+        payload: {
+          assignmentId: assignment.id,
+          sponsorId: assignment.sponsor.id,
+          rotationPoolId: null,
+          funnelPublicationId: publication.id,
+          trafficLayer: 'PAID_WHEEL',
+          adWheelId,
+          adWheelTurnId: turn.id,
+          adWheelTurnPosition: turn.position,
+        },
+        occurredAt: assignedAt,
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
+        funnelStepId: input.funnelStepId ?? null,
+        leadId: lead.id,
+        assignmentId: assignment.id,
+      },
+    });
+
+    await this.trackingEventsService.recordTrackingEventInTransaction(tx, {
+      workspaceId: publication.workspaceId,
+      aggregateType: 'assignment',
+      aggregateId: assignment.id,
+      eventName: 'assignment_created',
+      actorType: 'system',
+      occurredAt: assignedAt,
+      funnelInstanceId: publication.funnelInstanceId,
+      funnelPublicationId: publication.id,
+      funnelStepId: input.funnelStepId ?? null,
+      leadId: lead.id,
+      assignmentId: assignment.id,
+      payload: {
+        source: 'server',
+        triggerEventId: input.triggerEventId ?? null,
+        sponsorId: assignment.sponsor.id,
+        rotationPoolId: null,
+        assignmentReason: 'rotation',
+        trafficLayer: 'PAID_WHEEL',
+        adWheelId,
+        adWheelTurnId: turn.id,
+        adWheelTurnPosition: turn.position,
+      },
+    });
+
+    await this.trackingEventsService.recordTrackingEventInTransaction(tx, {
+      workspaceId: publication.workspaceId,
+      aggregateType: 'assignment',
+      aggregateId: assignment.id,
+      eventName: 'handoff_started',
+      actorType: 'system',
+      occurredAt: assignedAt,
+      funnelInstanceId: publication.funnelInstanceId,
+      funnelPublicationId: publication.id,
+      funnelStepId: input.funnelStepId ?? null,
+      leadId: lead.id,
+      assignmentId: assignment.id,
+      payload: {
+        source: 'server',
+        triggerEventId: input.triggerEventId ?? null,
+        sponsorId: assignment.sponsor.id,
+        handoffStrategyId: effectiveHandoffStrategy?.id ?? null,
+        trafficLayer: 'PAID_WHEEL',
+        adWheelId,
+        adWheelTurnId: turn.id,
+      },
+    });
+
+    return {
+      assignment: {
+        id: assignment.id,
+        status: assignment.status,
+        reason: assignment.reason,
+        assignedAt: assignment.assignedAt.toISOString(),
+        sponsor: {
+          id: assignment.sponsor.id,
+          displayName: assignment.sponsor.displayName,
+          email: assignment.sponsor.email,
+          phone: assignment.sponsor.phone,
+          avatarUrl: assignment.sponsor.avatarUrl,
+        },
+      },
+      advisor:
+        (await this.resolveAssignedAdvisorBySponsorId(
+          tx,
+          publication,
+          assignment.sponsor.id,
+        )) ?? this.toPublicAssignedAdvisorFromSponsor(assignment.sponsor),
+      wasCreated: true,
+    };
   }
 
   private async assignLeadToForcedSponsorInTransaction(
@@ -1493,6 +1760,8 @@ export class LeadCaptureAssignmentService {
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         rotationPoolId: null,
+        trafficLayer: 'DIRECT',
+        originAdWheelId: null,
         status: 'assigned',
         reason: 'manual',
         assignedAt,
@@ -1509,6 +1778,8 @@ export class LeadCaptureAssignmentService {
       data: {
         status: 'assigned',
         currentAssignmentId: assignment.id,
+        trafficLayer: 'DIRECT',
+        originAdWheelId: null,
       },
     });
 
@@ -1527,6 +1798,8 @@ export class LeadCaptureAssignmentService {
           funnelPublicationId: publication.id,
           assignmentMode: 'organic_asesor_bypass',
           entryMode: input.entryContext?.entryMode ?? 'organic_asesor',
+          trafficLayer: 'DIRECT',
+          adWheelId: null,
           teamPointerUnaffected: true,
         },
         occurredAt: assignedAt,
@@ -1558,6 +1831,8 @@ export class LeadCaptureAssignmentService {
         assignmentReason: 'manual',
         assignmentMode: 'organic_asesor_bypass',
         entryMode: input.entryContext?.entryMode ?? 'organic_asesor',
+        trafficLayer: 'DIRECT',
+        adWheelId: null,
         forcedSponsorId,
         teamPointerUnaffected: true,
       },
@@ -1582,6 +1857,8 @@ export class LeadCaptureAssignmentService {
         handoffStrategyId: effectiveHandoffStrategy?.id ?? null,
         assignmentMode: 'organic_asesor_bypass',
         entryMode: input.entryContext?.entryMode ?? 'organic_asesor',
+        trafficLayer: 'DIRECT',
+        adWheelId: null,
       },
     });
 
@@ -1599,11 +1876,12 @@ export class LeadCaptureAssignmentService {
           avatarUrl: assignment.sponsor.avatarUrl,
         },
       },
-      advisor: await this.resolveAssignedAdvisorBySponsorId(
-        tx,
-        publication,
-        assignment.sponsor.id,
-      ),
+      advisor:
+        (await this.resolveAssignedAdvisorBySponsorId(
+          tx,
+          publication,
+          assignment.sponsor.id,
+        )) ?? this.toPublicAssignedAdvisorFromSponsor(assignment.sponsor),
       wasCreated: true,
     };
   }
@@ -1648,6 +1926,23 @@ export class LeadCaptureAssignmentService {
       bio: role,
       phone: user.sponsor?.phone ?? null,
       photoUrl: user.sponsor?.avatarUrl ?? null,
+    };
+  }
+
+  private toPublicAssignedAdvisorFromSponsor(sponsor: {
+    id: string;
+    displayName: string;
+    phone: string | null;
+    avatarUrl: string | null;
+  }): PublicAssignedAdvisor {
+    return {
+      id: sponsor.id,
+      sponsorId: sponsor.id,
+      name: sponsor.displayName,
+      role: 'Asesor',
+      bio: 'Asesor',
+      phone: sponsor.phone,
+      photoUrl: sponsor.avatarUrl,
     };
   }
 
@@ -1985,6 +2280,8 @@ export class LeadCaptureAssignmentService {
       case 'api':
       case 'import':
       case 'automation':
+      case 'ORGANIC':
+      case 'PAID':
         return value;
       default:
         return 'form';

@@ -136,15 +136,22 @@ export class PublicRuntimeService {
       dto.firstName?.trim() ||
       null;
 
+    const fallbackSourcePath = dto.path?.trim() || runtime.request.path;
+    const fallbackSourceUrl = fallbackSourcePath.startsWith('http')
+      ? fallbackSourcePath
+      : `https://${runtime.domain.host}${
+          fallbackSourcePath.startsWith('/')
+            ? fallbackSourcePath
+            : `/${fallbackSourcePath}`
+        }`;
+
     return this.leadCaptureAssignmentService.submitLeadCapture({
       submissionEventId: dto.submissionEventId ?? `runtime-submit-${randomUUID()}`,
       publicationId: runtime.publication.id,
       currentStepId: runtime.currentStep.id,
       anonymousId: dto.anonymousId?.trim() || `runtime-anon-${randomUUID()}`,
       sourceChannel: dto.sourceChannel ?? 'form',
-      sourceUrl:
-        dto.sourceUrl?.trim() ??
-        `https://${runtime.domain.host}${runtime.request.path}`,
+      sourceUrl: dto.sourceUrl?.trim() ?? fallbackSourceUrl,
       utmSource: dto.utmSource ?? null,
       utmCampaign: dto.utmCampaign ?? null,
       utmMedium: dto.utmMedium ?? null,

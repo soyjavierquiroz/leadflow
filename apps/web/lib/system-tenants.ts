@@ -104,11 +104,14 @@ const assertOkResponse = async (
   throw error;
 };
 
-export const getSystemTenants = async () => {
+export const getSystemTenants = async (options?: {
+  includeArchived?: boolean;
+}) => {
   noStore();
 
   try {
-    const response = await apiFetchWithSession("/system/tenants");
+    const query = options?.includeArchived ? "?includeArchived=true" : "";
+    const response = await apiFetchWithSession(`/system/tenants${query}`);
 
     await assertOkResponse(
       response,

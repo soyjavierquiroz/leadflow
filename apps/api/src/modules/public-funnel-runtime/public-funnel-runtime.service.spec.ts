@@ -242,7 +242,67 @@ describe('PublicFunnelRuntimeService', () => {
     expect(runtime.domain.normalizedHost).toBe('localhost');
     expect(runtime.entryContext).toEqual({
       entryMode: 'paid_ads',
+      trafficLayer: 'ORGANIC',
       forcedSponsorId: null,
+      adWheelId: null,
+      browserPixelsEnabled: true,
+    });
+  });
+
+  it('marks the entry context as paid wheel when awid belongs to an active wheel window', async () => {
+    const findMany = jest.fn<
+      Promise<MockPublicationRecord[]>,
+      [FindManyArgs]
+    >();
+    const adWheelFindFirst = jest.fn().mockResolvedValue({
+      id: 'wheel-1',
+    });
+    const prisma = {
+      funnelPublication: {
+        findMany,
+      },
+      sponsor: {
+        findFirst: jest.fn(),
+      },
+      adWheel: {
+        findFirst: adWheelFindFirst,
+      },
+    } as unknown as PrismaService;
+
+    findMany.mockResolvedValue([
+      buildPublicationRecord({
+        id: 'publication-root',
+        pathPrefix: '/',
+      }),
+    ]);
+
+    const service = new PublicFunnelRuntimeService(prisma);
+    const runtime = await service.resolveByHostAndPath(
+      'localhost',
+      '/?awid=wheel-1',
+    );
+
+    expect(adWheelFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'wheel-1',
+        teamId: 'team-1',
+        status: 'ACTIVE',
+        startDate: {
+          lte: expect.any(Date),
+        },
+        endDate: {
+          gte: expect.any(Date),
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(runtime.entryContext).toEqual({
+      entryMode: 'paid_ads',
+      trafficLayer: 'PAID_WHEEL',
+      forcedSponsorId: null,
+      adWheelId: 'wheel-1',
       browserPixelsEnabled: true,
     });
   });
@@ -436,7 +496,9 @@ describe('PublicFunnelRuntimeService', () => {
     expect(runtime.currentStep.path).toBe('/a/asesor-uno/confirmado');
     expect(runtime.entryContext).toEqual({
       entryMode: 'organic_asesor',
+      trafficLayer: 'DIRECT',
       forcedSponsorId: 'sponsor-1',
+      adWheelId: null,
       browserPixelsEnabled: false,
     });
   });

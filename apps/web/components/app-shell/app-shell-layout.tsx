@@ -66,7 +66,7 @@ export function AppShellLayout({
             currentUser={currentUser}
             workspaceSwitcher={workspaceSwitcher}
           />
-          <main className="flex w-full flex-col items-start px-5 py-6 text-left md:px-8 md:py-8">
+          <main className="flex w-full flex-col items-start p-4 text-left md:p-6 lg:p-8">
             {children}
           </main>
         </div>

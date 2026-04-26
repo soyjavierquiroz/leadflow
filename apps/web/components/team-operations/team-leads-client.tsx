@@ -48,7 +48,6 @@ const leadStatusFilterOptions = [
 ] as const;
 
 const filterLabelByValue = {
-  all: "Todos",
   orphaned: "Huerfanos",
   stagnant: "Estancados",
   active: "Activos",
@@ -61,7 +60,13 @@ const filterLabelByValue = {
 } satisfies Record<string, string>;
 
 const buttonClassName =
-  "rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-app-border bg-app-card px-3 py-1.5 text-xs font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
+
+const filterControlClassName =
+  "w-full rounded-full border border-app-border bg-app-card px-4 py-2 text-sm text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-border-strong focus:ring-2 focus:ring-app-accent-soft md:w-auto [&>option]:bg-app-card [&>option]:text-app-text";
+
+const modalSelectClassName =
+  "mt-3 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-border-strong focus:ring-2 focus:ring-app-accent-soft [&>option]:bg-app-card [&>option]:text-app-text";
 
 const getLeadLabel = (lead: TeamLeadInboxItem) =>
   lead.fullName ?? lead.phone ?? lead.email ?? "Lead sin nombre";
@@ -76,6 +81,7 @@ export function TeamLeadsClient({
     useState<(typeof supervisionFilterOptions)[number]>("all");
   const [leadStatusFilter, setLeadStatusFilter] =
     useState<(typeof leadStatusFilterOptions)[number]>("all");
+  const [sponsorFilter, setSponsorFilter] = useState("all");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [selectedSponsorId, setSelectedSponsorId] = useState<string>("");
   const [feedback, setFeedback] = useState<{
@@ -109,10 +115,43 @@ export function TeamLeadsClient({
         row.supervisionStatus === supervisionFilter;
       const matchesLeadStatus =
         leadStatusFilter === "all" || row.leadStatus === leadStatusFilter;
+      const matchesSponsor =
+        sponsorFilter === "all" ||
+        (sponsorFilter === "unassigned"
+          ? !row.sponsor
+          : row.sponsor?.id === sponsorFilter);
 
-      return matchesSearch && matchesSupervision && matchesLeadStatus;
+      return (
+        matchesSearch &&
+        matchesSupervision &&
+        matchesLeadStatus &&
+        matchesSponsor
+      );
     });
-  }, [deferredSearch, leadStatusFilter, rows, supervisionFilter]);
+  }, [deferredSearch, leadStatusFilter, rows, sponsorFilter, supervisionFilter]);
+
+  const sponsorFilterOptions = useMemo(() => {
+    const sponsorById = new Map<string, string>();
+
+    rows.forEach((row) => {
+      if (row.sponsor) {
+        sponsorById.set(row.sponsor.id, row.sponsor.displayName);
+      }
+    });
+
+    availableSponsors.forEach((sponsor) => {
+      if (!sponsorById.has(sponsor.id)) {
+        sponsorById.set(sponsor.id, sponsor.displayName);
+      }
+    });
+
+    return Array.from(sponsorById, ([id, displayName]) => ({
+      id,
+      displayName,
+    })).sort((first, second) =>
+      first.displayName.localeCompare(second.displayName),
+    );
+  }, [availableSponsors, rows]);
 
   const selectedLead =
     rows.find((row) => row.id === selectedLeadId) ?? null;
@@ -240,7 +279,7 @@ export function TeamLeadsClient({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="w-full min-w-0 space-y-8">
       <SectionHeader
         eyebrow="Team Admin / Leads"
         title="Bandeja global del equipo"
@@ -251,7 +290,7 @@ export function TeamLeadsClient({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por lead, telefono, sponsor o funnel"
-              className="min-w-72 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
+              className={`${filterControlClassName} min-w-72`}
             />
             <select
               value={supervisionFilter}
@@ -260,11 +299,14 @@ export function TeamLeadsClient({
                   event.target.value as (typeof supervisionFilterOptions)[number],
                 )
               }
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
+              aria-label="Estado operativo"
+              className={filterControlClassName}
             >
               {supervisionFilterOptions.map((option) => (
                 <option key={option} value={option}>
-                  {filterLabelByValue[option]}
+                  {option === "all"
+                    ? "Estado operativo"
+                    : filterLabelByValue[option]}
                 </option>
               ))}
             </select>
@@ -275,11 +317,28 @@ export function TeamLeadsClient({
                   event.target.value as (typeof leadStatusFilterOptions)[number],
                 )
               }
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm outline-none focus:border-slate-950"
+              aria-label="Estado del lead"
+              className={filterControlClassName}
             >
               {leadStatusFilterOptions.map((option) => (
                 <option key={option} value={option}>
-                  {filterLabelByValue[option]}
+                  {option === "all"
+                    ? "Estado del lead"
+                    : filterLabelByValue[option]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={sponsorFilter}
+              onChange={(event) => setSponsorFilter(event.target.value)}
+              aria-label="Sponsor asignado"
+              className={filterControlClassName}
+            >
+              <option value="all">Sponsor asignado</option>
+              <option value="unassigned">Sin sponsor</option>
+              {sponsorFilterOptions.map((sponsor) => (
+                <option key={sponsor.id} value={sponsor.id}>
+                  {sponsor.displayName}
                 </option>
               ))}
             </select>
@@ -291,7 +350,7 @@ export function TeamLeadsClient({
         <OperationBanner tone={feedback.tone} message={feedback.message} />
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Panorama total"
           value={formatCompactNumber(rows.length)}
@@ -321,10 +380,10 @@ export function TeamLeadsClient({
             header: "Lead",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">
+                <p className="font-semibold text-app-text">
                   {row.fullName ?? "Lead sin nombre"}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-app-text-soft">
                   {row.phone ?? row.email ?? "Sin telefono"}
                 </p>
               </div>
@@ -336,7 +395,7 @@ export function TeamLeadsClient({
             render: (row) => (
               <div>
                 <p>{row.funnelName ?? "Sin funnel"}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-app-text-soft">
                   {row.domainHost ?? "Host pendiente"}
                   {row.publicationPath ? ` · ${row.publicationPath}` : ""}
                 </p>
@@ -349,7 +408,7 @@ export function TeamLeadsClient({
             render: (row) => (
               <div>
                 <p>{row.sponsor?.displayName ?? "Sin owner"}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-app-text-soft">
                   {row.sponsor
                     ? formatDateTime(row.assignedAt)
                     : "Sin asignacion activa"}
@@ -376,7 +435,7 @@ export function TeamLeadsClient({
             render: (row) => (
               <div>
                 <p>{formatRelativeTime(row.lastActivity)}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-app-text-soft">
                   {formatDateTime(row.lastActivity)}
                 </p>
               </div>
@@ -392,7 +451,7 @@ export function TeamLeadsClient({
                     ? formatRelativeTime(row.assignedAt)
                     : "Sin asignar"}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-app-text-soft">
                   {row.assignedAt ? formatDateTime(row.assignedAt) : "Pendiente"}
                 </p>
               </div>
@@ -437,23 +496,23 @@ export function TeamLeadsClient({
         >
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                <p className="text-slate-500">Owner actual</p>
-                <p className="mt-2 font-medium text-slate-950">
+              <div className="rounded-2xl bg-app-surface-muted p-4 text-sm">
+                <p className="text-app-text-soft">Owner actual</p>
+                <p className="mt-2 font-medium text-app-text">
                   {selectedLead.sponsor?.displayName ?? "Sin owner"}
                 </p>
-                <p className="mt-1 text-slate-700">
+                <p className="mt-1 text-app-text-muted">
                   {selectedLead.assignedAt
                     ? `Asignado ${formatRelativeTime(selectedLead.assignedAt)}`
                     : "Lead huerfano"}
                 </p>
               </div>
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm">
-                <p className="text-slate-500">Contexto</p>
-                <p className="mt-2 font-medium text-slate-950">
+              <div className="rounded-2xl bg-app-surface-muted p-4 text-sm">
+                <p className="text-app-text-soft">Contexto</p>
+                <p className="mt-2 font-medium text-app-text">
                   {selectedLead.funnelName ?? "Sin funnel"}
                 </p>
-                <p className="mt-1 text-slate-700">
+                <p className="mt-1 text-app-text-muted">
                   {selectedLead.domainHost ?? "Host pendiente"}
                   {selectedLead.publicationPath
                     ? ` · ${selectedLead.publicationPath}`
@@ -464,13 +523,14 @@ export function TeamLeadsClient({
 
             {candidateSponsors.length > 0 ? (
               <label className="block">
-                <span className="text-sm font-semibold text-slate-900">
+                <span className="text-sm font-semibold text-app-text">
                   Nuevo sponsor
                 </span>
                 <select
                   value={selectedSponsorId}
                   onChange={(event) => setSelectedSponsorId(event.target.value)}
-                  className="mt-3 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-950"
+                  aria-label="Nuevo sponsor asignado"
+                  className={modalSelectClassName}
                 >
                   {candidateSponsors.map((sponsor) => (
                     <option key={sponsor.id} value={sponsor.id}>
@@ -481,7 +541,7 @@ export function TeamLeadsClient({
                 </select>
               </label>
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+              <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-4 text-sm text-app-text-muted">
                 No hay sponsors activos y disponibles distintos al owner actual.
               </div>
             )}
@@ -498,7 +558,7 @@ export function TeamLeadsClient({
                 type="button"
                 onClick={handleReassign}
                 disabled={isPending || !selectedSponsorId}
-                className="rounded-full border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-app-text bg-app-text px-4 py-2 text-sm font-semibold text-app-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPending ? "Reasignando..." : "Confirmar reasignacion"}
               </button>

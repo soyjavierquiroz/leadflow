@@ -31,6 +31,9 @@ export type LeadContextUpsertPayload = {
     lead_stage: 'new';
     lead_source: 'leadflow_wheel';
     vertical_hint: string;
+    traffic_layer: string;
+    ad_wheel_id: string | null;
+    is_owned_lead: boolean;
     campaign: Record<string, never>;
     signals: {
       detected_signal: 'lead_assigned';
@@ -41,7 +44,11 @@ export type LeadContextUpsertPayload = {
       last_objection: string;
       next_action: 'Esperando primer mensaje del lead';
     };
-    custom_fields: Record<string, never>;
+    custom_fields: {
+      traffic_layer: string;
+      ad_wheel_id: string | null;
+      is_owned_lead: boolean;
+    };
     notes: string;
   };
 };

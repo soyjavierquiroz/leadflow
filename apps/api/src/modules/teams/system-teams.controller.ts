@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
@@ -13,6 +14,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
 import type { UpdateSystemTenantFunnelStepDto } from './dto/update-system-tenant-funnel-step.dto';
+import type { UpdateSystemTenantDto } from './dto/update-system-tenant.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
 import { SystemTenantAccessGuard } from './system-tenant-access.guard';
 import { TeamsService } from './teams.service';
@@ -25,8 +27,8 @@ export class SystemTeamsController {
   constructor(private readonly teamsService: TeamsService) {}
 
   @Get('tenants')
-  listTenants() {
-    return this.teamsService.listSystemTenants();
+  listTenants(@Query('includeArchived') includeArchived?: string) {
+    return this.teamsService.listSystemTenants(includeArchived === 'true');
   }
 
   @Get('tenants/:id')
@@ -101,6 +103,19 @@ export class SystemTeamsController {
   @Post('tenants')
   createTenant(@Body() dto: CreateSystemTenantDto) {
     return this.teamsService.createSystemTenant(dto);
+  }
+
+  @Patch('tenants/:id')
+  updateTenant(
+    @Param('id') id: string,
+    @Body() dto: UpdateSystemTenantDto,
+  ) {
+    return this.teamsService.updateSystemTenant(id, dto);
+  }
+
+  @Patch('tenants/:id/archive')
+  archiveTenant(@Param('id') id: string) {
+    return this.teamsService.archiveSystemTenant(id);
   }
 
   @Post('provision-tenant')

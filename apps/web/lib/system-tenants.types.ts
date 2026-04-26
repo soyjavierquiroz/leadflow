@@ -12,6 +12,7 @@ export type SystemTenantRecord = LooseRecord & {
   workspaceName: string;
   workspaceSlug: string;
   managerUserId: string | null;
+  managerEmail: string | null;
   lastAssignedUserId?: string | null;
   name: string;
   code: string;

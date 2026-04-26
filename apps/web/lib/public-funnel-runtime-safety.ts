@@ -171,9 +171,19 @@ export function normalizePublicFunnelRuntimePayload(
         entryContextRecord.entryMode === 'organic_asesor'
           ? 'organic_asesor'
           : 'paid_ads',
+      trafficLayer:
+        entryContextRecord.trafficLayer === 'DIRECT' ||
+        entryContextRecord.trafficLayer === 'PAID_WHEEL' ||
+        entryContextRecord.trafficLayer === 'ORGANIC'
+          ? entryContextRecord.trafficLayer
+          : 'ORGANIC',
       forcedSponsorId:
         typeof entryContextRecord.forcedSponsorId === 'string'
           ? entryContextRecord.forcedSponsorId
+          : null,
+      adWheelId:
+        typeof entryContextRecord.adWheelId === 'string'
+          ? entryContextRecord.adWheelId
           : null,
       browserPixelsEnabled: asBoolean(
         entryContextRecord.browserPixelsEnabled,

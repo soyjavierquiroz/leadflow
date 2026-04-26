@@ -12,14 +12,22 @@ import type { HandoffStrategy } from '../modules/handoff-strategies/interfaces/h
 import type { Lead } from '../modules/leads/interfaces/lead.interface';
 import type { RotationPool } from '../modules/rotation-pools/interfaces/rotation-pool.interface';
 import type { Sponsor } from '../modules/sponsors/interfaces/sponsor.interface';
-import type { Team } from '../modules/teams/interfaces/team.interface';
+import type {
+  Team,
+  TeamStatus,
+} from '../modules/teams/interfaces/team.interface';
 import type { TrackingProfile } from '../modules/tracking-profiles/interfaces/tracking-profile.interface';
 import type { Visitor } from '../modules/visitors/interfaces/visitor.interface';
 import type { Workspace } from '../modules/workspaces/interfaces/workspace.interface';
-import type { JsonValue } from '../modules/shared/domain.types';
+import type {
+  JsonValue,
+  LeadSourceChannel,
+} from '../modules/shared/domain.types';
 
 const toIso = (value: Date) => value.toISOString();
 const toJson = (value: unknown): JsonValue => value as JsonValue;
+const mapLeadSourceChannel = (value: string): LeadSourceChannel =>
+  value === 'landing_page' ? 'landing-page' : (value as LeadSourceChannel);
 const readNullableString = (record: object, key: string) => {
   const value = (record as Record<string, unknown>)[key];
   return typeof value === 'string' ? value : null;
@@ -115,7 +123,7 @@ export const mapTeamRecord = (record: TeamRecord): Team => ({
   name: record.name,
   code: record.code,
   logoUrl: record.logoUrl,
-  status: record.status,
+  status: record.status as TeamStatus,
   isActive: record.isActive,
   subscriptionExpiresAt: record.subscriptionExpiresAt
     ? toIso(record.subscriptionExpiresAt)
@@ -163,9 +171,7 @@ export const mapFunnelRecord = (record: FunnelRecord): Funnel => ({
   status: record.status,
   isTemplate: record.isTemplate,
   stages: record.stages,
-  entrySources: record.entrySources.map((item) =>
-    item === 'landing_page' ? 'landing-page' : item,
-  ),
+  entrySources: record.entrySources.map(mapLeadSourceChannel),
   defaultTeamId: record.defaultTeamId,
   defaultRotationPoolId: record.defaultRotationPoolId,
   createdAt: toIso(record.createdAt),
@@ -351,10 +357,7 @@ export const mapVisitorRecord = (record: VisitorRecord): Visitor => ({
   anonymousId: record.anonymousId,
   kind: record.kind,
   status: record.status,
-  sourceChannel:
-    record.sourceChannel === 'landing_page'
-      ? 'landing-page'
-      : record.sourceChannel,
+  sourceChannel: mapLeadSourceChannel(record.sourceChannel),
   leadId: record.lead?.id ?? null,
   firstSeenAt: toIso(record.firstSeenAt),
   lastSeenAt: toIso(record.lastSeenAt),
@@ -371,10 +374,7 @@ export const mapLeadRecord = (record: LeadRecord): Lead => ({
   funnelInstanceId: record.funnelInstanceId,
   funnelPublicationId: record.funnelPublicationId,
   visitorId: record.visitorId,
-  sourceChannel:
-    record.sourceChannel === 'landing_page'
-      ? 'landing-page'
-      : record.sourceChannel,
+  sourceChannel: mapLeadSourceChannel(record.sourceChannel),
   fullName: record.fullName,
   email: record.email,
   phone: record.phone,

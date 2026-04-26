@@ -33,11 +33,14 @@ export type LeadSourceChannel =
   | 'landing-page'
   | 'api'
   | 'import'
-  | 'automation';
+  | 'automation'
+  | 'ORGANIC'
+  | 'PAID';
 
 export type AvailabilityStatus = 'available' | 'paused' | 'offline';
 
 export type RotationStrategy = 'round-robin' | 'weighted' | 'manual';
+export type TrafficLayer = 'DIRECT' | 'PAID_WHEEL' | 'ORGANIC';
 
 export type EventActorType = 'system' | 'user' | 'visitor' | 'integration';
 

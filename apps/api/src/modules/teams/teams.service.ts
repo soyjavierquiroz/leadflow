@@ -23,6 +23,10 @@ import { assertSupportedFunnelBlocksJson } from '../shared/funnel-block-validati
 import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { CreateTeamDto } from './dto/create-team.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
+import type {
+  SystemTenantProvisioningStatus,
+  UpdateSystemTenantDto,
+} from './dto/update-system-tenant.dto';
 import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
 import type { UpdateSystemTenantFunnelStepDto } from './dto/update-system-tenant-funnel-step.dto';
 import type { Team, TeamRepository } from './interfaces/team.interface';
@@ -86,6 +90,8 @@ const isFunnelThemeId = (value: unknown): value is FunnelThemeId =>
 const toIso = (value: Date) => value.toISOString();
 const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const subdomainPattern = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 export type SystemTenantSummary = {
   id: string;
@@ -93,6 +99,7 @@ export type SystemTenantSummary = {
   workspaceName: string;
   workspaceSlug: string;
   managerUserId: string | null;
+  managerEmail: string | null;
   name: string;
   code: string;
   status: string;
@@ -307,14 +314,35 @@ export class TeamsService {
     return this.mapTeamSettings(updated);
   }
 
-  async listSystemTenants(): Promise<SystemTenantSummary[]> {
+  async listSystemTenants(
+    includeArchived = false,
+  ): Promise<SystemTenantSummary[]> {
     const records = await this.prisma.team.findMany({
+      where: includeArchived
+        ? undefined
+        : {
+            status: {
+              not: 'archived',
+            },
+          },
       include: {
         workspace: {
           select: {
             id: true,
             name: true,
             slug: true,
+          },
+        },
+        users: {
+          where: {
+            role: {
+              in: [UserRole.TEAM_ADMIN, UserRole.SUPER_ADMIN],
+            },
+          },
+          orderBy: [{ createdAt: 'asc' }],
+          select: {
+            id: true,
+            email: true,
           },
         },
         sponsors: {
@@ -329,25 +357,33 @@ export class TeamsService {
       orderBy: [{ createdAt: 'desc' }],
     });
 
-    return records.map((record) => ({
-      id: record.id,
-      workspaceId: record.workspaceId,
-      workspaceName: record.workspace.name,
-      workspaceSlug: record.workspace.slug,
-      managerUserId: record.managerUserId,
-      name: record.name,
-      code: record.code,
-      status: record.status,
-      isActive: record.isActive,
-      subscriptionExpiresAt: record.subscriptionExpiresAt
-        ? toIso(record.subscriptionExpiresAt)
-        : null,
-      maxSeats: record.maxSeats,
-      occupiedSeats: record.sponsors.length,
-      activeSponsorsCount: record.sponsors.length,
-      createdAt: toIso(record.createdAt),
-      updatedAt: toIso(record.updatedAt),
-    }));
+    return records.map((record) => {
+      const managerUser =
+        record.users.find((user) => user.id === record.managerUserId) ??
+        record.users[0] ??
+        null;
+
+      return {
+        id: record.id,
+        workspaceId: record.workspaceId,
+        workspaceName: record.workspace.name,
+        workspaceSlug: record.workspace.slug,
+        managerUserId: record.managerUserId,
+        managerEmail: managerUser?.email ?? null,
+        name: record.name,
+        code: record.code,
+        status: record.status,
+        isActive: record.isActive,
+        subscriptionExpiresAt: record.subscriptionExpiresAt
+          ? toIso(record.subscriptionExpiresAt)
+          : null,
+        maxSeats: record.maxSeats,
+        occupiedSeats: record.sponsors.length,
+        activeSponsorsCount: record.sponsors.length,
+        createdAt: toIso(record.createdAt),
+        updatedAt: toIso(record.updatedAt),
+      };
+    });
   }
 
   async getSystemTenantDetail(id: string): Promise<SystemTenantDetail> {
@@ -368,6 +404,18 @@ export class TeamsService {
             defaultCurrency: true,
             primaryLocale: true,
             primaryDomain: true,
+          },
+        },
+        users: {
+          where: {
+            role: {
+              in: [UserRole.TEAM_ADMIN, UserRole.SUPER_ADMIN],
+            },
+          },
+          orderBy: [{ createdAt: 'asc' }],
+          select: {
+            id: true,
+            email: true,
           },
         },
         sponsors: {
@@ -402,12 +450,17 @@ export class TeamsService {
     }
 
     const occupiedSeats = record.sponsors.length;
+    const managerUser =
+      record.users.find((user) => user.id === record.managerUserId) ??
+      record.users[0] ??
+      null;
 
     return {
       id: record.id,
       workspaceId: record.workspaceId,
       workspaceName: record.workspace.name,
       workspaceSlug: record.workspace.slug,
+      managerEmail: managerUser?.email ?? null,
       name: record.name,
       code: record.code,
       status: record.status,
@@ -711,10 +764,7 @@ export class TeamsService {
 
   async createSystemTenant(dto: CreateSystemTenantDto) {
     const tenantName = sanitizeRequiredText(dto.tenantName, 'tenantName');
-    const adminEmail = sanitizeRequiredText(
-      dto.adminEmail,
-      'adminEmail',
-    ).toLowerCase();
+    const adminEmail = this.normalizeEmail(dto.adminEmail, 'adminEmail');
     const adminFullName = this.deriveAdminFullName(adminEmail, tenantName);
     const response = await this.provisionTenant({
       workspaceName: tenantName,
@@ -730,6 +780,150 @@ export class TeamsService {
       workspaceId: response.workspace.id,
       adminUserId: response.adminUser.id,
     };
+  }
+
+  async updateSystemTenant(id: string, dto: UpdateSystemTenantDto) {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const adminEmail = this.normalizeEmail(dto.adminEmail, 'adminEmail');
+    const subdomain = this.normalizeSubdomain(dto.subdomain);
+    const provisioningStatus = this.normalizeProvisioningStatus(
+      dto.provisioningStatus,
+    );
+    const tenantName =
+      dto.tenantName === undefined
+        ? null
+        : sanitizeRequiredText(dto.tenantName, 'tenantName');
+    const statusFlags = this.resolveProvisioningStatusFlags(provisioningStatus);
+
+    const existing = await this.prisma.team.findUnique({
+      where: {
+        id: tenantId,
+      },
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+        users: {
+          where: {
+            role: {
+              in: [UserRole.TEAM_ADMIN, UserRole.SUPER_ADMIN],
+            },
+          },
+          orderBy: [{ createdAt: 'asc' }],
+          select: {
+            id: true,
+            sponsorId: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'TENANT_NOT_FOUND',
+        message: 'The requested tenant was not found.',
+      });
+    }
+
+    const adminUser =
+      existing.users.find((user) => user.id === existing.managerUserId) ??
+      existing.users[0] ??
+      null;
+
+    if (!adminUser) {
+      throw new BadRequestException({
+        code: 'TENANT_ADMIN_REQUIRED',
+        message: 'The selected tenant does not have a team admin user.',
+      });
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.workspace.update({
+          where: {
+            id: existing.workspaceId,
+          },
+          data: {
+            slug: subdomain,
+            status:
+              provisioningStatus === 'pending'
+                ? 'draft'
+                : existing.workspace.status === 'archived'
+                  ? 'archived'
+                  : 'active',
+          },
+        });
+
+        await tx.team.update({
+          where: {
+            id: tenantId,
+          },
+          data: {
+            ...(tenantName ? { name: tenantName } : {}),
+            status: statusFlags.status,
+            isActive: statusFlags.isActive,
+          },
+        });
+
+        await tx.user.update({
+          where: {
+            id: adminUser.id,
+          },
+          data: {
+            email: adminEmail,
+          },
+        });
+
+        if (adminUser.sponsorId) {
+          await tx.sponsor.update({
+            where: {
+              id: adminUser.sponsorId,
+            },
+            data: {
+              email: adminEmail,
+            },
+          });
+        }
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const target = Array.isArray(error.meta?.target)
+          ? error.meta.target.join(', ')
+          : 'unique field';
+
+        throw new ConflictException({
+          code: 'TENANT_UPDATE_CONFLICT',
+          message: `A record already exists for ${target}.`,
+        });
+      }
+
+      throw error;
+    }
+
+    return this.getSystemTenantDetail(tenantId);
+  }
+
+  async archiveSystemTenant(id: string) {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    await this.assertSystemTenantExists(tenantId);
+
+    await this.prisma.team.update({
+      where: {
+        id: tenantId,
+      },
+      data: {
+        status: 'archived',
+        isActive: false,
+      },
+    });
+
+    return this.getSystemTenantDetail(tenantId);
   }
 
   async provisionTenant(dto: ProvisionTenantDto) {
@@ -765,10 +959,7 @@ export class TeamsService {
       dto.adminFullName ?? dto.adminName,
       'adminFullName',
     );
-    const adminEmail = sanitizeRequiredText(
-      dto.adminEmail,
-      'adminEmail',
-    ).toLowerCase();
+    const adminEmail = this.normalizeEmail(dto.adminEmail, 'adminEmail');
     const providedAdminPassword = sanitizeOptionalText(dto.adminPassword);
     const adminPassword =
       providedAdminPassword ?? this.generateTemporaryPassword();
@@ -1274,6 +1465,78 @@ export class TeamsService {
     }
 
     return normalizedHostname;
+  }
+
+  private normalizeEmail(value: string | null | undefined, field: string) {
+    const normalized = sanitizeRequiredText(value, field).toLowerCase();
+
+    if (!emailPattern.test(normalized)) {
+      throw new BadRequestException({
+        code: 'INVALID_EMAIL',
+        message: `${field} must be a valid email address.`,
+        field,
+      });
+    }
+
+    return normalized;
+  }
+
+  private normalizeSubdomain(value: string | null | undefined) {
+    const normalized = slugify(sanitizeRequiredText(value, 'subdomain'));
+
+    if (!subdomainPattern.test(normalized)) {
+      throw new BadRequestException({
+        code: 'INVALID_SUBDOMAIN',
+        message:
+          'subdomain must contain 1 to 63 lowercase letters, numbers or hyphens and cannot start or end with a hyphen.',
+        field: 'subdomain',
+      });
+    }
+
+    return normalized;
+  }
+
+  private normalizeProvisioningStatus(
+    value: string | null | undefined,
+  ): SystemTenantProvisioningStatus {
+    const normalized = sanitizeRequiredText(
+      value,
+      'provisioningStatus',
+    ).toLowerCase();
+
+    if (
+      normalized !== 'active' &&
+      normalized !== 'suspended' &&
+      normalized !== 'pending'
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_PROVISIONING_STATUS',
+        message: 'provisioningStatus must be active, suspended or pending.',
+        field: 'provisioningStatus',
+      });
+    }
+
+    return normalized;
+  }
+
+  private resolveProvisioningStatusFlags(status: SystemTenantProvisioningStatus) {
+    switch (status) {
+      case 'active':
+        return {
+          status: 'active' as const,
+          isActive: true,
+        };
+      case 'suspended':
+        return {
+          status: 'suspended' as const,
+          isActive: false,
+        };
+      case 'pending':
+        return {
+          status: 'pending' as const,
+          isActive: false,
+        };
+    }
   }
 
   private cloneJsonValue(value: JsonValue): JsonValue {

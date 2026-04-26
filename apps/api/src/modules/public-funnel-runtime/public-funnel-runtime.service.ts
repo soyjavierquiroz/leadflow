@@ -54,6 +54,7 @@ type RuntimePublicationRecord = Prisma.FunnelPublicationGetPayload<{
 }>;
 
 type PersonalLinkRoute = {
+  kind: 'prefixed' | 'root';
   sponsorSlug: string;
   runtimePathPrefix: string;
 };
@@ -93,7 +94,16 @@ const parsePersonalLinkRoute = (path: string): PersonalLinkRoute | null => {
     .filter(Boolean);
 
   if (segments[0] !== 'a') {
-    return null;
+    const sponsorSlug = normalizePersonalLinkSegment(segments[0]);
+    if (!sponsorSlug) {
+      return null;
+    }
+
+    return {
+      kind: 'root',
+      sponsorSlug,
+      runtimePathPrefix: `/${sponsorSlug}`,
+    };
   }
 
   const sponsorSlug = normalizePersonalLinkSegment(segments[1]);
@@ -102,9 +112,34 @@ const parsePersonalLinkRoute = (path: string): PersonalLinkRoute | null => {
   }
 
   return {
+    kind: 'prefixed',
     sponsorSlug,
     runtimePathPrefix: `${PERSONAL_LINK_PATH_PREFIX}/${sponsorSlug}`,
   };
+};
+
+const extractAwid = (value: string | null | undefined) => {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  try {
+    return normalizePersonalLinkSegment(
+      new URL(trimmed).searchParams.get('awid'),
+    );
+  } catch {
+    const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+
+    try {
+      return normalizePersonalLinkSegment(
+        new URL(path, 'https://runtime.local').searchParams.get('awid'),
+      );
+    } catch {
+      return null;
+    }
+  }
 };
 
 @Injectable()
@@ -141,17 +176,37 @@ export class PublicFunnelRuntimeService {
       include: publicRuntimeInclude,
     });
 
-    const matchingPublication = publications
-      .filter((publication) => {
-        if (personalLinkRoute) {
-          return publication.pathPrefix === '/';
-        }
+    let preResolvedEntryContext: ResolvedRuntimeEntryContext | null = null;
+    const rootPublication = personalLinkRoute
+      ? publications.find((publication) => publication.pathPrefix === '/')
+      : null;
 
-        return matchesPublicationPath(normalizedPath, publication.pathPrefix);
-      })
-      .sort((left, right) =>
-        comparePublicationPathPrefix(left.pathPrefix, right.pathPrefix),
-      )[0];
+    if (rootPublication) {
+      preResolvedEntryContext = await this.resolveEntryContextForPublication({
+        workspaceId: rootPublication.workspaceId,
+        teamId: rootPublication.teamId,
+        publicationPathPrefix: rootPublication.pathPrefix,
+        requestedPath: path,
+      });
+    }
+
+    const matchingPublication =
+      preResolvedEntryContext?.trafficLayer === 'DIRECT'
+        ? rootPublication
+        : publications
+            .filter((publication) => {
+              if (personalLinkRoute?.kind === 'prefixed') {
+                return publication.pathPrefix === '/';
+              }
+
+              return matchesPublicationPath(
+                normalizedPath,
+                publication.pathPrefix,
+              );
+            })
+            .sort((left, right) =>
+              comparePublicationPathPrefix(left.pathPrefix, right.pathPrefix),
+            )[0];
 
     if (!matchingPublication) {
       throw new NotFoundException({
@@ -160,12 +215,16 @@ export class PublicFunnelRuntimeService {
       });
     }
 
-    const entryContext = await this.resolveEntryContextForPublication({
-      workspaceId: matchingPublication.workspaceId,
-      teamId: matchingPublication.teamId,
-      publicationPathPrefix: matchingPublication.pathPrefix,
-      requestedPath: normalizedPath,
-    });
+    const entryContext =
+      preResolvedEntryContext?.trafficLayer === 'DIRECT' &&
+      matchingPublication.id === rootPublication?.id
+        ? preResolvedEntryContext
+        : await this.resolveEntryContextForPublication({
+            workspaceId: matchingPublication.workspaceId,
+            teamId: matchingPublication.teamId,
+            publicationPathPrefix: matchingPublication.pathPrefix,
+            requestedPath: path,
+          });
 
     return this.buildRuntimePayload(
       matchingPublication,
@@ -184,43 +243,81 @@ export class PublicFunnelRuntimeService {
   }): Promise<ResolvedRuntimeEntryContext> {
     const normalizedPath = normalizePath(input.requestedPath);
     const personalLinkRoute = parsePersonalLinkRoute(normalizedPath);
+    const prismaClient = input.tx ?? this.prisma;
 
-    if (!personalLinkRoute || input.publicationPathPrefix !== '/') {
-      return {
-        entryMode: 'paid_ads',
-        forcedSponsorId: null,
-        browserPixelsEnabled: true,
-        runtimePathPrefix: null,
-      };
+    if (personalLinkRoute && input.publicationPathPrefix === '/') {
+      const sponsor = await prismaClient.sponsor.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          teamId: input.teamId,
+          publicSlug: personalLinkRoute.sponsorSlug,
+          isActive: true,
+          status: 'active',
+          availabilityStatus: 'available',
+        } as Prisma.SponsorWhereInput,
+        select: {
+          id: true,
+        },
+      });
+
+      if (sponsor) {
+        return {
+          entryMode: 'organic_asesor',
+          trafficLayer: 'DIRECT',
+          forcedSponsorId: sponsor.id,
+          adWheelId: null,
+          browserPixelsEnabled: false,
+          runtimePathPrefix: personalLinkRoute.runtimePathPrefix,
+        };
+      }
+
+      if (personalLinkRoute.kind === 'prefixed') {
+        throw new NotFoundException({
+          code: 'PUBLIC_SPONSOR_NOT_FOUND',
+          message: `No active public sponsor matched ${normalizedPath}.`,
+        });
+      }
     }
 
-    const prismaClient = input.tx ?? this.prisma;
-    const sponsor = await prismaClient.sponsor.findFirst({
-      where: {
-        workspaceId: input.workspaceId,
-        teamId: input.teamId,
-        publicSlug: personalLinkRoute.sponsorSlug,
-        isActive: true,
-        status: 'active',
-        availabilityStatus: 'available',
-      } as Prisma.SponsorWhereInput,
-      select: {
-        id: true,
-      },
-    });
-
-    if (!sponsor) {
-      throw new NotFoundException({
-        code: 'PUBLIC_SPONSOR_NOT_FOUND',
-        message: `No active public sponsor matched ${normalizedPath}.`,
+    const requestedAdWheelId = extractAwid(input.requestedPath);
+    if (requestedAdWheelId) {
+      const now = new Date();
+      const adWheel = await prismaClient.adWheel.findFirst({
+        where: {
+          id: requestedAdWheelId,
+          teamId: input.teamId,
+          status: 'ACTIVE',
+          startDate: {
+            lte: now,
+          },
+          endDate: {
+            gte: now,
+          },
+        },
+        select: {
+          id: true,
+        },
       });
+
+      if (adWheel) {
+        return {
+          entryMode: 'paid_ads',
+          trafficLayer: 'PAID_WHEEL',
+          forcedSponsorId: null,
+          adWheelId: adWheel.id,
+          browserPixelsEnabled: true,
+          runtimePathPrefix: null,
+        };
+      }
     }
 
     return {
-      entryMode: 'organic_asesor',
-      forcedSponsorId: sponsor.id,
-      browserPixelsEnabled: false,
-      runtimePathPrefix: personalLinkRoute.runtimePathPrefix,
+      entryMode: 'paid_ads',
+      trafficLayer: 'ORGANIC',
+      forcedSponsorId: null,
+      adWheelId: null,
+      browserPixelsEnabled: true,
+      runtimePathPrefix: null,
     };
   }
 
@@ -250,7 +347,9 @@ export class PublicFunnelRuntimeService {
       publication.pathPrefix,
       {
         entryMode: 'paid_ads',
+        trafficLayer: 'ORGANIC',
         forcedSponsorId: null,
+        adWheelId: null,
         browserPixelsEnabled: true,
         runtimePathPrefix: null,
       },
@@ -353,7 +452,9 @@ export class PublicFunnelRuntimeService {
       },
       entryContext: {
         entryMode: entryContext.entryMode,
+        trafficLayer: entryContext.trafficLayer,
         forcedSponsorId: entryContext.forcedSponsorId,
+        adWheelId: entryContext.adWheelId,
         browserPixelsEnabled: entryContext.browserPixelsEnabled,
       },
       publication: {

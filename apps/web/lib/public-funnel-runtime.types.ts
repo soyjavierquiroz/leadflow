@@ -17,7 +17,9 @@ export type RuntimeBlock = {
 
 export type PublicRuntimeEntryContext = {
   entryMode: "organic_asesor" | "paid_ads";
+  trafficLayer: "DIRECT" | "PAID_WHEEL" | "ORGANIC";
   forcedSponsorId: string | null;
+  adWheelId: string | null;
   browserPixelsEnabled: boolean;
 };
 

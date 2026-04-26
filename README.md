@@ -1,6 +1,6 @@
 # Leadflow
 
-Leadflow es un SaaS de captación, asignación y automatización de leads construido como monorepo con `web` y `api`.
+Leadflow es un SaaS de captación, asignación y automatización de leads construido como monorepo con `web`, `api` y paquetes compartidos.
 
 ## Arquitectura actual
 
@@ -12,13 +12,17 @@ Leadflow ahora opera en un clúster Swarm unificado, conectado a las redes exter
 
 La base de datos ya no está aislada por stack. El despliegue consume el clúster centralizado en `postgres_postgres`.
 
-Piezas principales:
+Piezas principales del monorepo:
 
 - `apps/web`: Next.js. Atiende el sitio principal y el runtime público por `HostRegexp`.
 - `apps/api`: NestJS + Fastify. Expone auth, runtime público, asignación de leads e integraciones.
+- `packages/shared/mail` (`@leadflow/mail`): cliente compartido para emails transaccionales sobre AWS SES.
+- `packages/kurukin-video-player-pkg`: reproductor reutilizable para VSL y bloques de video del runtime público.
 - `Prisma/Postgres`: persistencia transaccional del backend.
 - `Runtime Context Central`: registro y resolución del contexto operativo antes de habilitar dispatch downstream.
 - `n8n`: recibe eventos del dispatcher y automatizaciones complementarias.
+
+Los paquetes placeholder sin consumidores activos (`@leadflow/config`, `@leadflow/types`, `@leadflow/ui`) fueron retirados de la superficie versionada. La arquitectura compartida activa queda concentrada en mail y video.
 
 ## Base de conocimiento RAG
 
@@ -159,9 +163,9 @@ infra/
   docker/  entorno local con docker compose
   swarm/   stacks y ejemplos de variables para Swarm
 packages/
-  config/
-  types/
-  ui/
+  kurukin-video-player-pkg/  reproductor compartido
+  shared/
+    mail/                    @leadflow/mail, AWS SES
 ```
 
 ## Variables de entorno críticas
@@ -172,6 +176,7 @@ La API necesita como mínimo:
 
 - `DATABASE_URL`
 - `APP_BASE_DOMAIN`
+- `NEXT_PUBLIC_APP_URL`
 - `API_URL`
 - `SITE_URL`
 - `MEMBERS_URL`
@@ -206,10 +211,21 @@ Variables críticas del onboarding central y del dispatcher:
 - `SSO_BLACKLIST_SECRET`
 - `KURUKIN_BLACKLIST_API_TOKEN`
 
+Variables de correo transaccional:
+
+- `AWS_REGION`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN` opcional
+- `MAIL_FROM_NAME`
+- `MAIL_FROM_ADDRESS`
+- `MAIL_REPLY_TO_ADDRESS`
+
 ### Web
 
 La web publica y consume:
 
+- `NEXT_PUBLIC_APP_URL`
 - `NEXT_PUBLIC_APP_BASE_DOMAIN`
 - `NEXT_PUBLIC_SITE_URL`
 - `NEXT_PUBLIC_MEMBERS_URL`
@@ -219,6 +235,8 @@ La web publica y consume:
 - `NEXT_PUBLIC_PRODUCT_KEY`
 - `NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET`
 - `NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN`
+
+La recuperación de contraseña se ejecuta desde server actions de la web y usa `@leadflow/mail`, por lo que los entornos web también deben declarar `AWS_*` y `MAIL_FROM_*` cuando envíen correos directamente.
 
 ## Integración con Kurukin Blacklist
 

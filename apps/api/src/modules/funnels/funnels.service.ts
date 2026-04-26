@@ -6,7 +6,10 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type {
+  LeadSourceChannel as PrismaLeadSourceChannel,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildEntity } from '../shared/domain.factory';
 import { FUNNEL_REPOSITORY } from '../shared/domain.tokens';
@@ -487,6 +490,8 @@ export class FunnelsService {
       'api',
       'import',
       'automation',
+      'ORGANIC',
+      'PAID',
     ]);
 
     if (!Array.isArray(entrySources) || entrySources.length === 0) {
@@ -515,7 +520,9 @@ export class FunnelsService {
     return normalized;
   }
 
-  private toDbSource(value: Funnel['entrySources'][number]) {
+  private toDbSource(
+    value: Funnel['entrySources'][number],
+  ): PrismaLeadSourceChannel {
     return value === 'landing-page' ? 'landing_page' : value;
   }
 

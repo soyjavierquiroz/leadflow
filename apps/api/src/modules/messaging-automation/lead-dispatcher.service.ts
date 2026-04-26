@@ -139,6 +139,11 @@ export class LeadDispatcherService {
   ): LeadContextUpsertPayload {
     const occurredAt = new Date().toISOString();
     const normalizedLeadPhone = normalizeMessagingPhone(assignment.lead.phone);
+    const trafficLayer =
+      assignment.trafficLayer ?? assignment.lead.trafficLayer ?? 'ORGANIC';
+    const adWheelId =
+      assignment.originAdWheelId ?? assignment.lead.originAdWheelId ?? null;
+    const isOwnedLead = trafficLayer === 'DIRECT';
 
     return {
       event: 'LEAD_CONTEXT_UPSERT',
@@ -176,6 +181,9 @@ export class LeadDispatcherService {
         lead_stage: 'new',
         lead_source: 'leadflow_wheel',
         vertical_hint: toVerticalHint(assignment),
+        traffic_layer: trafficLayer,
+        ad_wheel_id: adWheelId,
+        is_owned_lead: isOwnedLead,
         campaign: {},
         signals: {
           detected_signal: 'lead_assigned',
@@ -186,7 +194,11 @@ export class LeadDispatcherService {
           last_objection: '',
           next_action: 'Esperando primer mensaje del lead',
         },
-        custom_fields: {},
+        custom_fields: {
+          traffic_layer: trafficLayer,
+          ad_wheel_id: adWheelId,
+          is_owned_lead: isOwnedLead,
+        },
         notes: '',
       },
     };

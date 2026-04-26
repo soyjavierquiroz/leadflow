@@ -1,4 +1,5 @@
 import { MessagingRuntimeContextStatus } from '@prisma/client';
+import type { PrismaService } from '../../prisma/prisma.service';
 import { RuntimeContextCentralService } from './runtime-context-central.service';
 
 const buildResponse = (status: number, data: unknown) =>
@@ -24,7 +25,7 @@ describe('RuntimeContextCentralService', () => {
       messagingConnection: {
         update: jest.fn().mockResolvedValue(null),
       },
-    } as never;
+    } as unknown as PrismaService;
     const service = new RuntimeContextCentralService(prisma);
     const fetchSpy = jest
       .spyOn(global, 'fetch')
@@ -56,7 +57,7 @@ describe('RuntimeContextCentralService', () => {
       messagingConnection: {
         update: jest.fn().mockResolvedValue(null),
       },
-    } as never;
+    } as unknown as PrismaService;
     const service = new RuntimeContextCentralService(prisma);
     const fetchSpy = jest
       .spyOn(global, 'fetch')
@@ -84,7 +85,7 @@ describe('RuntimeContextCentralService', () => {
       messagingConnection: {
         update: jest.fn().mockResolvedValue(null),
       },
-    } as never;
+    } as unknown as PrismaService;
     const service = new RuntimeContextCentralService(prisma);
     const fetchSpy = jest
       .spyOn(global, 'fetch')
@@ -110,7 +111,7 @@ describe('RuntimeContextCentralService', () => {
       messagingConnection: {
         update: jest.fn().mockResolvedValue(null),
       },
-    } as never;
+    } as unknown as PrismaService;
     const service = new RuntimeContextCentralService(prisma);
 
     jest
@@ -154,7 +155,7 @@ describe('RuntimeContextCentralService', () => {
       messagingConnection: {
         update: jest.fn().mockResolvedValue(null),
       },
-    } as never;
+    } as unknown as PrismaService;
     const service = new RuntimeContextCentralService(prisma);
 
     const result = await service.ensureConnectionReady({

@@ -13,5 +13,5 @@ echo "🔄 Actualizando servicio WEB..."
 docker service update --image leadflow-web:$TAG --with-registry-auth leadflow_web
 
 echo "🧹 Limpiando basura..."
-docker image prune -f
+docker system prune -af --volumes
 echo "✅ ¡Despliegue finalizado! Cero días de la marmota."

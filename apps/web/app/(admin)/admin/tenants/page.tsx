@@ -4,7 +4,7 @@ import { getSystemTenants } from "@/lib/system-tenants";
 
 export default async function AdminTenantsPage() {
   try {
-    const tenants = await getSystemTenants();
+    const tenants = await getSystemTenants({ includeArchived: true });
 
     return <SystemTenantsClient initialRows={tenants} />;
   } catch (error) {

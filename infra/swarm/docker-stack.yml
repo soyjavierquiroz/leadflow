@@ -3,12 +3,11 @@ version: "3.9"
 services:
   web:
     image: leadflow-web:latest
-    env_file:
-      - .env
     environment:
       NEXT_PUBLIC_APP_NAME: "Leadflow"
       NEXT_PUBLIC_APP_ENV: "${APP_ENV:-staging}"
       NEXT_PUBLIC_APP_BASE_DOMAIN: "${APP_BASE_DOMAIN:-leadflow.kuruk.in}"
+      NEXT_PUBLIC_APP_URL: "${NEXT_PUBLIC_APP_URL:-https://leadflow.kuruk.in}"
       NEXT_PUBLIC_SITE_URL: "${SITE_URL:-https://leadflow.kuruk.in}"
       NEXT_PUBLIC_MEMBERS_URL: "${MEMBERS_URL:-https://leadflow.kuruk.in}"
       NEXT_PUBLIC_ADMIN_URL: "${ADMIN_URL:-https://leadflow.kuruk.in}"
@@ -17,6 +16,13 @@ services:
       NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET: "${CLOUDFLARE_SAAS_CUSTOMER_CNAME_TARGET:-customers.leadflow.kuruk.in}"
       NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN: "${CLOUDFLARE_SAAS_FALLBACK_ORIGIN:-proxy-fallback.leadflow.kuruk.in}"
       DATABASE_URL: "${DATABASE_URL}"
+      AWS_REGION: "${AWS_REGION:-us-east-1}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
+      MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Kurukin LeadFlow}"
+      MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS:-}"
+      MAIL_REPLY_TO_ADDRESS: "${MAIL_REPLY_TO_ADDRESS:-}"
       PORT: "3000"
     networks:
       - traefik_public
@@ -107,7 +113,10 @@ services:
       AWS_REGION: "${AWS_REGION:-us-east-1}"
       AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
       AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
+      MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Kurukin LeadFlow}"
       MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS:-}"
+      MAIL_REPLY_TO_ADDRESS: "${MAIL_REPLY_TO_ADDRESS:-}"
       WALLET_ENGINE_BASE_URL: "${WALLET_ENGINE_BASE_URL:-}"
       WALLET_ENGINE_INTERNAL_URL: "${WALLET_ENGINE_INTERNAL_URL:-}"
       WALLET_ENGINE_API_KEY: "${WALLET_ENGINE_API_KEY:-}"

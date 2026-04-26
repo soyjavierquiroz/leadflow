@@ -9,7 +9,11 @@ describe('LeadDispatcherService', () => {
       fullName: 'Carlos Mendoza',
       phone: '+52 55 1234 5678',
       email: 'carlos.mendoza@example.com',
+      trafficLayer: 'PAID_WHEEL',
+      originAdWheelId: 'wheel_test_001',
     },
+    trafficLayer: 'PAID_WHEEL',
+    originAdWheelId: 'wheel_test_001',
     sponsor: {
       id: 'sponsor_ana_001',
       displayName: 'Ana',
@@ -94,6 +98,9 @@ describe('LeadDispatcherService', () => {
         lead_stage: 'new',
         lead_source: 'leadflow_wheel',
         vertical_hint: 'inmuno',
+        traffic_layer: 'PAID_WHEEL',
+        ad_wheel_id: 'wheel_test_001',
+        is_owned_lead: false,
         campaign: {},
         signals: {
           detected_signal: 'lead_assigned',
@@ -104,7 +111,11 @@ describe('LeadDispatcherService', () => {
           last_objection: '',
           next_action: 'Esperando primer mensaje del lead',
         },
-        custom_fields: {},
+        custom_fields: {
+          traffic_layer: 'PAID_WHEEL',
+          ad_wheel_id: 'wheel_test_001',
+          is_owned_lead: false,
+        },
         notes: '',
       },
     });

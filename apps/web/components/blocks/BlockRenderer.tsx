@@ -93,7 +93,9 @@ function buildPreviewRuntime(
     },
     entryContext: {
       entryMode: "paid_ads",
+      trafficLayer: "ORGANIC",
       forcedSponsorId: null,
+      adWheelId: null,
       browserPixelsEnabled: true,
     },
     publication: {

@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
+import { getSessionUser } from '@/lib/auth';
 import {
   fetchPublicFunnelRuntime,
   normalizeRuntimePath,
   resolveRuntimeHost,
   resolveRuntimePath,
 } from '@/lib/funnel-runtime';
+import { webPublicConfig } from '@/lib/public-env';
 import type { PublicFunnelRuntimePayload } from '@/lib/public-funnel-runtime.types';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +20,7 @@ type SiteRuntimePageProps = {
   }>;
   searchParams: Promise<{
     previewHost?: string;
+    awid?: string;
   }>;
 };
 
@@ -25,6 +28,30 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+
+const normalizeHost = (value: string | null | undefined) =>
+  (value ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/\.+$/, '');
+
+const canonicalSiteHost = (() => {
+  try {
+    return normalizeHost(new URL(webPublicConfig.urls.site).host);
+  } catch {
+    return normalizeHost(webPublicConfig.urls.site);
+  }
+})();
+
+const isCanonicalAppHomeRequest = (host: string, path: string) =>
+  normalizeRuntimePath(path) === '/' && normalizeHost(host) === canonicalSiteHost;
+
+const appendAwid = (path: string, awid: string | undefined) => {
+  const normalizedAwid = awid?.trim();
+  if (!normalizedAwid) {
+    return path;
+  }
+
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}awid=${encodeURIComponent(normalizedAwid)}`;
+};
 
 const resolveSeoFromRuntime = (runtime: PublicFunnelRuntimePayload) => {
   const stepSettings = asRecord(runtime.currentStep.settingsJson);
@@ -86,7 +113,7 @@ export async function generateMetadata({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtime = await loadRuntimeSafely(host, path);
+  const runtime = await loadRuntimeSafely(host, appendAwid(path, query.awid));
 
   if (!runtime) {
     return {};
@@ -133,7 +160,14 @@ export default async function SiteRuntimePage({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtime = await loadRuntimeSafely(host, path);
+  const runtimePath = appendAwid(path, query.awid);
+
+  if (!previewHost && isCanonicalAppHomeRequest(host, path)) {
+    const user = await getSessionUser();
+    redirect(user?.homePath ?? '/login');
+  }
+
+  const runtime = await loadRuntimeSafely(host, runtimePath);
 
   if (!runtime) {
     notFound();

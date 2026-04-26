@@ -6,7 +6,12 @@ import type {
   WorkspaceScoped,
 } from '../../shared/domain.types';
 
-export type TeamStatus = 'draft' | 'active' | 'archived';
+export type TeamStatus =
+  | 'draft'
+  | 'pending'
+  | 'active'
+  | 'suspended'
+  | 'archived';
 
 export interface Team extends BaseDomainEntity, WorkspaceScoped {
   name: string;

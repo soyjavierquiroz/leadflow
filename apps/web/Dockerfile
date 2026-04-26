@@ -10,18 +10,18 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/api/package.json apps/api/package.json
-COPY packages/ui/package.json packages/ui/package.json
-COPY packages/config/package.json packages/config/package.json
-COPY packages/types/package.json packages/types/package.json
 COPY packages/kurukin-video-player-pkg/package.json packages/kurukin-video-player-pkg/package.json
+COPY packages/shared/mail/package.json packages/shared/mail/package.json
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 FROM deps AS builder
 ARG NEXT_PUBLIC_APP_BASE_DOMAIN=leadflow.kuruk.in
+ARG NEXT_PUBLIC_APP_URL=https://leadflow.kuruk.in
 ARG NEXT_PUBLIC_API_URL=https://api.leadflow.kuruk.in
 ARG NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=customers.leadflow.kuruk.in
 ARG NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=proxy-fallback.leadflow.kuruk.in
 ENV NEXT_PUBLIC_APP_BASE_DOMAIN=$NEXT_PUBLIC_APP_BASE_DOMAIN
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=$NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET
 ENV NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=$NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN
@@ -40,15 +40,19 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ARG NEXT_PUBLIC_APP_BASE_DOMAIN=leadflow.kuruk.in
+ARG NEXT_PUBLIC_APP_URL=https://leadflow.kuruk.in
 ARG NEXT_PUBLIC_API_URL=https://api.leadflow.kuruk.in
 ARG NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=customers.leadflow.kuruk.in
 ARG NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=proxy-fallback.leadflow.kuruk.in
 ENV NEXT_PUBLIC_APP_BASE_DOMAIN=$NEXT_PUBLIC_APP_BASE_DOMAIN
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=$NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET
 ENV NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=$NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN
 COPY --from=builder /workspace/apps/web/.next/standalone ./
 COPY --from=builder /workspace/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /workspace/apps/web/public ./apps/web/public
+COPY --from=builder /workspace/packages/shared/mail/package.json ./packages/shared/mail/package.json
+COPY --from=builder /workspace/packages/shared/mail/dist ./packages/shared/mail/dist
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]

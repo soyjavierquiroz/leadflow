@@ -50,7 +50,9 @@ describe('LeadCaptureAssignmentService', () => {
     const publicFunnelRuntimeService = {
       resolveEntryContextForPublication: jest.fn().mockResolvedValue({
         entryMode: 'paid_ads',
+        trafficLayer: 'ORGANIC',
         forcedSponsorId: null,
+        adWheelId: null,
         browserPixelsEnabled: true,
         runtimePathPrefix: null,
       }),
@@ -319,6 +321,7 @@ describe('LeadCaptureAssignmentService', () => {
           is: {
             isActive: true,
             status: 'active',
+            availabilityStatus: 'available',
           },
         },
       },
@@ -450,6 +453,7 @@ describe('LeadCaptureAssignmentService', () => {
           is: {
             isActive: true,
             status: 'active',
+            availabilityStatus: 'available',
           },
         },
       },

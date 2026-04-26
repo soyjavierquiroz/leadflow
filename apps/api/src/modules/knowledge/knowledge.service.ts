@@ -447,17 +447,23 @@ export class KnowledgeService {
     );
     formData.append('tenant_id', input.tenantId);
     formData.append('file_name', fileName);
+    formData.append('platform_key', 'kurukin');
+    formData.append('product_key', 'leadflow');
     formData.append('cost_kredits', input.costKredits);
     formData.append('training_cost_kredits', input.costKredits);
 
-    // The n8n RAG ingestion webhook is multi-stack. Client-provided routing
-    // fields such as platform_key and product_key must pass through untouched.
+    // The n8n RAG ingestion webhook is multi-stack. Routing identity fields
+    // are owned by Leadflow so client metadata cannot duplicate them.
     for (const [key, value] of Object.entries(input.metadata)) {
       if (
         key === 'tenant_id' ||
         key === 'tenantId' ||
         key === 'file_name' ||
         key === 'fileName' ||
+        key === 'platform_key' ||
+        key === 'platformKey' ||
+        key === 'product_key' ||
+        key === 'productKey' ||
         key === 'cost' ||
         key === 'cost_kredits' ||
         key === 'costKredits' ||

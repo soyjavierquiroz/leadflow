@@ -17,12 +17,12 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.1021.0
         version: 3.1021.0
-      '@aws-sdk/client-ses':
-        specifier: ^3.1021.0
-        version: 3.1031.0
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1021.0
         version: 3.1021.0
+      '@leadflow/mail':
+        specifier: workspace:*
+        version: link:../../packages/shared/mail
       '@fastify/cookie':
         specifier: ^11.0.2
         version: 11.0.2
@@ -135,9 +135,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@leadflow/mail':
+        specifier: workspace:*
+        version: link:../../packages/shared/mail
       '@codemirror/lang-json':
         specifier: ^6.0.2
         version: 6.0.2
+      '@prisma/client':
+        specifier: ^6.16.3
+        version: 6.16.3(prisma@6.16.3(typescript@5.9.3))(typescript@5.9.3)
       '@radix-ui/react-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -187,20 +193,14 @@ importers:
       eslint-config-next:
         specifier: 16.2.1
         version: 16.2.1(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
+      prisma:
+        specifier: 6.16.3
+        version: 6.16.3(typescript@5.9.3)
       tailwindcss:
         specifier: ^4
         version: 4.2.2
       typescript:
         specifier: ^5
-        version: 5.9.3
-
-  packages/config:
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.7
-        version: 22.19.15
-      typescript:
-        specifier: ^5.7.3
         version: 5.9.3
 
   packages/kurukin-video-player-pkg:
@@ -276,14 +276,15 @@ importers:
         specifier: ^4.5.0
         version: 4.5.4(@types/node@20.19.37)(rollup@4.60.1)(typescript@5.7.3)(vite@6.4.2(@types/node@20.19.37)(jiti@1.21.7)(lightningcss@1.32.0)(terser@5.46.1))
 
-  packages/types:
+  packages/shared/mail:
+    dependencies:
+      '@aws-sdk/client-ses':
+        specifier: ^3.1021.0
+        version: 3.1031.0
     devDependencies:
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
-  packages/ui:
-    devDependencies:
+      '@types/node':
+        specifier: ^22.10.7
+        version: 22.19.15
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
