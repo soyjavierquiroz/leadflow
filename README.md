@@ -24,6 +24,18 @@ Piezas principales del monorepo:
 
 Los paquetes placeholder sin consumidores activos (`@leadflow/config`, `@leadflow/types`, `@leadflow/ui`) fueron retirados de la superficie versionada. La arquitectura compartida activa queda concentrada en mail y video.
 
+## Ad Wheels
+
+La capa de ruedas pagadas ya opera con ruleta ponderada infinita:
+
+- `seatCount` define peso relativo dentro del ciclo.
+- `currentTurnPosition` funciona como cursor transaccional del siguiente turno.
+- `sequenceVersion` separa ciclos viejos y nuevos cuando cambian participantes o pesos.
+
+Referencia tecnica:
+
+- [`docs/ad-wheels.md`](docs/ad-wheels.md)
+
 ## Base de conocimiento RAG
 
 La arquitectura RAG end-to-end queda dividida entre Leadflow, n8n y Runtime Context Central:

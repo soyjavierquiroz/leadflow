@@ -24,6 +24,20 @@ Backend base de Leadflow con NestJS + Fastify.
 - `leads`
 - `assignments`
 - `events`
+- `ad-wheels`
+
+## Ad Wheels
+
+La rueda pagada ya opera con un ciclo ponderado infinito y cursor transaccional.
+
+- `seatCount` funciona como peso dentro de la secuencia, no como inventario consumible.
+- `currentTurnPosition` apunta al siguiente turno de `AdWheelTurn` que debe evaluarse.
+- `sequenceVersion` permite regenerar la secuencia cuando cambian participantes o pesos sin mezclar turnos viejos y nuevos.
+- la reserva del siguiente turno se serializa con `FOR UPDATE` en la transaccion de captura publica.
+
+Documentacion tecnica completa:
+
+- [`docs/ad-wheels.md`](../../docs/ad-wheels.md)
 
 ## Persistencia actual
 - Prisma integrado con schema en `prisma/schema.prisma`.
@@ -71,6 +85,11 @@ Variables soportadas:
 - `MEMBERS_URL`
 - `ADMIN_URL`
 - `CORS_ALLOWED_ORIGINS`
+
+## Scripts operativos
+
+- `pnpm ad-wheels:force-migrate`: aplica manualmente la migracion del ciclo infinito si el entorno necesita un replay controlado.
+- `pnpm qa:wipe-test-environment`: limpia leads, assignments, eventos de dominio y turnos de rueda; ademas resetea `currentTurnPosition` y `sequenceVersion` en ruedas activas para QA.
 
 ## OBSERVACIONES SRE
 

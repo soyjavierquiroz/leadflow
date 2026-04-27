@@ -23,6 +23,8 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "node prisma/seed.js",
+    "ad-wheels:force-migrate": "ts-node src/scripts/force-migrate.ts",
+    "qa:wipe-test-environment": "ts-node src/scripts/wipe-test-environment.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
