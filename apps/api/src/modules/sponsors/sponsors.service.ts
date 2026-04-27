@@ -112,6 +112,68 @@ type MemberLeadAcceptResult = {
   alreadyAccepted: boolean;
 };
 
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+
+const normalizePathPrefix = (value: string) => {
+  const trimmed = value.trim().replace(/\/+/g, '/').replace(/\/$/, '');
+  if (!trimmed || trimmed === '.') {
+    return '/';
+  }
+
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+};
+
+const buildPublicOrigin = (host: string) => {
+  const normalizedHost = host.trim().replace(/\/+$/, '');
+  const protocol =
+    normalizedHost.startsWith('localhost') ||
+    normalizedHost.startsWith('127.0.0.1')
+      ? 'http'
+      : 'https';
+
+  return `${protocol}://${normalizedHost}`;
+};
+
+const buildAdvisorReferralUrl = (input: {
+  host: string;
+  pathPrefix: string;
+  publicSlug: string;
+}) => {
+  const pathPrefix = normalizePathPrefix(input.pathPrefix);
+  const encodedSlug = encodeURIComponent(input.publicSlug);
+  const referralPath =
+    pathPrefix === '/'
+      ? `/ref/${encodedSlug}`
+      : `${pathPrefix}/ref/${encodedSlug}`;
+
+  return `${buildPublicOrigin(input.host)}${referralPath}`;
+};
+
+export type MemberLinkGallery = {
+  advisor: {
+    sponsorId: string;
+    displayName: string;
+    publicSlug: string | null;
+    requiresPublicSlug: boolean;
+  };
+  links: Array<{
+    id: string;
+    url: string;
+    domainHost: string;
+    pathPrefix: string;
+    funnelName: string;
+    funnelCode: string;
+    isPrimary: boolean;
+  }>;
+};
+
 @Injectable()
 export class SponsorsService {
   private readonly logger = new Logger(SponsorsService.name);
@@ -131,6 +193,7 @@ export class SponsorsService {
       workspaceId: dto.workspaceId,
       teamId: dto.teamId,
       displayName: dto.displayName,
+      publicSlug: null,
       status: 'draft',
       isActive: dto.isActive ?? false,
       avatarUrl: null,
@@ -415,6 +478,97 @@ export class SponsorsService {
     return mapSponsorRecord(sponsor);
   }
 
+  async getLinkGalleryForMember(scope: {
+    workspaceId: string;
+    teamId: string;
+    sponsorId: string;
+  }): Promise<MemberLinkGallery> {
+    const sponsor = await this.prisma.sponsor.findFirst({
+      where: {
+        id: scope.sponsorId,
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+      },
+      select: {
+        id: true,
+        displayName: true,
+        publicSlug: true,
+      },
+    });
+
+    if (!sponsor) {
+      throw new NotFoundException({
+        code: 'SPONSOR_NOT_FOUND',
+        message: 'The requested sponsor was not found for this member.',
+      });
+    }
+
+    const publicSlug = sanitizeNullableText(sponsor.publicSlug);
+
+    if (!publicSlug) {
+      return {
+        advisor: {
+          sponsorId: sponsor.id,
+          displayName: sponsor.displayName,
+          publicSlug: null,
+          requiresPublicSlug: true,
+        },
+        links: [],
+      };
+    }
+
+    const publications = await this.prisma.funnelPublication.findMany({
+      where: {
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        status: 'active',
+        isActive: true,
+        domain: {
+          status: 'active',
+        },
+        funnelInstance: {
+          status: 'active',
+        },
+      },
+      include: {
+        domain: {
+          select: {
+            host: true,
+          },
+        },
+        funnelInstance: {
+          select: {
+            name: true,
+            code: true,
+          },
+        },
+      },
+      orderBy: [{ isPrimary: 'desc' }, { pathPrefix: 'asc' }],
+    });
+
+    return {
+      advisor: {
+        sponsorId: sponsor.id,
+        displayName: sponsor.displayName,
+        publicSlug,
+        requiresPublicSlug: false,
+      },
+      links: publications.map((publication) => ({
+        id: publication.id,
+        url: buildAdvisorReferralUrl({
+          host: publication.domain.host,
+          pathPrefix: publication.pathPrefix,
+          publicSlug,
+        }),
+        domainHost: publication.domain.host,
+        pathPrefix: publication.pathPrefix,
+        funnelName: publication.funnelInstance.name,
+        funnelCode: publication.funnelInstance.code,
+        isPrimary: publication.isPrimary,
+      })),
+    };
+  }
+
   async getKreditsForMember(scope: {
     workspaceId: string;
     teamId: string;
@@ -485,6 +639,7 @@ export class SponsorsService {
   ): Promise<Sponsor> {
     if (
       dto.displayName === undefined &&
+      dto.publicSlug === undefined &&
       dto.avatarUrl === undefined &&
       dto.email === undefined &&
       dto.phone === undefined &&
@@ -540,12 +695,18 @@ export class SponsorsService {
 
     const nextEmail = normalizeNullable(dto.email);
     const nextPhone = normalizeNullable(dto.phone);
+    const nextPublicSlug = await this.normalizeAvailablePublicSlug(
+      dto.publicSlug,
+      sponsor.id,
+    );
     const nextAvatarUrl = this.normalizeSponsorAvatarUrl(dto.avatarUrl);
 
     const record = await this.prisma.sponsor.update({
       where: { id: sponsor.id },
       data: {
         displayName,
+        publicSlug:
+          nextPublicSlug !== undefined ? nextPublicSlug : sponsor.publicSlug,
         avatarUrl:
           nextAvatarUrl !== undefined ? nextAvatarUrl : sponsor.avatarUrl,
         email: nextEmail !== undefined ? nextEmail : sponsor.email,
@@ -556,6 +717,49 @@ export class SponsorsService {
     });
 
     return mapSponsorRecord(record);
+  }
+
+  private async normalizeAvailablePublicSlug(
+    value: string | null | undefined,
+    sponsorId: string,
+  ) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const normalized = slugify(value);
+
+    if (!normalized) {
+      throw new BadRequestException({
+        code: 'SPONSOR_PUBLIC_SLUG_REQUIRED',
+        message: 'A public advisor slug is required.',
+      });
+    }
+
+    const existing = await this.prisma.sponsor.findFirst({
+      where: {
+        publicSlug: normalized,
+        NOT: {
+          id: sponsorId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException({
+        code: 'SPONSOR_PUBLIC_SLUG_TAKEN',
+        message: 'This public advisor slug is already in use.',
+      });
+    }
+
+    return normalized;
   }
 
   private normalizeSponsorAvatarUrl(

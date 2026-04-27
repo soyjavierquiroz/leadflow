@@ -69,6 +69,16 @@ export class SponsorsController {
     });
   }
 
+  @Get('me/link-gallery')
+  @RequireOperationalMemberAccess()
+  getMemberLinkGallery(@CurrentAuthUser() user: AuthenticatedUser) {
+    return this.sponsorsService.getLinkGalleryForMember({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+      sponsorId: user.sponsorId!,
+    });
+  }
+
   @Get('me')
   @RequireOperationalMemberAccess()
   findMe(@CurrentAuthUser() user: AuthenticatedUser) {

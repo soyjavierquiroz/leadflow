@@ -40,6 +40,15 @@ const roleLabel: Record<MyProfileSnapshot["role"], string> = {
   MEMBER: "Member",
 };
 
+const normalizePublicSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+
 export function ProfileSettingsClient({
   initialProfile,
   scope,
@@ -47,6 +56,9 @@ export function ProfileSettingsClient({
   const router = useRouter();
   const [profile, setProfile] = useState(initialProfile);
   const [fullName, setFullName] = useState(initialProfile.fullName);
+  const [publicSlug, setPublicSlug] = useState(
+    initialProfile.sponsorPublicSlug ?? "",
+  );
   const [phone, setPhone] = useState(initialProfile.phone ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -155,6 +167,7 @@ export function ProfileSettingsClient({
             method: "PATCH",
             body: JSON.stringify({
               fullName,
+              publicSlug: hasOperationalSponsor ? publicSlug || null : undefined,
               phone: phone.trim() || null,
             }),
           },
@@ -162,6 +175,7 @@ export function ProfileSettingsClient({
 
         setProfile(nextProfile);
         setFullName(nextProfile.fullName);
+        setPublicSlug(nextProfile.sponsorPublicSlug ?? "");
         setPhone(nextProfile.phone ?? "");
         setFeedback({
           tone: "success",
@@ -389,6 +403,26 @@ export function ProfileSettingsClient({
               <input value={profile.email} disabled className={inputClassName} />
             </label>
 
+            {hasOperationalSponsor ? (
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-app-text-muted">
+                  Slug de Identidad (URL)
+                </span>
+                <input
+                  value={publicSlug}
+                  onChange={(event) =>
+                    setPublicSlug(normalizePublicSlug(event.target.value))
+                  }
+                  className={inputClassName}
+                  placeholder="javier-garcia"
+                />
+                <p className="text-xs leading-5 text-amber-700">
+                  Nota: Cambiar tu slug actualizará todos tus enlaces
+                  personales. Los enlaces viejos dejarán de funcionar.
+                </p>
+              </label>
+            ) : null}
+
             <label className="block space-y-2">
               <span className="text-sm font-medium text-app-text-muted">
                 Teléfono / móvil
@@ -414,6 +448,7 @@ export function ProfileSettingsClient({
                 disabled={isSavingProfile || isSavingPassword}
                 onClick={() => {
                   setFullName(profile.fullName);
+                  setPublicSlug(profile.sponsorPublicSlug ?? "");
                   setPhone(profile.phone ?? "");
                   setFeedback(null);
                 }}

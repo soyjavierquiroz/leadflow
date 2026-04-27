@@ -64,16 +64,16 @@ export function HybridJsonPreviewPage() {
 
   if (errorMessage) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(148,163,184,0.18),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] px-4 py-5 md:px-6 md:py-6">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_28%),linear-gradient(180deg,var(--app-bg-elevated)_0%,var(--app-bg)_100%)] px-4 py-5 text-app-text md:px-6 md:py-6">
         <div className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center">
-          <div className="w-full rounded-[2rem] border border-amber-300 bg-white/90 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
+          <div className="w-full rounded-[2rem] border border-app-warning-border bg-app-card p-8 shadow-[var(--ai-panel-shadow)] backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-warning-text">
               Vista previa aislada
             </p>
-            <h1 className="mt-3 text-3xl font-semibold text-slate-950">
+            <h1 className="mt-3 text-3xl font-semibold text-app-text">
               {errorMessage}
             </h1>
-            <p className="mt-4 text-sm leading-7 text-slate-600">
+            <p className="mt-4 text-sm leading-7 text-app-text-muted">
               Vuelve al editor del funnel y lanza la vista previa desde el botón dedicado para abrir una ventana con el borrador correcto.
             </p>
           </div>
@@ -83,7 +83,7 @@ export function HybridJsonPreviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(148,163,184,0.18),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] px-4 py-5 md:px-6 md:py-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_28%),linear-gradient(180deg,var(--app-bg-elevated)_0%,var(--app-bg)_100%)] px-4 py-5 text-app-text md:px-6 md:py-6">
       <HybridJsonLivePreview
         blocksText={draft.blocks}
         mediaMap={draft.media}

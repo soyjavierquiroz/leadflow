@@ -148,6 +148,7 @@ export const mapSponsorRecord = (record: SponsorRecord): Sponsor => ({
   workspaceId: record.workspaceId,
   teamId: record.teamId,
   displayName: record.displayName,
+  publicSlug: record.publicSlug,
   status: record.status,
   isActive: record.isActive,
   avatarUrl: record.avatarUrl,

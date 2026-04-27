@@ -12,6 +12,7 @@ import {
   readWalletEngineException,
   WalletEngineService,
 } from '../finance/wallet-engine.service';
+import { AdWheelSequenceGeneratorService } from './ad-wheel-sequence-generator.service';
 import type { CreateTeamAdWheelDto } from './dto/create-team-ad-wheel.dto';
 import type { UpdateTeamAdWheelDto } from './dto/update-team-ad-wheel.dto';
 
@@ -154,6 +155,7 @@ export class AdWheelsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
+    private readonly adWheelSequenceGeneratorService: AdWheelSequenceGeneratorService,
   ) {}
 
   async createForTeam(
@@ -476,6 +478,7 @@ export class AdWheelsService {
           sponsorId: scope.sponsorId,
         },
       });
+      await this.adWheelSequenceGeneratorService.generateSequence(wheel.id);
 
       return {
         wheel: mapAdWheelRecord(wheel),
@@ -509,6 +512,8 @@ export class AdWheelsService {
         });
 
         if (participant) {
+          await this.adWheelSequenceGeneratorService.generateSequence(wheel.id);
+
           return {
             wheel: mapAdWheelRecord(wheel),
             participant: {

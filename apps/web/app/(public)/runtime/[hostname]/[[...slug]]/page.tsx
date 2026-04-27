@@ -16,7 +16,31 @@ type PublicRuntimePageProps = {
   }>;
   searchParams: Promise<{
     awid?: string;
+    ref?: string;
   }>;
+};
+
+const appendRuntimeQuery = (
+  path: string,
+  query: {
+    awid?: string;
+    ref?: string;
+  },
+) => {
+  const params = new URLSearchParams();
+
+  if (query.awid?.trim()) {
+    params.set("awid", query.awid.trim());
+  }
+
+  if (query.ref?.trim()) {
+    params.set("ref", query.ref.trim());
+  }
+
+  const serialized = params.toString();
+  return serialized
+    ? `${path}${path.includes("?") ? "&" : "?"}${serialized}`
+    : path;
 };
 
 export default async function PublicRuntimePage({
@@ -25,11 +49,7 @@ export default async function PublicRuntimePage({
 }: PublicRuntimePageProps) {
   const [{ hostname, slug }, query] = await Promise.all([params, searchParams]);
   const path = resolvePublicRuntimePath(slug);
-  const runtimePath = query.awid?.trim()
-    ? `${path}${path.includes('?') ? '&' : '?'}awid=${encodeURIComponent(
-        query.awid.trim(),
-      )}`
-    : path;
+  const runtimePath = appendRuntimeQuery(path, query);
 
   let runtime = null;
 

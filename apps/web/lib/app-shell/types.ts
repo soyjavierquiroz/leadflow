@@ -134,6 +134,7 @@ export type SponsorRecord = {
   workspaceId: string;
   teamId: string;
   displayName: string;
+  publicSlug: string | null;
   status: string;
   isActive: boolean;
   avatarUrl: string | null;

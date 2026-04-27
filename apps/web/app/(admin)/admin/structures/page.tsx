@@ -10,9 +10,9 @@ function StickySplitPreview() {
       contentPanelClassName="min-h-[18rem] px-4 pb-4 pt-3 lg:px-6 lg:pb-6 lg:pt-3"
       contentInnerClassName="max-w-none space-y-4"
       mediaSlot={
-        <div className="flex h-full flex-col justify-between p-5 text-white lg:p-6">
+        <div className="flex h-full flex-col justify-between p-5 text-app-shell-text lg:p-6">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-teal-200">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-app-accent">
               Sticky Media
             </p>
             <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-[color:color-mix(in_srgb,var(--app-surface)_14%,transparent)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.25)]">
@@ -21,14 +21,14 @@ function StickySplitPreview() {
           </div>
           <div className="space-y-2">
             <div className="h-2 w-20 rounded-full bg-[color:color-mix(in_srgb,var(--app-surface)_22%,transparent)]" />
-            <div className="h-2 w-32 rounded-full bg-teal-300/50" />
+            <div className="h-2 w-32 rounded-full bg-app-accent/50" />
           </div>
         </div>
       }
       contentSlot={
         <>
           <div className="space-y-2 rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-card)] p-4">
-            <div className="h-2 w-20 rounded-full bg-teal-500/30" />
+            <div className="h-2 w-20 rounded-full bg-app-accent/30" />
             <div className="h-4 w-40 rounded-full bg-[var(--app-text)]/90" />
             <div className="h-2 w-full rounded-full bg-[var(--app-surface-muted)]" />
             <div className="h-2 w-5/6 rounded-full bg-[var(--app-surface-muted)]" />

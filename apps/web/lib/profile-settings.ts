@@ -7,6 +7,7 @@ export type MyProfileSnapshot = {
   role: "SUPER_ADMIN" | "TEAM_ADMIN" | "MEMBER";
   phone: string | null;
   sponsorDisplayName: string | null;
+  sponsorPublicSlug: string | null;
   avatarUrl: string | null;
   updatedAt: string;
 };

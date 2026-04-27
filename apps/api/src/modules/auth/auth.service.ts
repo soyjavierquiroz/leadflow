@@ -42,6 +42,7 @@ export type MyProfileSnapshot = {
   role: UserRole;
   phone: string | null;
   sponsorDisplayName: string | null;
+  sponsorPublicSlug: string | null;
   avatarUrl: string | null;
   updatedAt: string;
 };
@@ -287,10 +288,15 @@ export class AuthService {
     userId: string,
     input: {
       fullName?: string;
+      publicSlug?: string | null;
       phone?: string | null;
     },
   ): Promise<MyProfileSnapshot> {
-    if (input.fullName === undefined && input.phone === undefined) {
+    if (
+      input.fullName === undefined &&
+      input.publicSlug === undefined &&
+      input.phone === undefined
+    ) {
       throw new BadRequestException({
         code: 'MY_PROFILE_UPDATE_EMPTY',
         message: 'At least one profile field is required.',
@@ -306,6 +312,13 @@ export class AuthService {
       input.phone === undefined
         ? existing.sponsor?.phone ?? null
         : this.normalizeOptionalText(input.phone);
+    const publicSlug =
+      input.publicSlug === undefined
+        ? existing.sponsor?.publicSlug ?? null
+        : await this.normalizeAvailablePublicSlug(
+            input.publicSlug,
+            existing.sponsorId,
+          );
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.update({
@@ -323,6 +336,7 @@ export class AuthService {
           },
           data: {
             displayName: fullName,
+            publicSlug,
             phone,
           },
         });
@@ -696,6 +710,56 @@ export class AuthService {
     return trimmed ? trimmed : null;
   }
 
+  private async normalizeAvailablePublicSlug(
+    value: string | null | undefined,
+    sponsorId: string | null,
+  ) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (!sponsorId) {
+      throw new BadRequestException({
+        code: 'SPONSOR_PROFILE_REQUIRED',
+        message: 'A sponsor profile is required to update the public slug.',
+      });
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const normalized = slugify(value);
+
+    if (!normalized) {
+      throw new BadRequestException({
+        code: 'SPONSOR_PUBLIC_SLUG_REQUIRED',
+        message: 'A public advisor slug is required.',
+      });
+    }
+
+    const existing = await this.prisma.sponsor.findFirst({
+      where: {
+        publicSlug: normalized,
+        NOT: {
+          id: sponsorId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException({
+        code: 'SPONSOR_PUBLIC_SLUG_TAKEN',
+        message: 'This public advisor slug is already in use.',
+      });
+    }
+
+    return normalized;
+  }
+
   private toMyProfileSnapshot(user: AuthUserRecord): MyProfileSnapshot {
     return {
       id: user.id,
@@ -704,6 +768,7 @@ export class AuthService {
       role: user.role,
       phone: user.sponsor?.phone ?? null,
       sponsorDisplayName: user.sponsor?.displayName ?? null,
+      sponsorPublicSlug: user.sponsor?.publicSlug ?? null,
       avatarUrl: user.sponsor?.avatarUrl ?? null,
       updatedAt: user.updatedAt.toISOString(),
     };

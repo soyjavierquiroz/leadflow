@@ -21,6 +21,7 @@ type SiteRuntimePageProps = {
   searchParams: Promise<{
     previewHost?: string;
     awid?: string;
+    ref?: string;
   }>;
 };
 
@@ -43,14 +44,27 @@ const canonicalSiteHost = (() => {
 const isCanonicalAppHomeRequest = (host: string, path: string) =>
   normalizeRuntimePath(path) === '/' && normalizeHost(host) === canonicalSiteHost;
 
-const appendAwid = (path: string, awid: string | undefined) => {
-  const normalizedAwid = awid?.trim();
-  if (!normalizedAwid) {
-    return path;
+const appendRuntimeQuery = (
+  path: string,
+  query: {
+    awid?: string;
+    ref?: string;
+  },
+) => {
+  const params = new URLSearchParams();
+
+  if (query.awid?.trim()) {
+    params.set('awid', query.awid.trim());
   }
 
-  const separator = path.includes('?') ? '&' : '?';
-  return `${path}${separator}awid=${encodeURIComponent(normalizedAwid)}`;
+  if (query.ref?.trim()) {
+    params.set('ref', query.ref.trim());
+  }
+
+  const serialized = params.toString();
+  return serialized
+    ? `${path}${path.includes('?') ? '&' : '?'}${serialized}`
+    : path;
 };
 
 const resolveSeoFromRuntime = (runtime: PublicFunnelRuntimePayload) => {
@@ -113,7 +127,7 @@ export async function generateMetadata({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtime = await loadRuntimeSafely(host, appendAwid(path, query.awid));
+  const runtime = await loadRuntimeSafely(host, appendRuntimeQuery(path, query));
 
   if (!runtime) {
     return {};
@@ -160,7 +174,7 @@ export default async function SiteRuntimePage({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtimePath = appendAwid(path, query.awid);
+  const runtimePath = appendRuntimeQuery(path, query);
 
   if (!previewHost && isCanonicalAppHomeRequest(host, path)) {
     const user = await getSessionUser();

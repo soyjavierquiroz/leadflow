@@ -380,7 +380,7 @@ export function TeamMembersClient({
           </div>
           <div className="mt-6 h-4 overflow-hidden rounded-full bg-[var(--app-surface-muted)]">
             <div
-              className="h-full rounded-full bg-[linear-gradient(90deg,_#0f172a_0%,_#14b8a6_60%,_#f59e0b_100%)] transition-[width] duration-300"
+              className="h-full rounded-full bg-[linear-gradient(90deg,var(--app-text)_0%,var(--app-accent)_60%,var(--app-warning-text)_100%)] transition-[width] duration-300"
               style={{
                 width: `${seatUsagePercentage}%`,
               }}
@@ -743,7 +743,7 @@ export function TeamMembersClient({
                 type="button"
                 onClick={handleDeleteMember}
                 disabled={isPending}
-                className="rounded-full bg-[var(--app-danger)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full bg-[var(--app-danger)] px-4 py-2 text-sm font-semibold text-app-bg transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPending ? "Eliminando..." : "Eliminar definitivamente"}
               </button>

@@ -502,4 +502,125 @@ describe('PublicFunnelRuntimeService', () => {
       browserPixelsEnabled: false,
     });
   });
+
+  it('resolves publication scoped ref paths and keeps the ref prefix for multipage navigation', async () => {
+    const findMany = jest.fn<
+      Promise<MockPublicationRecord[]>,
+      [FindManyArgs]
+    >();
+    const sponsorFindFirst = jest.fn().mockResolvedValue({
+      id: 'sponsor-1',
+    });
+    const prisma = {
+      funnelPublication: {
+        findMany,
+      },
+      sponsor: {
+        findFirst: sponsorFindFirst,
+      },
+    } as unknown as PrismaService;
+
+    findMany.mockResolvedValue([
+      buildPublicationRecord({
+        id: 'publication-root',
+        pathPrefix: '/',
+      }),
+      buildPublicationRecord({
+        id: 'publication-demo',
+        pathPrefix: '/demo',
+        steps: [
+          buildStepRecord({
+            publicationId: 'publication-demo',
+            idSuffix: 'entry',
+            slug: 'landing',
+            position: 1,
+            isEntryStep: true,
+          }),
+          buildStepRecord({
+            publicationId: 'publication-demo',
+            idSuffix: 'gracias',
+            slug: 'gracias',
+            position: 2,
+            stepType: 'thank_you',
+          }),
+        ],
+      }),
+    ]);
+
+    const service = new PublicFunnelRuntimeService(prisma);
+    const runtime = await service.resolveByHostAndPath(
+      'localhost',
+      '/demo/ref/asesor-uno/gracias',
+    );
+
+    expect(runtime.publication.id).toBe('publication-demo');
+    expect(runtime.request.publicationPathPrefix).toBe('/demo/ref/asesor-uno');
+    expect(runtime.currentStep.slug).toBe('gracias');
+    expect(runtime.currentStep.path).toBe('/demo/ref/asesor-uno/gracias');
+    expect(runtime.previousStep?.path).toBe('/demo/ref/asesor-uno');
+    expect(runtime.entryContext).toEqual({
+      entryMode: 'organic_asesor',
+      trafficLayer: 'DIRECT',
+      forcedSponsorId: 'sponsor-1',
+      adWheelId: null,
+      browserPixelsEnabled: false,
+    });
+  });
+
+  it('resolves query ref attribution and appends the query ref to adjacent steps', async () => {
+    const findMany = jest.fn<
+      Promise<MockPublicationRecord[]>,
+      [FindManyArgs]
+    >();
+    const sponsorFindFirst = jest.fn().mockResolvedValue({
+      id: 'sponsor-1',
+    });
+    const prisma = {
+      funnelPublication: {
+        findMany,
+      },
+      sponsor: {
+        findFirst: sponsorFindFirst,
+      },
+    } as unknown as PrismaService;
+
+    findMany.mockResolvedValue([
+      buildPublicationRecord({
+        id: 'publication-demo',
+        pathPrefix: '/demo',
+        steps: [
+          buildStepRecord({
+            publicationId: 'publication-demo',
+            idSuffix: 'entry',
+            slug: 'landing',
+            position: 1,
+            isEntryStep: true,
+          }),
+          buildStepRecord({
+            publicationId: 'publication-demo',
+            idSuffix: 'gracias',
+            slug: 'gracias',
+            position: 2,
+            stepType: 'thank_you',
+          }),
+        ],
+      }),
+    ]);
+
+    const service = new PublicFunnelRuntimeService(prisma);
+    const runtime = await service.resolveByHostAndPath(
+      'localhost',
+      '/demo?ref=asesor-uno',
+    );
+
+    expect(runtime.currentStep.path).toBe('/demo?ref=asesor-uno');
+    expect(runtime.nextStep?.path).toBe('/demo/gracias?ref=asesor-uno');
+    expect(runtime.entryContext).toEqual({
+      entryMode: 'organic_asesor',
+      trafficLayer: 'DIRECT',
+      forcedSponsorId: 'sponsor-1',
+      adWheelId: null,
+      browserPixelsEnabled: false,
+    });
+  });
 });

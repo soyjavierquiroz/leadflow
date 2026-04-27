@@ -12,6 +12,7 @@ export type SponsorStatus = 'draft' | 'active' | 'paused' | 'archived';
 export interface Sponsor extends BaseDomainEntity, WorkspaceScoped {
   teamId: DomainId;
   displayName: string;
+  publicSlug: string | null;
   status: SponsorStatus;
   isActive: boolean;
   avatarUrl: string | null;

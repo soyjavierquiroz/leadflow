@@ -20,13 +20,16 @@ import type { SystemTemplateRecord } from "@/lib/system-tenants.types";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
 const primaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-full bg-app-text px-4 py-2.5 text-sm font-semibold text-app-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
 
 const secondaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6";
+  "rounded-[2rem] border border-app-border bg-app-card p-5 text-app-text shadow-[var(--ai-panel-shadow)] md:p-6";
+
+const inputClassName =
+  "rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft";
 
 const slugify = (value: string) =>
   value
@@ -268,14 +271,14 @@ export function SystemTemplateEditor({
       <section className="grid gap-4 md:grid-cols-3">
         <article className={sectionClassName}>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-teal-100 p-2 text-teal-700">
+            <div className="rounded-full bg-app-accent-soft p-2 text-app-accent">
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 Estado del builder
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {initialTemplate ? "Template persistido" : "Borrador local"}
               </p>
             </div>
@@ -283,14 +286,14 @@ export function SystemTemplateEditor({
         </article>
         <article className={sectionClassName}>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-amber-100 p-2 text-amber-700">
+            <div className="rounded-full bg-app-warning-bg p-2 text-app-warning-text">
               <FileJson className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 Bloques válidos
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {parsedBlocks.value
                   ? `${parsedBlocks.value.length} bloques listos`
                   : "Corrige el JSON"}
@@ -300,14 +303,14 @@ export function SystemTemplateEditor({
         </article>
         <article className={sectionClassName}>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-sky-100 p-2 text-sky-700">
+            <div className="rounded-full bg-app-success-bg p-2 text-app-success-text">
               <Check className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 Código sugerido
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {slugify(name || "nuevo-template") || "nuevo-template"}
               </p>
             </div>
@@ -318,10 +321,10 @@ export function SystemTemplateEditor({
       <details open className={sectionClassName}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
               Configuración
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+            <h2 className="mt-2 text-2xl font-semibold text-app-text">
               Identidad del template
             </h2>
           </div>
@@ -329,19 +332,19 @@ export function SystemTemplateEditor({
 
         <div className="mt-6 grid gap-5">
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
+            <span className="text-sm font-semibold text-app-text">
               Nombre del template
             </span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Plantilla Global Captación VSL"
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             />
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-semibold text-slate-900">
+            <span className="text-sm font-semibold text-app-text">
               Descripción
             </span>
             <textarea
@@ -349,7 +352,7 @@ export function SystemTemplateEditor({
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Describe el tipo de oferta, vertical o caso de uso para este template."
               rows={4}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             />
           </label>
         </div>
@@ -382,13 +385,13 @@ export function SystemTemplateEditor({
       <section className={sectionClassName}>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
               Persistencia
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+            <h2 className="mt-2 text-2xl font-semibold text-app-text">
               Catálogo global listo
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-sm leading-6 text-app-text-muted">
               El guardado persiste nombre, descripción, blocks y mediaMap para que
               luego puedas desplegar el template directamente a cualquier tenant.
             </p>

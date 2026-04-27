@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
-import Plyr from 'plyr';
 import { createProviderEventHub } from './createProviderEventHub';
 import { subscribeProviderCallbacks } from './subscribeProviderCallbacks';
 import type { IVideoProvider, ProviderBinding, ProviderHookOptions } from './IVideoProvider';
+import type Plyr from 'plyr';
 
 export function useYouTubeProvider({
   enabled,
@@ -55,46 +55,36 @@ export function useYouTubeProvider({
     const controls = shouldUseZeroUi
       ? []
       : ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'];
-
-    container.dataset.plyrProvider = 'youtube';
-    container.dataset.plyrEmbedId = videoId;
-
-    const player = new Plyr(container, {
-      autoplay: autoPlay,
-      muted,
-      clickToPlay: false,
-      controls,
-      youtube: {
-        noCookie: true,
-        rel: 0,
-        showinfo: 0,
-        modestbranding: 1,
-        iv_load_policy: 3,
-        controls: 0,
-        disablekb: 1,
-        playsinline: 1,
-      },
-    });
-
+    let player: Plyr | null = null;
     let loopEnabled = loop;
+    let disposed = false;
+    let unsubscribeCallbacks: Array<() => void> = [];
 
     const provider: IVideoProvider = {
       async play() {
         try {
-          await Promise.resolve(player.play());
+          await Promise.resolve(player?.play());
         } catch (error) {
           eventHub.emit('autoplayblocked');
           throw error;
         }
       },
       pause() {
-        player.pause();
+        player?.pause();
       },
       mute(nextMuted) {
+        if (!player) {
+          return;
+        }
+
         player.muted = nextMuted;
         eventHub.emit('mutechange', player.muted);
       },
       seek(seconds) {
+        if (!player) {
+          return;
+        }
+
         player.currentTime = seconds;
         eventHub.emit('progress', player.currentTime);
       },
@@ -103,16 +93,16 @@ export function useYouTubeProvider({
       },
       destroy() {
         eventHub.clear();
-        player.destroy();
+        player?.destroy();
       },
       getCurrentTime() {
-        return player.currentTime || 0;
+        return player?.currentTime || 0;
       },
       getDuration() {
-        return Number.isFinite(player.duration) ? player.duration : 0;
+        return player && Number.isFinite(player.duration) ? player.duration : 0;
       },
       isMuted() {
-        return player.muted;
+        return player?.muted ?? false;
       },
       onReady(callback) {
         return eventHub.on('ready', callback);
@@ -137,7 +127,7 @@ export function useYouTubeProvider({
       },
     };
 
-    const unsubscribeCallbacks = subscribeProviderCallbacks(provider, {
+    unsubscribeCallbacks = subscribeProviderCallbacks(provider, {
       onReady: (activeProvider) => callbacksRef.current.onReady?.(activeProvider),
       onPlay: () => callbacksRef.current.onPlay?.(),
       onPause: () => callbacksRef.current.onPause?.(),
@@ -148,37 +138,71 @@ export function useYouTubeProvider({
     });
     providerRef.current = provider;
 
-    player.on('ready', () => {
-      eventHub.emit('ready', provider);
-    });
+    const initializePlayer = async () => {
+      const { default: Plyr } = await import('plyr');
 
-    player.on('playing', () => {
-      eventHub.emit('play');
-    });
-
-    player.on('pause', () => {
-      eventHub.emit('pause');
-    });
-
-    player.on('timeupdate', () => {
-      eventHub.emit('progress', player.currentTime);
-    });
-
-    player.on('volumechange', () => {
-      eventHub.emit('mutechange', player.muted);
-    });
-
-    player.on('ended', () => {
-      if (loopEnabled) {
-        player.restart();
-        void Promise.resolve(player.play()).catch(() => undefined);
+      if (disposed) {
         return;
       }
 
-      eventHub.emit('ended');
+      container.dataset.plyrProvider = 'youtube';
+      container.dataset.plyrEmbedId = videoId;
+
+      player = new Plyr(container, {
+        autoplay: autoPlay,
+        muted,
+        clickToPlay: false,
+        controls,
+        youtube: {
+          noCookie: true,
+          rel: 0,
+          showinfo: 0,
+          modestbranding: 1,
+          iv_load_policy: 3,
+          controls: 0,
+          disablekb: 1,
+          playsinline: 1,
+        },
+      });
+
+      player.on('ready', () => {
+        eventHub.emit('ready', provider);
+      });
+
+      player.on('playing', () => {
+        eventHub.emit('play');
+      });
+
+      player.on('pause', () => {
+        eventHub.emit('pause');
+      });
+
+      player.on('timeupdate', () => {
+        eventHub.emit('progress', player?.currentTime ?? 0);
+      });
+
+      player.on('volumechange', () => {
+        eventHub.emit('mutechange', player?.muted ?? false);
+      });
+
+      player.on('ended', () => {
+        if (loopEnabled) {
+          player?.restart();
+          void Promise.resolve(player?.play()).catch(() => undefined);
+          return;
+        }
+
+        eventHub.emit('ended');
+      });
+    };
+
+    void initializePlayer().catch((error) => {
+      console.error('[KurukinPlayer] No se pudo inicializar Plyr.', error);
+      eventHub.emit('autoplayblocked');
     });
 
     return () => {
+      disposed = true;
       unsubscribeCallbacks.forEach((unsubscribe) => unsubscribe());
       provider.destroy();
       providerRef.current = null;

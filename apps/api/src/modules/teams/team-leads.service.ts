@@ -247,6 +247,8 @@ export class TeamLeadsService {
       }
 
       const now = new Date();
+      const trafficLayer = lead.trafficLayer ?? 'ORGANIC';
+      const originAdWheelId = lead.originAdWheelId ?? null;
 
       if (lead.currentAssignment) {
         await tx.assignment.update({
@@ -285,6 +287,8 @@ export class TeamLeadsService {
           funnelInstanceId: lead.funnelInstanceId,
           funnelPublicationId: lead.funnelPublicationId,
           rotationPoolId: null,
+          trafficLayer,
+          originAdWheelId,
           status: 'assigned',
           reason: 'manual',
           assignedAt: now,
@@ -317,6 +321,8 @@ export class TeamLeadsService {
           previousAssignmentId: lead.currentAssignment?.id ?? null,
           previousSponsorId: lead.currentAssignment?.sponsorId ?? null,
           nextAssignmentId: assignment.id,
+          trafficLayer,
+          adWheelId: originAdWheelId,
         },
       });
 
@@ -333,6 +339,8 @@ export class TeamLeadsService {
           sponsorId: targetSponsor.id,
           assignmentReason: 'manual',
           reassignedFromAssignmentId: lead.currentAssignment?.id ?? null,
+          trafficLayer,
+          adWheelId: originAdWheelId,
         },
       });
 

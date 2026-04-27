@@ -53,15 +53,17 @@ export function AppSidebar({
         aria-current={isActive ? "page" : undefined}
         className={`block rounded-[1.35rem] border px-4 py-3 transition ${
           isActive
-            ? "border-app-accent bg-app-surface-strong text-app-text shadow-[0_16px_40px_rgba(15,23,42,0.16)]"
-            : "border-app-shell-border bg-app-shell-surface text-app-shell-text hover:border-white/20 hover:bg-white/10"
+            ? "border-app-accent bg-app-accent-soft text-app-shell-text shadow-[var(--ai-card-shadow)]"
+            : "border-app-shell-border bg-app-shell-surface text-app-shell-text hover:border-app-shell-muted hover:bg-[color:color-mix(in_srgb,var(--app-shell-text)_10%,transparent)]"
         }`}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span
               className={`h-8 w-1 rounded-full ${
-                isActive ? "bg-app-accent" : "bg-white/12"
+                isActive
+                  ? "bg-app-accent"
+                  : "bg-[color:color-mix(in_srgb,var(--app-shell-text)_12%,transparent)]"
               }`}
             />
             {Icon ? (
@@ -81,7 +83,7 @@ export function AppSidebar({
         </div>
         <p
           className={`mt-1 text-xs leading-5 ${
-            isActive ? "text-app-text-muted" : "text-app-shell-muted"
+            isActive ? "text-app-shell-text" : "text-app-shell-muted"
           }`}
         >
           {item.description}
@@ -92,14 +94,14 @@ export function AppSidebar({
 
   const statusBadgeClassName =
     statusBadge?.tone === "amber"
-      ? "border-amber-300/30 bg-amber-400/12 text-amber-100"
+      ? "border-app-warning-border bg-app-warning-bg text-app-warning-text"
       : statusBadge?.tone === "teal"
-        ? "border-app-accent bg-app-accent-soft text-teal-100"
-        : "border-app-shell-border bg-white/8 text-app-shell-text";
+        ? "border-app-accent bg-app-accent-soft text-app-accent"
+        : "border-app-shell-border bg-[color:color-mix(in_srgb,var(--app-shell-text)_8%,transparent)] text-app-shell-text";
 
   return (
     <aside className="border-b border-app-shell-border bg-[linear-gradient(180deg,var(--app-shell-bg)_0%,var(--app-shell-bg-strong)_100%)] px-5 py-6 text-app-shell-text lg:min-h-screen lg:border-b-0 lg:border-r">
-      <div className="rounded-[2rem] border border-app-shell-border bg-[radial-gradient(circle_at_top_left,_rgba(67,198,172,0.18),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.08)_0%,_rgba(255,255,255,0.03)_100%)] p-5 shadow-[0_24px_60px_rgba(2,6,23,0.32)]">
+      <div className="rounded-[2rem] border border-app-shell-border bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_42%),linear-gradient(180deg,var(--app-shell-surface)_0%,var(--app-shell-bg-strong)_100%)] p-5 shadow-[var(--ai-panel-shadow)]">
         <p className="text-xs font-semibold uppercase tracking-[0.32em] text-app-accent">
           Leadflow OS
         </p>
@@ -110,7 +112,7 @@ export function AppSidebar({
           {areaDescription}
         </p>
 
-        <div className="mt-5 rounded-3xl border border-app-shell-border bg-black/18 px-4 py-4">
+        <div className="mt-5 rounded-3xl border border-app-shell-border bg-[color:color-mix(in_srgb,var(--app-shell-text)_8%,transparent)] px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-shell-muted">
             Objetivo del rol
           </p>

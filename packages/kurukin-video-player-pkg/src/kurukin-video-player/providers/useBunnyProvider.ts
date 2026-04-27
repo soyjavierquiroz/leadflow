@@ -1,9 +1,9 @@
-import Hls from 'hls.js';
 import { useEffect, useRef } from 'react';
 import { createProviderEventHub } from './createProviderEventHub';
 import { bindNativeVideoEvents, createNativeVideoProvider } from './nativeVideoProvider';
 import { subscribeProviderCallbacks } from './subscribeProviderCallbacks';
 import type { ProviderBinding, ProviderHookOptions } from './IVideoProvider';
+import type Hls from 'hls.js';
 
 export function useBunnyProvider({
   enabled,
@@ -63,6 +63,7 @@ export function useBunnyProvider({
     });
     let hls: Hls | null = null;
     let readyEmitted = false;
+    let disposed = false;
 
     const notifyReady = () => {
       if (readyEmitted) {
@@ -82,29 +83,42 @@ export function useBunnyProvider({
 
     const cleanupEvents = bindNativeVideoEvents(videoElement, eventHub, notifyReady);
 
-    if (Hls.isSupported()) {
-      hls = new Hls({
-        startLevel: 2,
-        capLevelToPlayerSize: true,
-      });
-      hls.loadSource(videoId);
-      hls.attachMedia(videoElement);
+    const initializeHls = async () => {
+      const { default: Hls } = await import('hls.js');
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        notifyReady();
-      });
+      if (disposed) {
+        return;
+      }
 
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        console.error('[BunnyProvider HLS Error]:', data.type, data.details, data.fatal);
-      });
-    } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-      videoElement.src = videoId;
-      console.log('[BunnyProvider] Usando fallback nativo HLS para Safari:', videoId);
-    } else {
-      console.warn('[KurukinPlayer] HLS no es compatible en este navegador para Bunny.net.');
-    }
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          startLevel: 2,
+          capLevelToPlayerSize: true,
+        });
+        hls.loadSource(videoId);
+        hls.attachMedia(videoElement);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          notifyReady();
+        });
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          console.error('[BunnyProvider HLS Error]:', data.type, data.details, data.fatal);
+        });
+      } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+        videoElement.src = videoId;
+        console.log('[BunnyProvider] Usando fallback nativo HLS para Safari:', videoId);
+      } else {
+        console.warn('[KurukinPlayer] HLS no es compatible en este navegador para Bunny.net.');
+      }
+    };
+
+    void initializeHls().catch((error) => {
+      console.error('[KurukinPlayer] No se pudo inicializar HLS.', error);
+    });
 
     return () => {
+      disposed = true;
       cleanupEvents();
       unsubscribeCallbacks.forEach((unsubscribe) => unsubscribe());
       hls?.destroy();

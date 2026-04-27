@@ -19,7 +19,10 @@ type TeamPoolsClientProps = {
 };
 
 const buttonClassName =
-  "rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-app-border bg-app-card px-4 py-2 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
+
+const selectClassName =
+  "rounded-full border border-app-border bg-app-card px-3 py-2 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft";
 
 export function TeamPoolsClient({
   initialPools,
@@ -157,8 +160,8 @@ export function TeamPoolsClient({
             header: "Pool",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">{row.name}</p>
-                <p className="text-xs text-slate-500">{row.strategy}</p>
+                <p className="font-semibold text-app-text">{row.name}</p>
+                <p className="text-xs text-app-text-soft">{row.strategy}</p>
               </div>
             ),
           },
@@ -195,17 +198,17 @@ export function TeamPoolsClient({
           return (
             <section
               key={pool.id}
-              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)]"
+              className="rounded-3xl border border-app-border bg-app-card p-5 text-app-text shadow-[var(--ai-panel-shadow)]"
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Rotation Pool
                   </p>
-                  <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                  <h3 className="mt-2 text-xl font-semibold text-app-text">
                     {pool.name}
                   </h3>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-app-text-muted">
                     {poolMembers.length} miembros configurados
                   </p>
                 </div>
@@ -216,14 +219,14 @@ export function TeamPoolsClient({
                 {poolMembers.map((member) => (
                   <div
                     key={member.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    className="rounded-2xl border border-app-border bg-app-surface-muted p-4"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="font-semibold text-slate-950">
+                        <p className="font-semibold text-app-text">
                           {member.sponsorName}
                         </p>
-                        <p className="text-sm text-slate-600">
+                        <p className="text-sm text-app-text-muted">
                           Posición {member.position} · {member.isActive ? "Activo" : "Pausado"}
                         </p>
                       </div>
@@ -241,7 +244,7 @@ export function TeamPoolsClient({
                         >
                           {member.isActive ? "Pausar" : "Activar"}
                         </button>
-                        <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <label className="flex items-center gap-2 text-sm text-app-text-muted">
                           Orden
                           <select
                             value={member.position}
@@ -251,7 +254,7 @@ export function TeamPoolsClient({
                               })
                             }
                             disabled={isPending}
-                            className="rounded-full border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-950"
+                            className={selectClassName}
                           >
                             {poolMembers.map((item) => (
                               <option key={item.id} value={item.position}>
@@ -265,7 +268,7 @@ export function TeamPoolsClient({
                   </div>
                 ))}
                 {poolMembers.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                  <div className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-5 text-sm text-app-text-muted">
                     Este pool todavía no tiene miembros operativos.
                   </div>
                 ) : null}

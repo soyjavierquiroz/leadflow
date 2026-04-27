@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
+import { MailModule } from '../mail/mail.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
 import { PublicFunnelRuntimeController } from './public-funnel-runtime.controller';
@@ -8,7 +9,7 @@ import { PublicRuntimeController } from './public-runtime.controller';
 import { PublicRuntimeService } from './public-runtime.service';
 
 @Module({
-  imports: [EventsModule, MessagingAutomationModule],
+  imports: [EventsModule, MessagingAutomationModule, MailModule],
   controllers: [PublicFunnelRuntimeController, PublicRuntimeController],
   providers: [
     PublicFunnelRuntimeService,

@@ -5,6 +5,7 @@ export type MemberProfileSponsor = {
   workspaceId: string;
   teamId: string;
   displayName: string;
+  publicSlug: string | null;
   status: string;
   avatarUrl: string | null;
   email: string | null;

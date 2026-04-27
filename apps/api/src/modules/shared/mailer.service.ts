@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MailClient } from '@leadflow/mail';
+import { MailClient, type MailDetail } from '@leadflow/mail';
 
 const DEFAULT_LOGIN_URL = 'http://localhost:3000/login';
 const DEFAULT_PUBLIC_SITE_URL = 'http://localhost:3000';
@@ -122,6 +122,78 @@ export class MailerService {
           },
       footerNote:
         'Si no reconoces esta activacion, avisa a tu Team Admin de inmediato.',
+    });
+  }
+
+  async sendAdvisorLeadAssignmentEmail(input: {
+    email: string;
+    advisorName: string;
+    leadName?: string | null;
+    leadPhone?: string | null;
+    leadEmail?: string | null;
+    teamName?: string | null;
+    trafficLayer?: string | null;
+    assignmentId?: string | null;
+  }) {
+    const normalizedEmail =
+      sanitizeNullableText(input.email)?.toLowerCase() ??
+      'unknown@leadflow.local';
+    const advisorName = sanitizeNullableText(input.advisorName) ?? 'asesor';
+    const leadName = sanitizeNullableText(input.leadName) ?? 'Lead nuevo';
+    const teamName = sanitizeNullableText(input.teamName) ?? 'Leadflow';
+    const trafficLayer = sanitizeNullableText(input.trafficLayer) ?? 'ORGANIC';
+    const leadPhone = sanitizeNullableText(input.leadPhone);
+    const leadEmail = sanitizeNullableText(input.leadEmail);
+    const assignmentId = sanitizeNullableText(input.assignmentId);
+    const loginUrl = this.resolveLoginUrl();
+    const details: MailDetail[] = [
+      {
+        label: 'Lead',
+        value: leadName,
+      },
+      ...(leadPhone
+        ? [
+            {
+              label: 'Telefono',
+              value: leadPhone,
+            },
+          ]
+        : []),
+      ...(leadEmail
+        ? [
+            {
+              label: 'Email',
+              value: leadEmail,
+            },
+          ]
+        : []),
+      {
+        label: 'Trafico',
+        value: trafficLayer,
+      },
+      ...(assignmentId
+        ? [
+            {
+              label: 'Asignacion',
+              value: assignmentId,
+            },
+          ]
+        : []),
+    ];
+
+    await this.mailClient.sendSystemEmail({
+      toAddress: normalizedEmail,
+      subject: 'Tienes un nuevo lead asignado',
+      title: 'Tienes un nuevo lead asignado',
+      paragraphs: [
+        `${advisorName}, recibiste un nuevo lead en el team "${teamName}".`,
+        'Revisa el contexto operativo y contactalo lo antes posible.',
+      ],
+      details,
+      action: {
+        label: 'Abrir LeadFlow',
+        href: loginUrl,
+      },
     });
   }
 

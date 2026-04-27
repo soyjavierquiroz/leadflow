@@ -23,6 +23,11 @@ const memberNav: ShellNavItem[] = [
     description: "Solo mis leads asignados para seguimiento, prioridad y cierre.",
   },
   {
+    href: "/member/links",
+    label: "Enlaces",
+    description: "Funnels publicados con tu atribucion directa para compartir.",
+  },
+  {
     href: "/member/profile",
     label: "Perfil",
     description: "Datos de trabajo y configuracion del sponsor.",

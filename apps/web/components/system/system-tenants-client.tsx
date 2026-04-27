@@ -147,18 +147,18 @@ const getProvisioningStatusBadgeClassName = (
   status: EditSystemTenantFormValues["provisioningStatus"] | "archived",
 ) => {
   if (status === "active") {
-    return "border-emerald-400/35 bg-emerald-400/10 text-emerald-200";
+    return "border-app-success-border bg-app-success-bg text-app-success-text";
   }
 
   if (status === "pending") {
-    return "border-amber-300/35 bg-amber-300/10 text-amber-200";
+    return "border-app-warning-border bg-app-warning-bg text-app-warning-text";
   }
 
   if (status === "suspended") {
-    return "border-rose-300/35 bg-rose-300/10 text-rose-200";
+    return "border-app-danger-border bg-app-danger-bg text-app-danger-text";
   }
 
-  return "border-slate-500/40 bg-slate-700/35 text-slate-300";
+  return "border-app-border bg-app-surface-muted text-app-text-muted";
 };
 
 export function SystemTenantsClient({

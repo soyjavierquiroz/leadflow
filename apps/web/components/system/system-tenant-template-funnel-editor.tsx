@@ -561,7 +561,7 @@ export function SystemTenantTemplateFunnelEditor({
       <section className="grid gap-4 md:grid-cols-3">
         <article className={sectionClassName}>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-teal-100 p-2 text-teal-700">
+            <div className="rounded-full bg-app-accent-soft p-2 text-app-accent">
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
@@ -576,7 +576,7 @@ export function SystemTenantTemplateFunnelEditor({
         </article>
         <article className={sectionClassName}>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-amber-100 p-2 text-amber-700">
+            <div className="rounded-full bg-app-warning-bg p-2 text-app-warning-text">
               <FileJson className="h-4 w-4" />
             </div>
             <div>
@@ -593,7 +593,7 @@ export function SystemTenantTemplateFunnelEditor({
         </article>
         <article className={sectionClassName}>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-sky-100 p-2 text-sky-700">
+            <div className="rounded-full bg-app-success-bg p-2 text-app-success-text">
               <Check className="h-4 w-4" />
             </div>
             <div>

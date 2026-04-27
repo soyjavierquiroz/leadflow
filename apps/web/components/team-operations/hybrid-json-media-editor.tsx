@@ -37,13 +37,19 @@ import {
 import { FUNNEL_ASSET_IMAGE_ACCEPT } from "@/lib/media-optimizer";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-6 text-left shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
+  "rounded-[2rem] border border-app-border bg-app-card p-6 text-left text-app-text shadow-[var(--ai-panel-shadow)] md:p-8";
 
 const secondaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
 
 const scaffoldButtonClassName =
-  "inline-flex min-h-28 w-full items-start justify-between gap-4 rounded-[1.75rem] border border-slate-200 bg-white px-5 py-4 text-left text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-28 w-full items-start justify-between gap-4 rounded-[1.75rem] border border-app-border bg-app-card px-5 py-4 text-left text-app-text shadow-sm transition hover:-translate-y-0.5 hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
+
+const inputClassName =
+  "w-full rounded-xl border border-app-border bg-app-card px-3 py-2 text-sm text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft";
+
+const codePanelClassName =
+  "overflow-x-auto rounded-2xl border border-app-border bg-app-surface-muted p-4 text-xs leading-6 text-app-text";
 
 export const requiredMediaKeys = [
   "hero",
@@ -492,14 +498,14 @@ export function HybridJsonMediaEditor({
 
       <section className={sectionClassName}>
         <div className="grid gap-4 lg:grid-cols-2">
-          <article className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
+          <article className="rounded-[1.5rem] border border-app-warning-border bg-app-warning-bg p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-warning-text">
               Ayuda rápida / blocksJson
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">
+            <h2 className="mt-2 text-xl font-semibold text-app-text">
               Cómo abrir la captación nativa
             </h2>
-            <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
+            <div className="mt-3 space-y-3 text-sm leading-6 text-app-text-muted">
               <p>
                 Usa un bloque <code>lead_capture_form</code> si quieres que los
                 CTAs comerciales salten al formulario nativo con la ancla
@@ -514,14 +520,14 @@ export function HybridJsonMediaEditor({
             </div>
           </article>
 
-          <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+          <article className="rounded-[1.5rem] border border-app-border bg-app-accent-soft p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
               Ayuda rápida / mediaMap
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">
+            <h2 className="mt-2 text-xl font-semibold text-app-text">
               Qué llaves conviene mapear
             </h2>
-            <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
+            <div className="mt-3 space-y-3 text-sm leading-6 text-app-text-muted">
               <p>
                 Sube los assets directo al CDN desde cada fila y deja{" "}
                 <code>mediaMap</code> solo como diccionario final de URLs
@@ -541,7 +547,7 @@ export function HybridJsonMediaEditor({
         <details open className={sectionClassName}>
           <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
             <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
                 Bloques
               </p>
               {stepSwitcher ? (
@@ -563,8 +569,8 @@ export function HybridJsonMediaEditor({
                             }}
                             className={
                               isActive
-                                ? "inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
-                                : "inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                ? "inline-flex items-center justify-center rounded-full bg-app-text px-4 py-2.5 text-sm font-semibold text-app-bg transition disabled:cursor-not-allowed disabled:opacity-60"
+                                : "inline-flex items-center justify-center rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text-muted transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                             }
                           >
                             {tab.label}
@@ -574,30 +580,30 @@ export function HybridJsonMediaEditor({
                     </div>
 
                     {stepSwitcher.badge ? (
-                      <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700 ring-1 ring-slate-200">
+                      <span className="inline-flex items-center rounded-full bg-app-card px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted ring-1 ring-app-border">
                         {stepSwitcher.badge}
                       </span>
                     ) : null}
                   </div>
 
                   {stepSwitcher.helperText ? (
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-app-text-muted">
                       {stepSwitcher.helperText}
                     </p>
                   ) : null}
                 </div>
               ) : (
-                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                <h2 className="mt-2 text-2xl font-semibold text-app-text">
                   JSON engine del funnel
                 </h2>
               )}
             </div>
-            <ChevronDown className="h-5 w-5 text-slate-400" />
+            <ChevronDown className="h-5 w-5 text-app-text-soft" />
           </summary>
 
           <div className="mt-6 space-y-4">
             {stepSwitcher?.warningText ? (
-              <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              <p className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
                 {stepSwitcher.warningText}
               </p>
             ) : null}
@@ -605,22 +611,22 @@ export function HybridJsonMediaEditor({
             {stepSpecificSettingsPanel}
 
             {routingReference && routingReference.items.length > 0 ? (
-              <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-6 text-left">
+              <article className="rounded-[1.5rem] border border-app-border bg-app-accent-soft p-6 text-left">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="text-left">
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
                       {routingReference.title}
                     </p>
-                    <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                    <h3 className="mt-2 text-lg font-semibold text-app-text">
                       URLs disponibles para redirección
                     </h3>
                     {routingReference.helperText ? (
-                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                      <p className="mt-2 text-sm leading-6 text-app-text-muted">
                         {routingReference.helperText}
                       </p>
                     ) : null}
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 ring-1 ring-sky-200">
+                  <span className="inline-flex items-center rounded-full bg-app-card px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-app-accent ring-1 ring-app-border">
                     {routingReference.items.length} paso
                     {routingReference.items.length === 1 ? "" : "s"}
                   </span>
@@ -633,20 +639,20 @@ export function HybridJsonMediaEditor({
                     return (
                       <div
                         key={item.id}
-                        className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between"
+                        className="flex flex-col gap-3 rounded-2xl border border-app-border bg-app-card px-4 py-3 md:flex-row md:items-center md:justify-between"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-950">
+                            <p className="text-sm font-semibold text-app-text">
                               {item.label}
                             </p>
                             {item.badge ? (
-                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                              <span className="inline-flex items-center rounded-full bg-app-surface-muted px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                 {item.badge}
                               </span>
                             ) : null}
                           </div>
-                          <code className="mt-2 block overflow-x-auto rounded-xl bg-slate-950 px-3 py-2 text-sm text-slate-100">
+                          <code className="mt-2 block overflow-x-auto rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text">
                             {item.path}
                           </code>
                         </div>
@@ -670,16 +676,16 @@ export function HybridJsonMediaEditor({
               </article>
             ) : null}
 
-            <div className="mb-2 flex w-full items-center justify-between gap-3 border-b border-slate-200 pb-2">
+            <div className="mb-2 flex w-full items-center justify-between gap-3 border-b border-app-border pb-2">
               <div className="flex min-w-0 flex-1 flex-col justify-start gap-1 text-left">
-                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700">
+                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-app-surface-muted px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-app-text-muted">
                   <FileJson className="h-3.5 w-3.5" />
                   CodeMirror JSON
                 </span>
-                <p className="text-sm font-semibold text-slate-950">
+                <p className="text-sm font-semibold text-app-text">
                   Codigo JSON
                 </p>
-                <span className="text-xs leading-5 text-slate-500">
+                <span className="text-xs leading-5 text-app-text-soft">
                   El guardado solo se habilita si el contenido es un JSON Array
                   válido.
                 </span>
@@ -712,12 +718,12 @@ export function HybridJsonMediaEditor({
             </div>
 
             {editorContext ? (
-              <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-300 bg-amber-500/10 shadow-sm backdrop-blur">
+              <div className="sticky top-4 z-10 rounded-[1.5rem] border border-app-warning-border bg-app-warning-bg shadow-sm backdrop-blur">
                 <div className="flex w-full items-center justify-start px-4 py-3 text-left">
-                  <span className="mr-3 shrink-0 text-base leading-none text-amber-700">
+                  <span className="mr-3 shrink-0 text-base leading-none text-app-warning-text">
                     ⚠️
                   </span>
-                  <p className="text-sm font-semibold text-amber-900">
+                  <p className="text-sm font-semibold text-app-warning-text">
                     {`EDITANDO BORRADOR: ${editorContext.stepName} | Ruta: ${editorContext.stepPath}`}
                   </p>
                 </div>
@@ -725,16 +731,16 @@ export function HybridJsonMediaEditor({
             ) : null}
 
             {isBlankCanvas ? (
-              <div className="rounded-[1.75rem] border border-dashed border-amber-300 bg-[linear-gradient(180deg,_rgba(255,251,235,0.95)_0%,_rgba(255,255,255,1)_100%)] p-6 text-left">
+              <div className="rounded-[1.75rem] border border-dashed border-app-warning-border bg-[linear-gradient(180deg,var(--app-warning-bg)_0%,var(--app-card)_100%)] p-6 text-left">
                 <div className="flex flex-col gap-5">
                   <div className="max-w-2xl space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-warning-text">
                       Lienzo en blanco
                     </p>
-                    <h3 className="text-2xl font-semibold text-slate-950">
+                    <h3 className="text-2xl font-semibold text-app-text">
                       Arranca este paso con una estructura segura
                     </h3>
-                    <p className="text-sm leading-6 text-slate-600">
+                    <p className="text-sm leading-6 text-app-text-muted">
                       Evita copiar y pegar desde otro paso. Inyecta una base lista para editar y luego ajusta el JSON en CodeMirror.
                     </p>
                   </div>
@@ -749,11 +755,11 @@ export function HybridJsonMediaEditor({
                         <p className="text-base font-semibold">
                           ⚡ Inyectar Plantilla VSL / Captura
                         </p>
-                        <p className="text-sm leading-6 text-slate-600">
+                        <p className="text-sm leading-6 text-app-text-muted">
                           Carga un arranque con <code>hero</code>, <code>video</code> y <code>lead_capture_config</code>.
                         </p>
                       </div>
-                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-amber-600" />
+                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-app-warning-text" />
                     </button>
 
                     <button
@@ -765,18 +771,18 @@ export function HybridJsonMediaEditor({
                         <p className="text-base font-semibold">
                           ⚡ Inyectar Plantilla Confirmación
                         </p>
-                        <p className="text-sm leading-6 text-slate-600">
+                        <p className="text-sm leading-6 text-app-text-muted">
                           Carga una base con <code>conversion_page_config</code> y <code>whatsapp_handoff_cta</code>.
                         </p>
                       </div>
-                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-emerald-600" />
+                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-app-success-text" />
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
               <>
-                <div className="overflow-hidden rounded-[1.5rem] border border-slate-200">
+                <div className="leadflow-json-editor overflow-hidden rounded-[1.5rem] border border-app-border bg-app-bg">
                   <CodeMirror
                     value={blocksText}
                     height="420px"
@@ -791,11 +797,11 @@ export function HybridJsonMediaEditor({
                 </div>
 
                 {parsedBlocksError ? (
-                  <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <p className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">
                     {parsedBlocksError}
                   </p>
                 ) : (
-                  <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  <p className="rounded-2xl border border-app-success-border bg-app-success-bg px-4 py-3 text-sm text-app-success-text">
                     JSON válido. El engine detectó {parsedBlocksCount} bloque
                     {parsedBlocksCount === 1 ? "" : "s"} listo
                     {parsedBlocksCount === 1 ? "" : "s"} para persistir como{" "}
@@ -806,16 +812,16 @@ export function HybridJsonMediaEditor({
             )}
 
             {selectedBlockDefinition ? (
-              <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6 text-left">
+              <article className="rounded-[1.5rem] border border-app-border bg-app-surface-muted p-6 text-left">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="text-left">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                       Catálogo / {selectedBlockDefinition.category}
                     </p>
-                    <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                    <h3 className="mt-2 text-xl font-semibold text-app-text">
                       {selectedBlockDefinition.name}
                     </h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-app-text-muted">
                       {catalogBlocks.length} bloque
                       {catalogBlocks.length === 1 ? "" : "s"} disponible
                       {catalogBlocks.length === 1 ? "" : "s"} en el arsenal
@@ -837,13 +843,13 @@ export function HybridJsonMediaEditor({
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,20rem)_1fr] lg:items-start">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-app-text-muted">
                       Selector de bloque
                     </span>
                     <select
                       value={selectedBlockDefinition.key}
                       onChange={(event) => setSelectedBlockKey(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-slate-400"
+                      className="w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm font-medium text-app-text shadow-sm outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
                     >
                       {catalogBlocks.map((definition) => (
                         <option key={definition.key} value={definition.key}>
@@ -853,9 +859,9 @@ export function HybridJsonMediaEditor({
                     </select>
                   </label>
 
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-600">
+                  <div className="rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm leading-6 text-app-text-muted">
                     <p>{selectedBlockDefinition.description}</p>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-soft">
                       Clave runtime: {selectedBlockDefinition.key}
                     </p>
                   </div>
@@ -863,18 +869,18 @@ export function HybridJsonMediaEditor({
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-app-text-soft">
                       Schema
                     </p>
-                    <pre className="mt-2 overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100">
+                    <pre className="mt-2 overflow-x-auto rounded-2xl border border-app-border bg-app-bg p-4 text-xs leading-6 text-app-text">
                       {JSON.stringify(selectedBlockDefinition.schema, null, 2)}
                     </pre>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-app-text-soft">
                       Ejemplo
                     </p>
-                    <pre className="mt-2 overflow-x-auto rounded-2xl bg-white p-4 text-xs leading-6 text-slate-700 ring-1 ring-slate-200">
+                    <pre className={codePanelClassName}>
                       {JSON.stringify(selectedBlockDefinition.example, null, 2)}
                     </pre>
                   </div>
@@ -887,14 +893,14 @@ export function HybridJsonMediaEditor({
         <details open className={sectionClassName}>
           <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
             <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
                 Media
               </p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+              <h2 className="mt-2 text-2xl font-semibold text-app-text">
                 CDN bridge y media dictionary
               </h2>
             </div>
-            <ChevronDown className="h-5 w-5 text-slate-400" />
+            <ChevronDown className="h-5 w-5 text-app-text-soft" />
           </summary>
 
           <div className="mt-6 space-y-4">
@@ -910,7 +916,7 @@ export function HybridJsonMediaEditor({
                     onAddMediaRow(key);
                   }}
                   disabled={uploadingRowIndex !== null}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-card px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-app-text-muted transition hover:border-app-border-strong hover:bg-app-surface-muted"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {key}
@@ -918,17 +924,17 @@ export function HybridJsonMediaEditor({
               ))}
             </div>
 
-            <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200 text-left">
-                <thead className="bg-slate-50">
-                  <tr className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="overflow-x-auto rounded-[1.5rem] border border-app-border">
+              <table className="min-w-full divide-y divide-app-border text-left">
+                <thead className="bg-app-surface-muted">
+                  <tr className="text-xs font-semibold uppercase tracking-[0.22em] text-app-text-soft">
                     <th className="px-4 py-3">Key</th>
                     <th className="px-4 py-3">URL</th>
                     <th className="px-4 py-3">Preview</th>
                     <th className="px-4 py-3">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
+                <tbody className="divide-y divide-app-border bg-app-card">
                   {mediaRows.map((row, index) => (
                     <tr key={`${row.key}-${index}`}>
                       <td className="px-4 py-3 align-top">
@@ -939,7 +945,7 @@ export function HybridJsonMediaEditor({
                           }
                           placeholder="hero"
                           disabled={uploadingRowIndex !== null}
-                          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+                          className={inputClassName}
                         />
                       </td>
                       <td className="px-4 py-3 align-top">
@@ -952,7 +958,7 @@ export function HybridJsonMediaEditor({
                           }
                           placeholder="https://cdn.kuruk.in/funnels/..."
                           disabled={uploadingRowIndex !== null}
-                          className="w-full min-w-72 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+                          className={`${inputClassName} min-w-72`}
                         />
                       </td>
                       <td className="px-4 py-3 align-top">
@@ -964,7 +970,7 @@ export function HybridJsonMediaEditor({
                             className="h-16 w-16 rounded-xl object-cover"
                           />
                         ) : (
-                          <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-app-border text-xs text-app-text-soft">
                             <Link2 className="h-4 w-4" />
                           </div>
                         )}
@@ -986,7 +992,7 @@ export function HybridJsonMediaEditor({
                             type="button"
                             onClick={() => onRemoveMediaRow(index)}
                             disabled={uploadingRowIndex !== null}
-                            className="inline-flex items-center justify-center gap-2 rounded-full border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
+                            className="inline-flex items-center justify-center gap-2 rounded-full border border-app-danger-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-danger-text transition hover:bg-app-danger-bg"
                           >
                             <Trash2 className="h-4 w-4" />
                             Quitar
@@ -1000,7 +1006,7 @@ export function HybridJsonMediaEditor({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs leading-6 text-slate-500">
+              <div className="text-xs leading-6 text-app-text-soft">
                 El media dictionary acepta URLs absolutas del CDN de
                 Leadflow/MinIO y mantiene compatibilidad con{" "}
                 <code>leadflow-media-resolver.ts</code>.
@@ -1017,11 +1023,11 @@ export function HybridJsonMediaEditor({
             </div>
 
             {mediaValidation ? (
-              <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <p className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">
                 {mediaValidation}
               </p>
             ) : (
-              <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <p className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
                 Llaves sugeridas listas:{" "}
                 {mediaMapKeys.join(", ") ||
                   "todavía faltan hero, product_box, gallery_1 y seo_cover"}
@@ -1040,15 +1046,15 @@ export function HybridJsonMediaEditor({
           onClose={historyPanel.onClose}
         >
           {historyPanel.isLoading ? (
-            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-6 text-sm text-slate-600">
+            <div className="rounded-[1.5rem] border border-app-border bg-app-surface-muted px-5 py-6 text-sm text-app-text-muted">
               Cargando versiones guardadas...
             </div>
           ) : historyPanel.errorMessage ? (
-            <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 px-5 py-6 text-sm text-rose-700">
+            <div className="rounded-[1.5rem] border border-app-danger-border bg-app-danger-bg px-5 py-6 text-sm text-app-danger-text">
               {historyPanel.errorMessage}
             </div>
           ) : historyPanel.versions.length === 0 ? (
-            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-6 text-sm text-slate-600">
+            <div className="rounded-[1.5rem] border border-app-border bg-app-surface-muted px-5 py-6 text-sm text-app-text-muted">
               Todavía no hay versiones previas guardadas para este paso.
             </div>
           ) : (
@@ -1059,16 +1065,16 @@ export function HybridJsonMediaEditor({
                 return (
                   <div
                     key={version.id}
-                    className="flex flex-col gap-3 rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 md:flex-row md:items-center md:justify-between"
+                    className="flex flex-col gap-3 rounded-[1.5rem] border border-app-border bg-app-card px-4 py-4 md:flex-row md:items-center md:justify-between"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-950">
+                      <p className="text-sm font-semibold text-app-text">
                         {`Versión ${historyPanel.versions.length - index}`}
                       </p>
-                      <p className="mt-1 text-sm text-slate-600">
+                      <p className="mt-1 text-sm text-app-text-muted">
                         {createdAtLabel}
                       </p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-app-text-soft">
                         {version.createdBy?.trim()
                           ? `Autor: ${version.createdBy}`
                           : "Autor no disponible"}

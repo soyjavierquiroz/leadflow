@@ -28,9 +28,9 @@ export function EmptyState({
       >
         <div className="relative flex h-16 w-16 items-center justify-center rounded-[1.6rem] border border-app-border bg-app-card shadow-[0_16px_35px_rgba(15,23,42,0.08)]">
           <span className="absolute inset-x-3 bottom-3 h-1 rounded-full bg-app-border" />
-          <span className="absolute left-4 top-6 h-5 w-1.5 rounded-full bg-teal-500" />
+          <span className="absolute left-4 top-6 h-5 w-1.5 rounded-full bg-app-accent" />
           <span className="absolute left-7 top-4 h-7 w-1.5 rounded-full bg-app-text" />
-          <span className="absolute left-10 top-8 h-3 w-1.5 rounded-full bg-sky-500" />
+          <span className="absolute left-10 top-8 h-3 w-1.5 rounded-full bg-app-accent-soft" />
         </div>
       </div>
       <p className="mt-5 text-xs font-semibold uppercase tracking-[0.26em] text-app-text-soft">

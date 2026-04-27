@@ -14,6 +14,7 @@ import { TrackingEventsService } from '../events/tracking-events.service';
 import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
 import { MessagingAutomationService } from '../messaging-automation/messaging-automation.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailerService } from '../shared/mailer.service';
 import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
 import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto';
 import type { CapturePublicLeadDto } from './dto/capture-public-lead.dto';
@@ -144,6 +145,11 @@ type RuntimeAttributionPayload = {
   ttclid?: string | null;
 };
 
+type SubmissionEntryContext = PublicRuntimeEntryContext & {
+  runtimePathPrefix?: string | null;
+  referralQueryParam?: string | null;
+};
+
 const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
   'ROTATION_POOL_NOT_CONFIGURED',
   'ROTATION_POOL_NOT_FOUND',
@@ -151,6 +157,7 @@ const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
   'ROTATION_MEMBER_NOT_FOUND',
   'NO_AVAILABLE_AD_WHEEL_TURNS',
   'AD_WHEEL_TURN_ALREADY_CONSUMED',
+  'AD_WHEEL_SEAT_EXHAUSTED',
 ]);
 
 const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
@@ -160,6 +167,7 @@ const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
   'NO_ACTIVE_AD_WHEEL_PARTICIPANTS',
   'NO_AVAILABLE_AD_WHEEL_TURNS',
   'AD_WHEEL_TURN_ALREADY_CONSUMED',
+  'AD_WHEEL_SEAT_EXHAUSTED',
 ]);
 
 type DirectEligibleSponsor = Prisma.SponsorGetPayload<Record<string, never>>;
@@ -179,6 +187,7 @@ export class LeadCaptureAssignmentService {
     private readonly messagingAutomationService: MessagingAutomationService,
     private readonly leadDispatcherService: LeadDispatcherService,
     private readonly publicFunnelRuntimeService: PublicFunnelRuntimeService,
+    private readonly mailerService: MailerService,
   ) {}
 
   async registerVisitor(dto: RegisterPublicVisitorDto) {
@@ -406,6 +415,7 @@ export class LeadCaptureAssignmentService {
         const nextStep = this.resolveNextStepAfterCaptureFromPublication(
           publication,
           dto.currentStepId,
+          entryContext,
         );
         const publicCaptureContext = this.buildPublicCaptureContext({
           publication,
@@ -525,6 +535,49 @@ export class LeadCaptureAssignmentService {
     }
   }
 
+  private async sendAdvisorAssignmentEmail(input: { assignmentId: string }) {
+    try {
+      const assignment = await this.prisma.assignment.findUnique({
+        where: {
+          id: input.assignmentId,
+        },
+        include: {
+          lead: true,
+          sponsor: true,
+          team: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      const advisorEmail = assignment?.sponsor.email?.trim();
+
+      if (!assignment || !advisorEmail) {
+        return;
+      }
+
+      await this.mailerService.sendAdvisorLeadAssignmentEmail({
+        email: advisorEmail,
+        advisorName: assignment.sponsor.displayName,
+        leadName: assignment.lead.fullName,
+        leadPhone: assignment.lead.phone,
+        leadEmail: assignment.lead.email,
+        teamName: assignment.team.name,
+        trafficLayer:
+          assignment.trafficLayer ?? assignment.lead.trafficLayer ?? 'ORGANIC',
+        assignmentId: assignment.id,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Advisor assignment email failed for assignment ${input.assignmentId}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+  }
+
   private dispatchAssignmentCreatedSideEffects(input: {
     assignmentId: string;
     sponsorId: string;
@@ -537,6 +590,10 @@ export class LeadCaptureAssignmentService {
     );
 
     void this.sendLeadContextUpsert({
+      assignmentId: input.assignmentId,
+    });
+
+    void this.sendAdvisorAssignmentEmail({
       assignmentId: input.assignmentId,
     });
 
@@ -872,7 +929,7 @@ export class LeadCaptureAssignmentService {
     input?: {
       triggerEventId?: string | null;
       funnelStepId?: string | null;
-      entryContext?: PublicRuntimeEntryContext;
+      entryContext?: SubmissionEntryContext;
     },
   ): Promise<AssignmentResolution> {
     const lockedLead = await lockLeadRowForUpdate(tx, {
@@ -1120,7 +1177,7 @@ export class LeadCaptureAssignmentService {
     input?: {
       triggerEventId?: string | null;
       funnelStepId?: string | null;
-      entryContext?: PublicRuntimeEntryContext;
+      entryContext?: SubmissionEntryContext;
     },
   ): Promise<AssignmentResolution> {
     try {
@@ -1506,7 +1563,7 @@ export class LeadCaptureAssignmentService {
     input: {
       triggerEventId?: string | null;
       funnelStepId?: string | null;
-      entryContext?: PublicRuntimeEntryContext;
+      entryContext?: SubmissionEntryContext;
     },
   ): Promise<AssignmentResolution> {
     const now = new Date();
@@ -1574,6 +1631,28 @@ export class LeadCaptureAssignmentService {
       throw new ConflictException({
         code: 'AD_WHEEL_TURN_ALREADY_CONSUMED',
         message: `Ad wheel turn ${turn.id} was already consumed.`,
+      });
+    }
+
+    const debitedSeat = await tx.adWheelParticipant.updateMany({
+      where: {
+        adWheelId,
+        sponsorId: turn.sponsorId,
+        seatCount: {
+          gt: 0,
+        },
+      },
+      data: {
+        seatCount: {
+          decrement: 1,
+        },
+      },
+    });
+
+    if (debitedSeat.count !== 1) {
+      throw new ConflictException({
+        code: 'AD_WHEEL_SEAT_EXHAUSTED',
+        message: `Sponsor ${turn.sponsorId} does not have remaining seats in ad wheel ${adWheelId}.`,
       });
     }
 
@@ -1720,7 +1799,7 @@ export class LeadCaptureAssignmentService {
     input: {
       triggerEventId?: string | null;
       funnelStepId?: string | null;
-      entryContext?: PublicRuntimeEntryContext;
+      entryContext?: SubmissionEntryContext;
     },
   ): Promise<AssignmentResolution> {
     const forcedSponsorId = input.entryContext?.forcedSponsorId;
@@ -2243,6 +2322,7 @@ export class LeadCaptureAssignmentService {
   private resolveNextStepAfterCaptureFromPublication(
     publication: FlowPublicationRecord,
     currentStepId?: string,
+    entryContext?: SubmissionEntryContext | null,
   ): StepNavigation {
     if (!currentStepId) {
       return null;
@@ -2262,13 +2342,34 @@ export class LeadCaptureAssignmentService {
     return {
       id: nextStep.id,
       slug: nextStep.slug,
-      path: buildPublicationStepPath(
-        publication.pathPrefix,
-        nextStep.slug,
-        nextStep.isEntryStep,
+      path: this.buildStepPathWithEntryContext(
+        publication,
+        nextStep,
+        entryContext,
       ),
       stepType: nextStep.stepType,
     };
+  }
+
+  private buildStepPathWithEntryContext(
+    publication: FlowPublicationRecord,
+    step: FlowPublicationRecord['funnelInstance']['steps'][number],
+    entryContext?: SubmissionEntryContext | null,
+  ) {
+    const path = buildPublicationStepPath(
+      entryContext?.runtimePathPrefix ?? publication.pathPrefix,
+      step.slug,
+      step.isEntryStep,
+    );
+
+    if (!entryContext?.referralQueryParam) {
+      return path;
+    }
+
+    const separator = path.includes('?') ? '&' : '?';
+    return `${path}${separator}ref=${encodeURIComponent(
+      entryContext.referralQueryParam,
+    )}`;
   }
 
   private toDbSource(value: string): PrismaLeadSourceChannel {

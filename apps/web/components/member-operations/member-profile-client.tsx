@@ -24,6 +24,15 @@ type MemberProfileClientProps = {
   kpis: MemberDashboardKpis;
 };
 
+const normalizePublicSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+
 export function MemberProfileClient({
   sponsor,
   kpis,
@@ -31,6 +40,7 @@ export function MemberProfileClient({
   const [currentSponsor, setCurrentSponsor] = useState(sponsor);
   const [formState, setFormState] = useState({
     displayName: sponsor.displayName,
+    publicSlug: sponsor.publicSlug ?? "",
     email: sponsor.email ?? "",
     phone: sponsor.phone ?? "",
     availabilityStatus: sponsor.availabilityStatus,
@@ -55,6 +65,7 @@ export function MemberProfileClient({
           method: "PATCH",
           body: JSON.stringify({
             displayName: formState.displayName,
+            publicSlug: formState.publicSlug || null,
             email: formState.email || null,
             phone: formState.phone || null,
             availabilityStatus: formState.availabilityStatus,
@@ -65,6 +76,7 @@ export function MemberProfileClient({
       setCurrentSponsor(updatedSponsor);
       setFormState({
         displayName: updatedSponsor.displayName,
+        publicSlug: updatedSponsor.publicSlug ?? "",
         email: updatedSponsor.email ?? "",
         phone: updatedSponsor.phone ?? "",
         availabilityStatus: updatedSponsor.availabilityStatus,
@@ -327,6 +339,27 @@ export function MemberProfileClient({
                   }
                   className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
                 />
+              </label>
+
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-slate-700">
+                  Slug de Identidad (URL)
+                </span>
+                <input
+                  value={formState.publicSlug}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      publicSlug: normalizePublicSlug(event.target.value),
+                    }))
+                  }
+                  placeholder="javier-garcia"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                />
+                <p className="text-xs leading-5 text-amber-700">
+                  Nota: Cambiar tu slug actualizará todos tus enlaces
+                  personales. Los enlaces viejos dejarán de funcionar.
+                </p>
               </label>
 
               <label className="space-y-2 text-sm">

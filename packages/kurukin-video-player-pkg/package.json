@@ -6,11 +6,11 @@
   "main": "./dist/kurukin-video-player.umd.js",
   "module": "./dist/kurukin-video-player.es.js",
   "style": "./dist/style.css",
-  "types": "./dist/index.d.ts",
+  "types": "./src/kurukin-video-player/ssr.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/kurukin-video-player.es.js",
+      "types": "./src/kurukin-video-player/ssr.ts",
+      "import": "./src/kurukin-video-player/ssr.ts",
       "require": "./dist/kurukin-video-player.umd.js"
     },
     "./style.css": "./dist/style.css"

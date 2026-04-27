@@ -117,17 +117,17 @@ export function SuperAdminBlacklistButton() {
   };
 
   return (
-    <section className="w-full overflow-hidden rounded-[2rem] border border-amber-200 bg-[linear-gradient(135deg,rgba(15,23,42,1),rgba(30,41,59,0.96)_58%,rgba(180,83,9,0.92))] p-6 text-left shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+    <section className="w-full overflow-hidden rounded-[2rem] border border-app-warning-border bg-[linear-gradient(135deg,var(--app-shell-bg),var(--app-shell-bg-strong)_58%,color-mix(in_srgb,var(--app-warning-text)_74%,var(--app-shell-bg)))] p-6 text-left shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-amber-200">
+          <div className="inline-flex items-center gap-2 rounded-full border border-app-shell-border bg-app-shell-surface px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-app-warning-text">
             <Crown className="h-4 w-4" />
             Olimpo
           </div>
-          <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
+          <h2 className="mt-4 text-2xl font-semibold tracking-tight text-app-shell-text">
             Acceso Maestro: Kurukin Blacklist
           </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-app-shell-text">
             Entra al dashboard administrativo global de Kurukin Blacklist con la
             llave maestra configurada para plataforma. Este acceso ignora el
             filtro por asesor y habilita la vista completa para operación de
@@ -139,7 +139,7 @@ export function SuperAdminBlacklistButton() {
           type="button"
           onClick={() => void handleOpen()}
           disabled={isOpening}
-          className="inline-flex min-h-16 items-center justify-center gap-3 rounded-[1.5rem] bg-amber-400 px-8 py-4 text-base font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60 lg:min-w-[22rem]"
+          className="inline-flex min-h-16 items-center justify-center gap-3 rounded-[1.5rem] bg-app-warning-text px-8 py-4 text-base font-semibold text-app-bg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 lg:min-w-[22rem]"
         >
           <Zap className="h-5 w-5" />
           {isOpening

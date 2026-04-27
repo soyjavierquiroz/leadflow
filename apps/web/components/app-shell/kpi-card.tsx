@@ -14,7 +14,7 @@ export function KpiCard({ label, value, hint }: KpiCardProps) {
         {value}
       </p>
       <p className="mt-3 text-sm leading-6 text-app-text-muted">{hint}</p>
-      <div className="mt-4 h-1.5 w-14 rounded-full bg-[linear-gradient(90deg,_#0f172a_0%,_#14b8a6_100%)]" />
+      <div className="mt-4 h-1.5 w-14 rounded-full bg-[linear-gradient(90deg,var(--app-text)_0%,var(--app-accent)_100%)]" />
     </article>
   );
 }

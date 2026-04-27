@@ -59,8 +59,15 @@ type PersonalLinkRoute = {
   runtimePathPrefix: string;
 };
 
+type AdvisorRefPathRoute = {
+  sponsorSlug: string;
+  runtimePathPrefix: string;
+  publicationResolutionPath: string;
+};
+
 type ResolvedRuntimeEntryContext = PublicRuntimeEntryContext & {
   runtimePathPrefix: string | null;
+  referralQueryParam: string | null;
 };
 
 const asJsonRecord = (value: Prisma.JsonValue | null | undefined) =>
@@ -87,11 +94,14 @@ const normalizePersonalLinkSegment = (value: string | null | undefined) => {
   return decoded.length > 0 ? decoded : null;
 };
 
-const parsePersonalLinkRoute = (path: string): PersonalLinkRoute | null => {
-  const segments = normalizePath(path)
+const pathSegments = (path: string) =>
+  normalizePath(path)
     .split('/')
     .map((segment) => segment.trim())
     .filter(Boolean);
+
+const parsePersonalLinkRoute = (path: string): PersonalLinkRoute | null => {
+  const segments = pathSegments(path);
 
   if (segments[0] !== 'a') {
     const sponsorSlug = normalizePersonalLinkSegment(segments[0]);
@@ -116,6 +126,66 @@ const parsePersonalLinkRoute = (path: string): PersonalLinkRoute | null => {
     sponsorSlug,
     runtimePathPrefix: `${PERSONAL_LINK_PATH_PREFIX}/${sponsorSlug}`,
   };
+};
+
+const parseAdvisorRefPathRoute = (
+  path: string,
+): AdvisorRefPathRoute | null => {
+  const segments = pathSegments(path);
+  const refIndex = segments.findIndex((segment) => segment === 'ref');
+
+  if (refIndex < 0) {
+    return null;
+  }
+
+  const sponsorSlug = normalizePersonalLinkSegment(segments[refIndex + 1]);
+  if (!sponsorSlug) {
+    return null;
+  }
+
+  const publicationSegments = [
+    ...segments.slice(0, refIndex),
+    ...segments.slice(refIndex + 2),
+  ];
+  const runtimePrefixSegments = [
+    ...segments.slice(0, refIndex),
+    'ref',
+    sponsorSlug,
+  ];
+
+  return {
+    sponsorSlug,
+    runtimePathPrefix: `/${runtimePrefixSegments.join('/')}`,
+    publicationResolutionPath:
+      publicationSegments.length > 0
+        ? `/${publicationSegments.join('/')}`
+        : '/',
+  };
+};
+
+const extractQueryParam = (
+  value: string | null | undefined,
+  key: string,
+) => {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  try {
+    return normalizePersonalLinkSegment(new URL(trimmed).searchParams.get(key));
+  } catch {
+    const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+
+    try {
+      return normalizePersonalLinkSegment(
+        new URL(path, 'https://runtime.local').searchParams.get(key),
+      );
+    } catch {
+      return null;
+    }
+  }
 };
 
 const extractAwid = (value: string | null | undefined) => {
@@ -152,7 +222,14 @@ export class PublicFunnelRuntimeService {
   ): Promise<PublicRuntimePayload> {
     const normalizedHost = normalizeHost(host);
     const normalizedPath = normalizePath(path);
-    const personalLinkRoute = parsePersonalLinkRoute(normalizedPath);
+    const advisorRefPathRoute = parseAdvisorRefPathRoute(path);
+    const queryReferralSlug = extractQueryParam(path, 'ref');
+    const personalLinkRoute =
+      advisorRefPathRoute || queryReferralSlug
+        ? null
+        : parsePersonalLinkRoute(normalizedPath);
+    const publicationResolutionPath =
+      advisorRefPathRoute?.publicationResolutionPath ?? normalizedPath;
 
     if (!normalizedHost) {
       throw new BadRequestException({
@@ -200,7 +277,7 @@ export class PublicFunnelRuntimeService {
               }
 
               return matchesPublicationPath(
-                normalizedPath,
+                publicationResolutionPath,
                 publication.pathPrefix,
               );
             })
@@ -242,8 +319,52 @@ export class PublicFunnelRuntimeService {
     tx?: Prisma.TransactionClient | PrismaService;
   }): Promise<ResolvedRuntimeEntryContext> {
     const normalizedPath = normalizePath(input.requestedPath);
-    const personalLinkRoute = parsePersonalLinkRoute(normalizedPath);
+    const advisorRefPathRoute = parseAdvisorRefPathRoute(input.requestedPath);
+    const queryReferralSlug = extractQueryParam(input.requestedPath, 'ref');
+    const personalLinkRoute =
+      advisorRefPathRoute || queryReferralSlug
+        ? null
+        : parsePersonalLinkRoute(normalizedPath);
     const prismaClient = input.tx ?? this.prisma;
+    const pathReferralPrefixMatchesPublication = advisorRefPathRoute
+      ? matchesPublicationPath(
+          advisorRefPathRoute.publicationResolutionPath,
+          input.publicationPathPrefix,
+        )
+      : false;
+
+    if (advisorRefPathRoute && pathReferralPrefixMatchesPublication) {
+      const sponsor = await prismaClient.sponsor.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          teamId: input.teamId,
+          publicSlug: advisorRefPathRoute.sponsorSlug,
+          isActive: true,
+          status: 'active',
+          availabilityStatus: 'available',
+        } as Prisma.SponsorWhereInput,
+        select: {
+          id: true,
+        },
+      });
+
+      if (sponsor) {
+        return {
+          entryMode: 'organic_asesor',
+          trafficLayer: 'DIRECT',
+          forcedSponsorId: sponsor.id,
+          adWheelId: null,
+          browserPixelsEnabled: false,
+          runtimePathPrefix: advisorRefPathRoute.runtimePathPrefix,
+          referralQueryParam: null,
+        };
+      }
+
+      throw new NotFoundException({
+        code: 'PUBLIC_SPONSOR_NOT_FOUND',
+        message: `No active public sponsor matched ${normalizedPath}.`,
+      });
+    }
 
     if (personalLinkRoute && input.publicationPathPrefix === '/') {
       const sponsor = await prismaClient.sponsor.findFirst({
@@ -268,6 +389,7 @@ export class PublicFunnelRuntimeService {
           adWheelId: null,
           browserPixelsEnabled: false,
           runtimePathPrefix: personalLinkRoute.runtimePathPrefix,
+          referralQueryParam: null,
         };
       }
 
@@ -276,6 +398,34 @@ export class PublicFunnelRuntimeService {
           code: 'PUBLIC_SPONSOR_NOT_FOUND',
           message: `No active public sponsor matched ${normalizedPath}.`,
         });
+      }
+    }
+
+    if (queryReferralSlug) {
+      const sponsor = await prismaClient.sponsor.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          teamId: input.teamId,
+          publicSlug: queryReferralSlug,
+          isActive: true,
+          status: 'active',
+          availabilityStatus: 'available',
+        } as Prisma.SponsorWhereInput,
+        select: {
+          id: true,
+        },
+      });
+
+      if (sponsor) {
+        return {
+          entryMode: 'organic_asesor',
+          trafficLayer: 'DIRECT',
+          forcedSponsorId: sponsor.id,
+          adWheelId: null,
+          browserPixelsEnabled: false,
+          runtimePathPrefix: null,
+          referralQueryParam: queryReferralSlug,
+        };
       }
     }
 
@@ -307,6 +457,7 @@ export class PublicFunnelRuntimeService {
           adWheelId: adWheel.id,
           browserPixelsEnabled: true,
           runtimePathPrefix: null,
+          referralQueryParam: null,
         };
       }
     }
@@ -318,6 +469,7 @@ export class PublicFunnelRuntimeService {
       adWheelId: null,
       browserPixelsEnabled: true,
       runtimePathPrefix: null,
+      referralQueryParam: null,
     };
   }
 
@@ -352,6 +504,7 @@ export class PublicFunnelRuntimeService {
         adWheelId: null,
         browserPixelsEnabled: true,
         runtimePathPrefix: null,
+        referralQueryParam: null,
       },
     );
   }
@@ -378,6 +531,16 @@ export class PublicFunnelRuntimeService {
   ): PublicRuntimePayload {
     const effectivePublicationPathPrefix =
       entryContext.runtimePathPrefix ?? publication.pathPrefix;
+    const decorateStepPath = (stepPath: string) => {
+      if (!entryContext.referralQueryParam) {
+        return stepPath;
+      }
+
+      const separator = stepPath.includes('?') ? '&' : '?';
+      return `${stepPath}${separator}ref=${encodeURIComponent(
+        entryContext.referralQueryParam,
+      )}`;
+    };
     const relativeStepPath = resolveRelativeStepPath(
       requestedPath,
       effectivePublicationPathPrefix,
@@ -386,10 +549,12 @@ export class PublicFunnelRuntimeService {
     const steps = publication.funnelInstance.steps.map((step) => ({
       slug: normalizeStepSlug(step.slug),
       id: step.id,
-      path: buildPublicationStepPath(
-        effectivePublicationPathPrefix,
-        step.slug,
-        step.isEntryStep,
+      path: decorateStepPath(
+        buildPublicationStepPath(
+          effectivePublicationPathPrefix,
+          step.slug,
+          step.isEntryStep,
+        ),
       ),
       stepType: step.stepType,
       position: step.position,

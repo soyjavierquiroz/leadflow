@@ -57,6 +57,9 @@ describe('LeadCaptureAssignmentService', () => {
         runtimePathPrefix: null,
       }),
     } as any;
+    const mailerService = {
+      sendAdvisorLeadAssignmentEmail: jest.fn().mockResolvedValue(undefined),
+    } as any;
 
     const service = new LeadCaptureAssignmentService(
       prisma,
@@ -64,6 +67,7 @@ describe('LeadCaptureAssignmentService', () => {
       messagingAutomationService,
       leadDispatcherService,
       publicFunnelRuntimeService,
+      mailerService,
     );
 
     return {
@@ -577,6 +581,155 @@ describe('LeadCaptureAssignmentService', () => {
     expect(result.assignment).toMatchObject({
       id: 'assignment-1',
       reason: 'manual',
+    });
+  });
+
+  it('preserves direct referral context when building the post-capture next step', () => {
+    const { service } = buildService();
+    const publication = buildPublication();
+
+    const nextStep = (service as any).resolveNextStepAfterCaptureFromPublication(
+      publication,
+      'step-1',
+      {
+        entryMode: 'organic_asesor',
+        trafficLayer: 'DIRECT',
+        forcedSponsorId: 'sponsor-1',
+        adWheelId: null,
+        browserPixelsEnabled: false,
+        runtimePathPrefix: '/demo/ref/asesor-uno',
+      },
+    );
+
+    expect(nextStep).toEqual({
+      id: 'step-2',
+      slug: 'gracias',
+      path: '/demo/ref/asesor-uno/gracias',
+      stepType: 'thank_you',
+    });
+  });
+
+  it('consumes an ad wheel turn and debits one participant seat atomically', async () => {
+    const { service, trackingEventsService } = buildService();
+    const publication = buildPublication();
+    const assignedAt = new Date('2026-04-18T00:00:00.000Z');
+    const tx = {
+      adWheelTurn: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'turn-1',
+          adWheelId: 'wheel-1',
+          sponsorId: 'sponsor-1',
+          position: 1,
+          sponsor: {
+            id: 'sponsor-1',
+            displayName: 'Advisor Uno',
+            email: 'advisor@example.com',
+            phone: '+57 300 000 0001',
+            avatarUrl: 'https://cdn.example.com/a1.png',
+          },
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      adWheelParticipant: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      assignment: {
+        create: jest.fn().mockResolvedValue({
+          id: 'assignment-1',
+          status: 'assigned',
+          reason: 'rotation',
+          assignedAt,
+          sponsor: {
+            id: 'sponsor-1',
+            displayName: 'Advisor Uno',
+            email: 'advisor@example.com',
+            phone: '+57 300 000 0001',
+            avatarUrl: 'https://cdn.example.com/a1.png',
+          },
+        }),
+      },
+      lead: {
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+      domainEvent: {
+        create: jest.fn().mockResolvedValue(undefined),
+      },
+      user: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    };
+
+    const result = await (service as any).assignLeadToAdWheelTurnInTransaction(
+      tx,
+      publication,
+      {
+        id: 'lead-1',
+        currentAssignmentId: null,
+      },
+      'wheel-1',
+      {
+        triggerEventId: 'trigger-1',
+        funnelStepId: 'step-1',
+        entryContext: {
+          entryMode: 'paid_ads',
+          trafficLayer: 'PAID_WHEEL',
+          forcedSponsorId: null,
+          adWheelId: 'wheel-1',
+          browserPixelsEnabled: true,
+        },
+      },
+    );
+
+    expect(tx.adWheelTurn.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'turn-1',
+        isConsumed: false,
+      },
+      data: {
+        isConsumed: true,
+        assignmentId: expect.any(String),
+      },
+    });
+    expect(tx.adWheelParticipant.updateMany).toHaveBeenCalledWith({
+      where: {
+        adWheelId: 'wheel-1',
+        sponsorId: 'sponsor-1',
+        seatCount: {
+          gt: 0,
+        },
+      },
+      data: {
+        seatCount: {
+          decrement: 1,
+        },
+      },
+    });
+    expect(tx.assignment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        leadId: 'lead-1',
+        sponsorId: 'sponsor-1',
+        trafficLayer: 'PAID_WHEEL',
+        originAdWheelId: 'wheel-1',
+        reason: 'rotation',
+      }),
+      include: {
+        sponsor: true,
+      },
+    });
+    expect(trackingEventsService.recordTrackingEventInTransaction).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        eventName: 'assignment_created',
+        payload: expect.objectContaining({
+          trafficLayer: 'PAID_WHEEL',
+          adWheelId: 'wheel-1',
+          adWheelTurnId: 'turn-1',
+        }),
+      }),
+    );
+    expect(result.assignment).toMatchObject({
+      id: 'assignment-1',
+      reason: 'rotation',
     });
   });
 });

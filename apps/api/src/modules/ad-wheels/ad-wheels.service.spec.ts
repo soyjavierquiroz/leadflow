@@ -31,11 +31,19 @@ describe('AdWheelsService', () => {
       formatMinorUnits: jest.fn(),
       debitSeat: jest.fn(),
     } as any;
+    const adWheelSequenceGeneratorService = {
+      generateSequence: jest.fn().mockResolvedValue([]),
+    } as any;
 
     return {
       prisma,
       walletEngineService,
-      service: new AdWheelsService(prisma, walletEngineService),
+      adWheelSequenceGeneratorService,
+      service: new AdWheelsService(
+        prisma,
+        walletEngineService,
+        adWheelSequenceGeneratorService,
+      ),
     };
   };
 
@@ -388,7 +396,12 @@ describe('AdWheelsService', () => {
   });
 
   it('returns an existing participation without charging again', async () => {
-    const { prisma, walletEngineService, service } = buildService();
+    const {
+      prisma,
+      walletEngineService,
+      service,
+      adWheelSequenceGeneratorService,
+    } = buildService();
 
     prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
@@ -422,6 +435,65 @@ describe('AdWheelsService', () => {
     expect(result.alreadyJoined).toBe(true);
     expect(result.wallet).toBeNull();
     expect(walletEngineService.debitSeat).not.toHaveBeenCalled();
+    expect(
+      adWheelSequenceGeneratorService.generateSequence,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('regenerates pending turns after a successful sponsor buy-in', async () => {
+    const {
+      prisma,
+      walletEngineService,
+      service,
+      adWheelSequenceGeneratorService,
+    } = buildService();
+
+    prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
+    prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
+      id: 'wheel-1',
+      teamId: 'team-1',
+      status: 'ACTIVE',
+      name: 'Abril',
+      seatPrice: 5_000,
+      startDate: new Date('2026-04-01T00:00:00.000Z'),
+      endDate: new Date('2026-04-30T23:59:59.000Z'),
+      createdAt: new Date('2026-04-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+      participants: [],
+    });
+    prisma.adWheelParticipant.create = jest.fn().mockResolvedValue({
+      adWheelId: 'wheel-1',
+      sponsorId: 'sponsor-1',
+      joinedAt: new Date('2026-04-01T01:00:00.000Z'),
+    });
+    walletEngineService.upsertTeamAccount.mockResolvedValue({
+      id: 'account-1',
+    });
+    walletEngineService.formatMinorUnits.mockReturnValue('50.00');
+    walletEngineService.debitSeat.mockResolvedValue({
+      balance: {
+        unit_code: 'USD',
+        unit_scale: 2,
+        available_balance: '150.00',
+      },
+      ledger_entry: {
+        balance_after: '150.00',
+      },
+    });
+
+    const result = await service.joinForSponsor(
+      {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        sponsorId: 'sponsor-1',
+      },
+      'wheel-1',
+    );
+
+    expect(result.alreadyJoined).toBe(false);
+    expect(adWheelSequenceGeneratorService.generateSequence).toHaveBeenCalledWith(
+      'wheel-1',
+    );
   });
 
   it('rejects creating a second active wheel for the same team', async () => {

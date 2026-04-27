@@ -29,9 +29,12 @@ type WheelEditorState =
   | null;
 
 const primaryButtonClassName =
-  "rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full bg-app-text px-4 py-2.5 text-sm font-semibold text-app-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
-  "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
+
+const inputClassName =
+  "w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-soft";
 
 const sortRows = (rows: TeamAdWheelRecord[]) => {
   const statusOrder = {
@@ -277,17 +280,17 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
           {rows.map((wheel) => (
             <article
               key={wheel.id}
-              className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-6 shadow-[0_22px_60px_rgba(15,23,42,0.06)]"
+              className="rounded-[2rem] border border-app-border bg-[linear-gradient(180deg,var(--app-surface)_0%,var(--app-card)_100%)] p-6 text-app-text shadow-[var(--ai-panel-shadow)]"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                     Ad Co-op
                   </p>
-                  <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                  <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-text">
                     {wheel.name}
                   </h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-app-text-muted">
                     Ventana operativa desde {formatDateTime(wheel.startDate)} hasta{" "}
                     {formatDateTime(wheel.endDate)}.
                   </p>
@@ -306,30 +309,30 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
               </div>
 
               <div className="mt-6 grid gap-3 md:grid-cols-3">
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <div className="rounded-[1.5rem] border border-app-border bg-app-card p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
                     Precio del Asiento
                   </p>
-                  <p className="mt-3 text-lg font-semibold text-slate-950">
+                  <p className="mt-3 text-lg font-semibold text-app-text">
                     {formatAdWheelSeatPrice(wheel.seatPrice)}
                   </p>
                 </div>
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <div className="rounded-[1.5rem] border border-app-border bg-app-card p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
                     Participantes
                   </p>
-                  <p className="mt-3 text-lg font-semibold text-slate-950">
+                  <p className="mt-3 text-lg font-semibold text-app-text">
                     {formatCompactNumber(wheel.participantCount)}
                   </p>
                 </div>
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <div className="rounded-[1.5rem] border border-app-border bg-app-card p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
                     Duración
                   </p>
-                  <p className="mt-3 text-lg font-semibold text-slate-950">
+                  <p className="mt-3 text-lg font-semibold text-app-text">
                     {getCampaignDurationDays(wheel.startDate, wheel.endDate)} días
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-app-text-muted">
                     Finaliza {formatDateTime(wheel.endDate)}.
                   </p>
                 </div>
@@ -366,19 +369,19 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
         >
           <form className="space-y-5" onSubmit={handleSubmit}>
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-app-text">
                 Nombre
               </span>
               <input
                 value={formName}
                 onChange={(event) => setFormName(event.target.value)}
                 placeholder="Abril Premium"
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                className={inputClassName}
               />
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-app-text">
                 Seat Price
               </span>
               <input
@@ -389,16 +392,16 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
                 onChange={(event) => setFormSeatPrice(event.target.value)}
                 placeholder="50"
                 disabled={!scheduleIsEditable}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                className={inputClassName}
               />
-              <p className="text-sm leading-6 text-slate-500">
+              <p className="text-sm leading-6 text-app-text-soft">
                 Ingresa el valor en USD. Ejemplo: `50` envía `5000` centavos al
                 backend; `50.25` envía `5025`.
               </p>
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-app-text">
                 Start Date
               </span>
               <input
@@ -406,15 +409,15 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
                 value={formStartDate}
                 onChange={(event) => setFormStartDate(event.target.value)}
                 disabled={!scheduleIsEditable}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                className={inputClassName}
               />
-              <p className="text-sm leading-6 text-slate-500">
+              <p className="text-sm leading-6 text-app-text-soft">
                 Selecciona la fecha exacta en la que la rueda debe comenzar.
               </p>
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-app-text">
                 Duración de la campaña
               </span>
               <input
@@ -425,9 +428,9 @@ export function TeamWheelsClient({ initialRows }: TeamWheelsClientProps) {
                 onChange={(event) => setFormDurationDays(event.target.value)}
                 placeholder="30"
                 disabled={!scheduleIsEditable}
-                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                className={inputClassName}
               />
-              <p className="text-sm leading-6 text-slate-500">
+              <p className="text-sm leading-6 text-app-text-soft">
                 Ingresa el total de días. El API recalculará la fecha de
                 finalización automáticamente.
               </p>

@@ -45,15 +45,18 @@ import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import { teamOperationRequest } from "@/lib/team-operations";
 
 const primaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-full bg-app-text px-4 py-2.5 text-sm font-semibold text-app-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
 
 const secondaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
 
 const sectionClassName =
-  "rounded-[2rem] border border-slate-200 bg-white p-6 text-left shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8";
+  "rounded-[2rem] border border-app-border bg-app-card p-6 text-left text-app-text shadow-[var(--ai-panel-shadow)] md:p-8";
 
-const fieldLabelClassName = "text-sm font-medium text-slate-700";
+const fieldLabelClassName = "text-sm font-medium text-app-text-muted";
+
+const inputClassName =
+  "rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-soft";
 
 const defaultMediaRows = requiredMediaKeys.map((key) => ({
   key,
@@ -949,14 +952,14 @@ export function TeamVslPublicationEditor({
       <section className="grid gap-4 md:grid-cols-3">
         <article className={sectionClassName}>
           <div className="flex items-center gap-3 text-left">
-            <div className="rounded-full bg-teal-100 p-2 text-teal-700">
+            <div className="rounded-full bg-app-accent-soft p-2 text-app-accent">
               <Sparkles className="h-4 w-4" />
             </div>
             <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 Template activo
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {selectedTemplate?.name ?? "Selecciona un template"}
               </p>
             </div>
@@ -964,14 +967,14 @@ export function TeamVslPublicationEditor({
         </article>
         <article className={sectionClassName}>
           <div className="flex items-center gap-3 text-left">
-            <div className="rounded-full bg-amber-100 p-2 text-amber-700">
+            <div className="rounded-full bg-app-warning-bg p-2 text-app-warning-text">
               <FileJson className="h-4 w-4" />
             </div>
             <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 Bloques válidos
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {parsedBlocks.value
                   ? `${parsedBlocks.value.length} bloques listos`
                   : "Corrige el JSON"}
@@ -981,14 +984,14 @@ export function TeamVslPublicationEditor({
         </article>
         <article className={sectionClassName}>
           <div className="flex items-center gap-3 text-left">
-            <div className="rounded-full bg-sky-100 p-2 text-sky-700">
+            <div className="rounded-full bg-app-success-bg p-2 text-app-success-text">
               <Globe className="h-4 w-4" />
             </div>
             <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
                 {showStepSwitcher ? "Paso activo" : "Publicación"}
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">
+              <p className="mt-1 text-sm font-semibold text-app-text">
                 {showStepSwitcher
                   ? stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
                     "Paso activo"
@@ -1004,18 +1007,18 @@ export function TeamVslPublicationEditor({
       <details open className={sectionClassName}>
         <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
           <div className="text-left">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
               Configuración
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+            <h2 className="mt-2 text-2xl font-semibold text-app-text">
               Header y metadata del funnel
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-app-text-muted">
               Define identidad, dominio, tema y SEO con una jerarquía más clara
               antes de entrar al JSON operativo de cada paso.
             </p>
           </div>
-          <ChevronDown className="h-5 w-5 text-slate-400" />
+          <ChevronDown className="h-5 w-5 text-app-text-soft" />
         </summary>
 
         <div className="mt-6 grid gap-5 md:grid-cols-2">
@@ -1025,9 +1028,9 @@ export function TeamVslPublicationEditor({
               value={funnelName}
               onChange={(event) => setFunnelName(event.target.value)}
               placeholder="Dragon Vintage T9 - Jakawi Import"
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             />
-            <span className="text-xs leading-5 text-slate-500">
+            <span className="text-xs leading-5 text-app-text-soft">
               Código interno sugerido:{" "}
               {slugify(funnelName || "nuevo-funnel") || "nuevo-funnel"}
             </span>
@@ -1038,7 +1041,7 @@ export function TeamVslPublicationEditor({
             <select
               value={selectedDomainId}
               onChange={(event) => setSelectedDomainId(event.target.value)}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             >
               {activeDomains.map((domain) => (
                 <option key={domain.id} value={domain.id}>
@@ -1054,7 +1057,7 @@ export function TeamVslPublicationEditor({
               value={pathPrefix}
               onChange={(event) => setPathPrefix(event.target.value)}
               placeholder="/"
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             />
           </label>
 
@@ -1063,7 +1066,7 @@ export function TeamVslPublicationEditor({
             <select
               value={selectedTemplateId}
               onChange={(event) => setSelectedTemplateId(event.target.value)}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             >
               <option value="">Selecciona un template</option>
               {visibleTemplateOptions.map((template) => (
@@ -1079,7 +1082,7 @@ export function TeamVslPublicationEditor({
             <select
               value={selectedThemeId}
               onChange={(event) => setSelectedThemeId(event.target.value)}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             >
               {availableFunnelThemes.map((theme) => (
                 <option key={theme.id} value={theme.id}>
@@ -1087,7 +1090,7 @@ export function TeamVslPublicationEditor({
                 </option>
               ))}
             </select>
-            <span className="text-xs leading-5 text-slate-500">
+            <span className="text-xs leading-5 text-app-text-soft">
               Este theme se guarda a nivel Funnel y el runtime público lo expone
               en la raíz del payload.
             </span>
@@ -1111,9 +1114,9 @@ export function TeamVslPublicationEditor({
               value={seoTitle}
               onChange={(event) => setSeoTitle(event.target.value)}
               placeholder={funnelName || "Dragon Vintage T9 | Leadflow"}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             />
-            <span className="text-xs leading-5 text-slate-500">
+            <span className="text-xs leading-5 text-app-text-soft">
               Si lo dejas vacío, usamos automáticamente el nombre del funnel.
             </span>
           </label>
@@ -1125,9 +1128,9 @@ export function TeamVslPublicationEditor({
               onChange={(event) => setMetaDescription(event.target.value)}
               placeholder="Resumen comercial y beneficio principal de la landing para buscadores y shares."
               rows={4}
-              className="rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+              className={inputClassName}
             />
-            <span className="text-xs leading-5 text-slate-500">
+            <span className="text-xs leading-5 text-app-text-soft">
               Recomendado: 140-160 caracteres orientados al beneficio principal.
             </span>
           </label>
@@ -1162,16 +1165,16 @@ export function TeamVslPublicationEditor({
         previewSettingsJson={editorSettingsJson}
         availableBlocks={availableBlocks}
         stepSpecificSettingsPanel={
-          <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6 text-left">
+          <article className="rounded-[1.5rem] border border-app-border bg-app-surface-muted p-6 text-left">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-2xl text-left">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
                   Configuración específica del paso
                 </p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                <h3 className="mt-2 text-xl font-semibold text-app-text">
                   Layout del paso
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-app-text-muted">
                   Este ajuste vive dentro de <code>settingsJson</code> del paso
                   activo y permite que páginas como <code>/confirmado</code>{" "}
                   rompan la herencia del layout sticky del funnel cuando haga
@@ -1191,7 +1194,7 @@ export function TeamVslPublicationEditor({
                       ),
                     })
                   }
-                  className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+                  className={inputClassName}
                 >
                   <option value="inherit">Heredar del Funnel (Por defecto)</option>
                   <option value="full-page">Estructura Centrada / Full Page</option>
@@ -1244,13 +1247,13 @@ export function TeamVslPublicationEditor({
       <section className={sectionClassName}>
         <div className="flex flex-col gap-4 text-left md:flex-row md:items-center md:justify-between">
           <div className="text-left">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
               Persistencia
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+            <h2 className="mt-2 text-2xl font-semibold text-app-text">
               Guardado atómico listo
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-sm leading-6 text-app-text-muted">
               El submit crea o actualiza la FunnelInstance, el FunnelStep activo
               y la FunnelPublication en una transacción, dejando todos los
               estados en `active`.
