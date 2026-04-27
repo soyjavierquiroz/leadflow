@@ -9,6 +9,8 @@ import {
 } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
+import { LeadSourceBadge } from "@/components/app-shell/lead-source-badge";
+import { PremiumSelect } from "@/components/app-shell/premium-select";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
 import { ModalShell } from "@/components/team-operations/modal-shell";
@@ -47,6 +49,26 @@ const leadStatusFilterOptions = [
   "lost",
 ] as const;
 
+const sourceFilterOptions = [
+  {
+    value: "all",
+    label: "Todas las fuentes",
+    description: "Orgánico y campañas",
+  },
+  {
+    value: "organic",
+    label: "Orgánicos",
+    description: "Directo y orgánico",
+  },
+  {
+    value: "paid",
+    label: "Campañas pagadas",
+    description: "Ruedas publicitarias",
+  },
+] as const;
+
+type SourceFilter = (typeof sourceFilterOptions)[number]["value"];
+
 const filterLabelByValue = {
   orphaned: "Huerfanos",
   stagnant: "Estancados",
@@ -81,7 +103,9 @@ export function TeamLeadsClient({
     useState<(typeof supervisionFilterOptions)[number]>("all");
   const [leadStatusFilter, setLeadStatusFilter] =
     useState<(typeof leadStatusFilterOptions)[number]>("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sponsorFilter, setSponsorFilter] = useState("all");
+  const [openSelectId, setOpenSelectId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [selectedSponsorId, setSelectedSponsorId] = useState<string>("");
   const [feedback, setFeedback] = useState<{
@@ -103,6 +127,10 @@ export function TeamLeadsClient({
           row.companyName,
           row.funnelName,
           row.domainHost,
+          row.originAdWheelName,
+          row.trafficLayer === "PAID_WHEEL"
+            ? "campaña pagada publicidad"
+            : "organico directo",
           row.sponsor?.displayName,
         ]
           .filter(Boolean)
@@ -120,15 +148,28 @@ export function TeamLeadsClient({
         (sponsorFilter === "unassigned"
           ? !row.sponsor
           : row.sponsor?.id === sponsorFilter);
+      const matchesSource =
+        sourceFilter === "all" ||
+        (sourceFilter === "paid"
+          ? row.trafficLayer === "PAID_WHEEL"
+          : row.trafficLayer !== "PAID_WHEEL");
 
       return (
         matchesSearch &&
         matchesSupervision &&
         matchesLeadStatus &&
+        matchesSource &&
         matchesSponsor
       );
     });
-  }, [deferredSearch, leadStatusFilter, rows, sponsorFilter, supervisionFilter]);
+  }, [
+    deferredSearch,
+    leadStatusFilter,
+    rows,
+    sourceFilter,
+    sponsorFilter,
+    supervisionFilter,
+  ]);
 
   const sponsorFilterOptions = useMemo(() => {
     const sponsorById = new Map<string, string>();
@@ -310,6 +351,16 @@ export function TeamLeadsClient({
                 </option>
               ))}
             </select>
+            <PremiumSelect
+              id="team-lead-source-filter"
+              value={sourceFilter}
+              placeholder="Fuente"
+              options={sourceFilterOptions}
+              open={openSelectId === "source"}
+              onOpenChange={(open) => setOpenSelectId(open ? "source" : null)}
+              onValueChange={(value) => setSourceFilter(value as SourceFilter)}
+              className="w-full md:w-60"
+            />
             <select
               value={leadStatusFilter}
               onChange={(event) =>
@@ -386,6 +437,12 @@ export function TeamLeadsClient({
                 <p className="text-xs text-app-text-soft">
                   {row.phone ?? row.email ?? "Sin telefono"}
                 </p>
+                <div className="mt-3">
+                  <LeadSourceBadge
+                    trafficLayer={row.trafficLayer}
+                    originAdWheelName={row.originAdWheelName}
+                  />
+                </div>
               </div>
             ),
           },

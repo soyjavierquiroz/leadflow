@@ -58,6 +58,12 @@ const teamLeadInboxInclude = {
       },
     },
   },
+  originAdWheel: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
 } satisfies Prisma.LeadInclude;
 
 type TeamLeadInboxRecord = Prisma.LeadGetPayload<{
@@ -65,6 +71,7 @@ type TeamLeadInboxRecord = Prisma.LeadGetPayload<{
 }>;
 
 type TeamLeadSupervisionStatus = 'orphaned' | 'stagnant' | 'active' | 'closed';
+type TeamLeadTrafficLayer = 'DIRECT' | 'PAID_WHEEL' | 'ORGANIC';
 
 export type TeamLeadInboxItem = {
   id: string;
@@ -83,6 +90,9 @@ export type TeamLeadInboxItem = {
   funnelName: string | null;
   publicationPath: string | null;
   domainHost: string | null;
+  trafficLayer: TeamLeadTrafficLayer;
+  originAdWheelId: string | null;
+  originAdWheelName: string | null;
   sponsor: {
     id: string;
     displayName: string;
@@ -102,6 +112,13 @@ const toInputJsonValue = (value: unknown): Prisma.InputJsonValue =>
 
 const byNewestFirst = (left: string, right: string) =>
   left < right ? 1 : left > right ? -1 : 0;
+
+const normalizeTrafficLayer = (
+  value: string | null | undefined,
+): TeamLeadTrafficLayer =>
+  value === 'DIRECT' || value === 'PAID_WHEEL' || value === 'ORGANIC'
+    ? value
+    : 'ORGANIC';
 
 const resolveSupervisionPriority = (value: TeamLeadSupervisionStatus) => {
   switch (value) {
@@ -446,6 +463,9 @@ export class TeamLeadsService {
       funnelName: record.funnelInstance?.name ?? null,
       publicationPath: record.funnelPublication?.pathPrefix ?? null,
       domainHost: record.funnelPublication?.domain?.host ?? null,
+      trafficLayer: normalizeTrafficLayer(record.trafficLayer),
+      originAdWheelId: record.originAdWheelId,
+      originAdWheelName: record.originAdWheel?.name ?? null,
       sponsor: sponsor
         ? {
             id: sponsor.id,

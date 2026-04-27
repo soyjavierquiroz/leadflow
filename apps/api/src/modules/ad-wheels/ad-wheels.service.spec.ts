@@ -9,21 +9,27 @@ describe('AdWheelsService', () => {
 
   const buildService = () => {
     const prisma = {
+      $transaction: jest.fn(async (callback) => callback(prisma)),
       team: {
         findFirst: jest.fn(),
       },
       sponsor: {
         findFirst: jest.fn(),
       },
+      funnelPublication: {
+        findFirst: jest.fn(),
+      },
       adWheel: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
       adWheelParticipant: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        upsert: jest.fn(),
       },
     } as unknown as PrismaService;
     const walletEngineService = {
@@ -33,6 +39,7 @@ describe('AdWheelsService', () => {
     } as any;
     const adWheelSequenceGeneratorService = {
       generateSequence: jest.fn().mockResolvedValue([]),
+      replaceSequenceInTransaction: jest.fn().mockResolvedValue([]),
     } as any;
 
     return {
@@ -53,10 +60,14 @@ describe('AdWheelsService', () => {
     const endDate = new Date('2026-04-24T00:00:00.000Z');
 
     prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
+    prisma.funnelPublication.findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 'publication-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue(null);
     prisma.adWheel.create = jest.fn().mockResolvedValue({
       id: 'wheel-1',
       teamId: 'team-1',
+      publicationId: 'publication-1',
       status: 'ACTIVE',
       name: 'Abril',
       seatPrice: 5_000,
@@ -73,6 +84,7 @@ describe('AdWheelsService', () => {
       },
       {
         status: 'ACTIVE',
+        publicationId: 'publication-1',
         name: 'Abril',
         seatPrice: 5_000,
         startDate: startDate.toISOString(),
@@ -84,6 +96,7 @@ describe('AdWheelsService', () => {
     expect(prisma.adWheel.create).toHaveBeenCalledWith({
       data: {
         teamId: 'team-1',
+        publicationId: 'publication-1',
         status: 'ACTIVE',
         name: 'Abril',
         seatPrice: 5_000,
@@ -106,6 +119,7 @@ describe('AdWheelsService', () => {
         },
         {
           status: 'ACTIVE',
+          publicationId: 'publication-1',
           name: 'Abril',
           seatPrice: 5_000,
           startDate: '2026-04-10T00:00:00.000Z',
@@ -275,6 +289,7 @@ describe('AdWheelsService', () => {
       {
         id: 'wheel-2',
         teamId: 'team-1',
+        publicationId: null,
         status: 'DRAFT',
         name: 'Mayo',
         seatPrice: 3_000,
@@ -285,10 +300,13 @@ describe('AdWheelsService', () => {
         _count: {
           participants: 1,
         },
+        publication: null,
+        participants: [],
       },
       {
         id: 'wheel-1',
         teamId: 'team-1',
+        publicationId: 'publication-1',
         status: 'ACTIVE',
         name: 'Abril',
         seatPrice: 5_000,
@@ -299,6 +317,39 @@ describe('AdWheelsService', () => {
         _count: {
           participants: 3,
         },
+        publication: {
+          id: 'publication-1',
+          pathPrefix: '/oportunidad',
+          domain: {
+            host: 'example.com',
+          },
+          funnelInstance: {
+            name: 'Oportunidad',
+            code: 'opp',
+          },
+        },
+        participants: [
+          {
+            sponsorId: 'sponsor-1',
+            seatCount: 2,
+            joinedAt: new Date('2026-04-03T00:00:00.000Z'),
+            sponsor: {
+              displayName: 'Sponsor Uno',
+              status: 'active',
+              availabilityStatus: 'available',
+            },
+          },
+          {
+            sponsorId: 'sponsor-2',
+            seatCount: 1,
+            joinedAt: new Date('2026-04-04T00:00:00.000Z'),
+            sponsor: {
+              displayName: 'Sponsor Dos',
+              status: 'active',
+              availabilityStatus: 'available',
+            },
+          },
+        ],
       },
     ]);
 
@@ -312,6 +363,11 @@ describe('AdWheelsService', () => {
       id: 'wheel-1',
       status: 'ACTIVE',
       participantCount: 3,
+      totalSeatCount: 3,
+      publication: expect.objectContaining({
+        id: 'publication-1',
+        funnelName: 'Oportunidad',
+      }),
     });
     expect(result[1]).toMatchObject({
       id: 'wheel-2',
@@ -436,11 +492,11 @@ describe('AdWheelsService', () => {
     expect(result.wallet).toBeNull();
     expect(walletEngineService.debitSeat).not.toHaveBeenCalled();
     expect(
-      adWheelSequenceGeneratorService.generateSequence,
+      adWheelSequenceGeneratorService.replaceSequenceInTransaction,
     ).not.toHaveBeenCalled();
   });
 
-  it('regenerates pending turns after a successful sponsor buy-in', async () => {
+  it('regenerates the weighted cycle after a successful sponsor buy-in', async () => {
     const {
       prisma,
       walletEngineService,
@@ -491,15 +547,140 @@ describe('AdWheelsService', () => {
     );
 
     expect(result.alreadyJoined).toBe(false);
-    expect(adWheelSequenceGeneratorService.generateSequence).toHaveBeenCalledWith(
+    expect(prisma.adWheel.update).toHaveBeenCalledWith({
+      where: {
+        id: 'wheel-1',
+      },
+      data: {
+        currentTurnPosition: 1,
+        sequenceVersion: {
+          increment: 1,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(
+      adWheelSequenceGeneratorService.replaceSequenceInTransaction,
+    ).toHaveBeenCalledWith(prisma, 'wheel-1');
+  });
+
+  it('regenerates the weighted cycle after a team admin updates participant seats', async () => {
+    const {
+      prisma,
+      service,
+      adWheelSequenceGeneratorService,
+    } = buildService();
+
+    prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
+    prisma.adWheel.findFirst = jest.fn().mockResolvedValue({ id: 'wheel-1' });
+    prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
+    prisma.adWheelParticipant.upsert = jest.fn().mockResolvedValue({
+      adWheelId: 'wheel-1',
+      sponsorId: 'sponsor-1',
+      seatCount: 3,
+    });
+    prisma.adWheel.findUnique = jest.fn().mockResolvedValue({
+      id: 'wheel-1',
+      teamId: 'team-1',
+      publicationId: 'publication-1',
+      status: 'ACTIVE',
+      name: 'Abril',
+      seatPrice: 5_000,
+      startDate: new Date('2026-04-01T00:00:00.000Z'),
+      endDate: new Date('2026-04-30T23:59:59.000Z'),
+      createdAt: new Date('2026-04-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+      publication: {
+        id: 'publication-1',
+        pathPrefix: '/demo',
+        domain: {
+          host: 'example.com',
+        },
+        funnelInstance: {
+          name: 'Demo',
+          code: 'demo',
+        },
+      },
+      participants: [
+        {
+          sponsorId: 'sponsor-1',
+          seatCount: 3,
+          joinedAt: new Date('2026-04-01T01:00:00.000Z'),
+          sponsor: {
+            displayName: 'Sponsor Uno',
+            status: 'active',
+            availabilityStatus: 'available',
+          },
+        },
+      ],
+      _count: {
+        participants: 1,
+      },
+    });
+
+    const result = await service.upsertParticipantForTeam(
+      {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+      },
       'wheel-1',
+      {
+        sponsorId: 'sponsor-1',
+        seatCount: 3,
+      },
     );
+
+    expect(prisma.adWheelParticipant.upsert).toHaveBeenCalledWith({
+      where: {
+        adWheelId_sponsorId: {
+          adWheelId: 'wheel-1',
+          sponsorId: 'sponsor-1',
+        },
+      },
+      create: {
+        adWheelId: 'wheel-1',
+        sponsorId: 'sponsor-1',
+        seatCount: 3,
+      },
+      update: {
+        seatCount: 3,
+      },
+    });
+    expect(prisma.adWheel.update).toHaveBeenCalledWith({
+      where: {
+        id: 'wheel-1',
+      },
+      data: {
+        currentTurnPosition: 1,
+        sequenceVersion: {
+          increment: 1,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(
+      adWheelSequenceGeneratorService.replaceSequenceInTransaction,
+    ).toHaveBeenCalledWith(prisma, 'wheel-1');
+    expect(
+      adWheelSequenceGeneratorService.generateSequence,
+    ).not.toHaveBeenCalled();
+    expect(result.participant).toMatchObject({
+      sponsorId: 'sponsor-1',
+      seatCount: 3,
+    });
   });
 
   it('rejects creating a second active wheel for the same team', async () => {
     const { prisma, service } = buildService();
 
     prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
+    prisma.funnelPublication.findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 'publication-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue({ id: 'wheel-1' });
 
     await expect(
@@ -510,6 +691,7 @@ describe('AdWheelsService', () => {
         },
         {
           status: 'ACTIVE',
+          publicationId: 'publication-1',
           name: 'Abril',
           seatPrice: 5_000,
           startDate: '2026-04-10T00:00:00.000Z',

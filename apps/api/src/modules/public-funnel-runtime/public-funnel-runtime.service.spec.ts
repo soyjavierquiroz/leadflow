@@ -256,6 +256,10 @@ describe('PublicFunnelRuntimeService', () => {
     >();
     const adWheelFindFirst = jest.fn().mockResolvedValue({
       id: 'wheel-1',
+      publicationId: 'publication-root',
+      status: 'ACTIVE',
+      startDate: new Date('2020-01-01T00:00:00.000Z'),
+      endDate: new Date('2099-01-01T00:00:00.000Z'),
     });
     const prisma = {
       funnelPublication: {
@@ -286,16 +290,13 @@ describe('PublicFunnelRuntimeService', () => {
       where: {
         id: 'wheel-1',
         teamId: 'team-1',
-        status: 'ACTIVE',
-        startDate: {
-          lte: expect.any(Date),
-        },
-        endDate: {
-          gte: expect.any(Date),
-        },
       },
       select: {
         id: true,
+        publicationId: true,
+        status: true,
+        startDate: true,
+        endDate: true,
       },
     });
     expect(runtime.entryContext).toEqual({
@@ -303,6 +304,49 @@ describe('PublicFunnelRuntimeService', () => {
       trafficLayer: 'PAID_WHEEL',
       forcedSponsorId: null,
       adWheelId: 'wheel-1',
+      browserPixelsEnabled: true,
+    });
+  });
+
+  it('falls back to direct organic entry context when awid lookup fails', async () => {
+    const findMany = jest.fn<
+      Promise<MockPublicationRecord[]>,
+      [FindManyArgs]
+    >();
+    const adWheelFindFirst = jest
+      .fn()
+      .mockRejectedValue(new Error('column AdWheel.publicationId does not exist'));
+    const prisma = {
+      funnelPublication: {
+        findMany,
+      },
+      sponsor: {
+        findFirst: jest.fn(),
+      },
+      adWheel: {
+        findFirst: adWheelFindFirst,
+      },
+    } as unknown as PrismaService;
+
+    findMany.mockResolvedValue([
+      buildPublicationRecord({
+        id: 'publication-root',
+        pathPrefix: '/',
+      }),
+    ]);
+
+    const service = new PublicFunnelRuntimeService(prisma);
+    const runtime = await service.resolveByHostAndPath(
+      'localhost',
+      '/?awid=wheel-1',
+    );
+
+    expect(adWheelFindFirst).toHaveBeenCalled();
+    expect(runtime.entryContext).toEqual({
+      entryMode: 'paid_ads',
+      trafficLayer: 'DIRECT',
+      forcedSponsorId: null,
+      adWheelId: null,
       browserPixelsEnabled: true,
     });
   });

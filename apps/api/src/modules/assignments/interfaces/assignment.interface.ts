@@ -4,6 +4,7 @@ import type {
   DomainId,
   ISODateString,
   RepositoryPort,
+  TrafficLayer,
   WorkspaceScoped,
 } from '../../shared/domain.types';
 
@@ -24,6 +25,9 @@ export interface Assignment extends BaseDomainEntity, WorkspaceScoped {
   funnelInstanceId: DomainId | null;
   funnelPublicationId: DomainId | null;
   rotationPoolId: DomainId | null;
+  trafficLayer: TrafficLayer;
+  originAdWheelId: DomainId | null;
+  originAdWheelName: string | null;
   status: AssignmentStatus;
   reason: AssignmentReason;
   assignedAt: ISODateString;

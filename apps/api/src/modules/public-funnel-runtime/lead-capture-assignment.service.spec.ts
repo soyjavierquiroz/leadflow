@@ -609,31 +609,75 @@ describe('LeadCaptureAssignmentService', () => {
     });
   });
 
-  it('consumes an ad wheel turn and debits one participant seat atomically', async () => {
-    const { service, trackingEventsService } = buildService();
+  it('reserves the current paid wheel cycle slot and advances the cursor', async () => {
+    const { service } = buildService();
+    const publication = buildPublication();
+    const tx = {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            id: 'wheel-1',
+            currentTurnPosition: 2,
+            sequenceVersion: 3,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'turn-2',
+            adWheelId: 'wheel-1',
+            sponsorId: 'sponsor-2',
+            position: 2,
+            sequenceVersion: 3,
+            displayName: 'Advisor Dos',
+            email: 'advisor2@example.com',
+            phone: '+57 300 000 0002',
+            avatarUrl: null,
+          },
+        ]),
+      adWheelTurn: {
+        count: jest.fn().mockResolvedValue(3),
+      },
+      adWheel: {
+        update: jest.fn().mockResolvedValue({ id: 'wheel-1' }),
+      },
+    };
+
+    const reservation = await (
+      service as any
+    ).reservePaidWheelCycleTurnInTransaction(tx, publication, 'wheel-1');
+
+    expect(tx.adWheel.update).toHaveBeenCalledWith({
+      where: {
+        id: 'wheel-1',
+      },
+      data: {
+        currentTurnPosition: 3,
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(reservation).toMatchObject({
+      adWheelId: 'wheel-1',
+      turnId: 'turn-2',
+      turnPosition: 2,
+      sequenceVersion: 3,
+      totalTurns: 3,
+      sponsor: {
+        id: 'sponsor-2',
+      },
+    });
+  });
+
+  it('falls back to direct organic assignment when paid wheel preflight fails', async () => {
+    const { service } = buildService();
     const publication = buildPublication();
     const assignedAt = new Date('2026-04-18T00:00:00.000Z');
     const tx = {
-      adWheelTurn: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'turn-1',
-          adWheelId: 'wheel-1',
-          sponsorId: 'sponsor-1',
-          position: 1,
-          sponsor: {
-            id: 'sponsor-1',
-            displayName: 'Advisor Uno',
-            email: 'advisor@example.com',
-            phone: '+57 300 000 0001',
-            avatarUrl: 'https://cdn.example.com/a1.png',
-          },
-        }),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      },
-      adWheelParticipant: {
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       assignment: {
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({
           id: 'assignment-1',
           status: 'assigned',
@@ -659,74 +703,65 @@ describe('LeadCaptureAssignmentService', () => {
       },
     };
 
-    const result = await (service as any).assignLeadToAdWheelTurnInTransaction(
+    jest
+      .spyOn(service as any, 'resolveRoundRobinAssigneeOrThrow')
+      .mockResolvedValue({
+        reason: 'rotation',
+        user: {
+          id: 'advisor-1',
+          fullName: 'Advisor Uno',
+          role: 'MEMBER',
+          sponsor: {
+            id: 'sponsor-1',
+            displayName: 'Advisor Uno',
+            phone: '+57 300 000 0001',
+            avatarUrl: 'https://cdn.example.com/a1.png',
+          },
+        },
+      });
+
+    const result = await (service as any).assignLeadToNextSponsorInTransaction(
       tx,
       publication,
       {
         id: 'lead-1',
         currentAssignmentId: null,
       },
-      'wheel-1',
       {
         triggerEventId: 'trigger-1',
         funnelStepId: 'step-1',
-        entryContext: {
-          entryMode: 'paid_ads',
-          trafficLayer: 'PAID_WHEEL',
-          forcedSponsorId: null,
-          adWheelId: 'wheel-1',
-          browserPixelsEnabled: true,
+          entryContext: {
+            entryMode: 'paid_ads',
+            trafficLayer: 'PAID_WHEEL',
+            forcedSponsorId: null,
+            adWheelId: 'wheel-1',
+            browserPixelsEnabled: true,
+            runtimePathPrefix: null,
+            referralQueryParam: null,
+          },
         },
-      },
-    );
+      );
 
-    expect(tx.adWheelTurn.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: 'turn-1',
-        isConsumed: false,
-      },
-      data: {
-        isConsumed: true,
-        assignmentId: expect.any(String),
-      },
-    });
-    expect(tx.adWheelParticipant.updateMany).toHaveBeenCalledWith({
-      where: {
-        adWheelId: 'wheel-1',
-        sponsorId: 'sponsor-1',
-        seatCount: {
-          gt: 0,
-        },
-      },
-      data: {
-        seatCount: {
-          decrement: 1,
-        },
-      },
-    });
     expect(tx.assignment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         leadId: 'lead-1',
         sponsorId: 'sponsor-1',
-        trafficLayer: 'PAID_WHEEL',
-        originAdWheelId: 'wheel-1',
-        reason: 'rotation',
+        trafficLayer: 'DIRECT',
+        originAdWheelId: null,
       }),
       include: {
         sponsor: true,
       },
     });
-    expect(trackingEventsService.recordTrackingEventInTransaction).toHaveBeenCalledWith(
-      tx,
-      expect.objectContaining({
-        eventName: 'assignment_created',
-        payload: expect.objectContaining({
-          trafficLayer: 'PAID_WHEEL',
-          adWheelId: 'wheel-1',
-          adWheelTurnId: 'turn-1',
-        }),
+    expect(tx.lead.update).toHaveBeenCalledWith({
+      where: { id: 'lead-1' },
+      data: expect.objectContaining({
+        status: 'assigned',
+        currentAssignmentId: 'assignment-1',
+        trafficLayer: 'DIRECT',
+        originAdWheelId: null,
       }),
-    );
+    });
     expect(result.assignment).toMatchObject({
       id: 'assignment-1',
       reason: 'rotation',

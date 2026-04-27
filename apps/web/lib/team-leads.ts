@@ -6,6 +6,7 @@ export type TeamLeadSupervisionStatus =
   | "stagnant"
   | "active"
   | "closed";
+export type TeamLeadTrafficLayer = "DIRECT" | "PAID_WHEEL" | "ORGANIC";
 
 export type TeamLeadInboxItem = {
   id: string;
@@ -36,6 +37,9 @@ export type TeamLeadInboxItem = {
   funnelName: string | null;
   publicationPath: string | null;
   domainHost: string | null;
+  trafficLayer: TeamLeadTrafficLayer;
+  originAdWheelId: string | null;
+  originAdWheelName: string | null;
   sponsor: {
     id: string;
     displayName: string;

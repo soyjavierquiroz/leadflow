@@ -15,6 +15,7 @@ import {
 import { AdWheelSequenceGeneratorService } from './ad-wheel-sequence-generator.service';
 import type { CreateTeamAdWheelDto } from './dto/create-team-ad-wheel.dto';
 import type { UpdateTeamAdWheelDto } from './dto/update-team-ad-wheel.dto';
+import type { UpsertTeamAdWheelParticipantDto } from './dto/upsert-team-ad-wheel-participant.dto';
 
 type TeamScope = {
   workspaceId: string;
@@ -28,6 +29,7 @@ type SponsorScope = TeamScope & {
 type AdWheelRecord = {
   id: string;
   teamId: string;
+  publicationId: string | null;
   status: 'DRAFT' | 'ACTIVE' | 'COMPLETED';
   name: string;
   seatPrice: number;
@@ -39,6 +41,22 @@ type AdWheelRecord = {
 
 type TeamAdWheelRecord = AdWheelRecord & {
   participantCount: number;
+  totalSeatCount: number;
+  publication: {
+    id: string;
+    pathPrefix: string;
+    domainHost: string;
+    funnelName: string;
+    funnelCode: string;
+  } | null;
+  participants: Array<{
+    sponsorId: string;
+    sponsorName: string;
+    sponsorStatus: string;
+    sponsorAvailabilityStatus: string;
+    seatCount: number;
+    joinedAt: string;
+  }>;
 };
 
 type SponsorActiveAdWheelResult = {
@@ -64,7 +82,52 @@ type AdWheelJoinResult = {
   alreadyJoined: boolean;
 };
 
+type TeamAdWheelParticipantResult = {
+  wheel: TeamAdWheelRecord;
+  participant: TeamAdWheelRecord['participants'][number];
+};
+
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
+
+const teamAdWheelInclude = {
+  publication: {
+    select: {
+      id: true,
+      pathPrefix: true,
+      domain: {
+        select: {
+          host: true,
+        },
+      },
+      funnelInstance: {
+        select: {
+          name: true,
+          code: true,
+        },
+      },
+    },
+  },
+  participants: {
+    select: {
+      sponsorId: true,
+      seatCount: true,
+      joinedAt: true,
+      sponsor: {
+        select: {
+          displayName: true,
+          status: true,
+          availabilityStatus: true,
+        },
+      },
+    },
+    orderBy: [{ joinedAt: 'asc' }, { sponsorId: 'asc' }],
+  },
+  _count: {
+    select: {
+      participants: true,
+    },
+  },
+} satisfies Prisma.AdWheelInclude;
 
 const sanitizeRequiredText = (
   value: string | null | undefined,
@@ -91,7 +154,7 @@ const sanitizeRequiredText = (
   return trimmed;
 };
 
-const requirePositiveInteger = (
+const requireIntegerAtLeast = (
   value: number,
   field: string,
   minimum = 1,
@@ -137,10 +200,23 @@ const calculateDurationDays = (startDate: Date, endDate: Date) =>
   Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / DAY_IN_MS));
 
 const mapAdWheelRecord = (
-  record: Prisma.AdWheelGetPayload<Record<string, never>>,
+  record: Pick<
+    Prisma.AdWheelGetPayload<Record<string, never>>,
+    | 'id'
+    | 'teamId'
+    | 'publicationId'
+    | 'status'
+    | 'name'
+    | 'seatPrice'
+    | 'startDate'
+    | 'endDate'
+    | 'createdAt'
+    | 'updatedAt'
+  >,
 ): AdWheelRecord => ({
   id: record.id,
   teamId: record.teamId,
+  publicationId: record.publicationId,
   status: record.status,
   name: record.name,
   seatPrice: record.seatPrice,
@@ -149,6 +225,75 @@ const mapAdWheelRecord = (
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
 });
+
+const mapTeamAdWheelRecord = (
+  record: Pick<
+    Prisma.AdWheelGetPayload<Record<string, never>>,
+    | 'id'
+    | 'teamId'
+    | 'publicationId'
+    | 'status'
+    | 'name'
+    | 'seatPrice'
+    | 'startDate'
+    | 'endDate'
+    | 'createdAt'
+    | 'updatedAt'
+  > & {
+    publication: {
+      id: string;
+      pathPrefix: string;
+      domain: {
+        host: string;
+      };
+      funnelInstance: {
+        name: string;
+        code: string;
+      };
+    } | null;
+    participants: Array<{
+      sponsorId: string;
+      seatCount: number;
+      joinedAt: Date;
+      sponsor: {
+        displayName: string;
+        status: string;
+        availabilityStatus: string;
+      };
+    }>;
+    _count: {
+      participants: number;
+    };
+  },
+): TeamAdWheelRecord => {
+  const participants = record.participants.map((participant) => ({
+    sponsorId: participant.sponsorId,
+    sponsorName: participant.sponsor.displayName,
+    sponsorStatus: participant.sponsor.status,
+    sponsorAvailabilityStatus: participant.sponsor.availabilityStatus,
+    seatCount: participant.seatCount,
+    joinedAt: participant.joinedAt.toISOString(),
+  }));
+
+  return {
+    ...mapAdWheelRecord(record),
+    participantCount: record._count.participants,
+    totalSeatCount: participants.reduce(
+      (total, participant) => total + participant.seatCount,
+      0,
+    ),
+    publication: record.publication
+      ? {
+          id: record.publication.id,
+          pathPrefix: record.publication.pathPrefix,
+          domainHost: record.publication.domain.host,
+          funnelName: record.publication.funnelInstance.name,
+          funnelCode: record.publication.funnelInstance.code,
+        }
+      : null,
+    participants,
+  };
+};
 
 @Injectable()
 export class AdWheelsService {
@@ -166,7 +311,7 @@ export class AdWheelsService {
 
     const name = sanitizeRequiredText(dto.name, 'name');
     const startDate = parseRequiredDate(dto.startDate, 'startDate');
-    const durationDays = requirePositiveInteger(dto.durationDays, 'durationDays');
+    const durationDays = requireIntegerAtLeast(dto.durationDays, 'durationDays');
     const endDate = calculateEndDate(startDate, durationDays);
 
     if (!Number.isInteger(dto.seatPrice) || dto.seatPrice <= 0) {
@@ -185,6 +330,11 @@ export class AdWheelsService {
         field: 'status',
       });
     }
+
+    const publication = await this.requirePublicationForTeam(
+      scope,
+      dto.publicationId,
+    );
 
     if (dto.status === 'ACTIVE') {
       const existingActiveWheel = await this.prisma.adWheel.findFirst({
@@ -209,6 +359,7 @@ export class AdWheelsService {
     const record = await this.prisma.adWheel.create({
       data: {
         teamId: scope.teamId,
+        publicationId: publication.id,
         status: dto.status,
         name,
         seatPrice: dto.seatPrice,
@@ -236,6 +387,7 @@ export class AdWheelsService {
       select: {
         id: true,
         teamId: true,
+        publicationId: true,
         status: true,
         name: true,
         seatPrice: true,
@@ -257,12 +409,16 @@ export class AdWheelsService {
       wheel.startDate,
       wheel.endDate,
     );
+    const nextPublicationId =
+      dto.publicationId === undefined
+        ? wheel.publicationId
+        : (await this.requirePublicationForTeam(scope, dto.publicationId)).id;
     const nextName =
       dto.name === undefined ? wheel.name : sanitizeRequiredText(dto.name, 'name');
     const nextSeatPrice =
       dto.seatPrice === undefined
         ? wheel.seatPrice
-        : requirePositiveInteger(dto.seatPrice, 'seatPrice');
+        : requireIntegerAtLeast(dto.seatPrice, 'seatPrice');
     const nextStartDate =
       dto.startDate === undefined
         ? wheel.startDate
@@ -270,7 +426,7 @@ export class AdWheelsService {
     const nextDurationDays =
       dto.durationDays === undefined
         ? currentDurationDays
-        : requirePositiveInteger(dto.durationDays, 'durationDays');
+        : requireIntegerAtLeast(dto.durationDays, 'durationDays');
     const nextEndDate = calculateEndDate(nextStartDate, nextDurationDays);
     const scheduleIsEditable =
       wheel.status === 'DRAFT' || Date.now() < wheel.startDate.getTime();
@@ -292,6 +448,9 @@ export class AdWheelsService {
         id: wheel.id,
       },
       data: {
+        ...(dto.publicationId !== undefined
+          ? { publicationId: nextPublicationId }
+          : {}),
         name: nextName,
         seatPrice: nextSeatPrice,
         startDate: nextStartDate,
@@ -309,13 +468,7 @@ export class AdWheelsService {
       where: {
         teamId: scope.teamId,
       },
-      include: {
-        _count: {
-          select: {
-            participants: true,
-          },
-        },
-      },
+      include: teamAdWheelInclude,
     });
 
     const statusOrder = {
@@ -335,10 +488,7 @@ export class AdWheelsService {
 
         return right.createdAt.getTime() - left.createdAt.getTime();
       })
-      .map((record) => ({
-        ...mapAdWheelRecord(record),
-        participantCount: record._count.participants,
-      }));
+      .map(mapTeamAdWheelRecord);
   }
 
   async getActiveForSponsor(
@@ -472,13 +622,34 @@ export class AdWheelsService {
     }
 
     try {
-      const participant = await this.prisma.adWheelParticipant.create({
-        data: {
-          adWheelId: wheel.id,
-          sponsorId: scope.sponsorId,
-        },
+      const participant = await this.prisma.$transaction(async (tx) => {
+        const createdParticipant = await tx.adWheelParticipant.create({
+          data: {
+            adWheelId: wheel.id,
+            sponsorId: scope.sponsorId,
+          },
+        });
+        await tx.adWheel.update({
+          where: {
+            id: wheel.id,
+          },
+          data: {
+            currentTurnPosition: 1,
+            sequenceVersion: {
+              increment: 1,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+        await this.adWheelSequenceGeneratorService.replaceSequenceInTransaction(
+          tx,
+          wheel.id,
+        );
+
+        return createdParticipant;
       });
-      await this.adWheelSequenceGeneratorService.generateSequence(wheel.id);
 
       return {
         wheel: mapAdWheelRecord(wheel),
@@ -512,8 +683,6 @@ export class AdWheelsService {
         });
 
         if (participant) {
-          await this.adWheelSequenceGeneratorService.generateSequence(wheel.id);
-
           return {
             wheel: mapAdWheelRecord(wheel),
             participant: {
@@ -538,6 +707,125 @@ export class AdWheelsService {
     }
   }
 
+  async upsertParticipantForTeam(
+    scope: TeamScope,
+    wheelId: string,
+    dto: UpsertTeamAdWheelParticipantDto,
+  ): Promise<TeamAdWheelParticipantResult> {
+    await this.requireTeam(scope);
+
+    const normalizedWheelId = sanitizeRequiredText(wheelId, 'wheelId');
+    const sponsorId = sanitizeRequiredText(dto.sponsorId, 'sponsorId');
+    const seatCount = requireIntegerAtLeast(dto.seatCount, 'seatCount', 0);
+
+    const wheel = await this.prisma.adWheel.findFirst({
+      where: {
+        id: normalizedWheelId,
+        teamId: scope.teamId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!wheel) {
+      throw new NotFoundException({
+        code: 'AD_WHEEL_NOT_FOUND',
+        message: 'The requested ad wheel was not found for this team.',
+      });
+    }
+
+    const sponsor = await this.prisma.sponsor.findFirst({
+      where: {
+        id: sponsorId,
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        isActive: true,
+        status: 'active',
+        availabilityStatus: 'available',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!sponsor) {
+      throw new NotFoundException({
+        code: 'SPONSOR_NOT_FOUND',
+        message:
+          'The selected sponsor is not active or does not belong to this team.',
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.adWheelParticipant.upsert({
+        where: {
+          adWheelId_sponsorId: {
+            adWheelId: wheel.id,
+            sponsorId,
+          },
+        },
+        create: {
+          adWheelId: wheel.id,
+          sponsorId,
+          seatCount,
+        },
+        update: {
+          seatCount,
+        },
+      });
+      await tx.adWheel.update({
+        where: {
+          id: wheel.id,
+        },
+        data: {
+          currentTurnPosition: 1,
+          sequenceVersion: {
+            increment: 1,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+      await this.adWheelSequenceGeneratorService.replaceSequenceInTransaction(
+        tx,
+        wheel.id,
+      );
+    });
+
+    const updatedWheel = await this.prisma.adWheel.findUnique({
+      where: {
+        id: wheel.id,
+      },
+      include: teamAdWheelInclude,
+    });
+
+    if (!updatedWheel) {
+      throw new NotFoundException({
+        code: 'AD_WHEEL_NOT_FOUND',
+        message: 'The requested ad wheel was not found for this team.',
+      });
+    }
+
+    const mappedWheel = mapTeamAdWheelRecord(updatedWheel);
+    const participant = mappedWheel.participants.find(
+      (item) => item.sponsorId === sponsorId,
+    );
+
+    if (!participant) {
+      throw new NotFoundException({
+        code: 'AD_WHEEL_PARTICIPANT_NOT_FOUND',
+        message: 'The wheel participant could not be resolved after update.',
+      });
+    }
+
+    return {
+      wheel: mappedWheel,
+      participant,
+    };
+  }
+
   private async requireTeam(scope: TeamScope) {
     const team = await this.prisma.team.findFirst({
       where: {
@@ -557,6 +845,41 @@ export class AdWheelsService {
     }
 
     return team;
+  }
+
+  private async requirePublicationForTeam(scope: TeamScope, publicationId: string) {
+    const normalizedPublicationId = sanitizeRequiredText(
+      publicationId,
+      'publicationId',
+    );
+    const publication = await this.prisma.funnelPublication.findFirst({
+      where: {
+        id: normalizedPublicationId,
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        status: 'active',
+        isActive: true,
+        domain: {
+          status: 'active',
+        },
+        funnelInstance: {
+          status: 'active',
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!publication) {
+      throw new NotFoundException({
+        code: 'FUNNEL_PUBLICATION_NOT_FOUND',
+        message:
+          'The selected funnel publication is not active or does not belong to this team.',
+      });
+    }
+
+    return publication;
   }
 
   private async requireActiveSponsor(scope: SponsorScope) {

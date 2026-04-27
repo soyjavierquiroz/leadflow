@@ -22,12 +22,17 @@ import type { Workspace } from '../modules/workspaces/interfaces/workspace.inter
 import type {
   JsonValue,
   LeadSourceChannel,
+  TrafficLayer,
 } from '../modules/shared/domain.types';
 
 const toIso = (value: Date) => value.toISOString();
 const toJson = (value: unknown): JsonValue => value as JsonValue;
 const mapLeadSourceChannel = (value: string): LeadSourceChannel =>
   value === 'landing_page' ? 'landing-page' : (value as LeadSourceChannel);
+const mapTrafficLayer = (value: string | null | undefined): TrafficLayer =>
+  value === 'DIRECT' || value === 'PAID_WHEEL' || value === 'ORGANIC'
+    ? value
+    : 'ORGANIC';
 const readNullableString = (record: object, key: string) => {
   const value = (record as Record<string, unknown>)[key];
   return typeof value === 'string' ? value : null;
@@ -96,10 +101,18 @@ export type RotationPoolRecord = Prisma.RotationPoolGetPayload<{
 export type VisitorRecord = Prisma.VisitorGetPayload<{
   include: typeof visitorInclude;
 }>;
-export type LeadRecord = Prisma.LeadGetPayload<Record<string, never>>;
+type OriginAdWheelSnapshot = {
+  id: string;
+  name: string;
+};
+export type LeadRecord = Prisma.LeadGetPayload<Record<string, never>> & {
+  originAdWheel?: OriginAdWheelSnapshot | null;
+};
 export type AssignmentRecord = Prisma.AssignmentGetPayload<
   Record<string, never>
->;
+> & {
+  originAdWheel?: OriginAdWheelSnapshot | null;
+};
 export type DomainEventRecord = Prisma.DomainEventGetPayload<
   Record<string, never>
 >;
@@ -374,6 +387,9 @@ export const mapLeadRecord = (record: LeadRecord): Lead => ({
   funnelId: record.funnelId,
   funnelInstanceId: record.funnelInstanceId,
   funnelPublicationId: record.funnelPublicationId,
+  trafficLayer: mapTrafficLayer(record.trafficLayer),
+  originAdWheelId: record.originAdWheelId,
+  originAdWheelName: record.originAdWheel?.name ?? null,
   visitorId: record.visitorId,
   sourceChannel: mapLeadSourceChannel(record.sourceChannel),
   fullName: record.fullName,
@@ -407,6 +423,9 @@ export const mapAssignmentRecord = (record: AssignmentRecord): Assignment => ({
   funnelInstanceId: record.funnelInstanceId,
   funnelPublicationId: record.funnelPublicationId,
   rotationPoolId: record.rotationPoolId,
+  trafficLayer: mapTrafficLayer(record.trafficLayer),
+  originAdWheelId: record.originAdWheelId,
+  originAdWheelName: record.originAdWheel?.name ?? null,
   status: record.status,
   reason: record.reason,
   assignedAt: toIso(record.assignedAt),

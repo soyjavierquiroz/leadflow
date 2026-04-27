@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -214,6 +215,8 @@ const extractAwid = (value: string | null | undefined) => {
 
 @Injectable()
 export class PublicFunnelRuntimeService {
+  private readonly logger = new Logger(PublicFunnelRuntimeService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async resolveByHostAndPath(
@@ -262,6 +265,7 @@ export class PublicFunnelRuntimeService {
       preResolvedEntryContext = await this.resolveEntryContextForPublication({
         workspaceId: rootPublication.workspaceId,
         teamId: rootPublication.teamId,
+        publicationId: rootPublication.id,
         publicationPathPrefix: rootPublication.pathPrefix,
         requestedPath: path,
       });
@@ -299,6 +303,7 @@ export class PublicFunnelRuntimeService {
         : await this.resolveEntryContextForPublication({
             workspaceId: matchingPublication.workspaceId,
             teamId: matchingPublication.teamId,
+            publicationId: matchingPublication.id,
             publicationPathPrefix: matchingPublication.pathPrefix,
             requestedPath: path,
           });
@@ -314,6 +319,7 @@ export class PublicFunnelRuntimeService {
   async resolveEntryContextForPublication(input: {
     workspaceId: string;
     teamId: string;
+    publicationId: string;
     publicationPathPrefix: string;
     requestedPath: string;
     tx?: Prisma.TransactionClient | PrismaService;
@@ -432,29 +438,63 @@ export class PublicFunnelRuntimeService {
     const requestedAdWheelId = extractAwid(input.requestedPath);
     if (requestedAdWheelId) {
       const now = new Date();
-      const adWheel = await prismaClient.adWheel.findFirst({
-        where: {
-          id: requestedAdWheelId,
-          teamId: input.teamId,
-          status: 'ACTIVE',
-          startDate: {
-            lte: now,
+      try {
+        const adWheel = await prismaClient.adWheel.findFirst({
+          where: {
+            id: requestedAdWheelId,
+            teamId: input.teamId,
           },
-          endDate: {
-            gte: now,
+          select: {
+            id: true,
+            publicationId: true,
+            status: true,
+            startDate: true,
+            endDate: true,
           },
-        },
-        select: {
-          id: true,
-        },
-      });
+        });
 
-      if (adWheel) {
+        const publicationMatches =
+          adWheel?.publicationId === input.publicationId ||
+          adWheel?.publicationId === null;
+        const dateWindowMatches =
+          adWheel && adWheel.startDate <= now && adWheel.endDate >= now;
+
+        if (
+          adWheel &&
+          publicationMatches &&
+          adWheel.status === 'ACTIVE' &&
+          dateWindowMatches
+        ) {
+          return {
+            entryMode: 'paid_ads',
+            trafficLayer: 'PAID_WHEEL',
+            forcedSponsorId: null,
+            adWheelId: adWheel.id,
+            browserPixelsEnabled: true,
+            runtimePathPrefix: null,
+            referralQueryParam: null,
+          };
+        }
+
+        this.logger.warn(
+          `[WHEEL_DEBUG] awid ${requestedAdWheelId} rejected in entry context. Motivo: ${this.describeAdWheelEntryRejection(
+            adWheel,
+            input.publicationId,
+            now,
+          )}. publicationId=${input.publicationId} teamId=${input.teamId}`,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Ad wheel entry context resolution failed; falling back to direct organic. publicationId=${input.publicationId} awid=${requestedAdWheelId} message=${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+
         return {
           entryMode: 'paid_ads',
-          trafficLayer: 'PAID_WHEEL',
+          trafficLayer: 'DIRECT',
           forcedSponsorId: null,
-          adWheelId: adWheel.id,
+          adWheelId: null,
           browserPixelsEnabled: true,
           runtimePathPrefix: null,
           referralQueryParam: null,
@@ -471,6 +511,43 @@ export class PublicFunnelRuntimeService {
       runtimePathPrefix: null,
       referralQueryParam: null,
     };
+  }
+
+  private describeAdWheelEntryRejection(
+    adWheel: {
+      id: string;
+      publicationId: string | null;
+      status: string;
+      startDate: Date;
+      endDate: Date;
+    } | null,
+    publicationId: string,
+    now: Date,
+  ) {
+    if (!adWheel) {
+      return 'adWheel_not_found_for_team';
+    }
+
+    if (
+      adWheel.publicationId !== null &&
+      adWheel.publicationId !== publicationId
+    ) {
+      return `publication_mismatch expected=${publicationId} actual=${adWheel.publicationId}`;
+    }
+
+    if (adWheel.status !== 'ACTIVE') {
+      return `status_not_ACTIVE actual=${adWheel.status}`;
+    }
+
+    if (adWheel.startDate > now) {
+      return `startDate_in_future startDate=${adWheel.startDate.toISOString()} now=${now.toISOString()}`;
+    }
+
+    if (adWheel.endDate < now) {
+      return `endDate_expired endDate=${adWheel.endDate.toISOString()} now=${now.toISOString()}`;
+    }
+
+    return 'unknown_entry_context_rejection';
   }
 
   async getPublicationRuntime(

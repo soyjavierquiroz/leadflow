@@ -182,6 +182,9 @@ export type LeadRecord = {
   funnelId: string;
   funnelInstanceId: string | null;
   funnelPublicationId: string | null;
+  trafficLayer: "DIRECT" | "PAID_WHEEL" | "ORGANIC";
+  originAdWheelId: string | null;
+  originAdWheelName: string | null;
   visitorId: string | null;
   sourceChannel: string;
   fullName: string | null;
@@ -226,6 +229,9 @@ export type AssignmentRecord = {
   funnelInstanceId: string | null;
   funnelPublicationId: string | null;
   rotationPoolId: string | null;
+  trafficLayer: "DIRECT" | "PAID_WHEEL" | "ORGANIC";
+  originAdWheelId: string | null;
+  originAdWheelName: string | null;
   status: string;
   reason: string;
   assignedAt: string;
@@ -348,6 +354,7 @@ export type ShellNavItem = {
   label: string;
   description: string;
   match?: string;
+  exact?: boolean;
   icon?: string;
 };
 

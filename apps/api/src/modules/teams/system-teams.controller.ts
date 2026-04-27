@@ -31,6 +31,11 @@ export class SystemTeamsController {
     return this.teamsService.listSystemTenants(includeArchived === 'true');
   }
 
+  @Post('dev/wipe-leads')
+  wipeLeadTestData() {
+    return this.teamsService.wipeLeadTestData();
+  }
+
   @Get('tenants/:id')
   getTenantDetail(@Param('id') id: string) {
     return this.teamsService.getSystemTenantDetail(id);

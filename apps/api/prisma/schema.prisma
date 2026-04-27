@@ -392,22 +392,27 @@ model Sponsor {
 }
 
 model AdWheel {
-  id           String               @id @default(uuid())
-  teamId       String
-  status       AdWheelStatus
-  name         String
-  seatPrice    Int
-  startDate    DateTime
-  endDate      DateTime
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
-  team         Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  participants AdWheelParticipant[]
-  turns        AdWheelTurn[]
-  originLeads  Lead[]               @relation("LeadOriginAdWheel")
-  originAssignments Assignment[]     @relation("AssignmentOriginAdWheel")
+  id                  String               @id @default(uuid())
+  teamId              String
+  publicationId       String?
+  status              AdWheelStatus
+  name                String
+  seatPrice           Int
+  startDate           DateTime
+  endDate             DateTime
+  currentTurnPosition Int                  @default(1)
+  sequenceVersion     Int                  @default(1)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  team                Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  publication         FunnelPublication?   @relation(fields: [publicationId], references: [id], onDelete: SetNull)
+  participants        AdWheelParticipant[]
+  turns               AdWheelTurn[]
+  originLeads         Lead[]               @relation("LeadOriginAdWheel")
+  originAssignments   Assignment[]         @relation("AssignmentOriginAdWheel")
 
   @@index([teamId, status])
+  @@index([teamId, publicationId, status])
   @@index([teamId, startDate, endDate])
 }
 
@@ -424,19 +429,18 @@ model AdWheelParticipant {
 }
 
 model AdWheelTurn {
-  id           String   @id @default(uuid())
-  adWheelId    String
-  sponsorId    String
-  position     Int
-  isConsumed   Boolean  @default(false)
-  assignmentId String?
-  createdAt    DateTime @default(now())
-  adWheel      AdWheel  @relation(fields: [adWheelId], references: [id], onDelete: Cascade)
-  sponsor      Sponsor  @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  adWheelId       String
+  sponsorId       String
+  position        Int
+  sequenceVersion Int      @default(1)
+  createdAt       DateTime @default(now())
+  adWheel         AdWheel  @relation(fields: [adWheelId], references: [id], onDelete: Cascade)
+  sponsor         Sponsor  @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
 
-  @@unique([adWheelId, position])
-  @@index([adWheelId, isConsumed, position])
-  @@index([sponsorId, isConsumed])
+  @@unique([adWheelId, sequenceVersion, position])
+  @@index([adWheelId, sequenceVersion, position])
+  @@index([sponsorId, sequenceVersion])
 }
 
 model User {
@@ -762,6 +766,7 @@ model FunnelPublication {
   leads                Lead[]
   assignments          Assignment[]
   automationDispatches AutomationDispatch[]
+  adWheels             AdWheel[]
 
   @@unique([domainId, pathPrefix])
   @@index([domainId, status, pathPrefix])

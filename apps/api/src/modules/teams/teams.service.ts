@@ -9,9 +9,15 @@ import {
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, UserRole, UserStatus } from '@prisma/client';
+import {
+  EventAggregateType,
+  Prisma,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { mapFunnelRecord } from '../../prisma/prisma.mappers';
+import { AdWheelSequenceGeneratorService } from '../ad-wheels/ad-wheel-sequence-generator.service';
 import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { FunnelsService } from '../funnels/funnels.service';
@@ -190,6 +196,7 @@ export class TeamsService {
     private readonly walletEngineService: WalletEngineService,
     private readonly funnelsService: FunnelsService,
     private readonly mailService: MailService,
+    private readonly adWheelSequenceGeneratorService: AdWheelSequenceGeneratorService,
     @Optional()
     @Inject(TEAM_REPOSITORY)
     private readonly repository?: TeamRepository,
@@ -215,6 +222,87 @@ export class TeamsService {
       trackingProfileIds: [],
       handoffStrategyIds: [],
       rotationPoolIds: [],
+    });
+  }
+
+  async wipeLeadTestData() {
+    return this.prisma.$transaction(async (tx) => {
+      const domainEvents = await tx.domainEvent.deleteMany({
+        where: {
+          OR: [
+            {
+              leadId: {
+                not: null,
+              },
+            },
+            {
+              assignmentId: {
+                not: null,
+              },
+            },
+            {
+              aggregateType: {
+                in: [EventAggregateType.lead, EventAggregateType.assignment],
+              },
+            },
+          ],
+        },
+      });
+      const automationDispatches = await tx.automationDispatch.deleteMany({});
+      const leadNotes = await tx.leadNote.deleteMany({});
+
+      await tx.lead.updateMany({
+        data: {
+          currentAssignmentId: null,
+        },
+      });
+
+      const assignments = await tx.assignment.deleteMany({});
+      const leads = await tx.lead.deleteMany({});
+      const deletedTurns = await tx.adWheelTurn.deleteMany({});
+      const resetWheels = await tx.adWheel.updateMany({
+        where: {
+          status: 'ACTIVE',
+        },
+        data: {
+          currentTurnPosition: 1,
+          sequenceVersion: 1,
+        },
+      });
+      const wheels = await tx.adWheel.findMany({
+        where: {
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      });
+      let regeneratedTurns = 0;
+
+      for (const wheel of wheels) {
+        const turns =
+          await this.adWheelSequenceGeneratorService.replaceSequenceInTransaction(
+            tx,
+            wheel.id,
+          );
+        regeneratedTurns += turns.length;
+      }
+
+      return {
+        deleted: {
+          domainEvents: domainEvents.count,
+          automationDispatches: automationDispatches.count,
+          leadNotes: leadNotes.count,
+          assignments: assignments.count,
+          leads: leads.count,
+          adWheelTurns: deletedTurns.count,
+        },
+        regenerated: {
+          adWheelTurns: regeneratedTurns,
+          adWheels: resetWheels.count,
+        },
+      };
     });
   }
 
@@ -1819,4 +1907,5 @@ export class TeamsService {
       });
     }
   }
+
 }

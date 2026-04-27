@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
+import { LeadSourceBadge } from "@/components/app-shell/lead-source-badge";
+import { PremiumSelect } from "@/components/app-shell/premium-select";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
 import { LeadQualificationTimelinePanel } from "@/components/lead-signals/lead-qualification-timeline-panel";
@@ -57,6 +59,26 @@ const reminderBucketOptions = [
   "upcoming",
   "unscheduled",
 ] as const;
+
+const sourceFilterOptions = [
+  {
+    value: "all",
+    label: "Todas las fuentes",
+    description: "Orgánico y campañas",
+  },
+  {
+    value: "organic",
+    label: "Orgánicos",
+    description: "Directo y orgánico",
+  },
+  {
+    value: "paid",
+    label: "Campañas pagadas",
+    description: "Ruedas publicitarias",
+  },
+] as const;
+
+type SourceFilter = (typeof sourceFilterOptions)[number]["value"];
 
 const leadStatusLabel: Record<(typeof leadStatusOptions)[number], string> = {
   all: "Todos",
@@ -200,6 +222,8 @@ export function MemberLeadsClient({
     useState<(typeof assignmentStatusOptions)[number]>("all");
   const [reminderBucket, setReminderBucket] =
     useState<(typeof reminderBucketOptions)[number]>("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [openSelectId, setOpenSelectId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -215,18 +239,25 @@ export function MemberLeadsClient({
       row.email?.toLowerCase().includes(searchTerm) ||
       row.phone?.toLowerCase().includes(searchTerm) ||
       row.companyName?.toLowerCase().includes(searchTerm) ||
-      row.funnelName?.toLowerCase().includes(searchTerm);
+      row.funnelName?.toLowerCase().includes(searchTerm) ||
+      row.originAdWheelName?.toLowerCase().includes(searchTerm);
 
     const matchesLeadStatus = leadStatus === "all" || row.status === leadStatus;
     const matchesAssignmentStatus =
       assignmentStatus === "all" || row.assignmentStatus === assignmentStatus;
     const matchesReminderBucket =
       reminderBucket === "all" || row.reminderBucket === reminderBucket;
+    const matchesSource =
+      sourceFilter === "all" ||
+      (sourceFilter === "paid"
+        ? row.trafficLayer === "PAID_WHEEL"
+        : row.trafficLayer !== "PAID_WHEEL");
 
     return Boolean(
       matchesSearch &&
       matchesLeadStatus &&
       matchesAssignmentStatus &&
+      matchesSource &&
       matchesReminderBucket,
     );
   });
@@ -496,7 +527,7 @@ export function MemberLeadsClient({
         </div>
       </section>
 
-      <section className="grid gap-3 rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)] md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-[0_18px_45px_rgba(15,23,42,0.05)] md:grid-cols-2 xl:grid-cols-5">
         <label className="space-y-2 text-sm">
           <span className="font-medium text-[var(--app-text)]">Buscar lead</span>
           <input
@@ -562,6 +593,18 @@ export function MemberLeadsClient({
             ))}
           </select>
         </label>
+        <label className="space-y-2 text-sm">
+          <span className="font-medium text-[var(--app-text)]">Fuente</span>
+          <PremiumSelect
+            id="member-lead-source-filter"
+            value={sourceFilter}
+            placeholder="Fuente"
+            options={sourceFilterOptions}
+            open={openSelectId === "source"}
+            onOpenChange={(open) => setOpenSelectId(open ? "source" : null)}
+            onValueChange={(value) => setSourceFilter(value as SourceFilter)}
+          />
+        </label>
       </section>
 
       <DataTable
@@ -584,11 +627,15 @@ export function MemberLeadsClient({
             key: "origin",
             header: "Origen comercial",
             render: (row: LeadView) => (
-              <div>
+              <div className="space-y-3">
                 <p>{row.publicationPath ?? "Sin publicación"}</p>
                 <p className="text-xs text-[var(--app-text-soft)]">
                   {row.domainHost ?? "Host pendiente"}
                 </p>
+                <LeadSourceBadge
+                  trafficLayer={row.trafficLayer}
+                  originAdWheelName={row.originAdWheelName}
+                />
               </div>
             ),
           },
@@ -692,6 +739,10 @@ export function MemberLeadsClient({
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <LeadSourceBadge
+                trafficLayer={selectedLead.trafficLayer}
+                originAdWheelName={selectedLead.originAdWheelName}
+              />
               <StatusBadge value={selectedLead.status} />
               {selectedLead.assignmentStatus ? (
                 <StatusBadge value={selectedLead.assignmentStatus} />

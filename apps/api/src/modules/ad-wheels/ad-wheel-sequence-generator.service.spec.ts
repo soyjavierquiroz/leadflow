@@ -7,12 +7,10 @@ type ParticipantFindManyArgs = Parameters<
 type TurnDeleteManyArgs = Parameters<
   PrismaService['adWheelTurn']['deleteMany']
 >[0];
-type TurnFindFirstArgs = Parameters<
-  PrismaService['adWheelTurn']['findFirst']
->[0];
 type TurnCreateManyArgs = Parameters<
   PrismaService['adWheelTurn']['createMany']
 >[0];
+type WheelFindUniqueArgs = Parameters<PrismaService['adWheel']['findUnique']>[0];
 type TransactionCallback = Parameters<PrismaService['$transaction']>[0];
 
 type ParticipantRecord = {
@@ -22,15 +20,17 @@ type ParticipantRecord = {
 };
 
 type TxMock = {
+  adWheel: {
+    findUnique: jest.Mock<
+      Promise<{ id: string; sequenceVersion: number } | null>,
+      [WheelFindUniqueArgs]
+    >;
+  };
   adWheelParticipant: {
     findMany: jest.Mock<Promise<ParticipantRecord[]>, [ParticipantFindManyArgs]>;
   };
   adWheelTurn: {
     deleteMany: jest.Mock<Promise<{ count: number }>, [TurnDeleteManyArgs]>;
-    findFirst: jest.Mock<
-      Promise<{ position: number } | null>,
-      [TurnFindFirstArgs]
-    >;
     createMany: jest.Mock<Promise<{ count: number }>, [TurnCreateManyArgs]>;
   };
 };
@@ -48,9 +48,14 @@ describe('AdWheelSequenceGeneratorService', () => {
       adWheelParticipant: {
         findMany: jest.fn(),
       },
+      adWheel: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'wheel-1',
+          sequenceVersion: 1,
+        }),
+      },
       adWheelTurn: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-        findFirst: jest.fn(),
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
@@ -87,8 +92,6 @@ describe('AdWheelSequenceGeneratorService', () => {
         joinedAt: new Date('2026-04-02T00:00:00.000Z'),
       },
     ]);
-    tx.adWheelTurn.findFirst.mockResolvedValue(null);
-
     const result = await service.generateSequence('wheel-1');
 
     expect(transaction).toHaveBeenCalledTimes(1);
@@ -109,15 +112,34 @@ describe('AdWheelSequenceGeneratorService', () => {
     expect(tx.adWheelTurn.deleteMany).toHaveBeenCalledWith({
       where: {
         adWheelId: 'wheel-1',
-        isConsumed: false,
       },
     });
     expect(tx.adWheelTurn.createMany).toHaveBeenCalledWith({
       data: [
-        { adWheelId: 'wheel-1', sponsorId: 'sponsor-a', position: 1 },
-        { adWheelId: 'wheel-1', sponsorId: 'sponsor-b', position: 2 },
-        { adWheelId: 'wheel-1', sponsorId: 'sponsor-a', position: 3 },
-        { adWheelId: 'wheel-1', sponsorId: 'sponsor-a', position: 4 },
+        {
+          adWheelId: 'wheel-1',
+          sponsorId: 'sponsor-a',
+          sequenceVersion: 1,
+          position: 1,
+        },
+        {
+          adWheelId: 'wheel-1',
+          sponsorId: 'sponsor-b',
+          sequenceVersion: 1,
+          position: 2,
+        },
+        {
+          adWheelId: 'wheel-1',
+          sponsorId: 'sponsor-a',
+          sequenceVersion: 1,
+          position: 3,
+        },
+        {
+          adWheelId: 'wheel-1',
+          sponsorId: 'sponsor-a',
+          sequenceVersion: 1,
+          position: 4,
+        },
       ],
     });
     expect(result.map((turn) => turn.sponsorId)).toEqual([
@@ -128,9 +150,13 @@ describe('AdWheelSequenceGeneratorService', () => {
     ]);
   });
 
-  it('starts new pending turns after consumed turn positions', async () => {
+  it('writes turns for the wheel sequence version', async () => {
     const { tx, service } = buildService();
 
+    tx.adWheel.findUnique.mockResolvedValue({
+      id: 'wheel-1',
+      sequenceVersion: 4,
+    });
     tx.adWheelParticipant.findMany.mockResolvedValue([
       {
         sponsorId: 'sponsor-a',
@@ -138,24 +164,18 @@ describe('AdWheelSequenceGeneratorService', () => {
         joinedAt: new Date('2026-04-01T00:00:00.000Z'),
       },
     ]);
-    tx.adWheelTurn.findFirst.mockResolvedValue({ position: 9 });
 
     await service.generateSequence('wheel-1');
 
-    expect(tx.adWheelTurn.findFirst).toHaveBeenCalledWith({
-      where: {
-        adWheelId: 'wheel-1',
-        isConsumed: true,
-      },
-      select: {
-        position: true,
-      },
-      orderBy: {
-        position: 'desc',
-      },
-    });
     expect(tx.adWheelTurn.createMany).toHaveBeenCalledWith({
-      data: [{ adWheelId: 'wheel-1', sponsorId: 'sponsor-a', position: 10 }],
+      data: [
+        {
+          adWheelId: 'wheel-1',
+          sponsorId: 'sponsor-a',
+          sequenceVersion: 4,
+          position: 1,
+        },
+      ],
     });
   });
 
@@ -168,10 +188,8 @@ describe('AdWheelSequenceGeneratorService', () => {
     expect(tx.adWheelTurn.deleteMany).toHaveBeenCalledWith({
       where: {
         adWheelId: 'wheel-1',
-        isConsumed: false,
       },
     });
-    expect(tx.adWheelTurn.findFirst).not.toHaveBeenCalled();
     expect(tx.adWheelTurn.createMany).not.toHaveBeenCalled();
   });
 });

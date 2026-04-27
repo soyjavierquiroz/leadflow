@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { LeadSourceChannel as PrismaLeadSourceChannel } from '@prisma/client';
+import {
+  LeadSourceChannel as PrismaLeadSourceChannel,
+  type Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { mapLeadRecord } from '../prisma.mappers';
 import type { CreateLeadDto } from '../../modules/leads/dto/create-lead.dto';
@@ -23,12 +26,22 @@ const toDbSource = (value: string): PrismaLeadSourceChannel => {
   }
 };
 
+const leadOriginInclude = {
+  originAdWheel: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+} satisfies Prisma.LeadInclude;
+
 @Injectable()
 export class LeadPrismaRepository implements LeadRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(): Promise<Lead[]> {
     const records = await this.prisma.lead.findMany({
+      include: leadOriginInclude,
       orderBy: { createdAt: 'asc' },
     });
 
@@ -36,13 +49,17 @@ export class LeadPrismaRepository implements LeadRepository {
   }
 
   async findById(id: string): Promise<Lead | null> {
-    const record = await this.prisma.lead.findUnique({ where: { id } });
+    const record = await this.prisma.lead.findUnique({
+      where: { id },
+      include: leadOriginInclude,
+    });
     return record ? mapLeadRecord(record) : null;
   }
 
   async findByVisitorId(visitorId: string): Promise<Lead[]> {
     const records = await this.prisma.lead.findMany({
       where: { visitorId },
+      include: leadOriginInclude,
       orderBy: { createdAt: 'asc' },
     });
 
@@ -52,6 +69,7 @@ export class LeadPrismaRepository implements LeadRepository {
   async findByWorkspaceId(workspaceId: string): Promise<Lead[]> {
     const records = await this.prisma.lead.findMany({
       where: { workspaceId },
+      include: leadOriginInclude,
       orderBy: { createdAt: 'asc' },
     });
 
@@ -79,6 +97,7 @@ export class LeadPrismaRepository implements LeadRepository {
           },
         ],
       },
+      include: leadOriginInclude,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -92,6 +111,7 @@ export class LeadPrismaRepository implements LeadRepository {
           some: { sponsorId },
         },
       },
+      include: leadOriginInclude,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -101,6 +121,7 @@ export class LeadPrismaRepository implements LeadRepository {
   async findByPublicationId(funnelPublicationId: string): Promise<Lead[]> {
     const records = await this.prisma.lead.findMany({
       where: { funnelPublicationId },
+      include: leadOriginInclude,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -114,6 +135,8 @@ export class LeadPrismaRepository implements LeadRepository {
         funnelId: data.funnelId,
         funnelInstanceId: data.funnelInstanceId ?? null,
         funnelPublicationId: data.funnelPublicationId ?? null,
+        trafficLayer: 'ORGANIC',
+        originAdWheelId: null,
         visitorId: data.visitorId ?? null,
         sourceChannel: toDbSource(data.sourceChannel),
         fullName: data.fullName ?? null,
@@ -130,6 +153,7 @@ export class LeadPrismaRepository implements LeadRepository {
         currentAssignmentId: null,
         tags: data.tags ?? [],
       },
+      include: leadOriginInclude,
     });
 
     return mapLeadRecord(record);
@@ -144,6 +168,8 @@ export class LeadPrismaRepository implements LeadRepository {
         funnelId: entity.funnelId,
         funnelInstanceId: entity.funnelInstanceId,
         funnelPublicationId: entity.funnelPublicationId,
+        trafficLayer: entity.trafficLayer,
+        originAdWheelId: entity.originAdWheelId,
         visitorId: entity.visitorId,
         sourceChannel: toDbSource(entity.sourceChannel),
         fullName: entity.fullName,
@@ -170,6 +196,8 @@ export class LeadPrismaRepository implements LeadRepository {
         funnelId: entity.funnelId,
         funnelInstanceId: entity.funnelInstanceId,
         funnelPublicationId: entity.funnelPublicationId,
+        trafficLayer: entity.trafficLayer,
+        originAdWheelId: entity.originAdWheelId,
         visitorId: entity.visitorId,
         sourceChannel: toDbSource(entity.sourceChannel),
         fullName: entity.fullName,
@@ -190,6 +218,7 @@ export class LeadPrismaRepository implements LeadRepository {
         currentAssignmentId: entity.currentAssignmentId,
         tags: entity.tags,
       },
+      include: leadOriginInclude,
     });
 
     return mapLeadRecord(record);

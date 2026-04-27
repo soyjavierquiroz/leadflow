@@ -124,6 +124,23 @@ type AssignmentResolution = {
   wasCreated: boolean;
 };
 
+type PaidWheelReservation = {
+  assignmentId: string;
+  adWheelId: string;
+  turnId: string;
+  turnPosition: number;
+  sequenceVersion: number;
+  totalTurns: number;
+  sponsor: AssignmentSummary['sponsor'];
+  assignedAt: Date;
+};
+
+type AssignmentRoutingInput = {
+  triggerEventId?: string | null;
+  funnelStepId?: string | null;
+  entryContext?: SubmissionEntryContext;
+};
+
 type AssignmentFailureTrackingContext = {
   workspaceId: string;
   publicationId: string;
@@ -146,8 +163,8 @@ type RuntimeAttributionPayload = {
 };
 
 type SubmissionEntryContext = PublicRuntimeEntryContext & {
-  runtimePathPrefix?: string | null;
-  referralQueryParam?: string | null;
+  runtimePathPrefix: string | null;
+  referralQueryParam: string | null;
 };
 
 const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
@@ -156,8 +173,6 @@ const ASSIGNMENT_FALLBACK_ERROR_CODES = new Set([
   'NO_ELIGIBLE_SPONSORS',
   'ROTATION_MEMBER_NOT_FOUND',
   'NO_AVAILABLE_AD_WHEEL_TURNS',
-  'AD_WHEEL_TURN_ALREADY_CONSUMED',
-  'AD_WHEEL_SEAT_EXHAUSTED',
 ]);
 
 const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
@@ -165,9 +180,6 @@ const UNASSIGNED_ASSIGNMENT_ERROR_CODES = new Set([
   'NO_FALLBACK_SPONSOR_AVAILABLE',
   'NO_ACTIVE_AD_WHEEL',
   'NO_ACTIVE_AD_WHEEL_PARTICIPANTS',
-  'NO_AVAILABLE_AD_WHEEL_TURNS',
-  'AD_WHEEL_TURN_ALREADY_CONSUMED',
-  'AD_WHEEL_SEAT_EXHAUSTED',
 ]);
 
 type DirectEligibleSponsor = Prisma.SponsorGetPayload<Record<string, never>>;
@@ -315,27 +327,45 @@ export class LeadCaptureAssignmentService {
     let failureContext: AssignmentFailureTrackingContext | null = null;
 
     try {
+      const publication = await this.getPublicationContextOrThrow(
+        this.prisma,
+        dto.publicationId,
+      );
+      const currentStep = publication.funnelInstance.steps.find(
+        (step) => step.id === dto.currentStepId,
+      );
+
+      if (!currentStep) {
+        throw new NotFoundException({
+          code: 'STEP_NOT_FOUND',
+          message: `Step ${dto.currentStepId} does not belong to publication ${dto.publicationId}.`,
+        });
+      }
+
+      let entryContext = await this.resolveSubmissionEntryContext(
+        this.prisma,
+        publication,
+        dto.sourceUrl ?? null,
+      );
+      const hasExistingOpenAssignment =
+        entryContext.trafficLayer === 'PAID_WHEEL'
+          ? await this.hasExistingOpenAssignmentForAnonymousId(
+              publication,
+              dto.anonymousId,
+            )
+          : false;
+
+      if (
+        entryContext.trafficLayer === 'PAID_WHEEL' &&
+        hasExistingOpenAssignment
+      ) {
+        this.logger.warn(
+          `[WHEEL_DEBUG] Fallback disparado para awid ${entryContext.adWheelId}. Motivo: anonymous_id_has_existing_open_assignment anonymousId=${dto.anonymousId}. publicationId=${publication.id} teamId=${publication.teamId}`,
+        );
+        entryContext = this.toPaidWheelFallbackEntryContext(entryContext);
+      }
+
       const result = await this.prisma.$transaction(async (tx) => {
-        const publication = await this.getPublicationContextOrThrow(
-          tx,
-          dto.publicationId,
-        );
-        const currentStep = publication.funnelInstance.steps.find(
-          (step) => step.id === dto.currentStepId,
-        );
-
-        if (!currentStep) {
-          throw new NotFoundException({
-            code: 'STEP_NOT_FOUND',
-            message: `Step ${dto.currentStepId} does not belong to publication ${dto.publicationId}.`,
-          });
-        }
-
-        const entryContext = await this.resolveSubmissionEntryContext(
-          tx,
-          publication,
-          dto.sourceUrl ?? null,
-        );
         const captureTags = Array.from(
           new Set([
             ...(dto.tags ?? []),
@@ -389,6 +419,8 @@ export class LeadCaptureAssignmentService {
             ttclid: dto.ttclid ?? null,
             tags: captureTags,
             triggerEventId: dto.submissionEventId ?? null,
+            trafficLayer: entryContext.trafficLayer,
+            originAdWheelId: entryContext.adWheelId ?? null,
           },
         );
 
@@ -441,18 +473,25 @@ export class LeadCaptureAssignmentService {
       });
 
       if (result.assignmentWasCreated && result.assignment) {
-        this.dispatchAssignmentCreatedSideEffects({
-          assignmentId: result.assignment.id,
-          sponsorId: result.assignment.sponsor.id,
-          automation: {
+        try {
+          this.dispatchAssignmentCreatedSideEffects({
             assignmentId: result.assignment.id,
-            triggerType: 'public_submission_assignment_created',
-            triggerEventId: dto.submissionEventId ?? null,
-            anonymousId: dto.anonymousId,
-            currentStepId: dto.currentStepId,
-            nextStepPath: result.nextStep?.path ?? null,
-          },
-        });
+            sponsorId: result.assignment.sponsor.id,
+            automation: {
+              assignmentId: result.assignment.id,
+              triggerType: 'public_submission_assignment_created',
+              triggerEventId: dto.submissionEventId ?? null,
+              anonymousId: dto.anonymousId,
+              currentStepId: dto.currentStepId,
+              nextStepPath: result.nextStep?.path ?? null,
+            },
+          });
+        } catch (error) {
+          this.logger.error(
+            `Post-capture side effects failed after successful lead capture. leadId=${result.lead.id} assignmentId=${result.assignment.id}`,
+            error instanceof Error ? error.stack : String(error),
+          );
+        }
       }
 
       return {
@@ -603,7 +642,7 @@ export class LeadCaptureAssignmentService {
   }
 
   private async getPublicationContextOrThrow(
-    tx: TransactionClient,
+    tx: TransactionClient | PrismaService,
     publicationId: string,
   ): Promise<FlowPublicationRecord> {
     const publication = await tx.funnelPublication.findUnique({
@@ -775,6 +814,8 @@ export class LeadCaptureAssignmentService {
     input: CapturePublicLeadDto &
       RuntimeAttributionPayload & {
         fieldValues?: Record<string, string | null>;
+        trafficLayer?: 'DIRECT' | 'PAID_WHEEL' | 'ORGANIC' | null;
+        originAdWheelId?: string | null;
       },
   ): Promise<LeadCaptureResult> {
     const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
@@ -789,63 +830,50 @@ export class LeadCaptureAssignmentService {
 
     const tags = Array.from(new Set(input.tags ?? []));
     const sourceChannel = this.toDbSource(input.sourceChannel ?? 'form');
-    let wasCreated = false;
-    let lead: Prisma.LeadGetPayload<Record<string, never>>;
-
-    try {
-      lead = await tx.lead.create({
-        data: {
-          workspaceId: publication.workspaceId,
-          funnelId: legacyFunnelId,
-          funnelInstanceId: publication.funnelInstanceId,
-          funnelPublicationId: publication.id,
-          visitorId: visitor.id,
-          sourceChannel,
-          fullName: input.fullName ?? null,
-          email: input.email ?? null,
-          phone: input.phone ?? null,
-          companyName: input.companyName ?? null,
-          status: 'captured',
-          currentAssignmentId: null,
-          tags,
-        },
-      });
-      wasCreated = true;
-    } catch (error) {
-      if (
-        !(
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === 'P2002'
-        )
-      ) {
-        throw error;
-      }
-
-      const existing = await tx.lead.findUnique({
-        where: {
-          visitorId: visitor.id,
-        },
-      });
-
-      if (!existing) {
-        throw error;
-      }
-
-      lead = await tx.lead.update({
-        where: { id: existing.id },
-        data: {
-          funnelId: legacyFunnelId,
-          funnelInstanceId: publication.funnelInstanceId,
-          funnelPublicationId: publication.id,
-          sourceChannel,
-          fullName: input.fullName ?? existing.fullName,
-          email: input.email ?? existing.email,
-          phone: input.phone ?? existing.phone,
-          companyName: input.companyName ?? existing.companyName,
-          tags: tags.length > 0 ? tags : existing.tags,
-        },
-      });
-    }
+    const existing = await tx.lead.findUnique({
+      where: {
+        visitorId: visitor.id,
+      },
+    });
+    const wasCreated = !existing;
+    const lead = await tx.lead.upsert({
+      where: {
+        visitorId: visitor.id,
+      },
+      create: {
+        workspaceId: publication.workspaceId,
+        funnelId: legacyFunnelId,
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
+        visitorId: visitor.id,
+        sourceChannel,
+        fullName: input.fullName ?? null,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        companyName: input.companyName ?? null,
+        status: 'captured',
+        currentAssignmentId: null,
+        trafficLayer: input.trafficLayer ?? null,
+        originAdWheelId: input.originAdWheelId ?? null,
+        tags,
+      },
+      update: {
+        funnelId: legacyFunnelId,
+        funnelInstanceId: publication.funnelInstanceId,
+        funnelPublicationId: publication.id,
+        sourceChannel,
+        fullName: input.fullName ?? existing?.fullName,
+        email: input.email ?? existing?.email,
+        phone: input.phone ?? existing?.phone,
+        companyName: input.companyName ?? existing?.companyName,
+        trafficLayer: input.trafficLayer ?? existing?.trafficLayer,
+        originAdWheelId:
+          input.originAdWheelId === undefined
+            ? existing?.originAdWheelId
+            : input.originAdWheelId,
+        tags: tags.length > 0 ? tags : existing?.tags,
+      },
+    });
 
     await tx.visitor.update({
       where: { id: visitor.id },
@@ -926,11 +954,7 @@ export class LeadCaptureAssignmentService {
       id: string;
       currentAssignmentId: string | null;
     },
-    input?: {
-      triggerEventId?: string | null;
-      funnelStepId?: string | null;
-      entryContext?: SubmissionEntryContext;
-    },
+    input?: AssignmentRoutingInput,
   ): Promise<AssignmentResolution> {
     const lockedLead = await lockLeadRowForUpdate(tx, {
       leadId: lead.id,
@@ -994,17 +1018,19 @@ export class LeadCaptureAssignmentService {
       );
     }
 
+    let effectiveRoutingInput = input;
+
     if (
-      input?.entryContext?.trafficLayer === 'PAID_WHEEL' &&
-      input.entryContext.adWheelId
+      effectiveRoutingInput?.entryContext?.trafficLayer === 'PAID_WHEEL' &&
+      effectiveRoutingInput.entryContext.adWheelId
     ) {
       try {
-        return await this.assignLeadToAdWheelTurnInTransaction(
+        return await this.assignLeadToPaidWheelCycleInTransaction(
           tx,
           publication,
           lead,
-          input.entryContext.adWheelId,
-          input,
+          effectiveRoutingInput.entryContext.adWheelId,
+          effectiveRoutingInput,
         );
       } catch (error) {
         const { code, message } = this.getConflictErrorDetails(error);
@@ -1014,8 +1040,14 @@ export class LeadCaptureAssignmentService {
         }
 
         this.logger.warn(
-          `Ad wheel assignment failed for lead ${lead.id}; falling back to organic. adWheelId=${input.entryContext.adWheelId} code=${code ?? 'UNKNOWN'} message=${message ?? 'Unable to consume ad wheel turn.'}`,
+          `[WHEEL_DEBUG] Fallback disparado para awid ${effectiveRoutingInput.entryContext.adWheelId}. Motivo: paid_cycle_assignment_failed code=${code} message=${message ?? 'Unable to advance paid wheel cursor.'}. publicationId=${publication.id} teamId=${publication.teamId}`,
         );
+        effectiveRoutingInput = {
+          ...effectiveRoutingInput,
+          entryContext: this.toPaidWheelFallbackEntryContext(
+            effectiveRoutingInput.entryContext,
+          ),
+        };
       }
     }
 
@@ -1045,6 +1077,10 @@ export class LeadCaptureAssignmentService {
     const assignedAt = new Date();
     const effectiveHandoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
+    const trafficLayer =
+      effectiveRoutingInput?.entryContext?.trafficLayer === 'DIRECT'
+        ? 'DIRECT'
+        : 'ORGANIC';
     const assignment = await tx.assignment.create({
       data: {
         workspaceId: publication.workspaceId,
@@ -1055,7 +1091,7 @@ export class LeadCaptureAssignmentService {
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         rotationPoolId: assignmentRotationPoolId,
-        trafficLayer: 'ORGANIC',
+        trafficLayer,
         originAdWheelId: null,
         status: 'assigned',
         reason: assignmentReason,
@@ -1073,7 +1109,7 @@ export class LeadCaptureAssignmentService {
       data: {
         status: 'assigned',
         currentAssignmentId: assignment.id,
-        trafficLayer: 'ORGANIC',
+        trafficLayer,
         originAdWheelId: null,
       },
     });
@@ -1091,13 +1127,13 @@ export class LeadCaptureAssignmentService {
           sponsorId: assignment.sponsor.id,
           rotationPoolId: assignmentRotationPoolId,
           funnelPublicationId: publication.id,
-          trafficLayer: 'ORGANIC',
+          trafficLayer,
           adWheelId: null,
         },
         occurredAt: assignedAt,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
-        funnelStepId: input?.funnelStepId ?? null,
+        funnelStepId: effectiveRoutingInput?.funnelStepId ?? null,
         leadId: lead.id,
         assignmentId: assignment.id,
       },
@@ -1112,16 +1148,16 @@ export class LeadCaptureAssignmentService {
       occurredAt: assignedAt,
       funnelInstanceId: publication.funnelInstanceId,
       funnelPublicationId: publication.id,
-      funnelStepId: input?.funnelStepId ?? null,
+      funnelStepId: effectiveRoutingInput?.funnelStepId ?? null,
       leadId: lead.id,
       assignmentId: assignment.id,
       payload: {
         source: 'server',
-        triggerEventId: input?.triggerEventId ?? null,
+        triggerEventId: effectiveRoutingInput?.triggerEventId ?? null,
         sponsorId: assignment.sponsor.id,
         rotationPoolId: assignmentRotationPoolId,
         assignmentReason,
-        trafficLayer: 'ORGANIC',
+        trafficLayer,
         adWheelId: null,
       },
     });
@@ -1135,15 +1171,15 @@ export class LeadCaptureAssignmentService {
       occurredAt: assignedAt,
       funnelInstanceId: publication.funnelInstanceId,
       funnelPublicationId: publication.id,
-      funnelStepId: input?.funnelStepId ?? null,
+      funnelStepId: effectiveRoutingInput?.funnelStepId ?? null,
       leadId: lead.id,
       assignmentId: assignment.id,
       payload: {
         source: 'server',
-        triggerEventId: input?.triggerEventId ?? null,
+        triggerEventId: effectiveRoutingInput?.triggerEventId ?? null,
         sponsorId: assignment.sponsor.id,
         handoffStrategyId: effectiveHandoffStrategy?.id ?? null,
-        trafficLayer: 'ORGANIC',
+        trafficLayer,
         adWheelId: null,
       },
     });
@@ -1174,11 +1210,7 @@ export class LeadCaptureAssignmentService {
       id: string;
       currentAssignmentId: string | null;
     },
-    input?: {
-      triggerEventId?: string | null;
-      funnelStepId?: string | null;
-      entryContext?: SubmissionEntryContext;
-    },
+    input?: AssignmentRoutingInput,
   ): Promise<AssignmentResolution> {
     try {
       return await this.assignLeadToNextSponsorInTransaction(
@@ -1521,7 +1553,7 @@ export class LeadCaptureAssignmentService {
   }
 
   private async resolveSubmissionEntryContext(
-    tx: TransactionClient,
+    tx: TransactionClient | PrismaService,
     publication: FlowPublicationRecord,
     sourceUrl: string | null,
   ) {
@@ -1532,6 +1564,7 @@ export class LeadCaptureAssignmentService {
       tx,
       workspaceId: publication.workspaceId,
       teamId: publication.teamId,
+      publicationId: publication.id,
       publicationPathPrefix: publication.pathPrefix,
       requestedPath,
     });
@@ -1552,7 +1585,185 @@ export class LeadCaptureAssignmentService {
     }
   }
 
-  private async assignLeadToAdWheelTurnInTransaction(
+  private async reservePaidWheelCycleTurnInTransaction(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+    adWheelId: string,
+  ): Promise<PaidWheelReservation | null> {
+    const now = new Date();
+    const [wheel] = await tx.$queryRaw<
+      Array<{
+        id: string;
+        currentTurnPosition: number;
+        sequenceVersion: number;
+      }>
+    >(Prisma.sql`
+      SELECT
+        aw.id,
+        aw."currentTurnPosition",
+        aw."sequenceVersion"
+      FROM "AdWheel" aw
+      WHERE aw.id = ${adWheelId}
+        AND aw."teamId" = ${publication.teamId}
+        AND (aw."publicationId" = ${publication.id} OR aw."publicationId" IS NULL)
+        AND aw.status = 'ACTIVE'
+        AND aw."startDate" <= ${now}
+        AND aw."endDate" >= ${now}
+      LIMIT 1
+      FOR UPDATE
+    `);
+
+    if (!wheel) {
+      this.logger.warn(
+        `[WHEEL_DEBUG] Fallback disparado para awid ${adWheelId}. Motivo: paid_wheel_lock_not_found_or_not_active. publicationId=${publication.id} teamId=${publication.teamId}`,
+      );
+      return null;
+    }
+
+    const totalTurns = await tx.adWheelTurn.count({
+      where: {
+        adWheelId,
+        sequenceVersion: wheel.sequenceVersion,
+      },
+    });
+
+    if (totalTurns === 0) {
+      this.logger.warn(
+        `[WHEEL_DEBUG] Fallback disparado para awid ${adWheelId}. Motivo: sequence_has_no_turns sequenceVersion=${wheel.sequenceVersion}. publicationId=${publication.id} teamId=${publication.teamId}`,
+      );
+      return null;
+    }
+
+    const currentPosition =
+      ((Math.max(1, wheel.currentTurnPosition) - 1) % totalTurns) + 1;
+    const [turn] = await tx.$queryRaw<
+      Array<{
+        id: string;
+        adWheelId: string;
+        sponsorId: string;
+        position: number;
+        sequenceVersion: number;
+        displayName: string;
+        email: string | null;
+        phone: string | null;
+        avatarUrl: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        awt.id,
+        awt."adWheelId",
+        awt."sponsorId",
+        awt.position,
+        awt."sequenceVersion",
+        s."displayName",
+        s.email,
+        s.phone,
+        s."avatarUrl"
+      FROM "AdWheelTurn" awt
+      INNER JOIN "Sponsor" s
+        ON s.id = awt."sponsorId"
+      INNER JOIN "AdWheelParticipant" awp
+        ON awp."adWheelId" = awt."adWheelId"
+       AND awp."sponsorId" = awt."sponsorId"
+      WHERE awt."adWheelId" = ${adWheelId}
+        AND awt."sequenceVersion" = ${wheel.sequenceVersion}
+        AND s."isActive" = true
+        AND s.status = 'active'
+        AND s."availabilityStatus" = 'available'
+        AND awp."seatCount" > 0
+      ORDER BY
+        CASE WHEN awt.position >= ${currentPosition} THEN 0 ELSE 1 END,
+        awt.position ASC
+      LIMIT 1
+    `);
+
+    if (!turn) {
+      this.logger.warn(
+        `[WHEEL_DEBUG] Fallback disparado para awid ${adWheelId}. Motivo: no_eligible_turn_in_sequence sequenceVersion=${wheel.sequenceVersion}. publicationId=${publication.id} teamId=${publication.teamId}`,
+      );
+      return null;
+    }
+
+    const nextPosition = (turn.position % totalTurns) + 1;
+    await tx.adWheel.update({
+      where: {
+        id: adWheelId,
+      },
+      data: {
+        currentTurnPosition: nextPosition,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return {
+      assignmentId: randomUUID(),
+      adWheelId,
+      turnId: turn.id,
+      turnPosition: turn.position,
+      sequenceVersion: turn.sequenceVersion,
+      totalTurns,
+      assignedAt: now,
+      sponsor: {
+        id: turn.sponsorId,
+        displayName: turn.displayName,
+        email: turn.email,
+        phone: turn.phone,
+        avatarUrl: turn.avatarUrl,
+      },
+    };
+  }
+
+  private async hasExistingOpenAssignmentForAnonymousId(
+    publication: FlowPublicationRecord,
+    anonymousId: string,
+  ) {
+    try {
+      const assignment = await this.prisma.assignment.findFirst({
+        where: {
+          workspaceId: publication.workspaceId,
+          status: {
+            in: ['pending', 'assigned', 'accepted'],
+          },
+          lead: {
+            visitor: {
+              is: {
+                workspaceId: publication.workspaceId,
+                anonymousId,
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return Boolean(assignment);
+    } catch (error) {
+      this.logger.warn(
+        `Existing assignment precheck failed; paid wheel preflight will continue. publicationId=${publication.id} message=${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+
+      return false;
+    }
+  }
+
+  private toPaidWheelFallbackEntryContext(
+    entryContext: SubmissionEntryContext,
+  ): SubmissionEntryContext {
+    return {
+      ...entryContext,
+      trafficLayer: 'DIRECT',
+      forcedSponsorId: null,
+      adWheelId: null,
+    };
+  }
+
+  private async assignLeadToPaidWheelCycleInTransaction(
     tx: TransactionClient,
     publication: FlowPublicationRecord,
     lead: {
@@ -1560,48 +1771,40 @@ export class LeadCaptureAssignmentService {
       currentAssignmentId: string | null;
     },
     adWheelId: string,
-    input: {
-      triggerEventId?: string | null;
-      funnelStepId?: string | null;
-      entryContext?: SubmissionEntryContext;
-    },
+    input: AssignmentRoutingInput,
   ): Promise<AssignmentResolution> {
-    const now = new Date();
-    const turn = await tx.adWheelTurn.findFirst({
-      where: {
-        adWheelId,
-        isConsumed: false,
-        adWheel: {
-          teamId: publication.teamId,
-          status: 'ACTIVE',
-          startDate: {
-            lte: now,
-          },
-          endDate: {
-            gte: now,
-          },
-        },
-        sponsor: {
-          isActive: true,
-          status: 'active',
-          availabilityStatus: 'available',
-        },
-      },
-      include: {
-        sponsor: true,
-      },
-      orderBy: {
-        position: 'asc',
-      },
-    });
+    const reservation = await this.reservePaidWheelCycleTurnInTransaction(
+      tx,
+      publication,
+      adWheelId,
+    );
 
-    if (!turn) {
+    if (!reservation) {
       throw new ConflictException({
         code: 'NO_AVAILABLE_AD_WHEEL_TURNS',
-        message: `Ad wheel ${adWheelId} does not have an available turn for publication ${publication.id}.`,
+        message: `Ad wheel ${adWheelId} does not have an eligible turn for publication ${publication.id}.`,
       });
     }
 
+    return this.assignLeadToReservedPaidWheelInTransaction(
+      tx,
+      publication,
+      lead,
+      reservation,
+      input,
+    );
+  }
+
+  private async assignLeadToReservedPaidWheelInTransaction(
+    tx: TransactionClient,
+    publication: FlowPublicationRecord,
+    lead: {
+      id: string;
+      currentAssignmentId: string | null;
+    },
+    reservation: PaidWheelReservation,
+    input: AssignmentRoutingInput,
+  ): Promise<AssignmentResolution> {
     const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
 
     if (!legacyFunnelId) {
@@ -1612,66 +1815,24 @@ export class LeadCaptureAssignmentService {
       });
     }
 
-    const assignedAt = now;
     const effectiveHandoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
-    const assignmentId = randomUUID();
-    const consumedTurn = await tx.adWheelTurn.updateMany({
-      where: {
-        id: turn.id,
-        isConsumed: false,
-      },
-      data: {
-        isConsumed: true,
-        assignmentId,
-      },
-    });
-
-    if (consumedTurn.count !== 1) {
-      throw new ConflictException({
-        code: 'AD_WHEEL_TURN_ALREADY_CONSUMED',
-        message: `Ad wheel turn ${turn.id} was already consumed.`,
-      });
-    }
-
-    const debitedSeat = await tx.adWheelParticipant.updateMany({
-      where: {
-        adWheelId,
-        sponsorId: turn.sponsorId,
-        seatCount: {
-          gt: 0,
-        },
-      },
-      data: {
-        seatCount: {
-          decrement: 1,
-        },
-      },
-    });
-
-    if (debitedSeat.count !== 1) {
-      throw new ConflictException({
-        code: 'AD_WHEEL_SEAT_EXHAUSTED',
-        message: `Sponsor ${turn.sponsorId} does not have remaining seats in ad wheel ${adWheelId}.`,
-      });
-    }
-
     const assignment = await tx.assignment.create({
       data: {
-        id: assignmentId,
+        id: reservation.assignmentId,
         workspaceId: publication.workspaceId,
         leadId: lead.id,
-        sponsorId: turn.sponsorId,
+        sponsorId: reservation.sponsor.id,
         teamId: publication.teamId,
         funnelId: legacyFunnelId,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         rotationPoolId: null,
         trafficLayer: 'PAID_WHEEL',
-        originAdWheelId: adWheelId,
+        originAdWheelId: reservation.adWheelId,
         status: 'assigned',
         reason: 'rotation',
-        assignedAt,
+        assignedAt: reservation.assignedAt,
         acceptedAt: null,
         resolvedAt: null,
       },
@@ -1686,7 +1847,7 @@ export class LeadCaptureAssignmentService {
         status: 'assigned',
         currentAssignmentId: assignment.id,
         trafficLayer: 'PAID_WHEEL',
-        originAdWheelId: adWheelId,
+        originAdWheelId: reservation.adWheelId,
       },
     });
 
@@ -1704,11 +1865,13 @@ export class LeadCaptureAssignmentService {
           rotationPoolId: null,
           funnelPublicationId: publication.id,
           trafficLayer: 'PAID_WHEEL',
-          adWheelId,
-          adWheelTurnId: turn.id,
-          adWheelTurnPosition: turn.position,
+          adWheelId: reservation.adWheelId,
+          adWheelTurnId: reservation.turnId,
+          adWheelTurnPosition: reservation.turnPosition,
+          adWheelSequenceVersion: reservation.sequenceVersion,
+          adWheelSequenceSize: reservation.totalTurns,
         },
-        occurredAt: assignedAt,
+        occurredAt: reservation.assignedAt,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         funnelStepId: input.funnelStepId ?? null,
@@ -1723,7 +1886,7 @@ export class LeadCaptureAssignmentService {
       aggregateId: assignment.id,
       eventName: 'assignment_created',
       actorType: 'system',
-      occurredAt: assignedAt,
+      occurredAt: reservation.assignedAt,
       funnelInstanceId: publication.funnelInstanceId,
       funnelPublicationId: publication.id,
       funnelStepId: input.funnelStepId ?? null,
@@ -1736,9 +1899,11 @@ export class LeadCaptureAssignmentService {
         rotationPoolId: null,
         assignmentReason: 'rotation',
         trafficLayer: 'PAID_WHEEL',
-        adWheelId,
-        adWheelTurnId: turn.id,
-        adWheelTurnPosition: turn.position,
+        adWheelId: reservation.adWheelId,
+        adWheelTurnId: reservation.turnId,
+        adWheelTurnPosition: reservation.turnPosition,
+        adWheelSequenceVersion: reservation.sequenceVersion,
+        adWheelSequenceSize: reservation.totalTurns,
       },
     });
 
@@ -1748,7 +1913,7 @@ export class LeadCaptureAssignmentService {
       aggregateId: assignment.id,
       eventName: 'handoff_started',
       actorType: 'system',
-      occurredAt: assignedAt,
+      occurredAt: reservation.assignedAt,
       funnelInstanceId: publication.funnelInstanceId,
       funnelPublicationId: publication.id,
       funnelStepId: input.funnelStepId ?? null,
@@ -1760,8 +1925,11 @@ export class LeadCaptureAssignmentService {
         sponsorId: assignment.sponsor.id,
         handoffStrategyId: effectiveHandoffStrategy?.id ?? null,
         trafficLayer: 'PAID_WHEEL',
-        adWheelId,
-        adWheelTurnId: turn.id,
+        adWheelId: reservation.adWheelId,
+        adWheelTurnId: reservation.turnId,
+        adWheelTurnPosition: reservation.turnPosition,
+        adWheelSequenceVersion: reservation.sequenceVersion,
+        adWheelSequenceSize: reservation.totalTurns,
       },
     });
 
@@ -1796,11 +1964,7 @@ export class LeadCaptureAssignmentService {
       id: string;
       currentAssignmentId: string | null;
     },
-    input: {
-      triggerEventId?: string | null;
-      funnelStepId?: string | null;
-      entryContext?: SubmissionEntryContext;
-    },
+    input: AssignmentRoutingInput,
   ): Promise<AssignmentResolution> {
     const forcedSponsorId = input.entryContext?.forcedSponsorId;
 

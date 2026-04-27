@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdWheelsModule } from '../ad-wheels/ad-wheels.module';
 import { FunnelsModule } from '../funnels/funnels.module';
 import { WalletEngineModule } from '../finance/wallet-engine.module';
 import { MailModule } from '../mail/mail.module';
@@ -18,6 +19,7 @@ import { TeamsService } from './teams.service';
 
 @Module({
   imports: [
+    AdWheelsModule,
     MessagingAutomationModule,
     WalletEngineModule,
     FunnelsModule,

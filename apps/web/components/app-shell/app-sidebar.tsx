@@ -17,6 +17,12 @@ type AppSidebarProps = {
   statusBadge?: SidebarStatusBadge;
 };
 
+const normalizePathname = (value: string) =>
+  value === "/" ? value : value.replace(/\/+$/, "");
+
+const isTopLevelRoute = (value: string) =>
+  normalizePathname(value).split("/").filter(Boolean).length === 1;
+
 export function AppSidebar({
   areaLabel,
   areaDescription,
@@ -40,10 +46,13 @@ export function AppSidebar({
         ];
 
   const renderNavItem = (item: ShellNavItem) => {
-    const match = item.match ?? item.href;
+    const currentPath = normalizePathname(pathname);
+    const href = normalizePathname(item.href);
+    const match = normalizePathname(item.match ?? item.href);
+    const exact = item.exact ?? isTopLevelRoute(match);
     const isActive =
-      pathname === item.href ||
-      (pathname.startsWith(`${match}/`) && match !== "/");
+      currentPath === href ||
+      (!exact && currentPath.startsWith(`${match}/`) && match !== "/");
     const Icon = item.icon ? iconMap[item.icon] ?? null : null;
 
     return (

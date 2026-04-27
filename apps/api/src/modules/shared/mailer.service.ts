@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { MailClient, type MailDetail } from '@leadflow/mail';
 
 const DEFAULT_LOGIN_URL = 'http://localhost:3000/login';
-const DEFAULT_PUBLIC_SITE_URL = 'http://localhost:3000';
+const LEADFLOW_DASHBOARD_URL = 'https://leadflow.kuruk.in';
 
 const sanitizeNullableText = (value: string | null | undefined) => {
   if (value === undefined || value === null) {
@@ -74,17 +74,11 @@ export class MailerService {
   async sendAdvisorActivationEmail(input: {
     email: string;
     teamName: string;
-    publicSlug?: string | null;
   }) {
     const normalizedEmail =
       sanitizeNullableText(input.email)?.toLowerCase() ??
       'unknown@leadflow.local';
     const normalizedTeamName = sanitizeNullableText(input.teamName) ?? 'Leadflow';
-    const loginUrl = this.resolveLoginUrl();
-    const personalLink = this.buildAdvisorPublicUrl(input.publicSlug ?? null);
-    const personalLinkText = personalLink
-      ? `Tu enlace personal ya esta activo: ${personalLink}`
-      : 'Tu enlace personal ya quedo marcado como activo para recibir leads.';
 
     await this.mailClient.sendSystemEmail({
       toAddress: normalizedEmail,
@@ -93,33 +87,12 @@ export class MailerService {
       paragraphs: [
         `Tu licencia dentro del team "${normalizedTeamName}" ya esta activa.`,
         'Desde este momento puedes operar normalmente dentro de LeadFlow.',
-        personalLinkText,
+        'Puedes ingresar a tu cuenta por https://leadflow.kuruk.in',
       ],
-      details: [
-        ...(personalLink
-          ? [
-              {
-                label: 'Enlace personal',
-                value: personalLink,
-                href: personalLink,
-              },
-            ]
-          : []),
-        {
-          label: 'Acceso operativo',
-          value: loginUrl,
-          href: loginUrl,
-        },
-      ],
-      action: personalLink
-        ? {
-            label: 'Abrir mi enlace personal',
-            href: personalLink,
-          }
-        : {
-            label: 'Entrar a LeadFlow',
-            href: loginUrl,
-          },
+      action: {
+        label: 'Entrar a LeadFlow',
+        href: LEADFLOW_DASHBOARD_URL,
+      },
       footerNote:
         'Si no reconoces esta activacion, avisa a tu Team Admin de inmediato.',
     });
@@ -236,24 +209,6 @@ export class MailerService {
         href: loginUrl,
       },
     });
-  }
-
-  private buildAdvisorPublicUrl(publicSlug: string | null) {
-    const normalizedSlug = sanitizeNullableText(publicSlug);
-
-    if (!normalizedSlug) {
-      return null;
-    }
-
-    return `${this.resolvePublicSiteUrl()}/a/${normalizedSlug}`;
-  }
-
-  private resolvePublicSiteUrl() {
-    return (
-      sanitizeNullableText(this.configService.get<string>('SITE_URL')) ??
-      sanitizeNullableText(this.configService.get<string>('ADMIN_URL')) ??
-      DEFAULT_PUBLIC_SITE_URL
-    ).replace(/\/+$/, '');
   }
 
   private resolveLoginUrl() {

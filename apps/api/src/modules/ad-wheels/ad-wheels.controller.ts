@@ -5,6 +5,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
 import type { CreateTeamAdWheelDto } from './dto/create-team-ad-wheel.dto';
 import type { UpdateTeamAdWheelDto } from './dto/update-team-ad-wheel.dto';
+import type { UpsertTeamAdWheelParticipantDto } from './dto/upsert-team-ad-wheel-participant.dto';
 import { AdWheelsService } from './ad-wheels.service';
 
 @Controller()
@@ -43,6 +44,23 @@ export class AdWheelsController {
     @Body() dto: UpdateTeamAdWheelDto,
   ) {
     return this.adWheelsService.updateForTeam(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+      },
+      wheelId,
+      dto,
+    );
+  }
+
+  @Post('team/wheels/:id/participants')
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  upsertParticipant(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('id') wheelId: string,
+    @Body() dto: UpsertTeamAdWheelParticipantDto,
+  ) {
+    return this.adWheelsService.upsertParticipantForTeam(
       {
         workspaceId: user.workspaceId!,
         teamId: user.teamId!,

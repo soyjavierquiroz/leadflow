@@ -304,7 +304,6 @@ export class TeamMembersService {
               ? {
                   email: member.email,
                   teamName: team.name,
-                  publicSlug: sponsor.publicSlug,
                 }
               : null,
         };
@@ -318,7 +317,6 @@ export class TeamMembersService {
       void this.dispatchAdvisorActivationEmail({
         email: mutation.activationEmail.email,
         teamName: mutation.activationEmail.teamName,
-        publicSlug: mutation.activationEmail.publicSlug,
       });
     }
 
@@ -918,13 +916,11 @@ export class TeamMembersService {
   private async dispatchAdvisorActivationEmail(input: {
     email: string;
     teamName: string;
-    publicSlug: string | null;
   }) {
     try {
       await this.mailerService.sendAdvisorActivationEmail({
         email: input.email,
         teamName: input.teamName,
-        publicSlug: input.publicSlug,
       });
     } catch (error) {
       this.logger.error(

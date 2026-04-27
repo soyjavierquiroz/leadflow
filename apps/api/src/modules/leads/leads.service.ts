@@ -163,6 +163,9 @@ export class LeadsService {
         funnelId: dto.funnelId,
         funnelInstanceId: dto.funnelInstanceId ?? null,
         funnelPublicationId: dto.funnelPublicationId ?? null,
+        trafficLayer: 'ORGANIC',
+        originAdWheelId: null,
+        originAdWheelName: null,
         visitorId: dto.visitorId ?? null,
         sourceChannel: dto.sourceChannel,
         fullName: dto.fullName ?? null,
@@ -266,6 +269,14 @@ export class LeadsService {
         },
         filters.id,
       ),
+      include: {
+        originAdWheel: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!record) {

@@ -6,6 +6,7 @@ import type {
   ISODateString,
   LeadSourceChannel,
   RepositoryPort,
+  TrafficLayer,
   WorkspaceScoped,
 } from '../../shared/domain.types';
 
@@ -23,6 +24,9 @@ export interface Lead extends BaseDomainEntity, WorkspaceScoped {
   funnelId: DomainId;
   funnelInstanceId: DomainId | null;
   funnelPublicationId: DomainId | null;
+  trafficLayer: TrafficLayer;
+  originAdWheelId: DomainId | null;
+  originAdWheelName: string | null;
   visitorId: DomainId | null;
   sourceChannel: LeadSourceChannel;
   fullName: string | null;

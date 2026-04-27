@@ -333,6 +333,11 @@ const buildLeadViews = (input: {
 
     return {
       ...lead,
+      trafficLayer: assignment?.trafficLayer ?? lead.trafficLayer ?? "ORGANIC",
+      originAdWheelId:
+        assignment?.originAdWheelId ?? lead.originAdWheelId ?? null,
+      originAdWheelName:
+        assignment?.originAdWheelName ?? lead.originAdWheelName ?? null,
       sponsorName: sponsor?.displayName ?? null,
       sponsorId: sponsor?.id ?? null,
       assignmentStatus: assignment?.status ?? null,

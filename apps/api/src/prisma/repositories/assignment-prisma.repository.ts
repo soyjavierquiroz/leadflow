@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { mapAssignmentRecord } from '../prisma.mappers';
 import type { CreateAssignmentDto } from '../../modules/assignments/dto/create-assignment.dto';
@@ -7,12 +8,22 @@ import type {
   AssignmentRepository,
 } from '../../modules/assignments/interfaces/assignment.interface';
 
+const assignmentOriginInclude = {
+  originAdWheel: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+} satisfies Prisma.AssignmentInclude;
+
 @Injectable()
 export class AssignmentPrismaRepository implements AssignmentRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(): Promise<Assignment[]> {
     const records = await this.prisma.assignment.findMany({
+      include: assignmentOriginInclude,
       orderBy: { assignedAt: 'desc' },
     });
 
@@ -20,13 +31,17 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
   }
 
   async findById(id: string): Promise<Assignment | null> {
-    const record = await this.prisma.assignment.findUnique({ where: { id } });
+    const record = await this.prisma.assignment.findUnique({
+      where: { id },
+      include: assignmentOriginInclude,
+    });
     return record ? mapAssignmentRecord(record) : null;
   }
 
   async findByWorkspaceId(workspaceId: string): Promise<Assignment[]> {
     const records = await this.prisma.assignment.findMany({
       where: { workspaceId },
+      include: assignmentOriginInclude,
       orderBy: { assignedAt: 'desc' },
     });
 
@@ -36,6 +51,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
   async findByTeamId(teamId: string): Promise<Assignment[]> {
     const records = await this.prisma.assignment.findMany({
       where: { teamId },
+      include: assignmentOriginInclude,
       orderBy: { assignedAt: 'desc' },
     });
 
@@ -45,6 +61,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
   async findBySponsorId(sponsorId: string): Promise<Assignment[]> {
     const records = await this.prisma.assignment.findMany({
       where: { sponsorId },
+      include: assignmentOriginInclude,
       orderBy: { assignedAt: 'desc' },
     });
 
@@ -56,6 +73,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
   ): Promise<Assignment[]> {
     const records = await this.prisma.assignment.findMany({
       where: { funnelPublicationId },
+      include: assignmentOriginInclude,
       orderBy: { assignedAt: 'desc' },
     });
 
@@ -70,6 +88,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
           in: ['pending', 'assigned'],
         },
       },
+      include: assignmentOriginInclude,
       orderBy: { assignedAt: 'desc' },
     });
 
@@ -87,12 +106,15 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
         funnelInstanceId: data.funnelInstanceId ?? null,
         funnelPublicationId: data.funnelPublicationId ?? null,
         rotationPoolId: data.rotationPoolId ?? null,
+        trafficLayer: 'ORGANIC',
+        originAdWheelId: null,
         status: 'pending',
         reason: data.reason ?? 'rotation',
         assignedAt: new Date(),
         acceptedAt: null,
         resolvedAt: null,
       },
+      include: assignmentOriginInclude,
     });
 
     return mapAssignmentRecord(record);
@@ -111,6 +133,8 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
         funnelInstanceId: entity.funnelInstanceId,
         funnelPublicationId: entity.funnelPublicationId,
         rotationPoolId: entity.rotationPoolId,
+        trafficLayer: entity.trafficLayer,
+        originAdWheelId: entity.originAdWheelId,
         status: entity.status,
         reason: entity.reason,
         assignedAt: new Date(entity.assignedAt),
@@ -126,12 +150,15 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
         funnelInstanceId: entity.funnelInstanceId,
         funnelPublicationId: entity.funnelPublicationId,
         rotationPoolId: entity.rotationPoolId,
+        trafficLayer: entity.trafficLayer,
+        originAdWheelId: entity.originAdWheelId,
         status: entity.status,
         reason: entity.reason,
         assignedAt: new Date(entity.assignedAt),
         acceptedAt: entity.acceptedAt ? new Date(entity.acceptedAt) : null,
         resolvedAt: entity.resolvedAt ? new Date(entity.resolvedAt) : null,
       },
+      include: assignmentOriginInclude,
     });
 
     return mapAssignmentRecord(record);
