@@ -152,7 +152,7 @@ const buildTeamCatalog = (ids: string[], workspaceId: string) => {
       status: mock?.status ?? "active",
       description:
         mock?.description ??
-        "Metadata temporal mientras llega el endpoint HTTP de teams.",
+        "Metadata operativa derivada para el catálogo interno de teams.",
       maxSeats: mock?.maxSeats ?? 10,
     } satisfies TeamMetadata;
   });

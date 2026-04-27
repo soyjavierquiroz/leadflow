@@ -53,10 +53,16 @@ const secondaryButtonClassName =
 const sectionClassName =
   "rounded-[2rem] border border-app-border bg-app-card p-6 text-left text-app-text shadow-[var(--ai-panel-shadow)] md:p-8";
 
+const contentFrameClassName =
+  "flex w-full flex-1 flex-col gap-6 pb-24";
+
 const fieldLabelClassName = "text-sm font-medium text-app-text-muted";
 
 const inputClassName =
   "rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-soft";
+
+const stickyFooterBarClassName =
+  "sticky bottom-0 z-40 border-t border-app-border bg-app-bg";
 
 const defaultMediaRows = requiredMediaKeys.map((key) => ({
   key,
@@ -918,347 +924,346 @@ export function TeamVslPublicationEditor({
     }
   };
 
+  const footerStatusLabel = isPending
+    ? "Guardando cambios..."
+    : errorMessage
+      ? "Revisa los errores antes de guardar."
+      : successMessage
+        ? successMessage
+        : isSaveDisabled
+          ? "Completa los datos requeridos para habilitar el guardado."
+          : "Cambios listos para guardar.";
+
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        eyebrow={headerEyebrow}
-        title={headerTitle}
-        description={headerDescription}
-        actions={
-          <>
-            <Link href={backHref} className={secondaryButtonClassName}>
-              {backLabel}
-            </Link>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaveDisabled}
-              className={primaryButtonClassName}
-            >
-              <Save className="h-4 w-4" />
-              {currentPublicationId ? "Guardar cambios" : "Crear y publicar"}
-            </button>
-          </>
-        }
-      />
+    <div className="flex w-full flex-1 flex-col text-left">
+      <div className={contentFrameClassName}>
+        <SectionHeader
+          eyebrow={headerEyebrow}
+          title={headerTitle}
+          description={headerDescription}
+          actions={
+            <>
+              <Link href={backHref} className={secondaryButtonClassName}>
+                {backLabel}
+              </Link>
+            </>
+          }
+        />
 
-      {errorMessage ? (
-        <OperationBanner tone="error" message={errorMessage} />
-      ) : null}
-      {successMessage ? (
-        <OperationBanner tone="success" message={successMessage} />
-      ) : null}
+        {errorMessage ? (
+          <OperationBanner tone="error" message={errorMessage} />
+        ) : null}
+        {successMessage ? (
+          <OperationBanner tone="success" message={successMessage} />
+        ) : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className={sectionClassName}>
-          <div className="flex items-center gap-3 text-left">
-            <div className="rounded-full bg-app-accent-soft p-2 text-app-accent">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
-                Template activo
-              </p>
-              <p className="mt-1 text-sm font-semibold text-app-text">
-                {selectedTemplate?.name ?? "Selecciona un template"}
-              </p>
-            </div>
-          </div>
-        </article>
-        <article className={sectionClassName}>
-          <div className="flex items-center gap-3 text-left">
-            <div className="rounded-full bg-app-warning-bg p-2 text-app-warning-text">
-              <FileJson className="h-4 w-4" />
-            </div>
-            <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
-                Bloques válidos
-              </p>
-              <p className="mt-1 text-sm font-semibold text-app-text">
-                {parsedBlocks.value
-                  ? `${parsedBlocks.value.length} bloques listos`
-                  : "Corrige el JSON"}
-              </p>
-            </div>
-          </div>
-        </article>
-        <article className={sectionClassName}>
-          <div className="flex items-center gap-3 text-left">
-            <div className="rounded-full bg-app-success-bg p-2 text-app-success-text">
-              <Globe className="h-4 w-4" />
-            </div>
-            <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
-                {showStepSwitcher ? "Paso activo" : "Publicación"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-app-text">
-                {showStepSwitcher
-                  ? stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
-                    "Paso activo"
-                  : selectedDomain
-                    ? `${selectedDomain.host}${pathPrefix}`
-                    : "Selecciona dominio y ruta"}
-              </p>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <details open className={sectionClassName}>
-        <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
-          <div className="text-left">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
-              Configuración
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold text-app-text">
-              Header y metadata del funnel
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-app-text-muted">
-              Define identidad, dominio, tema y SEO con una jerarquía más clara
-              antes de entrar al JSON operativo de cada paso.
-            </p>
-          </div>
-          <ChevronDown className="h-5 w-5 text-app-text-soft" />
-        </summary>
-
-        <div className="mt-6 grid gap-5 md:grid-cols-2">
-          <label className="grid gap-2">
-            <span className={fieldLabelClassName}>Nombre del funnel</span>
-            <input
-              value={funnelName}
-              onChange={(event) => setFunnelName(event.target.value)}
-              placeholder="Dragon Vintage T9 - Jakawi Import"
-              className={inputClassName}
-            />
-            <span className="text-xs leading-5 text-app-text-soft">
-              Código interno sugerido:{" "}
-              {slugify(funnelName || "nuevo-funnel") || "nuevo-funnel"}
-            </span>
-          </label>
-
-          <label className="grid gap-2">
-            <span className={fieldLabelClassName}>Dominio activo</span>
-            <select
-              value={selectedDomainId}
-              onChange={(event) => setSelectedDomainId(event.target.value)}
-              className={inputClassName}
-            >
-              {activeDomains.map((domain) => (
-                <option key={domain.id} value={domain.id}>
-                  {domain.host}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-2">
-            <span className={fieldLabelClassName}>Ruta</span>
-            <input
-              value={pathPrefix}
-              onChange={(event) => setPathPrefix(event.target.value)}
-              placeholder="/"
-              className={inputClassName}
-            />
-          </label>
-
-          <label className="grid gap-2">
-            <span className={fieldLabelClassName}>Template base</span>
-            <select
-              value={selectedTemplateId}
-              onChange={(event) => setSelectedTemplateId(event.target.value)}
-              className={inputClassName}
-            >
-              <option value="">Selecciona un template</option>
-              {visibleTemplateOptions.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-2">
-            <span className={fieldLabelClassName}>Funnel Theme</span>
-            <select
-              value={selectedThemeId}
-              onChange={(event) => setSelectedThemeId(event.target.value)}
-              className={inputClassName}
-            >
-              {availableFunnelThemes.map((theme) => (
-                <option key={theme.id} value={theme.id}>
-                  {theme.name}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs leading-5 text-app-text-soft">
-              Este theme se guarda a nivel Funnel y el runtime público lo expone
-              en la raíz del payload.
-            </span>
-          </label>
-
-          <PublicationTrackingFields
-            value={{
-              metaPixelId,
-              tiktokPixelId,
-              metaCapiToken,
-              tiktokAccessToken,
-            }}
-            onChange={updateTrackingField}
-            description="Estos campos viven en la publicación y se envían junto al PATCH o POST del editor híbrido."
-            variant="vsl"
-          />
-
-          <label className="grid gap-2 md:col-span-2">
-            <span className={fieldLabelClassName}>SEO Title</span>
-            <input
-              value={seoTitle}
-              onChange={(event) => setSeoTitle(event.target.value)}
-              placeholder={funnelName || "Dragon Vintage T9 | Leadflow"}
-              className={inputClassName}
-            />
-            <span className="text-xs leading-5 text-app-text-soft">
-              Si lo dejas vacío, usamos automáticamente el nombre del funnel.
-            </span>
-          </label>
-
-          <label className="grid gap-2 md:col-span-2">
-            <span className={fieldLabelClassName}>Meta Description</span>
-            <textarea
-              value={metaDescription}
-              onChange={(event) => setMetaDescription(event.target.value)}
-              placeholder="Resumen comercial y beneficio principal de la landing para buscadores y shares."
-              rows={4}
-              className={inputClassName}
-            />
-            <span className="text-xs leading-5 text-app-text-soft">
-              Recomendado: 140-160 caracteres orientados al beneficio principal.
-            </span>
-          </label>
-        </div>
-      </details>
-
-      <HybridJsonMediaEditor
-        key={activeStep?.id ?? activeStepTab}
-        blocksText={editorBlocksText}
-        previewDraftKey={previewDraftKey}
-        editorContext={editorContext}
-        onBlocksTextChange={(value) => updateEditorDraft({ blocksText: value })}
-        parsedBlocksError={parsedBlocks.error}
-        parsedBlocksCount={parsedBlocks.value?.length ?? 0}
-        mediaRows={editorMediaRows}
-        mediaValidation={mediaValidation}
-        mediaMapKeys={requiredMediaKeys.filter((key) =>
-          Object.prototype.hasOwnProperty.call(mediaMap, key),
-        )}
-        uploadingRowIndex={uploadingRowIndex}
-        mediaUploadInputRef={mediaUploadInputRef}
-        onMediaUploadChange={handleMediaUploadChange}
-        onMediaRowChange={handleMediaRowChange}
-        onAddMediaRow={handleAddMediaRow}
-        onUploadMediaClick={handleUploadMediaClick}
-        onRemoveMediaRow={(index) =>
-          updateEditorDraft({
-            mediaRows: editorMediaRows.filter((_, rowIndex) => rowIndex !== index),
-          })
-        }
-        previewTheme={selectedThemeId}
-        previewSettingsJson={editorSettingsJson}
-        availableBlocks={availableBlocks}
-        stepSpecificSettingsPanel={
-          <article className="rounded-[1.5rem] border border-app-border bg-app-surface-muted p-6 text-left">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl text-left">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
-                  Configuración específica del paso
+        <section className="grid gap-4 md:grid-cols-3">
+          <article className={sectionClassName}>
+            <div className="flex items-center gap-3 text-left">
+              <div className="rounded-full bg-app-accent-soft p-2 text-app-accent">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
+                  Template activo
                 </p>
-                <h3 className="mt-2 text-xl font-semibold text-app-text">
-                  Layout del paso
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-app-text-muted">
-                  Este ajuste vive dentro de <code>settingsJson</code> del paso
-                  activo y permite que páginas como <code>/confirmado</code>{" "}
-                  rompan la herencia del layout sticky del funnel cuando haga
-                  falta.
+                <p className="mt-1 text-sm font-semibold text-app-text">
+                  {selectedTemplate?.name ?? "Selecciona un template"}
                 </p>
               </div>
-
-              <label className="grid min-w-full gap-2 lg:min-w-[22rem]">
-                <span className={fieldLabelClassName}>Layout del paso</span>
-                <select
-                  value={editorLayoutOverride}
-                  onChange={(event) =>
-                    updateEditorDraft({
-                      settingsJson: mergeStepLayoutOverride(
-                        editorSettingsJson,
-                        event.target.value as StepLayoutOverrideValue,
-                      ),
-                    })
-                  }
-                  className={inputClassName}
-                >
-                  <option value="inherit">Heredar del Funnel (Por defecto)</option>
-                  <option value="full-page">Estructura Centrada / Full Page</option>
-                  <option value="blank">Blank</option>
-                </select>
-              </label>
             </div>
           </article>
-        }
-        historyPanel={
-          currentPublicationId && activeStep
-            ? {
-                isOpen: isHistoryOpen,
-                isLoading: isHistoryLoading,
-                errorMessage: historyErrorMessage,
-                title: activeStepHistoryTitle,
-                versions: historyVersions,
-                onOpen: handleOpenHistory,
-                onClose: () => setIsHistoryOpen(false),
-                onRestore: handleRestoreHistoryVersion,
-              }
-            : null
-        }
-        routingReference={routingReference}
-        stepSwitcher={
-          showStepSwitcher
-            ? {
-                activeKey: activeStepTab,
-                badge: activeStep?.slug ?? activeStepTab,
-                disabled: isPending || uploadingRowIndex !== null,
-                helperText:
-                  "Cada pestaña carga y guarda el JSON del FunnelStep activo del builder real.",
-                tabs: stepTabs.map((tab) => ({
-                  key: tab.key,
-                  label: tab.label,
-                })),
-                warningText: !activeStep
-                  ? "Ese paso todavía no existe en la publicación. Puedes prepararlo aquí y al guardar lo crearemos."
-                  : null,
-                onChange: (key) => {
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                  setActiveStepTab(key as EditorStepTabKey);
-                },
-              }
-            : null
-        }
-      />
+          <article className={sectionClassName}>
+            <div className="flex items-center gap-3 text-left">
+              <div className="rounded-full bg-app-warning-bg p-2 text-app-warning-text">
+                <FileJson className="h-4 w-4" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
+                  Bloques válidos
+                </p>
+                <p className="mt-1 text-sm font-semibold text-app-text">
+                  {parsedBlocks.value
+                    ? `${parsedBlocks.value.length} bloques listos`
+                    : "Corrige el JSON"}
+                </p>
+              </div>
+            </div>
+          </article>
+          <article className={sectionClassName}>
+            <div className="flex items-center gap-3 text-left">
+              <div className="rounded-full bg-app-success-bg p-2 text-app-success-text">
+                <Globe className="h-4 w-4" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
+                  {showStepSwitcher ? "Paso activo" : "Publicación"}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-app-text">
+                  {showStepSwitcher
+                    ? stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
+                      "Paso activo"
+                    : selectedDomain
+                      ? `${selectedDomain.host}${pathPrefix}`
+                      : "Selecciona dominio y ruta"}
+                </p>
+              </div>
+            </div>
+          </article>
+        </section>
 
-      <section className={sectionClassName}>
-        <div className="flex flex-col gap-4 text-left md:flex-row md:items-center md:justify-between">
-          <div className="text-left">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
+        <details open className={sectionClassName}>
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+            <div className="text-left">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
+                Configuración
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-app-text">
+                Header y metadata del funnel
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-app-text-muted">
+                Define identidad, dominio, tema y SEO con una jerarquía más clara
+                antes de entrar al JSON operativo de cada paso.
+              </p>
+            </div>
+            <ChevronDown className="h-5 w-5 text-app-text-soft" />
+          </summary>
+
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>Nombre del funnel</span>
+              <input
+                value={funnelName}
+                onChange={(event) => setFunnelName(event.target.value)}
+                placeholder="Dragon Vintage T9 - Jakawi Import"
+                className={inputClassName}
+              />
+              <span className="text-xs leading-5 text-app-text-soft">
+                Código interno sugerido:{" "}
+                {slugify(funnelName || "nuevo-funnel") || "nuevo-funnel"}
+              </span>
+            </label>
+
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>Dominio activo</span>
+              <select
+                value={selectedDomainId}
+                onChange={(event) => setSelectedDomainId(event.target.value)}
+                className={inputClassName}
+              >
+                {activeDomains.map((domain) => (
+                  <option key={domain.id} value={domain.id}>
+                    {domain.host}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>Ruta</span>
+              <input
+                value={pathPrefix}
+                onChange={(event) => setPathPrefix(event.target.value)}
+                placeholder="/"
+                className={inputClassName}
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>Template base</span>
+              <select
+                value={selectedTemplateId}
+                onChange={(event) => setSelectedTemplateId(event.target.value)}
+                className={inputClassName}
+              >
+                <option value="">Selecciona un template</option>
+                {visibleTemplateOptions.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-2">
+              <span className={fieldLabelClassName}>Funnel Theme</span>
+              <select
+                value={selectedThemeId}
+                onChange={(event) => setSelectedThemeId(event.target.value)}
+                className={inputClassName}
+              >
+                {availableFunnelThemes.map((theme) => (
+                  <option key={theme.id} value={theme.id}>
+                    {theme.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs leading-5 text-app-text-soft">
+                Este theme se guarda a nivel Funnel y el runtime público lo expone
+                en la raíz del payload.
+              </span>
+            </label>
+
+            <PublicationTrackingFields
+              value={{
+                metaPixelId,
+                tiktokPixelId,
+                metaCapiToken,
+                tiktokAccessToken,
+              }}
+              onChange={updateTrackingField}
+              description="Estos campos viven en la publicación y se envían junto al PATCH o POST del editor híbrido."
+              variant="vsl"
+            />
+
+            <label className="grid gap-2 md:col-span-2">
+              <span className={fieldLabelClassName}>SEO Title</span>
+              <input
+                value={seoTitle}
+                onChange={(event) => setSeoTitle(event.target.value)}
+                placeholder={funnelName || "Dragon Vintage T9 | Leadflow"}
+                className={inputClassName}
+              />
+              <span className="text-xs leading-5 text-app-text-soft">
+                Si lo dejas vacío, usamos automáticamente el nombre del funnel.
+              </span>
+            </label>
+
+            <label className="grid gap-2 md:col-span-2">
+              <span className={fieldLabelClassName}>Meta Description</span>
+              <textarea
+                value={metaDescription}
+                onChange={(event) => setMetaDescription(event.target.value)}
+                placeholder="Resumen comercial y beneficio principal de la landing para buscadores y shares."
+                rows={4}
+                className={inputClassName}
+              />
+              <span className="text-xs leading-5 text-app-text-soft">
+                Recomendado: 140-160 caracteres orientados al beneficio principal.
+              </span>
+            </label>
+          </div>
+        </details>
+
+        <HybridJsonMediaEditor
+          key={activeStep?.id ?? activeStepTab}
+          blocksText={editorBlocksText}
+          previewDraftKey={previewDraftKey}
+          editorContext={editorContext}
+          onBlocksTextChange={(value) => updateEditorDraft({ blocksText: value })}
+          parsedBlocksError={parsedBlocks.error}
+          parsedBlocksCount={parsedBlocks.value?.length ?? 0}
+          mediaRows={editorMediaRows}
+          mediaValidation={mediaValidation}
+          mediaMapKeys={requiredMediaKeys.filter((key) =>
+            Object.prototype.hasOwnProperty.call(mediaMap, key),
+          )}
+          uploadingRowIndex={uploadingRowIndex}
+          mediaUploadInputRef={mediaUploadInputRef}
+          onMediaUploadChange={handleMediaUploadChange}
+          onMediaRowChange={handleMediaRowChange}
+          onAddMediaRow={handleAddMediaRow}
+          onUploadMediaClick={handleUploadMediaClick}
+          onRemoveMediaRow={(index) =>
+            updateEditorDraft({
+              mediaRows: editorMediaRows.filter((_, rowIndex) => rowIndex !== index),
+            })
+          }
+          previewTheme={selectedThemeId}
+          previewSettingsJson={editorSettingsJson}
+          availableBlocks={availableBlocks}
+          stepSpecificSettingsPanel={
+            <article className="rounded-[1.5rem] border border-app-border bg-app-surface-muted p-6 text-left">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-2xl text-left">
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
+                    Configuración específica del paso
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold text-app-text">
+                    Layout del paso
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-app-text-muted">
+                    Este ajuste vive dentro de <code>settingsJson</code> del paso
+                    activo y permite que páginas como <code>/confirmado</code>{" "}
+                    rompan la herencia del layout sticky del funnel cuando haga
+                    falta.
+                  </p>
+                </div>
+
+                <label className="grid min-w-full gap-2 lg:min-w-[22rem]">
+                  <span className={fieldLabelClassName}>Layout del paso</span>
+                  <select
+                    value={editorLayoutOverride}
+                    onChange={(event) =>
+                      updateEditorDraft({
+                        settingsJson: mergeStepLayoutOverride(
+                          editorSettingsJson,
+                          event.target.value as StepLayoutOverrideValue,
+                        ),
+                      })
+                    }
+                    className={inputClassName}
+                  >
+                    <option value="inherit">Heredar del Funnel (Por defecto)</option>
+                    <option value="full-page">Estructura Centrada / Full Page</option>
+                    <option value="blank">Blank</option>
+                  </select>
+                </label>
+              </div>
+            </article>
+          }
+          historyPanel={
+            currentPublicationId && activeStep
+              ? {
+                  isOpen: isHistoryOpen,
+                  isLoading: isHistoryLoading,
+                  errorMessage: historyErrorMessage,
+                  title: activeStepHistoryTitle,
+                  versions: historyVersions,
+                  onOpen: handleOpenHistory,
+                  onClose: () => setIsHistoryOpen(false),
+                  onRestore: handleRestoreHistoryVersion,
+                }
+              : null
+          }
+          routingReference={routingReference}
+          stepSwitcher={
+            showStepSwitcher
+              ? {
+                  activeKey: activeStepTab,
+                  badge: activeStep?.slug ?? activeStepTab,
+                  disabled: isPending || uploadingRowIndex !== null,
+                  helperText:
+                    "Cada pestaña carga y guarda el JSON del FunnelStep activo del builder real.",
+                  tabs: stepTabs.map((tab) => ({
+                    key: tab.key,
+                    label: tab.label,
+                  })),
+                  warningText: !activeStep
+                    ? "Ese paso todavía no existe en la publicación. Puedes prepararlo aquí y al guardar lo crearemos."
+                    : null,
+                  onChange: (key) => {
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                    setActiveStepTab(key as EditorStepTabKey);
+                  },
+                }
+              : null
+          }
+        />
+      </div>
+
+      <div className={stickyFooterBarClassName}>
+        <div className="flex h-[60px] w-full items-center justify-between gap-4 px-4 text-left md:px-6">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
               Persistencia
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-app-text">
-              Guardado atómico listo
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-app-text-muted">
-              El submit crea o actualiza la FunnelInstance, el FunnelStep activo
-              y la FunnelPublication en una transacción, dejando todos los
-              estados en `active`.
+            <p className="truncate text-sm text-app-text-muted">
+              {footerStatusLabel}
             </p>
           </div>
+
           <button
             type="button"
             onClick={handleSave}
@@ -1275,7 +1280,7 @@ export function TeamVslPublicationEditor({
             )}
           </button>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

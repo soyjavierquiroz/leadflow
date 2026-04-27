@@ -1,8 +1,15 @@
 "use client";
 
+import { Loader2, RefreshCw, Star, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
@@ -12,7 +19,9 @@ import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime, toSentenceCase } from "@/lib/app-shell/utils";
 import type {
   SystemFunnelTemplateRecord,
+  SystemTenantDomainDeleteResponse,
   SystemTenantDomainRecord,
+  SystemTenantDomainVerificationResponse,
   SystemTenantDetailRecord,
   SystemTenantFunnelRecord,
 } from "@/lib/system-tenants.types";
@@ -37,10 +46,18 @@ type DomainFormState = {
   funnelId: string;
 };
 
+type ToastState = {
+  tone: "success" | "error";
+  title: string;
+  description: string | null;
+};
+
 const primaryButtonClassName =
   "rounded-full bg-app-text px-4 py-2 text-sm font-semibold text-app-bg transition hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButtonClassName =
   "rounded-full border border-app-border bg-app-card px-4 py-2 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
+const dangerButtonClassName =
+  "rounded-full bg-app-danger-text px-4 py-2 text-sm font-semibold text-app-bg transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 
 const buildInitialCloneFormState = (): CloneFormState => ({
   templateFunnelId: "",
@@ -101,6 +118,7 @@ export function TenantImmersionClient({
   initialFunnels,
 }: TenantImmersionClientProps) {
   const router = useRouter();
+  const toastTimeoutRef = useRef<number | null>(null);
   const [tenant, setTenant] = useState(initialTenant);
   const [activeTab, setActiveTab] = useState<ImmersionTab>("overview");
   const [domains, setDomains] = useState(initialDomains);
@@ -109,10 +127,21 @@ export function TenantImmersionClient({
     tone: "success" | "error";
     message: string;
   } | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
   const [isLoadingDomains, setIsLoadingDomains] = useState(false);
   const [isLoadingFunnels, setIsLoadingFunnels] = useState(false);
+  const [verifyingDomainId, setVerifyingDomainId] = useState<string | null>(
+    null,
+  );
+  const [settingPrimaryDomainId, setSettingPrimaryDomainId] = useState<
+    string | null
+  >(null);
+  const [deletingDomainId, setDeletingDomainId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SystemTenantDomainRecord | null>(
+    null,
+  );
   const [templateOptions, setTemplateOptions] = useState<
     SystemFunnelTemplateRecord[] | null
   >(null);
@@ -136,6 +165,14 @@ export function TenantImmersionClient({
   useEffect(() => {
     setDomains(initialDomains);
   }, [initialDomains]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current !== null) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isAssignOpen || templateOptions !== null || isLoadingTemplates) {
@@ -191,6 +228,33 @@ export function TenantImmersionClient({
     setDomainFormState(buildInitialDomainFormState());
   };
 
+  const closeDeleteModal = () => {
+    if (deletingDomainId !== null) {
+      return;
+    }
+
+    setDeleteTarget(null);
+  };
+
+  const showToast = (
+    tone: ToastState["tone"],
+    title: string,
+    description?: string | null,
+  ) => {
+    if (toastTimeoutRef.current !== null) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+
+    setToast({
+      tone,
+      title,
+      description: description ?? null,
+    });
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null);
+    }, 5000);
+  };
+
   const reloadFunnels = async () => {
     setIsLoadingFunnels(true);
 
@@ -235,6 +299,12 @@ export function TenantImmersionClient({
       setTenant((current) => ({
         ...current,
         domainCount: payload.length,
+        workspace: {
+          ...current.workspace,
+          primaryDomain:
+            payload.find((domain) => domain.isPrimary)?.host ??
+            current.workspace.primaryDomain,
+        },
       }));
       return payload;
     } catch (error) {
@@ -353,10 +423,156 @@ export function TenantImmersionClient({
     });
   };
 
+  const handleVerifyDomain = async (domainId: string) => {
+    setFeedback(null);
+    setVerifyingDomainId(domainId);
+
+    try {
+      const verificationResponse =
+        await authenticatedOperationRequest<SystemTenantDomainVerificationResponse>(
+          `/system/tenants/${encodeURIComponent(teamId)}/domains/${encodeURIComponent(domainId)}/verify`,
+          {
+            method: "POST",
+          },
+        );
+      const { domain: updatedDomain, status, errorDetail } = verificationResponse;
+
+      setDomains((current) =>
+        current.map((domain) =>
+          domain.id === updatedDomain.id ? { ...domain, ...updatedDomain } : domain,
+        ),
+      );
+
+      if (status === "verified") {
+        showToast(
+          "success",
+          "Dominio verificado",
+          "El hostname ya quedó activo y la tabla refleja el nuevo estado.",
+        );
+        return;
+      }
+
+      showToast(
+        "error",
+        status === "failed"
+          ? "La verificación devolvió un error"
+          : "La verificación sigue pendiente",
+        errorDetail ??
+          "Cloudflare todavía no reporta activación completa de DNS y SSL para este hostname.",
+      );
+    } catch (error) {
+      showToast(
+        "error",
+        "No pudimos verificar el dominio",
+        error instanceof Error
+          ? error.message
+          : "La validación a demanda falló antes de devolver un estado nuevo.",
+      );
+    } finally {
+      setVerifyingDomainId(null);
+    }
+  };
+
+  const handleSetPrimaryDomain = async (domain: SystemTenantDomainRecord) => {
+    setFeedback(null);
+    setSettingPrimaryDomainId(domain.id);
+
+    try {
+      const updatedDomain = await authenticatedOperationRequest<SystemTenantDomainRecord>(
+        `/system/tenants/${encodeURIComponent(teamId)}/domains/${encodeURIComponent(domain.id)}/set-primary`,
+        {
+          method: "PATCH",
+        },
+      );
+
+      setDomains((current) =>
+        current.map((item) =>
+          item.id === updatedDomain.id
+            ? { ...item, ...updatedDomain, isPrimary: true }
+            : { ...item, isPrimary: false },
+        ),
+      );
+      setTenant((current) => ({
+        ...current,
+        workspace: {
+          ...current.workspace,
+          primaryDomain: updatedDomain.host,
+        },
+      }));
+      showToast(
+        "success",
+        "Dominio principal actualizado",
+        `${updatedDomain.host} ahora quedó marcado como el host principal del tenant.`,
+      );
+    } catch (error) {
+      showToast(
+        "error",
+        "No pudimos actualizar el dominio principal",
+        error instanceof Error
+          ? error.message
+          : "La operación falló antes de devolver un estado nuevo.",
+      );
+    } finally {
+      setSettingPrimaryDomainId(null);
+    }
+  };
+
+  const handleDeleteDomain = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    setFeedback(null);
+    setDeletingDomainId(deleteTarget.id);
+
+    try {
+      const payload =
+        await authenticatedOperationRequest<SystemTenantDomainDeleteResponse>(
+          `/system/tenants/${encodeURIComponent(teamId)}/domains/${encodeURIComponent(deleteTarget.id)}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+      setDomains((current) => current.filter((domain) => domain.id !== payload.id));
+      setTenant((current) => ({
+        ...current,
+        domainCount: Math.max(0, current.domainCount - 1),
+        workspace: {
+          ...current.workspace,
+          primaryDomain:
+            current.workspace.primaryDomain === payload.host
+              ? null
+              : current.workspace.primaryDomain,
+        },
+      }));
+      setDeleteTarget(null);
+      showToast(
+        "success",
+        "Dominio eliminado",
+        `${payload.host} salió del inventario del tenant y se intentó limpiar también en Cloudflare.`,
+      );
+    } catch (error) {
+      showToast(
+        "error",
+        "No pudimos eliminar el dominio",
+        error instanceof Error
+          ? error.message
+          : "La eliminación falló antes de devolver una confirmación.",
+      );
+    } finally {
+      setDeletingDomainId(null);
+    }
+  };
+
   const linkedDomainCount = domains.filter((domain) => domain.linkedFunnelId).length;
   const verifiedDomainCount = domains.filter(
     (domain) => domain.verificationStatus === "verified",
   ).length;
+  const primaryDomainHost =
+    domains.find((domain) => domain.isPrimary)?.host ??
+    tenant.workspace.primaryDomain ??
+    "Pendiente";
 
   return (
     <div className="space-y-8">
@@ -382,6 +598,32 @@ export function TenantImmersionClient({
 
       {feedback ? (
         <OperationBanner tone={feedback.tone} message={feedback.message} />
+      ) : null}
+
+      {toast ? (
+        <div
+          className={`fixed right-4 top-4 z-50 w-full max-w-sm rounded-[1.5rem] border bg-app-card p-4 shadow-[0_24px_70px_rgba(15,23,42,0.16)] ${
+            toast.tone === "success"
+              ? "border-app-success-border"
+              : "border-app-danger-border"
+          }`}
+        >
+          <p
+            className={`text-xs font-semibold uppercase tracking-[0.22em] ${
+              toast.tone === "success"
+                ? "text-app-success-text"
+                : "text-app-danger-text"
+            }`}
+          >
+            {toast.tone === "success" ? "Operación completada" : "Requiere atención"}
+          </p>
+          <p className="text-sm font-semibold text-app-text">{toast.title}</p>
+          {toast.description ? (
+            <p className="mt-2 text-sm leading-6 text-app-text-muted">
+              {toast.description}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="rounded-[1.85rem] border border-app-border bg-app-card p-3 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
@@ -524,7 +766,9 @@ export function TenantImmersionClient({
                     Dominio principal del workspace
                   </p>
                   <p className="mt-2 text-sm font-semibold text-app-text">
-                    {tenant.workspace.primaryDomain ?? "Sin dominio principal"}
+                    {primaryDomainHost === "Pendiente"
+                      ? "Sin dominio principal"
+                      : primaryDomainHost}
                   </p>
                 </div>
                 <div className="rounded-3xl border border-app-border bg-app-surface-muted p-4">
@@ -740,7 +984,7 @@ export function TenantImmersionClient({
             />
             <KpiCard
               label="Dominio principal"
-              value={tenant.workspace.primaryDomain ?? "Pendiente"}
+              value={primaryDomainHost}
               hint="Referencia del workspace mientras operas hosts dedicados."
             />
           </section>
@@ -752,7 +996,15 @@ export function TenantImmersionClient({
                 header: "Hostname",
                 render: (row) => (
                   <div>
-                    <p className="font-semibold text-app-text">{row.host}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-app-text">{row.host}</p>
+                      {row.isPrimary ? (
+                        <span className="inline-flex items-center rounded-full border border-app-success-border bg-app-success-bg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-app-success-text">
+                          <Star className="mr-1 h-3 w-3 fill-current" />
+                          Principal
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
                       {row.normalizedHost}
                     </p>
@@ -773,6 +1025,82 @@ export function TenantImmersionClient({
                     >
                       {isVerified ? "Verificado" : "Pendiente"}
                     </span>
+                  );
+                },
+              },
+              {
+                key: "actions",
+                header: "Acciones",
+                className: "w-[320px]",
+                render: (row) => {
+                  const isVerified = row.verificationStatus === "verified";
+                  const isVerifying = verifyingDomainId === row.id;
+                  const isSettingPrimary = settingPrimaryDomainId === row.id;
+                  const isDeleting = deletingDomainId === row.id;
+
+                  return (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleVerifyDomain(row.id);
+                        }}
+                        disabled={isVerified || isVerifying || isDeleting}
+                        className="inline-flex items-center justify-center rounded-full border border-app-border bg-app-card px-3 py-2 text-xs font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isVerifying ? (
+                          <>
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            Verificando...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                            {isVerified ? "Verificado" : "Verificar"}
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleSetPrimaryDomain(row);
+                        }}
+                        disabled={!isVerified || row.isPrimary || isSettingPrimary || isDeleting}
+                        className="inline-flex items-center justify-center rounded-full border border-app-border bg-app-card px-3 py-2 text-xs font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isSettingPrimary ? (
+                          <>
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            Actualizando...
+                          </>
+                        ) : (
+                          <>
+                            <Star className="mr-2 h-3.5 w-3.5" />
+                            {row.isPrimary ? "Principal" : "Hacer Principal"}
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteTarget(row);
+                        }}
+                        disabled={isDeleting || isVerifying || isSettingPrimary}
+                        className="inline-flex items-center justify-center rounded-full border border-app-danger-border bg-app-danger-bg px-3 py-2 text-xs font-semibold text-app-danger-text transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isDeleting ? (
+                          <>
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            Eliminando...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="mr-2 h-3.5 w-3.5" />
+                            Eliminar
+                          </>
+                        )}
+                      </button>
+                    </div>
                   );
                 },
               },
@@ -896,6 +1224,47 @@ export function TenantImmersionClient({
               </button>
             </div>
           </form>
+        </ModalShell>
+      ) : null}
+
+      {deleteTarget ? (
+        <ModalShell
+          eyebrow="Super Admin / Dominios"
+          title="Eliminar dominio"
+          description="Esta acción quita el hostname del tenant y también intentará eliminar su custom hostname en Cloudflare si ya existía."
+          onClose={closeDeleteModal}
+        >
+          <div className="space-y-6">
+            <div className="rounded-[1.5rem] border border-app-danger-border bg-app-danger-bg px-4 py-4 text-sm text-app-danger-text">
+              <p className="font-semibold">{deleteTarget.host}</p>
+              <p className="mt-1">
+                {deleteTarget.isPrimary
+                  ? "Actualmente es el dominio principal del tenant."
+                  : "Se eliminará del inventario operativo del tenant."}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={deletingDomainId !== null}
+                className={secondaryButtonClassName}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleDeleteDomain();
+                }}
+                disabled={deletingDomainId !== null}
+                className={dangerButtonClassName}
+              >
+                {deletingDomainId !== null ? "Eliminando..." : "Eliminar dominio"}
+              </button>
+            </div>
+          </div>
         </ModalShell>
       ) : null}
 

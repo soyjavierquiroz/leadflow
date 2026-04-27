@@ -2,7 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot } from "lucide-react";
+import {
+  BarChart3,
+  Bot,
+  BriefcaseBusiness,
+  Building2,
+  Inbox,
+  Layers3,
+  LayoutDashboard,
+  LayoutTemplate,
+  Link2,
+  Network,
+  Orbit,
+  RadioTower,
+  Settings,
+  UserRound,
+  Users,
+} from "lucide-react";
 import type {
   ShellNavItem,
   ShellNavSection,
@@ -11,10 +27,11 @@ import type {
 
 type AppSidebarProps = {
   areaLabel: string;
-  areaDescription: string;
   nav: ShellNavItem[];
   navSections?: ShellNavSection[];
   statusBadge?: SidebarStatusBadge;
+  className?: string;
+  onNavigate?: () => void;
 };
 
 const normalizePathname = (value: string) =>
@@ -25,13 +42,28 @@ const isTopLevelRoute = (value: string) =>
 
 export function AppSidebar({
   areaLabel,
-  areaDescription,
   nav,
   navSections,
   statusBadge,
+  className,
+  onNavigate,
 }: AppSidebarProps) {
   const iconMap: Record<string, typeof Bot> = {
+    "bar-chart-3": BarChart3,
     bot: Bot,
+    "briefcase-business": BriefcaseBusiness,
+    "building-2": Building2,
+    inbox: Inbox,
+    "layers-3": Layers3,
+    "layout-dashboard": LayoutDashboard,
+    "layout-template": LayoutTemplate,
+    "link-2": Link2,
+    network: Network,
+    orbit: Orbit,
+    "radio-tower": RadioTower,
+    settings: Settings,
+    "user-round": UserRound,
+    users: Users,
   };
   const pathname = usePathname();
   const sections =
@@ -39,8 +71,7 @@ export function AppSidebar({
       ? navSections
       : [
           {
-            title: "Modulos",
-            description: "Lo importante de esta superficie, ordenado para trabajo diario.",
+            title: "Navegación",
             items: nav,
           },
         ];
@@ -60,7 +91,8 @@ export function AppSidebar({
         key={item.href}
         href={item.href}
         aria-current={isActive ? "page" : undefined}
-        className={`block rounded-[1.35rem] border px-4 py-3 transition ${
+        onClick={onNavigate}
+        className={`block rounded-[1.25rem] border px-4 py-3 transition ${
           isActive
             ? "border-app-accent bg-app-accent-soft text-app-shell-text shadow-[var(--ai-card-shadow)]"
             : "border-app-shell-border bg-app-shell-surface text-app-shell-text hover:border-app-shell-muted hover:bg-[color:color-mix(in_srgb,var(--app-shell-text)_10%,transparent)]"
@@ -69,34 +101,20 @@ export function AppSidebar({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span
-              className={`h-8 w-1 rounded-full ${
+              className={`flex size-9 items-center justify-center rounded-2xl border ${
                 isActive
-                  ? "bg-app-accent"
-                  : "bg-[color:color-mix(in_srgb,var(--app-shell-text)_12%,transparent)]"
+                  ? "border-app-accent bg-app-accent text-app-accent-contrast"
+                  : "border-app-shell-border bg-[color:color-mix(in_srgb,var(--app-shell-text)_6%,transparent)] text-app-shell-muted"
               }`}
-            />
-            {Icon ? (
-              <Icon
-                className={`h-4 w-4 shrink-0 ${
-                  isActive ? "text-app-accent" : "text-app-shell-muted"
-                }`}
-              />
-            ) : null}
+            >
+              {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
+            </span>
             <p className="text-sm font-semibold">{item.label}</p>
           </div>
           {isActive ? (
-            <span className="rounded-full bg-app-accent px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-app-accent-contrast">
-              Actual
-            </span>
+            <span className="h-2.5 w-2.5 rounded-full bg-app-accent" />
           ) : null}
         </div>
-        <p
-          className={`mt-1 text-xs leading-5 ${
-            isActive ? "text-app-shell-text" : "text-app-shell-muted"
-          }`}
-        >
-          {item.description}
-        </p>
       </Link>
     );
   };
@@ -109,59 +127,44 @@ export function AppSidebar({
         : "border-app-shell-border bg-[color:color-mix(in_srgb,var(--app-shell-text)_8%,transparent)] text-app-shell-text";
 
   return (
-    <aside className="border-b border-app-shell-border bg-[linear-gradient(180deg,var(--app-shell-bg)_0%,var(--app-shell-bg-strong)_100%)] px-5 py-6 text-app-shell-text lg:min-h-screen lg:border-b-0 lg:border-r">
-      <div className="rounded-[2rem] border border-app-shell-border bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_42%),linear-gradient(180deg,var(--app-shell-surface)_0%,var(--app-shell-bg-strong)_100%)] p-5 shadow-[var(--ai-panel-shadow)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.32em] text-app-accent">
-          Leadflow OS
-        </p>
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-app-shell-text">
-          {areaLabel}
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-app-shell-muted">
-          {areaDescription}
-        </p>
+    <aside
+      className={`border-r border-app-shell-border bg-[linear-gradient(180deg,var(--app-shell-bg)_0%,var(--app-shell-bg-strong)_100%)] px-4 py-5 text-app-shell-text ${className ?? ""}`}
+    >
+      <div className="flex min-h-full w-full flex-col">
+        <div className="rounded-[1.75rem] border border-app-shell-border bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_42%),linear-gradient(180deg,var(--app-shell-surface)_0%,var(--app-shell-bg-strong)_100%)] p-4 shadow-[var(--ai-panel-shadow)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-app-accent">
+            Leadflow OS
+          </p>
+          <h2 className="mt-3 text-xl font-semibold tracking-tight text-app-shell-text">
+            {areaLabel}
+          </h2>
 
-        <div className="mt-5 rounded-3xl border border-app-shell-border bg-[color:color-mix(in_srgb,var(--app-shell-text)_8%,transparent)] px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-shell-muted">
-            Objetivo del rol
-          </p>
-          <p className="mt-2 text-sm leading-6 text-app-shell-text">
-            Usa esta navegación para entender el estado actual, detectar bloqueos y mover la operación al siguiente paso.
-          </p>
+          {statusBadge ? (
+            <div
+              className={`mt-4 inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ${statusBadgeClassName}`}
+            >
+              {statusBadge.label}
+            </div>
+          ) : null}
         </div>
 
-        {statusBadge ? (
-          <div
-            className={`mt-4 inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ${statusBadgeClassName}`}
-          >
-            {statusBadge.label}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-6 space-y-6">
-        {sections.map((section, index) => (
-          <section
-            key={section.title}
-            className={index === 0 ? undefined : "border-t border-app-shell-border pt-6"}
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-app-shell-muted">
-              {section.title}
-            </p>
-            {section.description ? (
-              <p className="mt-2 text-sm text-app-shell-muted">
-                {section.description}
+        <div className="mt-5 flex-1 space-y-5">
+          {sections.map((section, index) => (
+            <section
+              key={section.title}
+              className={
+                index === 0 ? undefined : "border-t border-app-shell-border pt-5"
+              }
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-app-shell-muted">
+                {section.title}
               </p>
-            ) : null}
-            <nav className="mt-4 space-y-2">
-              {section.items.map((item) => renderNavItem(item))}
-            </nav>
-          </section>
-        ))}
-      </div>
-
-      <div className="mt-6 rounded-3xl border border-app-shell-border bg-app-shell-surface px-4 py-4 text-sm leading-6 text-app-shell-muted">
-        La navegacion lateral ya no habla solo de modulos tecnicos: busca orientar la operacion, la capacidad y el seguimiento del rol.
+              <nav className="mt-3 space-y-2">
+                {section.items.map((item) => renderNavItem(item))}
+              </nav>
+            </section>
+          ))}
+        </div>
       </div>
     </aside>
   );

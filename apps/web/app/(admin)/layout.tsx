@@ -6,32 +6,32 @@ const adminNav = [
   {
     href: "/admin",
     label: "Dashboard",
-    description: "Pulso general de plataforma, equipos y funnel runtime.",
+    icon: "layout-dashboard",
   },
   {
     href: "/admin/tenants",
     label: "Tenants",
-    description: "Provisioning, seats y lectura global de agencias cliente.",
+    icon: "building-2",
   },
   {
     href: "/admin/teams",
     label: "Teams",
-    description: "Capacidad instalada, ownership y cobertura operativa.",
+    icon: "users",
   },
   {
     href: "/admin/templates",
     label: "Templates",
-    description: "Catálogo base que define la experiencia pública.",
+    icon: "layout-template",
   },
   {
     href: "/admin/estructuras",
     label: "Estructuras",
-    description: "Registro visual de core layouts para catálogo interno y builder.",
+    icon: "network",
   },
   {
     href: "/admin/publications",
     label: "Publicaciones",
-    description: "Qué funnels ya están expuestos y por dónde salen.",
+    icon: "radio-tower",
   },
 ];
 
@@ -46,7 +46,7 @@ export default async function AdminLayout({
   return (
     <AdminShellFrame
       areaLabel="Super Admin"
-      areaDescription="Panel de plataforma para entender catálogo, equipos, publicaciones y salud del rollout sin perder el contexto comercial."
+      areaDescription="Panel principal de plataforma."
       topBarTitle="Plataforma Leadflow"
       personaLabel="Super Admin"
       workspaceName={snapshot.workspace.name}

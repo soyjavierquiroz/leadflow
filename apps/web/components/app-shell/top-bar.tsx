@@ -1,6 +1,6 @@
 "use client";
 
-import { User } from "lucide-react";
+import { Menu, User } from "lucide-react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { ThemeToggle } from "@/components/app-shell/theme-toggle";
@@ -23,6 +23,7 @@ type TopBarProps = {
   sourceMode?: DataSourceMode;
   currentUser: AuthenticatedAppUser | null;
   workspaceSwitcher?: WorkspaceSwitcherProps;
+  onMenuClick?: () => void;
 };
 
 const getCompactUserName = (fullName: string | null | undefined) => {
@@ -45,22 +46,35 @@ export function TopBar({
   personaLabel,
   currentUser,
   workspaceSwitcher,
+  onMenuClick,
 }: TopBarProps) {
   const compactUserName = getCompactUserName(currentUser?.fullName);
 
   return (
     <header className="sticky top-0 z-20 border-b border-app-border bg-app-surface px-4 py-3 shadow-[0_8px_30px_rgba(15,23,42,0.05)] backdrop-blur md:px-6 lg:px-8">
       <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
-        <div className="min-w-0">
-          <p className="truncate text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
-            {personaLabel}
-          </p>
-          <h1 className="mt-1 truncate text-lg font-semibold text-app-text md:text-xl">
-            {title}
-          </h1>
-          <p className="mt-1 truncate text-sm text-app-text-muted">
-            {workspaceName} · superficie operativa activa
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          {onMenuClick ? (
+            <button
+              type="button"
+              onClick={onMenuClick}
+              className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface text-app-text transition hover:bg-app-surface-muted md:hidden"
+              aria-label="Abrir navegación"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          ) : null}
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
+              {personaLabel}
+            </p>
+            <h1 className="mt-1 truncate text-lg font-semibold text-app-text md:text-xl">
+              {title}
+            </h1>
+            <p className="mt-1 truncate text-sm text-app-text-muted">
+              {workspaceName}
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 md:flex-nowrap md:justify-end">

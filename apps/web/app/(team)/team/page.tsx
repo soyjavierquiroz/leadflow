@@ -22,6 +22,8 @@ export default async function TeamPage() {
   const teamLeads = data.leadViews.filter(
     (item) => item.teamId === data.currentTeam.id,
   );
+  const teamFunnelCount = teamFunnels.length;
+  const hasTeamFunnels = teamFunnelCount > 0;
   const leadsNeedingAttention = teamLeads.filter((item) => item.needsAttention);
   const teamReadyFunnels = teamFunnels.filter((item) => item.trackingReady);
   const primaryActionClassName =
@@ -226,16 +228,32 @@ export default async function TeamPage() {
               },
             ]}
             rows={teamLeads.slice(0, 6)}
-            emptyEyebrow="Sin actividad todavía"
-            emptyTitle="Sin leads para este team"
-            emptyDescription="Cuando el funnel capture o rote nuevas oportunidades, aparecerán aquí para lectura rápida del equipo."
+            emptyEyebrow={
+              hasTeamFunnels ? "Esperando actividad" : "Sin actividad todavía"
+            }
+            emptyTitle={
+              hasTeamFunnels
+                ? "Esperando leads para este team"
+                : "Sin leads para este team"
+            }
+            emptyDescription={
+              hasTeamFunnels
+                ? `Este team ya tiene ${formatCompactNumber(teamFunnelCount)} funnel${teamFunnelCount === 1 ? "" : "s"} configurado${teamFunnelCount === 1 ? "" : "s"}. Cuando entren nuevas oportunidades, aparecerán aquí para lectura rápida del equipo.`
+                : "Cuando el funnel capture o rote nuevas oportunidades, aparecerán aquí para lectura rápida del equipo."
+            }
             emptyAction={
-              <Link
-                href="/team/publications/new-vsl"
-                className={primaryActionClassName}
-              >
-                Crear mi primer funnel
-              </Link>
+              hasTeamFunnels ? (
+                <Link href="/team/publications" className={primaryActionClassName}>
+                  Ver mis funnels
+                </Link>
+              ) : (
+                <Link
+                  href="/team/publications/new-vsl"
+                  className={primaryActionClassName}
+                >
+                  Crear mi primer funnel
+                </Link>
+              )
             }
           />
         </div>

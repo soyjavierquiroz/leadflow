@@ -352,7 +352,7 @@ export type MemberProfile = {
 export type ShellNavItem = {
   href: string;
   label: string;
-  description: string;
+  description?: string;
   match?: string;
   exact?: boolean;
   icon?: string;

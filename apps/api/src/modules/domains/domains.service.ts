@@ -329,6 +329,47 @@ export class DomainsService {
     };
   }
 
+  async setPrimaryForTeam(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+    },
+    domainId: string,
+  ): Promise<DomainSummary> {
+    const existingRecord = await this.findDomainRecord(scope, domainId);
+    const existing = mapDomainRecord(existingRecord);
+
+    if (existing.verificationStatus !== 'verified') {
+      throw new ConflictException({
+        code: 'DOMAIN_NOT_VERIFIED',
+        message:
+          'Only verified domains can be marked as the primary host for this tenant.',
+      });
+    }
+
+    const record = await this.prisma.$transaction(async (tx) => {
+      await tx.domain.updateMany({
+        where: {
+          teamId: scope.teamId,
+          isPrimary: true,
+          NOT: { id: existing.id },
+        },
+        data: {
+          isPrimary: false,
+        },
+      });
+
+      return tx.domain.update({
+        where: { id: existing.id },
+        data: {
+          isPrimary: true,
+        },
+      });
+    });
+
+    return this.toSummary(mapDomainRecord(record));
+  }
+
   async refreshForTeam(
     scope: {
       workspaceId: string;
@@ -337,9 +378,21 @@ export class DomainsService {
     domainId: string,
   ): Promise<DomainSummary> {
     const record = await this.findDomainRecord(scope, domainId);
-    const synced = await this.syncDomainToCloudflare(mapDomainRecord(record), {
+    const existing = mapDomainRecord(record);
+    const provisioned = existing.cloudflareCustomHostnameId
+      ? existing
+      : await this.syncDomainToCloudflare(existing, {
+          mode: 'create',
+          allowCreate: true,
+        });
+
+    if (!provisioned.cloudflareCustomHostnameId) {
+      return this.toSummary(provisioned);
+    }
+
+    const synced = await this.syncDomainToCloudflare(provisioned, {
       mode: 'refresh',
-      allowCreate: true,
+      allowCreate: false,
     });
 
     return this.toSummary(synced);

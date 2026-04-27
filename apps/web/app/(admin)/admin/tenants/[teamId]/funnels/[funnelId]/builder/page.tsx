@@ -71,7 +71,7 @@ export default async function AdminTenantFunnelBuilderPage({
   }
 
   return (
-    <div className="flex flex-col items-start w-full text-left">
+    <div className="flex min-h-screen w-full flex-col text-left">
       <TeamVslPublicationEditor
         mode="system"
         teamId={teamId}

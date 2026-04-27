@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -12,6 +14,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SystemTenantAccessGuard } from '../teams/system-tenant-access.guard';
 import type { CreateTeamDomainDto } from './dto/create-team-domain.dto';
 import type { CreateSystemTenantDomainDto } from './dto/create-system-tenant-domain.dto';
+import { buildDomainVerificationFeedback } from './domain-onboarding.utils';
 import { DomainsService } from './domains.service';
 
 @Controller('system/tenants')
@@ -52,6 +55,42 @@ export class SystemDomainsController {
     };
 
     return this.domainsService.createForTeam(team, createDomainDto);
+  }
+
+  @Post(':id/domains/:domainId/verify')
+  async verifyTenantDomain(
+    @Param('id') id: string,
+    @Param('domainId') domainId: string,
+  ) {
+    const team = await this.resolveTenantScope(id);
+    const domain = await this.domainsService.refreshForTeam(team, domainId);
+    const feedback = buildDomainVerificationFeedback(domain);
+
+    return {
+      domain,
+      status: feedback.status,
+      errorDetail: feedback.errorDetail,
+    };
+  }
+
+  @Delete(':id/domains/:domainId')
+  async deleteTenantDomain(
+    @Param('id') id: string,
+    @Param('domainId') domainId: string,
+  ) {
+    const team = await this.resolveTenantScope(id);
+
+    return this.domainsService.deleteForTeam(team, domainId);
+  }
+
+  @Patch(':id/domains/:domainId/set-primary')
+  async setPrimaryTenantDomain(
+    @Param('id') id: string,
+    @Param('domainId') domainId: string,
+  ) {
+    const team = await this.resolveTenantScope(id);
+
+    return this.domainsService.setPrimaryForTeam(team, domainId);
   }
 
   private requireTenantId(id: string) {

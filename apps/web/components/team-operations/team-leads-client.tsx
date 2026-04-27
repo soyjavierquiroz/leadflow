@@ -30,6 +30,7 @@ import {
 type TeamLeadsClientProps = {
   initialRows: TeamLeadInboxItem[];
   availableSponsors: TeamLeadAvailableSponsor[];
+  funnelCount: number;
 };
 
 const supervisionFilterOptions = [
@@ -96,6 +97,7 @@ const getLeadLabel = (lead: TeamLeadInboxItem) =>
 export function TeamLeadsClient({
   initialRows,
   availableSponsors,
+  funnelCount,
 }: TeamLeadsClientProps) {
   const [rows, setRows] = useState(initialRows);
   const [search, setSearch] = useState("");
@@ -215,6 +217,7 @@ export function TeamLeadsClient({
   const activeCount = rows.filter(
     (row) => row.supervisionStatus === "active",
   ).length;
+  const hasFunnels = funnelCount > 0;
 
   const openReassignModal = (leadId: string) => {
     const lead = rows.find((row) => row.id === leadId);
@@ -535,13 +538,25 @@ export function TeamLeadsClient({
           },
         ]}
         rows={filteredRows}
-        emptyEyebrow="Bandeja lista"
-        emptyTitle="Sin leads para mostrar"
-        emptyDescription="Cuando el team capture oportunidades o necesite rescates manuales, esta bandeja global mostrara el ownership y el pulso operativo completo."
+        emptyEyebrow={hasFunnels ? "Esperando actividad" : "Bandeja lista"}
+        emptyTitle={
+          hasFunnels ? "Esperando leads para mostrar" : "Sin leads para mostrar"
+        }
+        emptyDescription={
+          hasFunnels
+            ? `Este team ya tiene ${formatCompactNumber(funnelCount)} funnel${funnelCount === 1 ? "" : "s"} activo${funnelCount === 1 ? "" : "s"} para captar oportunidades. La bandeja global mostrara el ownership y el pulso operativo completo apenas entren nuevos leads.`
+            : "Cuando el team capture oportunidades o necesite rescates manuales, esta bandeja global mostrara el ownership y el pulso operativo completo."
+        }
         emptyAction={
-          <Link href="/team/publications/new-vsl" className={buttonClassName}>
-            Crear mi primer funnel
-          </Link>
+          hasFunnels ? (
+            <Link href="/team/publications" className={buttonClassName}>
+              Ver mis funnels
+            </Link>
+          ) : (
+            <Link href="/team/publications/new-vsl" className={buttonClassName}>
+              Crear mi primer funnel
+            </Link>
+          )
         }
       />
 

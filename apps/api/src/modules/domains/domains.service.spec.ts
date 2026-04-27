@@ -250,4 +250,213 @@ describe('DomainsService', () => {
     expect(result.domainType).toBe('custom_apex');
     expect(result.canonicalHost).toBe('retodetransformacion.com');
   });
+
+  it('provisions a custom hostname before refreshing when the domain has no Cloudflare id', async () => {
+    const { service, findFirst } = createService();
+    const existingRecord = buildDomainRecord({
+      status: 'draft',
+      onboardingStatus: 'pending_dns',
+      verificationStatus: 'pending',
+      sslStatus: 'pending',
+      cloudflareCustomHostnameId: null,
+      cloudflareStatusJson: null,
+      dnsTarget: 'customers.leadflow.kuruk.in',
+      lastCloudflareSyncAt: null,
+      activatedAt: null,
+    });
+    const provisionedDomain = buildDomainEntity(
+      buildDomainRecord({
+        ...existingRecord,
+        cloudflareCustomHostnameId: 'cf-hostname-2',
+        cloudflareStatusJson: {
+          id: 'cf-hostname-2',
+          hostname: existingRecord.host,
+          status: 'pending_validation',
+          customOriginServer: 'proxy-fallback.leadflow.kuruk.in',
+          verificationErrors: [],
+          ownershipVerification: null,
+          ssl: {
+            status: 'pending_validation',
+            method: 'http',
+            type: 'dv',
+            validationErrors: [],
+            validationRecords: [],
+          },
+          error: null,
+          raw: null,
+        },
+      }),
+    );
+    const refreshedDomain = buildDomainEntity(
+      buildDomainRecord({
+        ...existingRecord,
+        status: 'active',
+        onboardingStatus: 'active',
+        verificationStatus: 'verified',
+        sslStatus: 'active',
+        cloudflareCustomHostnameId: 'cf-hostname-2',
+        cloudflareStatusJson: {
+          id: 'cf-hostname-2',
+          hostname: existingRecord.host,
+          status: 'active',
+          customOriginServer: 'proxy-fallback.leadflow.kuruk.in',
+          verificationErrors: [],
+          ownershipVerification: null,
+          ssl: {
+            status: 'active',
+            method: 'http',
+            type: 'dv',
+            validationErrors: [],
+            validationRecords: [],
+          },
+          error: null,
+          raw: null,
+        },
+      }),
+    );
+
+    findFirst.mockResolvedValue(existingRecord);
+
+    const syncDomainToCloudflareSpy = jest
+      .spyOn(service as any, 'syncDomainToCloudflare')
+      .mockResolvedValueOnce(provisionedDomain)
+      .mockResolvedValueOnce(refreshedDomain);
+
+    const result = await service.refreshForTeam(scope, 'domain-1');
+
+    expect(syncDomainToCloudflareSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        id: 'domain-1',
+        cloudflareCustomHostnameId: null,
+      }),
+      {
+        mode: 'create',
+        allowCreate: true,
+      },
+    );
+    expect(syncDomainToCloudflareSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        id: 'domain-1',
+        cloudflareCustomHostnameId: 'cf-hostname-2',
+      }),
+      {
+        mode: 'refresh',
+        allowCreate: false,
+      },
+    );
+    expect(result.verificationStatus).toBe('verified');
+  });
+
+  it('returns the provisioning error summary when Cloudflare creation fails', async () => {
+    const { service, findFirst } = createService();
+    const existingRecord = buildDomainRecord({
+      status: 'draft',
+      onboardingStatus: 'pending_dns',
+      verificationStatus: 'pending',
+      sslStatus: 'pending',
+      cloudflareCustomHostnameId: null,
+      cloudflareStatusJson: null,
+      dnsTarget: 'customers.leadflow.kuruk.in',
+      lastCloudflareSyncAt: null,
+      activatedAt: null,
+    });
+    const failedProvisionDomain = buildDomainEntity(
+      buildDomainRecord({
+        ...existingRecord,
+        status: 'draft',
+        onboardingStatus: 'error',
+        verificationStatus: 'failed',
+        sslStatus: 'failed',
+        cloudflareCustomHostnameId: null,
+        cloudflareStatusJson: {
+          error: {
+            message: 'Domain already exists in another zone.',
+            status: 409,
+          },
+          raw: null,
+        },
+      }),
+    );
+
+    findFirst.mockResolvedValue(existingRecord);
+
+    const syncDomainToCloudflareSpy = jest
+      .spyOn(service as any, 'syncDomainToCloudflare')
+      .mockResolvedValueOnce(failedProvisionDomain);
+
+    const result = await service.refreshForTeam(scope, 'domain-1');
+
+    expect(syncDomainToCloudflareSpy).toHaveBeenCalledTimes(1);
+    expect(syncDomainToCloudflareSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'domain-1',
+        cloudflareCustomHostnameId: null,
+      }),
+      {
+        mode: 'create',
+        allowCreate: true,
+      },
+    );
+    expect(result.cloudflareErrorMessage).toBe(
+      'Domain already exists in another zone.',
+    );
+    expect(result.verificationStatus).toBe('failed');
+  });
+
+  it('marks a verified domain as primary and clears the previous primary flag', async () => {
+    const { service, findFirst, update, updateMany } = createService();
+    const existingRecord = buildDomainRecord({
+      isPrimary: false,
+      verificationStatus: 'verified',
+    });
+    const updatedRecord = buildDomainRecord({
+      isPrimary: true,
+      verificationStatus: 'verified',
+    });
+
+    findFirst.mockResolvedValue(existingRecord);
+    update.mockResolvedValue(updatedRecord);
+
+    const result = await service.setPrimaryForTeam(scope, 'domain-1');
+    const updateManyCall = updateMany.mock.calls[0]?.[0];
+    const updateCall = update.mock.calls[0]?.[0];
+
+    expect(updateManyCall).toEqual({
+      where: {
+        teamId: 'team-1',
+        isPrimary: true,
+        NOT: { id: 'domain-1' },
+      },
+      data: {
+        isPrimary: false,
+      },
+    });
+    expect(updateCall).toEqual({
+      where: { id: 'domain-1' },
+      data: {
+        isPrimary: true,
+      },
+    });
+    expect(result.isPrimary).toBe(true);
+  });
+
+  it('rejects setting a pending domain as primary', async () => {
+    const { service, findFirst } = createService();
+    const existingRecord = buildDomainRecord({
+      isPrimary: false,
+      verificationStatus: 'pending',
+      onboardingStatus: 'pending_validation',
+      sslStatus: 'pending',
+    });
+
+    findFirst.mockResolvedValue(existingRecord);
+
+    await expect(service.setPrimaryForTeam(scope, 'domain-1')).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'DOMAIN_NOT_VERIFIED',
+      }),
+    });
+  });
 });

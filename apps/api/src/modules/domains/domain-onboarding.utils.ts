@@ -488,3 +488,120 @@ export const buildDomainSummary = (
     }),
   };
 };
+
+const formatStatusLabel = (value: string | null) =>
+  value ? value.replace(/_/g, ' ') : null;
+
+export const buildDomainVerificationFeedback = (
+  domain: Pick<
+    DomainSummary,
+    | 'host'
+    | 'verificationStatus'
+    | 'onboardingStatus'
+    | 'cloudflareHostnameStatus'
+    | 'cloudflareSslStatus'
+    | 'cloudflareErrorMessage'
+    | 'legacyReason'
+    | 'dnsInstructions'
+    | 'cnameTarget'
+  >,
+): {
+  status: 'verified' | 'pending' | 'failed';
+  errorDetail: string | null;
+} => {
+  if (domain.verificationStatus === 'verified') {
+    return {
+      status: 'verified',
+      errorDetail: null,
+    };
+  }
+
+  if (domain.cloudflareErrorMessage) {
+    return {
+      status: domain.verificationStatus === 'failed' ? 'failed' : 'pending',
+      errorDetail: domain.cloudflareErrorMessage,
+    };
+  }
+
+  if (domain.legacyReason) {
+    return {
+      status: 'failed',
+      errorDetail: domain.legacyReason,
+    };
+  }
+
+  const ownershipInstruction = domain.dnsInstructions.find(
+    (instruction) => instruction.label === 'Ownership verification',
+  );
+  if (ownershipInstruction?.host) {
+    return {
+      status: 'pending',
+      errorDetail: `Cloudflare todavía exige verificar la propiedad del hostname. Crea el ${ownershipInstruction.type.toUpperCase()} ${ownershipInstruction.host} con valor ${ownershipInstruction.value}.`,
+    };
+  }
+
+  const domainCnameInstruction = domain.dnsInstructions.find(
+    (instruction) =>
+      instruction.type === 'cname' && instruction.host === domain.host,
+  );
+  if (
+    domain.onboardingStatus === 'pending_dns' &&
+    domainCnameInstruction?.host &&
+    domainCnameInstruction.value
+  ) {
+    return {
+      status: 'pending',
+      errorDetail: `Cloudflare todavía no confirma el CNAME de ${domainCnameInstruction.host} hacia ${domainCnameInstruction.value}.`,
+    };
+  }
+
+  const sslTxtInstruction = domain.dnsInstructions.find(
+    (instruction) => instruction.label === 'SSL validation TXT',
+  );
+  if (sslTxtInstruction?.host) {
+    return {
+      status: 'pending',
+      errorDetail: `Esperando validación de SSL. Crea el TXT ${sslTxtInstruction.host} con valor ${sslTxtInstruction.value}.`,
+    };
+  }
+
+  const sslHttpInstruction = domain.dnsInstructions.find(
+    (instruction) => instruction.label === 'HTTP validation',
+  );
+  if (sslHttpInstruction?.host) {
+    return {
+      status: 'pending',
+      errorDetail: `Esperando validación HTTP de SSL en ${sslHttpInstruction.host}. Cloudflare necesita recibir el contenido exacto que devolvió en esa instrucción.`,
+    };
+  }
+
+  if (domain.cloudflareSslStatus && domain.cloudflareSslStatus !== 'active') {
+    return {
+      status: 'pending',
+      errorDetail: `Esperando propagación o emisión de SSL. Cloudflare reporta el certificado en estado ${formatStatusLabel(domain.cloudflareSslStatus)}.`,
+    };
+  }
+
+  if (
+    domain.cloudflareHostnameStatus &&
+    domain.cloudflareHostnameStatus !== 'active'
+  ) {
+    return {
+      status: 'pending',
+      errorDetail: `Cloudflare todavía reporta el hostname en estado ${formatStatusLabel(domain.cloudflareHostnameStatus)}.`,
+    };
+  }
+
+  if (domain.cnameTarget) {
+    return {
+      status: 'pending',
+      errorDetail: `El servidor sigue esperando que ${domain.host} resuelva correctamente hacia ${domain.cnameTarget}.`,
+    };
+  }
+
+  return {
+    status: domain.verificationStatus === 'failed' ? 'failed' : 'pending',
+    errorDetail:
+      'La verificación sigue pendiente porque Cloudflare aún no devolvió una activación completa del hostname y su SSL.',
+  };
+};

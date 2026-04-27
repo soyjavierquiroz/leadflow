@@ -7,44 +7,43 @@ const teamNav = [
   {
     href: "/team",
     label: "Dashboard",
-    description: "Pulso del equipo, capacidad comercial y prioridades del día.",
+    icon: "layout-dashboard",
   },
   {
     href: "/team/leads",
     label: "Leads",
-    description: "Bandeja operativa para seguimiento, reminders y cierre.",
+    icon: "inbox",
   },
   {
     href: "/team/members",
     label: "Equipo",
-    description: "Licencias activas, invitados y control operativo del squad.",
+    icon: "users",
   },
   {
     href: "/team/wheels",
     label: "Ruedas",
-    description: "Bolsa comun activa, buy-ins y ocupacion de asientos.",
+    icon: "orbit",
   },
   {
     href: "/management/ai-config",
     label: "Configuración de IA",
-    description: "Prompt maestro, contextos y cierre del agente del equipo.",
     icon: "bot",
     match: "/management/ai-config",
   },
   {
     href: "/team/pools",
     label: "Pools",
-    description: "Cobertura de rotación y fallback de handoff.",
+    icon: "layers-3",
   },
   {
     href: "/team/settings",
     label: "Ajustes",
-    description: "Nombre, logo y dominio base del tenant.",
+    icon: "settings",
   },
   {
     href: "/team/profile",
     label: "Mi perfil",
-    description: "Datos personales, móvil y contraseña.",
+    icon: "user-round",
   },
 ];
 
@@ -75,7 +74,7 @@ export default async function TeamLayout({
   return (
     <AppShellLayout
       areaLabel="Team Admin"
-      areaDescription="Centro operativo del equipo para revisar captación, capacidad, asignación y seguimiento comercial."
+      areaDescription="Centro operativo del equipo."
       topBarTitle={snapshot.currentTeam.name}
       personaLabel="Team Admin"
       workspaceName={snapshot.workspace.name}

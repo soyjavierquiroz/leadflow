@@ -222,6 +222,22 @@ export type SystemTenantDomainRecord = LooseRecord & {
   status: string;
   onboardingStatus: string;
   verificationStatus: string;
+  isPrimary: boolean;
+  cloudflareHostnameStatus?: string | null;
+  cloudflareSslStatus?: string | null;
+  cloudflareErrorMessage?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type SystemTenantDomainVerificationResponse = LooseRecord & {
+  domain: SystemTenantDomainRecord;
+  status: "verified" | "pending" | "failed";
+  errorDetail: string | null;
+};
+
+export type SystemTenantDomainDeleteResponse = LooseRecord & {
+  id: string;
+  host: string;
+  deleted: true;
 };

@@ -13,7 +13,7 @@ export default async function AdminTeamsPage() {
       <SectionHeader
         eyebrow="Super Admin / Teams"
         title="Ownership operativo por team"
-        description="El backend todavía no expone un endpoint HTTP de teams. Esta vista combina métricas reales derivadas desde sponsors, funnels, pools, dominios y publicaciones con metadata temporal del team."
+        description="Vista transversal del ownership operativo por team. Consolida métricas reales de sponsors, funnels, pools, dominios, publicaciones, leads y assignments para mostrar cómo opera cada equipo dentro de su workspace."
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -15,22 +15,22 @@ const memberNav: ShellNavItem[] = [
   {
     href: "/member",
     label: "Dashboard",
-    description: "Mis metricas comerciales, handoffs nuevos y carga activa.",
+    icon: "layout-dashboard",
   },
   {
     href: "/member/leads",
     label: "Leads",
-    description: "Solo mis leads asignados para seguimiento, prioridad y cierre.",
+    icon: "inbox",
   },
   {
     href: "/member/links",
     label: "Enlaces",
-    description: "Funnels publicados con tu atribucion directa para compartir.",
+    icon: "link-2",
   },
   {
     href: "/member/profile",
     label: "Perfil",
-    description: "Datos de trabajo y configuracion del sponsor.",
+    icon: "user-round",
   },
 ];
 
@@ -65,14 +65,11 @@ export default async function MemberLayout({
   if (isHybridAdmin) {
     navSections.push({
       title: "Gestion de Equipo",
-      description:
-        "Tu cockpit de jefe para licencias, miembros, pools y control administrativo del tenant.",
       items: [
         {
           href: "/team",
           label: "Dashboard de Gestión",
-          description:
-            "Resumen del equipo, capacidad activa y decisiones operativas globales.",
+          icon: "briefcase-business",
         },
       ],
     });
@@ -81,9 +78,6 @@ export default async function MemberLayout({
   if (isMemberUser || isHybridAdmin) {
     navSections.push({
       title: "Mi Operacion",
-      description: isHybridAdmin
-        ? "Tu espacio personal como asesor: leads, perfil y acceso operativo sin cerrar sesión."
-        : "Tu espacio diario para atender leads, ajustar tu perfil y sostener tu operación.",
       items: operationalNav,
     });
   }
@@ -134,8 +128,8 @@ export default async function MemberLayout({
       areaLabel={isHybridAdmin ? "Team Admin / Operacion" : "Sponsor / Member"}
       areaDescription={
         isHybridAdmin
-          ? "Freddy entra a su panel personal de ventas, atiende leads y vuelve a gestion cuando lo necesite."
-          : "Workspace personal del sponsor para aceptar handoffs, hacer seguimiento y sostener su canal de atencion."
+          ? "Vista operativa personal."
+          : "Workspace personal."
       }
       topBarTitle={user.sponsor?.displayName ?? user.fullName}
       personaLabel={

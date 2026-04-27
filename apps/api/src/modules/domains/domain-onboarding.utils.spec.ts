@@ -1,4 +1,5 @@
 import {
+  buildDomainVerificationFeedback,
   buildDomainDnsInstructions,
   defaultVerificationMethodForDomainType,
   deriveLegacyDomainState,
@@ -121,5 +122,52 @@ describe('domain onboarding utils', () => {
     expect(legacy.recreateRequired).toBe(true);
     expect(legacy.legacyReason).toContain('DNS target legado');
     expect(legacy.legacyReason).toContain('fallback origin legado');
+  });
+
+  it('explains pending dns verification for custom subdomains', () => {
+    const feedback = buildDomainVerificationFeedback({
+      host: 'promo.cliente.com',
+      verificationStatus: 'pending',
+      onboardingStatus: 'pending_dns',
+      cloudflareHostnameStatus: null,
+      cloudflareSslStatus: null,
+      cloudflareErrorMessage: null,
+      legacyReason: null,
+      cnameTarget: 'customers.leadflow.kuruk.in',
+      dnsInstructions: [
+        {
+          id: 'cname-promo-cliente-com',
+          type: 'cname',
+          host: 'promo.cliente.com',
+          value: 'customers.leadflow.kuruk.in',
+          status: 'required',
+          label: 'CNAME required',
+          detail: null,
+        },
+      ],
+    });
+
+    expect(feedback.status).toBe('pending');
+    expect(feedback.errorDetail).toContain(
+      'Cloudflare todavía no confirma el CNAME',
+    );
+    expect(feedback.errorDetail).toContain('customers.leadflow.kuruk.in');
+  });
+
+  it('surfaces the direct Cloudflare error message when present', () => {
+    const feedback = buildDomainVerificationFeedback({
+      host: 'promo.cliente.com',
+      verificationStatus: 'failed',
+      onboardingStatus: 'error',
+      cloudflareHostnameStatus: 'error',
+      cloudflareSslStatus: 'failed',
+      cloudflareErrorMessage: 'Cloudflare request timed out.',
+      legacyReason: null,
+      cnameTarget: 'customers.leadflow.kuruk.in',
+      dnsInstructions: [],
+    });
+
+    expect(feedback.status).toBe('failed');
+    expect(feedback.errorDetail).toBe('Cloudflare request timed out.');
   });
 });
