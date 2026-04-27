@@ -36,6 +36,28 @@ Referencia tecnica:
 
 - [`docs/ad-wheels.md`](docs/ad-wheels.md)
 
+## Rotation Pools
+
+Leadflow separa la distribucion de trafico segun el origen operativo:
+
+- `Ad Wheels`: gobiernan trafico pagado. Usan asientos (`seatCount`) y una ruleta ponderada infinita para repartir leads de campañas pagadas.
+- `Rotation Pools`: gobiernan trafico organico y el fallback operativo del team. Agrupan sponsors en orden de rotacion y sirven como respaldo cuando el runtime necesita resolver asignacion organica.
+
+Comportamiento actual del backend:
+
+- al aprovisionar un nuevo `Tenant` / `Team`, Leadflow crea automaticamente un `RotationPool` activo llamado `Rotación Orgánica Principal`
+- ese pool se crea como `fallback` del team y conecta al sponsor inicial con `weight = 1`
+- cuando un team admin crea un pool manualmente desde la UI, `POST /v1/rotation-pools` asocia automaticamente los sponsors activos del team si no se envian `sponsorIds`
+
+Mantenimiento para equipos heredados:
+
+- existe el script [`apps/api/src/scripts/seed-default-pools.ts`](apps/api/src/scripts/seed-default-pools.ts) para detectar teams sin pools y sembrarles `Rotación Orgánica Principal` con sus sponsors activos actuales
+- ejecucion recomendada dentro del contenedor API:
+
+```bash
+docker exec -it $(docker ps --filter name=leadflow_api -q | head -n 1) sh -lc 'cd /app/apps/api && npx ts-node src/scripts/seed-default-pools.ts'
+```
+
 ## Base de conocimiento RAG
 
 La arquitectura RAG end-to-end queda dividida entre Leadflow, n8n y Runtime Context Central:
