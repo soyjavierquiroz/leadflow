@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { type FormEvent, useMemo, useState, useTransition } from "react";
+import { Plus } from "lucide-react";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
+import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type {
   RotationPoolMemberRecord,
@@ -23,16 +25,24 @@ const buttonClassName =
 
 const selectClassName =
   "rounded-full border border-app-border bg-app-card px-3 py-2 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft";
+const inputClassName =
+  "w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft";
+const primaryButtonClassName =
+  "inline-flex items-center gap-2 rounded-full bg-app-text px-5 py-2.5 text-sm font-semibold text-app-surface transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function TeamPoolsClient({
   initialPools,
   initialMembers,
 }: TeamPoolsClientProps) {
-  const [pools] = useState(initialPools);
+  const [pools, setPools] = useState(initialPools);
   const [members, setMembers] = useState(initialMembers);
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [formName, setFormName] = useState("Rotación Orgánica Principal");
+  const [formStrategy, setFormStrategy] = useState("round-robin");
+  const [formIsFallbackPool, setFormIsFallbackPool] = useState(true);
 
   const membersByPool = useMemo(() => {
     const map = new Map<string, RotationPoolMemberRecord[]>();
@@ -52,6 +62,66 @@ export function TeamPoolsClient({
 
     return map;
   }, [members]);
+
+  const openCreateModal = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setFormName("Rotación Orgánica Principal");
+    setFormStrategy("round-robin");
+    setFormIsFallbackPool(true);
+    setIsCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    if (isPending) {
+      return;
+    }
+
+    setIsCreateModalOpen(false);
+  };
+
+  const handleCreatePool = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    startTransition(async () => {
+      try {
+        const created = await teamOperationRequest<RotationPoolRecord>(
+          "/rotation-pools",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              name: formName,
+              strategy: formStrategy,
+              isFallbackPool: formIsFallbackPool,
+            }),
+          },
+        );
+        const createdMembers = await teamOperationRequest<
+          RotationPoolMemberRecord[]
+        >(`/rotation-pools/members?rotationPoolId=${created.id}`, {
+          method: "GET",
+        });
+
+        setPools((current) => [...current, created]);
+        setMembers((current) => {
+          const retained = current.filter(
+            (item) => item.rotationPoolId !== created.id,
+          );
+          return [...retained, ...createdMembers];
+        });
+        setIsCreateModalOpen(false);
+        setSuccessMessage("Pool creado y listo para operar.");
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No pudimos crear el pool de rotación.",
+        );
+      }
+    });
+  };
 
   const handleMemberPatch = (
     memberId: string,
@@ -123,6 +193,17 @@ export function TeamPoolsClient({
         description="Además de revisar cobertura, el team admin ya puede pausar miembros y reordenar posiciones simples dentro de cada pool."
       />
 
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={openCreateModal}
+          className={primaryButtonClassName}
+        >
+          <Plus className="h-4 w-4" />
+          Crear Pool
+        </button>
+      </div>
+
       {errorMessage ? <OperationBanner tone="error" message={errorMessage} /> : null}
       {successMessage ? (
         <OperationBanner tone="success" message={successMessage} />
@@ -187,8 +268,18 @@ export function TeamPoolsClient({
           },
         ]}
         rows={pools}
-        emptyTitle="Sin pools para este team"
-        emptyDescription="Cuando el team configure pools activos aparecerán aquí con sus sponsors y funnels conectados."
+        emptyTitle="No hay pools de rotación activos"
+        emptyDescription="Crea el primer pool para empezar a distribuir tráfico orgánico con los sponsors activos del team."
+        emptyAction={
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className={primaryButtonClassName}
+          >
+            <Plus className="h-4 w-4" />
+            Crear Primer Pool
+          </button>
+        }
       />
 
       <div className="space-y-4">
@@ -277,6 +368,74 @@ export function TeamPoolsClient({
           );
         })}
       </div>
+
+      {isCreateModalOpen ? (
+        <ModalShell
+          title="Crear pool de rotación"
+          description="Define el pool base del team. Si no eliges miembros manualmente, el backend conectará automáticamente los sponsors activos del team."
+          onClose={closeCreateModal}
+        >
+          <form className="space-y-5" onSubmit={handleCreatePool}>
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-app-text">
+                Nombre del pool
+              </span>
+              <input
+                value={formName}
+                onChange={(event) => setFormName(event.target.value)}
+                placeholder="Rotación Orgánica Principal"
+                className={inputClassName}
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-app-text">
+                Estrategia
+              </span>
+              <select
+                value={formStrategy}
+                onChange={(event) => setFormStrategy(event.target.value)}
+                className={inputClassName}
+              >
+                <option value="round-robin">Round robin</option>
+                <option value="weighted">Weighted</option>
+                <option value="manual">Manual</option>
+              </select>
+            </label>
+
+            <label className="flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface-muted p-4 text-sm text-app-text-muted">
+              <input
+                type="checkbox"
+                checked={formIsFallbackPool}
+                onChange={(event) => setFormIsFallbackPool(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-app-border text-app-text"
+              />
+              <span>
+                Marcar este pool como fallback orgánico principal del team.
+              </span>
+            </label>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeCreateModal}
+                disabled={isPending}
+                className={buttonClassName}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isPending}
+                className={primaryButtonClassName}
+              >
+                <Plus className="h-4 w-4" />
+                {isPending ? "Creando..." : "Guardar Pool"}
+              </button>
+            </div>
+          </form>
+        </ModalShell>
+      ) : null}
     </div>
   );
 }

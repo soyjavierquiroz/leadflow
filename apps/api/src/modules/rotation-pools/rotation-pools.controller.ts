@@ -5,12 +5,14 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Query,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireRoles } from '../auth/roles.decorator';
+import type { CreateRotationPoolDto } from './dto/create-rotation-pool.dto';
 import type { UpdateRotationMemberDto } from './dto/update-rotation-member.dto';
 import { RotationPoolsService } from './rotation-pools.service';
 
@@ -35,6 +37,28 @@ export class RotationPoolsController {
           ? teamId
           : (user.teamId ?? undefined),
     });
+  }
+
+  @Post()
+  @RequireRoles(UserRole.TEAM_ADMIN)
+  create(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Body() dto: CreateRotationPoolDto,
+  ) {
+    return this.rotationPoolsService.createForScope(
+      {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+      },
+      {
+        name: dto.name,
+        strategy: dto.strategy,
+        sponsorIds: dto.sponsorIds,
+        funnelIds: dto.funnelIds,
+        isFallbackPool: dto.isFallbackPool,
+        status: dto.status,
+      },
+    );
   }
 
   @Get('members')

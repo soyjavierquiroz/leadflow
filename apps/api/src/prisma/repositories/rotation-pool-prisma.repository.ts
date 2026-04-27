@@ -68,7 +68,7 @@ export class RotationPoolPrismaRepository implements RotationPoolRepository {
         workspaceId: data.workspaceId,
         teamId: data.teamId,
         name: data.name,
-        status: 'draft',
+        status: data.status ?? 'draft',
         strategy: toDbStrategy(data.strategy ?? 'round-robin'),
         isFallbackPool: data.isFallbackPool ?? false,
         members:

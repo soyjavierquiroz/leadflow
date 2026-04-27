@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -54,6 +55,80 @@ export class RotationPoolsService {
       sponsorIds: dto.sponsorIds ?? [],
       funnelIds: dto.funnelIds ?? [],
       isFallbackPool: dto.isFallbackPool ?? false,
+    });
+  }
+
+  async createForScope(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+    },
+    dto: {
+      name: string;
+      strategy?: RotationPool['strategy'];
+      sponsorIds?: string[];
+      funnelIds?: string[];
+      isFallbackPool?: boolean;
+      status?: RotationPool['status'];
+    },
+  ): Promise<RotationPool> {
+    if (!this.repository) {
+      throw new Error('RotationPoolRepository provider is not configured.');
+    }
+
+    const name =
+      typeof dto.name === 'string'
+        ? dto.name.trim()
+        : '';
+
+    if (!name) {
+      throw new BadRequestException({
+        code: 'ROTATION_POOL_NAME_REQUIRED',
+        message: 'Rotation pool name is required.',
+      });
+    }
+
+    const existing = await this.prisma.rotationPool.findFirst({
+      where: {
+        workspaceId: scope.workspaceId,
+        name,
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new ConflictException({
+        code: 'ROTATION_POOL_NAME_CONFLICT',
+        message:
+          'A rotation pool with this name already exists in the current workspace.',
+      });
+    }
+
+    const sponsorIds =
+      dto.sponsorIds && dto.sponsorIds.length > 0
+        ? dto.sponsorIds
+        : (
+            await this.prisma.sponsor.findMany({
+              where: {
+                workspaceId: scope.workspaceId,
+                teamId: scope.teamId,
+                isActive: true,
+                status: 'active',
+              },
+              orderBy: [{ createdAt: 'asc' }],
+              select: { id: true },
+            })
+          ).map((sponsor) => sponsor.id);
+
+    return this.repository.create({
+      workspaceId: scope.workspaceId,
+      teamId: scope.teamId,
+      name,
+      status: dto.status ?? 'active',
+      strategy: dto.strategy ?? 'round-robin',
+      sponsorIds,
+      funnelIds: dto.funnelIds ?? [],
+      isFallbackPool: dto.isFallbackPool ?? true,
     });
   }
 

@@ -98,6 +98,7 @@ const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const subdomainPattern = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const defaultRotationPoolName = 'Rotación Orgánica Principal';
 
 export type SystemTenantSummary = {
   id: string;
@@ -1248,6 +1249,13 @@ export class TeamsService {
           },
         });
 
+        await this.ensureDefaultRotationPool(tx, {
+          workspaceId: workspace.id,
+          teamId: team.id,
+          teamName: team.name,
+          sponsorIds: [sponsor.id],
+        });
+
         const linkedAdminUser = await tx.user.update({
           where: {
             id: adminUser.id,
@@ -1422,6 +1430,108 @@ export class TeamsService {
     }
 
     return record;
+  }
+
+  private async ensureDefaultRotationPool(
+    tx: Prisma.TransactionClient,
+    input: {
+      workspaceId: string;
+      teamId: string;
+      teamName: string;
+      sponsorIds: string[];
+    },
+  ) {
+    const uniqueName = await this.resolveAvailableRotationPoolName(
+      tx,
+      input.workspaceId,
+      input.teamName,
+    );
+
+    const existingPool = await tx.rotationPool.findFirst({
+      where: {
+        workspaceId: input.workspaceId,
+        teamId: input.teamId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingPool) {
+      return existingPool;
+    }
+
+    return tx.rotationPool.create({
+      data: {
+        workspaceId: input.workspaceId,
+        teamId: input.teamId,
+        name: uniqueName,
+        status: 'active',
+        strategy: 'round_robin',
+        isFallbackPool: true,
+        members:
+          input.sponsorIds.length > 0
+            ? {
+                create: input.sponsorIds.map((sponsorId, index) => ({
+                  sponsorId,
+                  position: index + 1,
+                  weight: 1,
+                  isActive: true,
+                })),
+              }
+            : undefined,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  private async resolveAvailableRotationPoolName(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    teamName: string,
+  ) {
+    const baseName = defaultRotationPoolName;
+    const teamScopedName = `${defaultRotationPoolName} - ${teamName}`;
+    const candidates = [baseName, teamScopedName];
+
+    for (const candidate of candidates) {
+      const existing = await tx.rotationPool.findFirst({
+        where: {
+          workspaceId,
+          name: candidate,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+    }
+
+    let suffix = 2;
+
+    while (true) {
+      const candidate = `${teamScopedName} ${suffix}`;
+      const existing = await tx.rotationPool.findFirst({
+        where: {
+          workspaceId,
+          name: candidate,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+
+      suffix += 1;
+    }
   }
 
   private mapTeamSettings(record: {
