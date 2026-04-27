@@ -24,6 +24,20 @@ Piezas principales del monorepo:
 
 Los paquetes placeholder sin consumidores activos (`@leadflow/config`, `@leadflow/types`, `@leadflow/ui`) fueron retirados de la superficie versionada. La arquitectura compartida activa queda concentrada en mail y video.
 
+## Tenant vs Team
+
+En la base de datos actual, `Workspace` y `Team` no significan lo mismo:
+
+- `Workspace` es el contenedor padre y la frontera compartida de datos. Un `Workspace` puede tener varios `Team`.
+- `Team` es la unidad operativa real. Casi todos los activos del negocio cuelgan de `teamId`: `Sponsor`, `Domain`, `FunnelInstance`, `FunnelPublication`, `TrackingProfile`, `RotationPool`, `AdWheel`, `Assignment`, `KnowledgeAudit` y mensajeria.
+- En el panel de Super Admin, la vista `Tenants` hoy lista `Team` aprovisionados con contexto de su `Workspace`. O sea: comercialmente hablamos de "tenant", pero tecnicamente ese registro vive en `Team`, no en `Workspace`.
+- La suscripcion y los asientos viven hoy en `Team` (`subscriptionExpiresAt`, `maxSeats`). El uso de asientos se calcula con los sponsors activos del team.
+- Los leads viven a nivel `Workspace`, pero su ownership operativo baja al `Team` por el funnel/publicacion/assignment que los atiende. Los funnels legacy viven en `Workspace` y pueden apuntar a un `defaultTeamId`; las instancias publicables y los rotation pools si pertenecen directamente al `Team`.
+
+Referencia ampliada:
+
+- [`docs/domain-model.md`](docs/domain-model.md)
+
 ## Ad Wheels
 
 La capa de ruedas pagadas ya opera con ruleta ponderada infinita:
