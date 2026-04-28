@@ -336,8 +336,9 @@ export const deriveDomainLifecycle = (input: {
     normalizedHostnameStatus === 'error';
 
   if (
-    normalizedHostnameStatus === 'active' &&
-    normalizedSslStatus === 'active'
+    normalizedSslStatus === 'active' ||
+    (normalizedHostnameStatus === 'active' &&
+      normalizedSslStatus === 'active')
   ) {
     return {
       status: 'active',

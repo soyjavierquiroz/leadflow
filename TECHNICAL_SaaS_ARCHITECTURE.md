@@ -79,7 +79,34 @@ Variables operativas críticas:
 - `N8N_AUTOMATION_WEBHOOK_BASE_URL`
 - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
 
-### 3.1 Infraestructura de Correos / Notificaciones
+### 3.1 Cloudflare SaaS Domains Troubleshooting
+
+Incidente consolidado:
+
+- El flujo de `Custom Hostnames` en Cloudflare depende obligatoriamente de dos credenciales en runtime:
+  - `CLOUDFLARE_ZONE_ID`
+  - `CLOUDFLARE_API_TOKEN`
+- Si alguna falta, Leadflow puede persistir el `Domain` y calcular `dnsTarget`, pero no podrá crear ni refrescar el custom hostname remoto.
+
+Permiso de menor privilegio:
+
+- El token de Cloudflare no debe ser global.
+- Para el flujo vigente de onboarding SaaS, el permiso mínimo requerido es:
+  - `Zone -> SSL and Certificates -> Edit`
+- Esto permite operar `Custom Hostnames` sin exponer privilegios innecesarios sobre toda la cuenta.
+
+Edge case de validación HTTP:
+
+- Para `custom_subdomain` con validación `http`, Cloudflare puede emitir el certificado y devolver un snapshot donde `ssl.status === "active"` aunque el resto del payload no cumpla la condición estricta previa de la máquina de estados.
+- Antes del parche, `deriveDomainLifecycle()` en `apps/api/src/modules/domains/domain-onboarding.utils.ts` exigía una combinación más rígida y podía dejar dominios funcionales en `pending_validation` o `pending`.
+- Leadflow ahora trata `ssl.status === "active"` como condición de éxito absoluta y promueve el dominio a:
+  - `status: active`
+  - `onboardingStatus: active`
+  - `verificationStatus: verified`
+  - `sslStatus: active`
+- Este ajuste evita falsos negativos cuando Cloudflare ya considera operativo el hostname aunque la estructura completa del snapshot no venga en el formato esperado por la lógica anterior.
+
+### 3.2 Infraestructura de Correos / Notificaciones
 
 La infraestructura de correos transaccionales y notificaciones técnicas queda
 estandarizada sobre AWS SES mediante el SDK oficial `@aws-sdk/client-ses`.
