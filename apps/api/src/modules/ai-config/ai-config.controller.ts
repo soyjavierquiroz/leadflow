@@ -79,6 +79,7 @@ export class AiConfigController {
     @Body()
     body?: {
       instance_name?: string | null;
+      team_id?: string | null;
       prompt?: string | null;
       session_id?: string | null;
       intent?: string | null;
@@ -86,6 +87,7 @@ export class AiConfigController {
   ): Promise<ExecuteOrchestrationResponse> {
     return this.aiConfigService.executeOrchestrationForUser(user, {
       instanceName: sanitizeNullableText(body?.instance_name),
+      teamId: sanitizeNullableText(body?.team_id),
       prompt: body?.prompt,
       sessionId: sanitizeNullableText(body?.session_id) ?? '',
       intent: body?.intent,
@@ -101,12 +103,14 @@ export class AiConfigController {
     body?: {
       instance_name?: string | null;
       funnel_id?: string | null;
+      team_id?: string | null;
       funnel_context?: Record<string, unknown> | null;
       metadata?: Record<string, unknown> | null;
     },
   ): Promise<InitOrchestrationSessionResponse> {
     return this.aiConfigService.initOrchestrationSessionForUser(user, {
       instanceName: sanitizeNullableText(body?.instance_name),
+      teamId: sanitizeNullableText(body?.team_id),
       funnelId: sanitizeNullableText(body?.funnel_id) ?? '',
       funnelContext: body?.funnel_context,
       metadata: body?.metadata,
@@ -121,11 +125,13 @@ export class AiConfigController {
     @Body()
     body?: {
       instance_name?: string | null;
+      team_id?: string | null;
       session_id?: string | null;
     },
   ): Promise<CloseOrchestrationSessionResponse> {
     return this.aiConfigService.closeOrchestrationSessionForUser(user, {
       instanceName: sanitizeNullableText(body?.instance_name),
+      teamId: sanitizeNullableText(body?.team_id),
       sessionId: sanitizeNullableText(body?.session_id) ?? '',
     });
   }

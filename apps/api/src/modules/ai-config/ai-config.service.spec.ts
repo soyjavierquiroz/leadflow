@@ -4,10 +4,17 @@ describe('AiConfigService', () => {
   const buildService = () => {
     const prisma = {
       channelInstance: {
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
       },
       aiAgentConfig: {
         findFirst: jest.fn(),
+      },
+      sponsor: {
+        findFirst: jest.fn(),
+      },
+      team: {
+        findUnique: jest.fn(),
       },
     };
     const walletEngineService = {
@@ -225,6 +232,104 @@ describe('AiConfigService', () => {
         },
       }),
     );
+  });
+
+  it('builds a development runtime context for default-constructor when the user has no channel instance yet', async () => {
+    const originalGatewayToken = process.env.GATEWAY_AUTH_TOKEN;
+    const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
+
+    process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
+    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+
+    const previousFetch = global.fetch;
+    const { prisma, walletEngineService, service } = buildService();
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ ok: true, session_ready: true })),
+    });
+
+    try {
+      global.fetch = fetchMock as never;
+
+      prisma.channelInstance.findUnique.mockResolvedValue(null);
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        name: 'Freddy Team',
+        code: 'freddy',
+      });
+      prisma.aiAgentConfig.findFirst.mockResolvedValue({
+        id: 'tenant-config-1',
+        basePrompt: 'Usa el contexto de {{team_name}} para cablear el funnel.',
+        routeContexts: {
+          offer: {
+            mode: 'team-default',
+          },
+        },
+        ctaPolicy: null,
+        aiPolicy: null,
+      });
+      walletEngineService.isConfigured.mockReturnValue(false);
+
+      await expect(
+        service.initOrchestrationSessionForUser(
+          {
+            id: 'user-1',
+            fullName: 'Super Admin',
+            email: 'admin@example.com',
+            role: 'SUPER_ADMIN',
+            workspaceId: 'workspace-1',
+            teamId: null,
+            sponsorId: null,
+            homePath: '/admin',
+            workspace: null,
+            team: null,
+            sponsor: null,
+          } as never,
+          {
+            instanceName: 'default-constructor',
+            teamId: 'team-1',
+            funnelId: 'funnel-1',
+            funnelContext: {
+              blocks: [{ type: 'hook_and_promise' }],
+            },
+          },
+        ),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          status: 200,
+          sessionId: 'default-constructor-funnel-1',
+          runtimeContext: expect.objectContaining({
+            routing: expect.objectContaining({
+              instance_name: 'default-constructor',
+              provider: 'leadflow_builder',
+            }),
+            tenant: expect.objectContaining({
+              id: 'team-1',
+            }),
+            resolution: expect.objectContaining({
+              strategy: 'tenant_default',
+            }),
+          }),
+        }),
+      );
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://ia_gateway:3000/v1/session/init',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining(
+            '"sessionId":"default-constructor-funnel-1"',
+          ),
+        }),
+      );
+    } finally {
+      global.fetch = previousFetch;
+      process.env.GATEWAY_AUTH_TOKEN = originalGatewayToken;
+      process.env.IA_GATEWAY_BASE_URL = originalGatewayBaseUrl;
+    }
   });
 
   it('initializes orchestration sessions against the IA Gateway with a synthesized system prompt', async () => {

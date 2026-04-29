@@ -8,7 +8,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { normalizeMessagingPhone } from '../shared/messaging-channel.utils';
 import {
@@ -36,6 +36,10 @@ const AI_SERVICE_OWNER_KEY = 'lead-handler' as const;
 const AI_RUNTIME_CHANNEL = 'whatsapp' as const;
 const DEFAULT_GATEWAY_TIMEOUT_MS = 10_000;
 const DEFAULT_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+const DEFAULT_DEVELOPMENT_ORCHESTRATION_INSTANCE_NAME =
+  'default-constructor' as const;
+const DEFAULT_DEVELOPMENT_ORCHESTRATION_PROMPT =
+  'Actua como el constructor de Smart Wiring de Leadflow y responde con un contrato JSON claro, conservador y aplicable por el builder.' as const;
 const IA_GATEWAY_SESSION_INIT_PATH = '/v1/session/init';
 const IA_GATEWAY_EXECUTE_PATH = '/v1/execute';
 const IA_GATEWAY_SESSION_CLOSE_PATH = '/v1/session/close';
@@ -540,6 +544,74 @@ export class AiConfigService {
     }
 
     const runtimeContext = await this.resolveRuntimeContext(instanceName);
+    return this.initOrchestrationSessionWithRuntimeContext(runtimeContext, input);
+  }
+
+  async executeOrchestration(
+    input: ExecuteOrchestrationInput,
+  ): Promise<ExecuteOrchestrationResponse> {
+    this.ensureGatewayConfigured();
+
+    const instanceName = sanitizeNullableText(input.instanceName);
+    const sessionId = sanitizeNullableText(input.sessionId);
+
+    if (!instanceName) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
+        message: 'instanceName is required to execute the orchestration.',
+      });
+    }
+
+    if (!sessionId) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_SESSION_REQUIRED',
+        message: 'sessionId is required to execute the orchestration.',
+      });
+    }
+
+    const runtimeContext = await this.resolveRuntimeContext(instanceName);
+    return this.executeOrchestrationWithRuntimeContext(runtimeContext, input);
+  }
+
+  async closeOrchestrationSession(
+    input: CloseOrchestrationSessionInput,
+  ): Promise<CloseOrchestrationSessionResponse> {
+    this.ensureGatewayConfigured();
+
+    const instanceName = sanitizeNullableText(input.instanceName);
+    const sessionId = sanitizeNullableText(input.sessionId);
+
+    if (!instanceName) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
+        message: 'instanceName is required to close the orchestration session.',
+      });
+    }
+
+    if (!sessionId) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_SESSION_REQUIRED',
+        message: 'sessionId is required to close the orchestration session.',
+      });
+    }
+
+    const runtimeContext = await this.resolveRuntimeContext(instanceName);
+    return this.closeOrchestrationSessionWithRuntimeContext(runtimeContext, input);
+  }
+
+  private async initOrchestrationSessionWithRuntimeContext(
+    runtimeContext: AiRuntimeContext,
+    input: InitOrchestrationSessionInput,
+  ): Promise<InitOrchestrationSessionResponse> {
+    const funnelId = sanitizeNullableText(input.funnelId);
+
+    if (!funnelId) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_FUNNEL_REQUIRED',
+        message: 'funnelId is required to initialize the orchestration session.',
+      });
+    }
+
     const sessionId = this.buildOrchestrationSessionId({
       instanceName: runtimeContext.routing.instance_name,
       funnelId,
@@ -592,20 +664,11 @@ export class AiConfigService {
     }
   }
 
-  async executeOrchestration(
+  private async executeOrchestrationWithRuntimeContext(
+    runtimeContext: AiRuntimeContext,
     input: ExecuteOrchestrationInput,
   ): Promise<ExecuteOrchestrationResponse> {
-    this.ensureGatewayConfigured();
-
-    const instanceName = sanitizeNullableText(input.instanceName);
     const sessionId = sanitizeNullableText(input.sessionId);
-
-    if (!instanceName) {
-      throw new BadRequestException({
-        code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
-        message: 'instanceName is required to execute the orchestration.',
-      });
-    }
 
     if (!sessionId) {
       throw new BadRequestException({
@@ -614,7 +677,6 @@ export class AiConfigService {
       });
     }
 
-    const runtimeContext = await this.resolveRuntimeContext(instanceName);
     const prompt =
       sanitizeNullableText(input.intent) ??
       sanitizeNullableText(input.prompt) ??
@@ -663,20 +725,11 @@ export class AiConfigService {
     }
   }
 
-  async closeOrchestrationSession(
+  private async closeOrchestrationSessionWithRuntimeContext(
+    runtimeContext: AiRuntimeContext,
     input: CloseOrchestrationSessionInput,
   ): Promise<CloseOrchestrationSessionResponse> {
-    this.ensureGatewayConfigured();
-
-    const instanceName = sanitizeNullableText(input.instanceName);
     const sessionId = sanitizeNullableText(input.sessionId);
-
-    if (!instanceName) {
-      throw new BadRequestException({
-        code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
-        message: 'instanceName is required to close the orchestration session.',
-      });
-    }
 
     if (!sessionId) {
       throw new BadRequestException({
@@ -684,8 +737,6 @@ export class AiConfigService {
         message: 'sessionId is required to close the orchestration session.',
       });
     }
-
-    const runtimeContext = await this.resolveRuntimeContext(instanceName);
 
     try {
       const { response, data } = await this.sendGatewayRequest({
@@ -735,13 +786,10 @@ export class AiConfigService {
       instanceName?: string | null;
     },
   ): Promise<ExecuteOrchestrationResponse> {
-    const resolvedInstanceName =
-      sanitizeNullableText(input.instanceName) ??
-      (await this.resolveInstanceNameForUser(user));
-
-    return this.executeOrchestration({
+    const runtimeContext = await this.resolveRuntimeContextForUser(user, input);
+    return this.executeOrchestrationWithRuntimeContext(runtimeContext, {
       ...input,
-      instanceName: resolvedInstanceName,
+      instanceName: runtimeContext.routing.instance_name,
     });
   }
 
@@ -751,13 +799,10 @@ export class AiConfigService {
       instanceName?: string | null;
     },
   ): Promise<InitOrchestrationSessionResponse> {
-    const resolvedInstanceName =
-      sanitizeNullableText(input.instanceName) ??
-      (await this.resolveInstanceNameForUser(user));
-
-    return this.initOrchestrationSession({
+    const runtimeContext = await this.resolveRuntimeContextForUser(user, input);
+    return this.initOrchestrationSessionWithRuntimeContext(runtimeContext, {
       ...input,
-      instanceName: resolvedInstanceName,
+      instanceName: runtimeContext.routing.instance_name,
     });
   }
 
@@ -767,14 +812,40 @@ export class AiConfigService {
       instanceName?: string | null;
     },
   ): Promise<CloseOrchestrationSessionResponse> {
-    const resolvedInstanceName =
-      sanitizeNullableText(input.instanceName) ??
-      (await this.resolveInstanceNameForUser(user));
-
-    return this.closeOrchestrationSession({
+    const runtimeContext = await this.resolveRuntimeContextForUser(user, input);
+    return this.closeOrchestrationSessionWithRuntimeContext(runtimeContext, {
       ...input,
-      instanceName: resolvedInstanceName,
+      instanceName: runtimeContext.routing.instance_name,
     });
+  }
+
+  private async resolveRuntimeContextForUser(
+    user: AuthenticatedUser,
+    input: {
+      instanceName?: string | null;
+      teamId?: string | null;
+    },
+  ) {
+    const explicitInstanceName = sanitizeNullableText(input.instanceName);
+
+    if (!explicitInstanceName) {
+      const resolvedInstanceName = await this.resolveInstanceNameForUser(user);
+      return this.resolveRuntimeContext(resolvedInstanceName);
+    }
+
+    try {
+      return await this.resolveRuntimeContext(explicitInstanceName);
+    } catch (error) {
+      if (!this.shouldUseDevelopmentRuntimeFallback(user, explicitInstanceName, error)) {
+        throw error;
+      }
+
+      return this.buildDevelopmentRuntimeContextForUser({
+        user,
+        instanceName: explicitInstanceName,
+        teamId: input.teamId ?? null,
+      });
+    }
   }
 
   private async requireScopedSponsor(scope: {
@@ -837,6 +908,178 @@ export class AiConfigService {
     }
 
     return channelInstance.instanceName;
+  }
+
+  private shouldUseDevelopmentRuntimeFallback(
+    user: AuthenticatedUser,
+    instanceName: string,
+    error: unknown,
+  ) {
+    if (instanceName !== DEFAULT_DEVELOPMENT_ORCHESTRATION_INSTANCE_NAME) {
+      return false;
+    }
+
+    if (!(error instanceof NotFoundException)) {
+      return false;
+    }
+
+    return user.role === UserRole.SUPER_ADMIN || Boolean(user.teamId);
+  }
+
+  private async buildDevelopmentRuntimeContextForUser(input: {
+    user: AuthenticatedUser;
+    instanceName: string;
+    teamId: string | null;
+  }): Promise<AiRuntimeContext> {
+    const teamId =
+      sanitizeNullableText(input.teamId) ??
+      sanitizeNullableText(input.user.teamId) ??
+      null;
+
+    if (!teamId) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_TEAM_CONTEXT_REQUIRED',
+        message:
+          'teamId is required to build a development orchestration context when no channel instance is available.',
+      });
+    }
+
+    const sponsor =
+      sanitizeNullableText(input.user.sponsorId) &&
+      input.user.teamId === teamId
+        ? await this.prisma.sponsor.findFirst({
+            where: {
+              id: input.user.sponsorId ?? undefined,
+              teamId,
+            },
+            include: {
+              team: true,
+            },
+          })
+        : null;
+
+    const team =
+      sponsor?.team ??
+      (await this.prisma.team.findUnique({
+        where: {
+          id: teamId,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      }));
+
+    if (!team) {
+      throw new NotFoundException({
+        code: 'AI_ORCHESTRATION_TEAM_NOT_FOUND',
+        message:
+          'No team could be resolved to build the development orchestration context.',
+      });
+    }
+
+    const [memberConfig, tenantConfig] = await Promise.all([
+      sponsor
+        ? this.prisma.aiAgentConfig.findFirst({
+            where: {
+              tenantId: team.id,
+              memberId: sponsor.id,
+              isActive: true,
+            },
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          })
+        : Promise.resolve(null),
+      this.prisma.aiAgentConfig.findFirst({
+        where: {
+          tenantId: team.id,
+          memberId: null,
+          isActive: true,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+      }),
+    ]);
+
+    const placeholders = this.buildPlaceholders({
+      name:
+        sanitizeNullableText(sponsor?.displayName) ??
+        sanitizeNullableText(input.user.fullName) ??
+        'Constructor Leadflow',
+      teamName: team.name,
+      phone: sanitizeNullableText(sponsor?.phone) ?? null,
+    });
+    const basePrompt =
+      buildMergedPrompt({
+        tenantPrompt: tenantConfig?.basePrompt ?? null,
+        memberPrompt: memberConfig?.basePrompt ?? null,
+      }) ?? DEFAULT_DEVELOPMENT_ORCHESTRATION_PROMPT;
+
+    return {
+      version: AI_RUNTIME_CONTEXT_VERSION,
+      routing: {
+        provider: 'leadflow_builder',
+        channel: AI_RUNTIME_CHANNEL,
+        instance_name: input.instanceName,
+        service_owner_key: AI_SERVICE_OWNER_KEY,
+      },
+      tenant: {
+        id: team.id,
+        name: team.name,
+        code: team.code,
+      },
+      member: {
+        id: sponsor?.id ?? input.user.id,
+        name:
+          sanitizeNullableText(sponsor?.displayName) ??
+          sanitizeNullableText(input.user.fullName) ??
+          'Constructor Leadflow',
+        email:
+          sanitizeNullableText(sponsor?.email) ??
+          sanitizeNullableText(input.user.email) ??
+          null,
+        phone: sanitizeNullableText(sponsor?.phone) ?? null,
+        public_slug: sanitizeNullableText(sponsor?.publicSlug) ?? null,
+        whatsapp_link: placeholders.whatsapp_link,
+      },
+      placeholders,
+      wallet: sponsor
+        ? await this.resolveWalletContext(sponsor.id)
+        : {
+            account_id: null,
+            balance: null,
+            status: 'unavailable',
+            reason:
+              'Development orchestration fallback does not bind a sponsor wallet.',
+          },
+      ai_agent: {
+        base_prompt: replacePromptPlaceholders(basePrompt, placeholders),
+        route_contexts: toJsonRecord(
+          mergeJsonValues(
+            tenantConfig?.routeContexts,
+            memberConfig?.routeContexts,
+          ),
+        ),
+        cta_policy: toJsonRecord(
+          mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
+        ),
+        ai_policy: toJsonRecord(
+          mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
+        ),
+      },
+      resolution: {
+        strategy: memberConfig
+          ? 'member_override'
+          : tenantConfig
+            ? 'tenant_default'
+            : 'development_fallback',
+        tenant_config_id: tenantConfig?.id ?? null,
+        member_config_id: memberConfig?.id ?? null,
+      },
+    };
   }
 
   private buildPlaceholders(input: {

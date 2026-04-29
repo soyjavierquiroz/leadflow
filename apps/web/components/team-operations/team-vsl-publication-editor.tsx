@@ -67,6 +67,8 @@ const defaultMediaRows = requiredMediaKeys.map((key) => ({
   value: "",
 }));
 
+const defaultDevelopmentOrchestrationInstanceName = "default-constructor";
+
 const editorStepDefinitions = [
   {
     key: "captura",
@@ -539,6 +541,8 @@ export function TeamVslPublicationEditor({
   headerTitle = "Crear o editar funnel VSL/Landing",
   availableBlocks,
 }: TeamVslPublicationEditorProps) {
+  const orchestrationInstanceName =
+    mode === "system" ? defaultDevelopmentOrchestrationInstanceName : null;
   const router = useRouter();
   const searchParams = useSearchParams();
   const publicationId =
@@ -1049,6 +1053,8 @@ export function TeamVslPublicationEditor({
       void fetch(`${webPublicConfig.urls.api}/v1/runtime/session/close`, {
         method: "POST",
         body: JSON.stringify({
+          instance_name: orchestrationInstanceName,
+          team_id: teamId ?? null,
           session_id: orchestrationSessionId,
         }),
         credentials: "include",
@@ -1060,7 +1066,7 @@ export function TeamVslPublicationEditor({
         // Session cleanup on unload is best-effort.
       });
     };
-  }, [orchestrationSessionId]);
+  }, [orchestrationInstanceName, orchestrationSessionId, teamId]);
 
   const orchestrationFunnelContext = useMemo(() => {
     if (!parsedBlocks.value) {
@@ -1141,6 +1147,8 @@ export function TeamVslPublicationEditor({
       {
         method: "POST",
         body: JSON.stringify({
+          instance_name: orchestrationInstanceName,
+          team_id: teamId ?? null,
           funnel_id: funnelInstanceId,
           funnel_context: orchestrationFunnelContext,
           metadata: {
@@ -1172,6 +1180,8 @@ export function TeamVslPublicationEditor({
       {
         method: "POST",
         body: JSON.stringify({
+          instance_name: orchestrationInstanceName,
+          team_id: teamId ?? null,
           funnel_id: funnelInstanceId,
           funnel_context: orchestrationFunnelContext,
           metadata: {
@@ -1194,8 +1204,10 @@ export function TeamVslPublicationEditor({
     currentPublicationId,
     funnelInstanceId,
     mode,
+    orchestrationInstanceName,
     orchestrationFunnelContext,
     orchestrationSessionId,
+    teamId,
   ]);
 
   const handleMediaRowChange = (index: number, patch: Partial<MediaRow>) => {
@@ -1511,6 +1523,8 @@ export function TeamVslPublicationEditor({
         {
           method: "POST",
           body: JSON.stringify({
+            instance_name: orchestrationInstanceName,
+            team_id: teamId ?? null,
             session_id: sessionId,
             intent: userIntent,
           }),

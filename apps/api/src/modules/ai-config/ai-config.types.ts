@@ -37,7 +37,7 @@ export type AiRuntimeContext = {
     ai_policy: Record<string, unknown>;
   };
   resolution: {
-    strategy: 'member_override' | 'tenant_default';
+    strategy: 'member_override' | 'tenant_default' | 'development_fallback';
     tenant_config_id: string | null;
     member_config_id: string | null;
   };
@@ -92,6 +92,7 @@ export type AiConfigEditorSnapshot = {
 
 export type InitOrchestrationSessionInput = {
   instanceName?: string | null;
+  teamId?: string | null;
   funnelId: string;
   funnelContext?: Record<string, unknown> | null;
   metadata?: Record<string, unknown> | null;
@@ -106,6 +107,7 @@ export type InitOrchestrationSessionResponse = {
 
 export type ExecuteOrchestrationInput = {
   instanceName?: string | null;
+  teamId?: string | null;
   sessionId: string;
   prompt?: string | null;
   intent?: string | null;
@@ -120,6 +122,7 @@ export type ExecuteOrchestrationResponse = {
 
 export type CloseOrchestrationSessionInput = {
   instanceName?: string | null;
+  teamId?: string | null;
   sessionId: string;
 };
 

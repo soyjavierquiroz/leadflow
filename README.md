@@ -42,6 +42,14 @@ El contrato operativo de sesión ahora usa un ID canónico:
 
 Leadflow genera ese `sessionId`, lo reusa durante toda la edición y lo cierra al terminar. La memoria efectiva de la sesión vive en Redis del lado del gateway, no en la API de Leadflow. Eso mantiene al backend stateless y hace que el estado de orquestación siga siendo recuperable por clave canónica.
 
+### Configuración de Contexto para Orquestación
+
+Cada usuario que vaya a ejecutar Smart Wiring desde el builder debe estar asociado a una instancia resoluble para que el Gateway pueda persistir y recuperar la memoria de sesión en Redis.
+
+- En operación normal, esa asociación sale de `ChannelInstance` y alimenta el `instanceName` real del asesor.
+- En desarrollo o pruebas de constructor, el frontend puede enviar un `instance_name` de fallback como `default-constructor` para evitar bloqueos cuando todavía no existe una instancia enlazada.
+- Ese fallback está pensado para pruebas controladas del builder. La ruta recomendada para producción sigue siendo mantener la relación usuario -> instancia -> contexto operativo correctamente registrada.
+
 ### Deep Mapping de bloques
 
 El builder de VSL ya no depende de mapeos superficiales por campo:

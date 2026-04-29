@@ -160,6 +160,7 @@ describe('AiConfigController', () => {
       controller.initOrchestrationSession(user as never, {
         instance_name: 'drenvexman',
         funnel_id: 'funnel-1',
+        team_id: 'team-1',
         funnel_context: {
           blocks: [],
         },
@@ -184,6 +185,7 @@ describe('AiConfigController', () => {
       user,
       {
         instanceName: 'drenvexman',
+        teamId: 'team-1',
         funnelId: 'funnel-1',
         funnelContext: {
           blocks: [],
@@ -220,6 +222,7 @@ describe('AiConfigController', () => {
     await expect(
       controller.executeOrchestration(user as never, {
         instance_name: 'drenvexman',
+        team_id: 'team-1',
         session_id: 'drenvexman-funnel-1',
         intent: 'Optimize the current funnel step wiring.',
       }),
@@ -240,6 +243,7 @@ describe('AiConfigController', () => {
       user,
       {
         instanceName: 'drenvexman',
+        teamId: 'team-1',
         prompt: undefined,
         sessionId: 'drenvexman-funnel-1',
         intent: 'Optimize the current funnel step wiring.',
@@ -272,6 +276,7 @@ describe('AiConfigController', () => {
     await expect(
       controller.closeOrchestrationSession(user as never, {
         instance_name: 'drenvexman',
+        team_id: 'team-1',
         session_id: 'drenvexman-funnel-1',
       }),
     ).resolves.toEqual({
@@ -291,6 +296,7 @@ describe('AiConfigController', () => {
       user,
       {
         instanceName: 'drenvexman',
+        teamId: 'team-1',
         sessionId: 'drenvexman-funnel-1',
       },
     );
