@@ -16,6 +16,10 @@ export type ApiRuntimeConfig = {
   n8nDispatcherWebhookUrl: string | null;
   n8nDispatcherApiKey: string | null;
   n8nOutboundWebhookUrl: string | null;
+  identityTokenSecret: string | null;
+  identityTokenTtlHours: number;
+  yourlsApiUrl: string | null;
+  yourlsSignature: string | null;
   walletEngineInternalUrl: string | null;
 };
 
@@ -111,6 +115,11 @@ export const getApiRuntimeConfig = (
   const n8nDispatcherWebhookUrl = sanitizeEnv(env.N8N_DISPATCHER_WEBHOOK_URL);
   const n8nDispatcherApiKey = sanitizeEnv(env.N8N_DISPATCHER_API_KEY);
   const n8nOutboundWebhookUrl = sanitizeEnv(env.N8N_OUTBOUND_WEBHOOK_URL);
+  const identityTokenSecret = sanitizeEnv(env.IDENTITY_TOKEN_SECRET);
+  const identityTokenTtlHours = parseNumber(env.IDENTITY_TOKEN_TTL_HOURS, 48);
+  const yourlsApiUrl =
+    normalizeUrl(env.YOURLS_API_URL, 'YOURLS_API_URL') ?? null;
+  const yourlsSignature = sanitizeEnv(env.YOURLS_SIGNATURE) ?? null;
   const walletEngineInternalUrl =
     normalizeUrl(env.WALLET_ENGINE_BASE_URL, 'WALLET_ENGINE_BASE_URL') ??
     normalizeUrl(
@@ -140,6 +149,10 @@ export const getApiRuntimeConfig = (
     n8nDispatcherWebhookUrl: n8nDispatcherWebhookUrl ?? null,
     n8nDispatcherApiKey: n8nDispatcherApiKey ?? null,
     n8nOutboundWebhookUrl: n8nOutboundWebhookUrl ?? null,
+    identityTokenSecret: identityTokenSecret ?? null,
+    identityTokenTtlHours,
+    yourlsApiUrl,
+    yourlsSignature,
     walletEngineInternalUrl,
   };
 };

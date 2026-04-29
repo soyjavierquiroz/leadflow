@@ -63,6 +63,7 @@ import {
   normalizeLeadCaptureFormBlock,
   normalizeRuntimeBlockType,
   resolveCtaHref,
+  resolveNextStepFromContract,
   toStepLabel,
 } from "@/components/public-funnel/runtime-block-utils";
 import { PublicGrandSlamOfferBlock } from "@/components/public-funnel/public-grand-slam-offer-block";
@@ -409,8 +410,8 @@ function HookAndPromiseBlockAdapter({
     runtime.currentStep.path;
   const ctaAction = asString(block.action) || "hook_primary";
   const ctaLabel =
-    asString(block.label) ||
     asString(content?.cta_button_text as never) ||
+    asString(block.label) ||
     asString(
       block.cta_text,
       asString(
@@ -1820,7 +1821,7 @@ function OfferBlockAdapter({
   const ctaAction = asString(block.action) || "offer_cta";
   const ctaHref = resolveModalAwareCtaHref(
     ctaAction,
-    asString(block.href) || runtime.currentStep.path,
+    resolveCtaHref(block, runtime),
     blocks,
   );
   const ctaLabel = asString(block.label, "Quiero esta oferta");
@@ -2095,6 +2096,10 @@ export function PublicBlockAdapter({
   layoutVariant = "single_column",
 }: PublicBlockAdapterProps) {
   try {
+    if (block.hidden || block.is_hidden || block.isHidden) {
+      return null;
+    }
+
     const normalizedType = normalizeRuntimeBlockType(block.type);
     const surfaceProps = resolveBlockSurfaceProps(block, normalizedType);
 
@@ -2237,6 +2242,14 @@ export function PublicBlockAdapter({
             currentStepId={runtime.currentStep.id}
             block={normalizeLeadCaptureFormBlock(block)}
             runtimeEntryContext={runtime.entryContext}
+            nextStepPath={
+              resolveNextStepFromContract(
+                runtime,
+                normalizeLeadCaptureFormBlock(block).outcome ?? "submit_success",
+              ) ??
+              runtime.publication.nextStepPath ??
+              runtime.nextStep?.path
+            }
             isBoxed={surfaceProps.isBoxed}
           />
         );

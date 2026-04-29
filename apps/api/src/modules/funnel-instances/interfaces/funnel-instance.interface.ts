@@ -9,6 +9,10 @@ import type {
 } from '../../shared/domain.types';
 
 export type FunnelInstanceStatus = 'draft' | 'active' | 'archived';
+export type FunnelStructuralType =
+  | 'generic'
+  | 'two_step_conversion'
+  | 'multi_step_conversion';
 
 export interface FunnelInstance
   extends BaseDomainEntity, WorkspaceScoped, TeamScoped {
@@ -18,6 +22,8 @@ export interface FunnelInstance
   code: string;
   thumbnailUrl: string | null;
   status: FunnelInstanceStatus;
+  structuralType: FunnelStructuralType;
+  conversionContract: JsonValue;
   rotationPoolId: DomainId | null;
   trackingProfileId: DomainId | null;
   handoffStrategyId: DomainId | null;

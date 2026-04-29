@@ -106,6 +106,13 @@ function buildPreviewRuntime(
       handoffStrategyId: null,
       metaPixelId: null,
       tiktokPixelId: null,
+      seoTitle: null,
+      seoDescription: null,
+      ogImageUrl: null,
+      faviconUrl: null,
+      nextStepPath: `${previewPath}/next`,
+      manifestVersion: 1,
+      runtimeHealthStatus: "healthy",
     },
     theme: resolveFunnelThemeId(themeId),
     funnel: {
@@ -113,6 +120,14 @@ function buildPreviewRuntime(
       name: "Preview Funnel",
       code: "preview-funnel",
       status: "draft",
+      structuralType: "two_step_conversion",
+      conversionContract: {
+        transitions: {
+          preview: {
+            default: `${previewPath}/next`,
+          },
+        },
+      },
       settingsJson: {},
       mediaMap,
       template: {
@@ -178,7 +193,10 @@ export function BlockRenderer({
     return (
       type !== "announcement" &&
       type !== "marquee" &&
-      type !== "lead_capture_config"
+      type !== "lead_capture_config" &&
+      !block.is_hidden &&
+      !block.hidden &&
+      !block.isHidden
     );
   });
   const stepLayout = resolvePublicStepLayout({

@@ -40,6 +40,7 @@ type PublicCaptureFormProps = {
   currentStepId: string;
   block: RuntimeLeadCaptureFormBlock;
   runtimeEntryContext: PublicRuntimeEntryContext;
+  nextStepPath?: string | null;
   sectionId?: string;
   isBoxed?: boolean;
 };
@@ -182,6 +183,7 @@ export function PublicCaptureForm({
   currentStepId,
   block,
   runtimeEntryContext,
+  nextStepPath,
   sectionId = "public-capture-form",
   isBoxed = false,
 }: PublicCaptureFormProps) {
@@ -272,6 +274,7 @@ export function PublicCaptureForm({
         metadata: {
           sessionId: getOrCreateRuntimeSessionId(),
           blockType: "lead_capture_form",
+          outcome: block.outcome ?? "submit_success",
           hasPhone: Boolean(phone),
           hasEmail: Boolean(email),
           configuredFields: block.fields.map((field) => field.name),
@@ -319,9 +322,16 @@ export function PublicCaptureForm({
             : "Lead capturado correctamente."),
       );
 
-      if (block.successMode === "next_step" && response.nextStep?.path) {
-        router.push(response.nextStep.path);
-        return;
+      if (block.successMode === "next_step") {
+        const redirectPath =
+          block.redirectUrl?.trim() ||
+          response.nextStep?.path?.trim() ||
+          nextStepPath?.trim();
+
+        if (redirectPath) {
+          router.push(redirectPath);
+          return;
+        }
       }
     } catch (error) {
       setErrorMessage(

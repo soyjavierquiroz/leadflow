@@ -98,7 +98,7 @@ export function AppShellLayout({
 
       {isMobileNavOpen ? (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm dark:bg-slate-950/45 md:hidden"
           onClick={() => setIsMobileNavOpen(false)}
           aria-hidden="true"
         />

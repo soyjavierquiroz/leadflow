@@ -226,4 +226,286 @@ describe('AiConfigService', () => {
       }),
     );
   });
+
+  it('initializes orchestration sessions against the IA Gateway with a synthesized system prompt', async () => {
+    const originalGatewayToken = process.env.GATEWAY_AUTH_TOKEN;
+    const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
+
+    process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
+    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+
+    const previousFetch = global.fetch;
+    const { prisma, walletEngineService, service } = buildService();
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ ok: true, session_ready: true })),
+    });
+
+    try {
+      global.fetch = fetchMock as never;
+
+      prisma.channelInstance.findUnique.mockResolvedValue({
+        id: 'channel-1',
+        instanceName: 'drenvexman',
+        tenantId: 'team-1',
+        memberId: 'sponsor-1',
+        provider: 'evolution',
+        tenant: {
+          id: 'team-1',
+          name: 'Freddy Team',
+          code: 'freddy',
+        },
+        member: {
+          id: 'sponsor-1',
+          teamId: 'team-1',
+          displayName: 'Ana Sponsor',
+          email: 'ana@example.com',
+          phone: '+52 55 1234 5678',
+          publicSlug: 'ana-sponsor',
+        },
+      });
+      prisma.aiAgentConfig.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'tenant-config-1',
+          basePrompt: 'Hola {{name}}',
+          routeContexts: {
+            business: {
+              team_default: true,
+            },
+          },
+          ctaPolicy: {
+            close: {
+              mode: 'team',
+            },
+          },
+          aiPolicy: {
+            model: 'gpt-4o-mini',
+          },
+        });
+      walletEngineService.isConfigured.mockReturnValue(false);
+
+      await expect(
+        service.initOrchestrationSession({
+          instanceName: 'drenvexman',
+          funnelId: 'funnel-1',
+          funnelContext: {
+            blocks: [{ type: 'hero' }],
+          },
+          metadata: {
+            source: 'unit-test',
+          },
+        }),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          status: 200,
+          sessionId: 'drenvexman-funnel-1',
+          data: {
+            ok: true,
+            session_ready: true,
+          },
+          runtimeContext: expect.objectContaining({
+            tenant: expect.objectContaining({
+              id: 'team-1',
+            }),
+          }),
+        }),
+      );
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://ia_gateway:3000/v1/session/init',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer gateway-token',
+            'x-service-key': 'lead-handler',
+          }),
+          body: expect.stringContaining('"sessionId":"drenvexman-funnel-1"'),
+        }),
+      );
+    } finally {
+      global.fetch = previousFetch;
+      process.env.GATEWAY_AUTH_TOKEN = originalGatewayToken;
+      process.env.IA_GATEWAY_BASE_URL = originalGatewayBaseUrl;
+    }
+  });
+
+  it('executes orchestrations by sending only sessionId and prompt to the IA Gateway', async () => {
+    const originalGatewayToken = process.env.GATEWAY_AUTH_TOKEN;
+    const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
+
+    process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
+    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+
+    const previousFetch = global.fetch;
+    const { prisma, walletEngineService, service } = buildService();
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ ok: true, execution_id: 'exec-1' })),
+    });
+
+    try {
+      global.fetch = fetchMock as never;
+
+      prisma.channelInstance.findUnique.mockResolvedValue({
+        id: 'channel-1',
+        instanceName: 'drenvexman',
+        tenantId: 'team-1',
+        memberId: 'sponsor-1',
+        provider: 'evolution',
+        tenant: {
+          id: 'team-1',
+          name: 'Freddy Team',
+          code: 'freddy',
+        },
+        member: {
+          id: 'sponsor-1',
+          teamId: 'team-1',
+          displayName: 'Ana Sponsor',
+          email: 'ana@example.com',
+          phone: '+52 55 1234 5678',
+          publicSlug: 'ana-sponsor',
+        },
+      });
+      prisma.aiAgentConfig.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'tenant-config-1',
+          basePrompt: 'Hola {{name}}',
+          routeContexts: {
+            business: {
+              team_default: true,
+            },
+          },
+          ctaPolicy: {
+            close: {
+              mode: 'team',
+            },
+          },
+          aiPolicy: {
+            model: 'gpt-4o-mini',
+          },
+        });
+      walletEngineService.isConfigured.mockReturnValue(false);
+
+      await expect(
+        service.executeOrchestration({
+          instanceName: 'drenvexman',
+          sessionId: 'drenvexman-funnel-1',
+          intent: 'Optimiza el wiring del funnel.',
+        }),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          status: 200,
+          sessionId: 'drenvexman-funnel-1',
+          data: {
+            ok: true,
+            execution_id: 'exec-1',
+          },
+        }),
+      );
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://ia_gateway:3000/v1/execute',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            sessionId: 'drenvexman-funnel-1',
+            prompt: 'Optimiza el wiring del funnel.',
+          }),
+        }),
+      );
+    } finally {
+      global.fetch = previousFetch;
+      process.env.GATEWAY_AUTH_TOKEN = originalGatewayToken;
+      process.env.IA_GATEWAY_BASE_URL = originalGatewayBaseUrl;
+    }
+  });
+
+  it('closes orchestration sessions against the IA Gateway', async () => {
+    const originalGatewayToken = process.env.GATEWAY_AUTH_TOKEN;
+    const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
+
+    process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
+    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+
+    const previousFetch = global.fetch;
+    const { prisma, walletEngineService, service } = buildService();
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest.fn().mockResolvedValue(JSON.stringify({ ok: true, closed: true })),
+    });
+
+    try {
+      global.fetch = fetchMock as never;
+
+      prisma.channelInstance.findUnique.mockResolvedValue({
+        id: 'channel-1',
+        instanceName: 'drenvexman',
+        tenantId: 'team-1',
+        memberId: 'sponsor-1',
+        provider: 'evolution',
+        tenant: {
+          id: 'team-1',
+          name: 'Freddy Team',
+          code: 'freddy',
+        },
+        member: {
+          id: 'sponsor-1',
+          teamId: 'team-1',
+          displayName: 'Ana Sponsor',
+          email: 'ana@example.com',
+          phone: '+52 55 1234 5678',
+          publicSlug: 'ana-sponsor',
+        },
+      });
+      prisma.aiAgentConfig.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'tenant-config-1',
+          basePrompt: 'Hola {{name}}',
+          routeContexts: null,
+          ctaPolicy: null,
+          aiPolicy: null,
+        });
+      walletEngineService.isConfigured.mockReturnValue(false);
+
+      await expect(
+        service.closeOrchestrationSession({
+          instanceName: 'drenvexman',
+          sessionId: 'drenvexman-funnel-1',
+        }),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          status: 200,
+          sessionId: 'drenvexman-funnel-1',
+          data: {
+            ok: true,
+            closed: true,
+          },
+        }),
+      );
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://ia_gateway:3000/v1/session/close',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            sessionId: 'drenvexman-funnel-1',
+          }),
+        }),
+      );
+    } finally {
+      global.fetch = previousFetch;
+      process.env.GATEWAY_AUTH_TOKEN = originalGatewayToken;
+      process.env.IA_GATEWAY_BASE_URL = originalGatewayBaseUrl;
+    }
+  });
 });

@@ -11,7 +11,10 @@ import {
   emitPublicRuntimeEvent,
   getOrCreateRuntimeSessionId,
 } from "@/lib/public-runtime-tracking";
-import { getOrCreateAnonymousId } from "@/lib/public-funnel-session";
+import {
+  getOrCreateAnonymousId,
+  readSubmissionContext,
+} from "@/lib/public-funnel-session";
 
 type TrackedCtaProps = {
   publicationId: string;
@@ -37,13 +40,17 @@ export function TrackedCta({
   const leadCaptureModal = useLeadCaptureModal();
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    console.log("CTA Click interceptado. Acción recibida:", action);
+    const submissionContext = readSubmissionContext(publicationId);
 
     void emitPublicRuntimeEvent({
       eventName: "cta_clicked",
       publicationId,
       stepId: currentStepId,
-      anonymousId: getOrCreateAnonymousId(publicationId),
+      anonymousId:
+        submissionContext?.anonymousId ?? getOrCreateAnonymousId(publicationId),
+      visitorId: submissionContext?.visitorId ?? null,
+      leadId: submissionContext?.leadId ?? null,
+      assignmentId: submissionContext?.assignment?.id ?? null,
       currentPath,
       ctaLabel: label,
       ctaHref: href,

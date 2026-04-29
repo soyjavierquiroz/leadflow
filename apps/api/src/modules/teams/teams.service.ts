@@ -22,6 +22,7 @@ import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { FunnelsService } from '../funnels/funnels.service';
 import { MailService } from '../mail/mail.service';
+import { RuntimeContextConfigSyncService } from '../runtime-context/runtime-context-config-sync.service';
 import { buildEntity } from '../shared/domain.factory';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import type { JsonValue } from '../shared/domain.types';
@@ -198,6 +199,7 @@ export class TeamsService {
     private readonly funnelsService: FunnelsService,
     private readonly mailService: MailService,
     private readonly adWheelSequenceGeneratorService: AdWheelSequenceGeneratorService,
+    private readonly runtimeContextConfigSyncService: RuntimeContextConfigSyncService,
     @Optional()
     @Inject(TEAM_REPOSITORY)
     private readonly repository?: TeamRepository,
@@ -704,12 +706,25 @@ export class TeamsService {
           },
           data: {
             settingsJson: toInputJson(settingsJson),
+            ...(dto.structuralType !== undefined
+              ? { structuralType: dto.structuralType }
+              : {}),
+            ...(dto.conversionContract !== undefined
+              ? { conversionContract: toInputJson(dto.conversionContract) }
+              : {}),
           },
         });
       }
 
       return updatedFunnel;
     });
+
+    if (funnelInstance) {
+      await this.runtimeContextConfigSyncService.syncFunnelContextForInstance({
+        tenantId,
+        funnelInstanceId: funnelInstance.id,
+      });
+    }
 
     return mapFunnelRecord(record);
   }

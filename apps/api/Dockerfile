@@ -32,10 +32,13 @@ ENV API_PORT=3001
 COPY --from=builder /workspace/node_modules ./node_modules
 COPY --from=builder /workspace/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /workspace/apps/api/node_modules ./apps/api/node_modules
-COPY --from=builder /workspace/apps/api/dist ./apps/api/dist
 COPY --from=builder /workspace/apps/api/prisma ./apps/api/prisma
 COPY --from=builder /workspace/packages/shared/mail/package.json ./packages/shared/mail/package.json
 COPY --from=builder /workspace/packages/shared/mail/node_modules ./packages/shared/mail/node_modules
 COPY --from=builder /workspace/packages/shared/mail/dist ./packages/shared/mail/dist
+WORKDIR /app/apps/api
+COPY --from=builder /workspace/apps/api/dist/. ./dist/
+RUN ls -R ./dist
+RUN test -f ./dist/apps/api/src/main.js
 EXPOSE 3001
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["node", "dist/apps/api/src/main.js"]

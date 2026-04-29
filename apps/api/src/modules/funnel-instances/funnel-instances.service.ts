@@ -15,6 +15,7 @@ import {
   mapFunnelInstanceRecord,
 } from '../../prisma/prisma.mappers';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RuntimeContextConfigSyncService } from '../runtime-context/runtime-context-config-sync.service';
 import type { CreateFunnelInstanceDto } from './dto/create-funnel-instance.dto';
 import type { CreateTeamFunnelInstanceDto } from './dto/create-team-funnel-instance.dto';
 import type { UpdateTeamFunnelInstanceDto } from './dto/update-team-funnel-instance.dto';
@@ -31,6 +32,7 @@ export class FunnelInstancesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly runtimeContextConfigSyncService: RuntimeContextConfigSyncService,
     @Optional()
     @Inject(FUNNEL_INSTANCE_REPOSITORY)
     private readonly repository?: FunnelInstanceRepository,
@@ -46,6 +48,8 @@ export class FunnelInstancesService {
       code: dto.code,
       thumbnailUrl: null,
       status: 'draft',
+      structuralType: 'generic',
+      conversionContract: {},
       rotationPoolId: dto.rotationPoolId ?? null,
       trackingProfileId: dto.trackingProfileId ?? null,
       handoffStrategyId: dto.handoffStrategyId ?? null,
@@ -200,6 +204,11 @@ export class FunnelInstancesService {
         ? this.normalizeAssetUrl(dto.thumbnailUrl)
         : existing.thumbnailUrl;
     const status = dto.status ?? existing.status;
+    const structuralType = dto.structuralType ?? existing.structuralType;
+    const conversionContract =
+      dto.conversionContract !== undefined
+        ? dto.conversionContract
+        : existing.conversionContract;
 
     if (!name) {
       throw new BadRequestException({
@@ -256,6 +265,8 @@ export class FunnelInstancesService {
           code,
           thumbnailUrl,
           status,
+          structuralType,
+          conversionContract: toInputJson(conversionContract),
           rotationPoolId:
             dto.rotationPoolId !== undefined
               ? dto.rotationPoolId
@@ -271,6 +282,11 @@ export class FunnelInstancesService {
         },
         include: funnelInstanceInclude,
       });
+    });
+
+    await this.runtimeContextConfigSyncService.syncFunnelContextForInstance({
+      tenantId: scope.teamId,
+      funnelInstanceId: record.id,
     });
 
     return mapFunnelInstanceRecord(record);

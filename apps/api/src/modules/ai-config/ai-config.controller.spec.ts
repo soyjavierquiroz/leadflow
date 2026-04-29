@@ -5,6 +5,9 @@ describe('AiConfigController', () => {
   const buildController = () => {
     const aiConfigService = {
       resolveRuntimeContext: jest.fn(),
+      initOrchestrationSessionForUser: jest.fn(),
+      executeOrchestrationForUser: jest.fn(),
+      closeOrchestrationSessionForUser: jest.fn(),
     };
 
     return {
@@ -129,5 +132,167 @@ describe('AiConfigController', () => {
         instance_name: '   ',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('forwards orchestration session init requests to the IA Gateway adapter', async () => {
+    const { controller, aiConfigService } = buildController();
+    const user = {
+      role: 'TEAM_ADMIN',
+      sponsorId: 'sponsor-1',
+      teamId: 'team-1',
+      workspaceId: 'workspace-1',
+    };
+
+    aiConfigService.initOrchestrationSessionForUser.mockResolvedValue({
+      status: 200,
+      sessionId: 'drenvexman-funnel-1',
+      runtimeContext: {
+        tenant: {
+          id: 'team-1',
+        },
+      },
+      data: {
+        execution_id: 'exec-1',
+      },
+    });
+
+    await expect(
+      controller.initOrchestrationSession(user as never, {
+        instance_name: 'drenvexman',
+        funnel_id: 'funnel-1',
+        funnel_context: {
+          blocks: [],
+        },
+        metadata: {
+          source: 'unit-test',
+        },
+      }),
+    ).resolves.toEqual({
+      status: 200,
+      sessionId: 'drenvexman-funnel-1',
+      runtimeContext: {
+        tenant: {
+          id: 'team-1',
+        },
+      },
+      data: {
+        execution_id: 'exec-1',
+      },
+    });
+
+    expect(aiConfigService.initOrchestrationSessionForUser).toHaveBeenCalledWith(
+      user,
+      {
+        instanceName: 'drenvexman',
+        funnelId: 'funnel-1',
+        funnelContext: {
+          blocks: [],
+        },
+        metadata: {
+          source: 'unit-test',
+        },
+      },
+    );
+  });
+
+  it('forwards execute requests with sessionId and prompt only', async () => {
+    const { controller, aiConfigService } = buildController();
+    const user = {
+      role: 'TEAM_ADMIN',
+      sponsorId: 'sponsor-1',
+      teamId: 'team-1',
+      workspaceId: 'workspace-1',
+    };
+
+    aiConfigService.executeOrchestrationForUser.mockResolvedValue({
+      status: 200,
+      sessionId: 'drenvexman-funnel-1',
+      runtimeContext: {
+        tenant: {
+          id: 'team-1',
+        },
+      },
+      data: {
+        execution_id: 'exec-1',
+      },
+    });
+
+    await expect(
+      controller.executeOrchestration(user as never, {
+        instance_name: 'drenvexman',
+        session_id: 'drenvexman-funnel-1',
+        intent: 'Optimize the current funnel step wiring.',
+      }),
+    ).resolves.toEqual({
+      status: 200,
+      sessionId: 'drenvexman-funnel-1',
+      runtimeContext: {
+        tenant: {
+          id: 'team-1',
+        },
+      },
+      data: {
+        execution_id: 'exec-1',
+      },
+    });
+
+    expect(aiConfigService.executeOrchestrationForUser).toHaveBeenCalledWith(
+      user,
+      {
+        instanceName: 'drenvexman',
+        prompt: undefined,
+        sessionId: 'drenvexman-funnel-1',
+        intent: 'Optimize the current funnel step wiring.',
+      },
+    );
+  });
+
+  it('forwards session close requests to the IA Gateway adapter', async () => {
+    const { controller, aiConfigService } = buildController();
+    const user = {
+      role: 'TEAM_ADMIN',
+      sponsorId: 'sponsor-1',
+      teamId: 'team-1',
+      workspaceId: 'workspace-1',
+    };
+
+    aiConfigService.closeOrchestrationSessionForUser.mockResolvedValue({
+      status: 200,
+      sessionId: 'drenvexman-funnel-1',
+      runtimeContext: {
+        tenant: {
+          id: 'team-1',
+        },
+      },
+      data: {
+        closed: true,
+      },
+    });
+
+    await expect(
+      controller.closeOrchestrationSession(user as never, {
+        instance_name: 'drenvexman',
+        session_id: 'drenvexman-funnel-1',
+      }),
+    ).resolves.toEqual({
+      status: 200,
+      sessionId: 'drenvexman-funnel-1',
+      runtimeContext: {
+        tenant: {
+          id: 'team-1',
+        },
+      },
+      data: {
+        closed: true,
+      },
+    });
+
+    expect(aiConfigService.closeOrchestrationSessionForUser).toHaveBeenCalledWith(
+      user,
+      {
+        instanceName: 'drenvexman',
+        sessionId: 'drenvexman-funnel-1',
+      },
+    );
   });
 });

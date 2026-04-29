@@ -10,7 +10,7 @@ import {
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import { buildWhatsappUrl, normalizeWhatsappPhone } from "@/lib/public-handoff";
-import { readSubmissionContext } from "@/lib/public-funnel-session";
+import { useSubmissionContext } from "@/lib/public-funnel-session";
 import {
   emitPublicRuntimeEvent,
   getOrCreateRuntimeSessionId,
@@ -44,10 +44,7 @@ export function HandoffCta({
   helperText,
   variant,
 }: HandoffCtaProps) {
-  const context = useMemo(
-    () => readSubmissionContext(runtime.publication.id),
-    [runtime.publication.id],
-  );
+  const context = useSubmissionContext(runtime.publication.id);
   const sponsor =
     context?.handoff?.sponsor ?? context?.assignment?.sponsor ?? null;
   const handoffPhone =

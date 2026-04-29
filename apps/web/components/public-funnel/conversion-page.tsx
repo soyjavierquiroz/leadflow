@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { RichHeadline } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import { normalizeWhatsappPhone } from "@/lib/public-handoff";
-import { readSubmissionContext } from "@/lib/public-funnel-session";
+import { useSubmissionContext } from "@/lib/public-funnel-session";
 
 type ConversionAdvisor = {
   name: string;
@@ -185,10 +185,7 @@ export function ConversionPage({
   const [isMobileWhatsappDevice, setIsMobileWhatsappDevice] = useState<
     boolean | null
   >(null);
-  const context = useMemo(
-    () => readSubmissionContext(runtime.publication.id),
-    [runtime.publication.id],
-  );
+  const context = useSubmissionContext(runtime.publication.id);
   const queryAdvisor = useMemo(
     () => readAdvisorFromSearchParams(searchParams),
     [searchParams],

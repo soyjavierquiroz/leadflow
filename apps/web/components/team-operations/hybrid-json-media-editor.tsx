@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useCallback,
   useMemo,
   useState,
   type ChangeEvent,
@@ -12,18 +13,47 @@ import {
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
 import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
+  readyMadeFunnelRecipes,
+  SmartWiringService,
+  type SmartWiringRecipe,
+} from "../../../../packages/shared/funnel-orchestrator/src";
+import {
   Check,
   ChevronDown,
   Copy,
+  FileQuestion,
   FileJson,
   History,
   ImagePlus,
   Link2,
+  MessageSquare,
   Plus,
   RotateCcw,
   Sparkles,
   Trash2,
+  Wand2,
+  CircleHelp,
+  X,
+  type LucideIcon,
 } from "lucide-react";
+import {
+  BlockCard,
+  type ComposerDestination,
+} from "@/components/team-operations/BlockCard";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import {
   buildMediaMap,
@@ -35,9 +65,10 @@ import {
   type BuilderBlockDefinition,
 } from "@/lib/blocks/registry";
 import { FUNNEL_ASSET_IMAGE_ACCEPT } from "@/lib/media-optimizer";
+import type { JsonValue } from "@/lib/public-funnel-runtime.types";
 
 const sectionClassName =
-  "rounded-[2rem] border border-app-border bg-app-card p-6 text-left text-app-text shadow-[var(--ai-panel-shadow)] md:p-8";
+  "rounded-xl border border-slate-200 bg-white/90 p-3 text-left text-slate-900 shadow-sm shadow-slate-200/50 md:p-4 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100 dark:shadow-slate-950/30";
 
 const secondaryButtonClassName =
   "inline-flex items-center justify-center gap-2 rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
@@ -49,7 +80,7 @@ const inputClassName =
   "w-full rounded-xl border border-app-border bg-app-card px-3 py-2 text-sm text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft";
 
 const codePanelClassName =
-  "overflow-x-auto rounded-2xl border border-app-border bg-app-surface-muted p-4 text-xs leading-6 text-app-text";
+  "overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100 p-4 text-xs leading-6 text-slate-900 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100";
 
 export const requiredMediaKeys = [
   "hero",
@@ -64,9 +95,13 @@ export const defaultBlocksSeed = JSON.stringify(
       type: "hook_and_promise",
       block_id: "hook_dragon_t9_seed",
       eyebrow_text: "barba precisa en casa",
-      headline: "Perfila tu barba en minutos con la DRAGON VINTAGE T9®",
-      subheadline:
-        "Consigue una barba limpia, definida y con acabado profesional sin salir de casa.",
+      content: {
+        headline: "Perfila tu barba en minutos con la DRAGON VINTAGE T9®",
+        subheadline:
+          "Consigue una barba limpia, definida y con acabado profesional sin salir de casa.",
+        cta_button_text: "quiero mi dragon t9 ahora",
+        cta_footer: "Te llevamos al siguiente paso sin romper el tracking.",
+      },
       primary_benefit_bullets: [
         "Define contornos con precisión profesional",
         "Reduce volumen y da forma en pocos minutos",
@@ -74,7 +109,6 @@ export const defaultBlocksSeed = JSON.stringify(
       ],
       price_anchor_text: "precio regular",
       price_main_text: "ver precio especial",
-      primary_cta_text: "quiero mi dragon t9 ahora",
       trust_badges: ["envío rápido", "pago seguro", "garantía"],
     },
     {
@@ -251,8 +285,62 @@ const defaultMediaRows = requiredMediaKeys.map((key) => ({
   value: "",
 }));
 
+const emptyComposerDestinations: ComposerDestination[] = [];
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+type ComposerBlock = Record<string, JsonValue | undefined> & {
+  type?: string;
+  key?: string;
+  block_id?: string;
+  is_hidden?: boolean;
+};
+
+const isComposerBlock = (value: unknown): value is ComposerBlock =>
+  isRecord(value);
+
+const parseComposerBlocks = (value: string): ComposerBlock[] => {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+
+    return Array.isArray(parsed)
+      ? parsed.filter(isComposerBlock).map((block, index) => ({
+          ...block,
+          type: typeof block.type === "string" ? block.type : "unknown",
+          block_id:
+            typeof block.block_id === "string" && block.block_id.trim()
+              ? block.block_id
+              : `${typeof block.type === "string" ? block.type : "block"}-${index + 1}`,
+        }))
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const blockIconByType: Record<string, LucideIcon> = {
+  hero: Sparkles,
+  hook_and_promise: MessageSquare,
+  lead_capture_config: Wand2,
+  lead_capture_form: FileJson,
+  faq: CircleHelp,
+  faq_accordion: CircleHelp,
+  faq_social_proof: CircleHelp,
+  cta: Link2,
+  sticky_conversion_bar: Link2,
+  grand_slam_offer: Sparkles,
+  conversion_page_config: Check,
+  whatsapp_handoff_cta: MessageSquare,
+};
+
+const getBlockIdentity = (block: ComposerBlock, index: number) =>
+  block.block_id ??
+  block.key ??
+  `${typeof block.type === "string" ? block.type : "block"}-${index + 1}`;
+
+const cloneJson = <T,>(value: T): T =>
+  value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
 
 export const isAbsoluteHttpUrl = (value: string) =>
   /^https?:\/\//i.test(value.trim());
@@ -298,6 +386,7 @@ type HybridJsonMediaEditorProps = {
   editorContext?: {
     stepName: string;
     stepPath: string;
+    stepType?: string | null;
   } | null;
   availableBlocks?: BuilderBlockDefinition[];
   routingReference?: {
@@ -310,6 +399,7 @@ type HybridJsonMediaEditorProps = {
       badge?: string | null;
     }>;
   } | null;
+  graphDestinations?: ComposerDestination[];
   stepSwitcher?: {
     activeKey: string;
     badge?: string | null;
@@ -360,6 +450,7 @@ export function HybridJsonMediaEditor({
   editorContext = null,
   availableBlocks = defaultBuilderBlockDefinitions,
   routingReference = null,
+  graphDestinations = emptyComposerDestinations,
   stepSwitcher = null,
   historyPanel = null,
   stepSpecificSettingsPanel = null,
@@ -377,11 +468,36 @@ export function HybridJsonMediaEditor({
 
     return Array.from(merged.values());
   }, [availableBlocks]);
+  const currentStepType = editorContext?.stepType ?? stepSwitcher?.badge ?? null;
+  const compatibleCatalogBlocks = useMemo(
+    () =>
+      catalogBlocks.filter((definition) =>
+        SmartWiringService.isCompatible(definition, currentStepType),
+      ),
+    [catalogBlocks, currentStepType],
+  );
+  const incompatibleCatalogBlocks = useMemo(
+    () =>
+      catalogBlocks.filter(
+        (definition) =>
+          !SmartWiringService.isCompatible(definition, currentStepType),
+      ),
+    [catalogBlocks, currentStepType],
+  );
+  const readyMadeRecipes = useMemo(
+    () =>
+      readyMadeFunnelRecipes.filter((recipe) =>
+        SmartWiringService.isCompatible(recipe, currentStepType),
+      ),
+    [currentStepType],
+  );
 
   const [selectedBlockKey, setSelectedBlockKey] = useState(
     catalogBlocks[0]?.key ?? "",
   );
   const [copiedRoutingPath, setCopiedRoutingPath] = useState<string | null>(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [formatError, setFormatError] = useState<string | null>(null);
   const previewDraft = useMemo<HybridJsonPreviewDraft>(
     () => ({
       blocks: blocksText,
@@ -413,14 +529,16 @@ export function HybridJsonMediaEditor({
       return;
     }
 
-    const hasCurrentSelection = catalogBlocks.some(
+    const activeCatalog =
+      compatibleCatalogBlocks.length > 0 ? compatibleCatalogBlocks : catalogBlocks;
+    const hasCurrentSelection = activeCatalog.some(
       (definition) => definition.key === selectedBlockKey,
     );
 
     if (!hasCurrentSelection) {
-      setSelectedBlockKey(catalogBlocks[0]?.key ?? "");
+      setSelectedBlockKey(activeCatalog[0]?.key ?? "");
     }
-  }, [catalogBlocks, selectedBlockKey]);
+  }, [catalogBlocks, compatibleCatalogBlocks, selectedBlockKey]);
 
   const isBlankCanvas = useMemo(() => {
     const trimmed = blocksText.trim();
@@ -435,26 +553,268 @@ export function HybridJsonMediaEditor({
 
     return parsedBlocksCount === 0;
   }, [blocksText, parsedBlocksCount, parsedBlocksError]);
+  const composerBlocks = useMemo(
+    () => (parsedBlocksError ? [] : parseComposerBlocks(blocksText)),
+    [blocksText, parsedBlocksError],
+  );
+  const composerBlockIds = useMemo(
+    () => composerBlocks.map((block, index) => getBlockIdentity(block, index)),
+    [composerBlocks],
+  );
+  const composerDefinitionByKey = useMemo(
+    () =>
+      new Map(
+        catalogBlocks.map((definition) => [definition.key, definition]),
+      ),
+    [catalogBlocks],
+  );
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
-  const handleInsertBlockExample = (definition: BuilderBlockDefinition) => {
-    const nextArray = (() => {
-      try {
-        const parsed = JSON.parse(blocksText) as unknown;
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
+  const writeComposerBlocks = (blocks: ComposerBlock[]) => {
+    const syncedBlocks =
+      routingReference?.items[0]?.path
+        ? SmartWiringService.syncSuccessRedirect({
+            blocks,
+            successRedirect: routingReference.items[0].path,
+          })
+        : blocks;
+
+    onBlocksTextChange(SmartWiringService.serialize(syncedBlocks));
+  };
+
+  const buildComposerDestinations = useCallback((blocks: ComposerBlock[]) => {
+    const routeDestinations: ComposerDestination[] =
+      routingReference?.items.map((item) => ({
+        value: item.path,
+        label: `Ir a: ${item.label}`,
+        kind: "route",
+      })) ?? [];
+    const blockDestinations: ComposerDestination[] = blocks
+      .map((block, index) => {
+        const type = typeof block.type === "string" ? block.type : "block";
+        const blockId = getBlockIdentity(block, index);
+        const definition = composerDefinitionByKey.get(type);
+        const isModalConfig = type === "lead_capture_config";
+
+        return {
+          value: isModalConfig ? "open_lead_capture_modal" : `#${blockId}`,
+          label: isModalConfig
+            ? `Abrir: ${definition?.name ?? "Modal de Captura"}`
+            : `Saltar a: ${definition?.name ?? type}`,
+          kind: "block" as const,
+        };
+      });
+    const actionDestinations: ComposerDestination[] = [
+      {
+        value: "open_lead_capture_modal",
+        label: "Abrir: Modal de Captura",
+        kind: "action",
+      },
+      {
+        value: "scroll_to_capture",
+        label: "Ir a: Formulario de Captura",
+        kind: "action",
+      },
+      {
+        value: "#public-capture-form",
+        label: "Ir a: Formulario en Página",
+        kind: "action",
+      },
+      {
+        value: "hook_primary",
+        label: "Acción: CTA Principal del Hook",
+        kind: "action",
+      },
+    ];
+    const seen = new Set<string>();
+
+    return [
+      ...actionDestinations,
+      ...graphDestinations,
+      ...routeDestinations,
+      ...blockDestinations,
+    ].filter((destination) => {
+      if (seen.has(destination.value)) {
+        return false;
       }
-    })();
 
-    onBlocksTextChange(
-      JSON.stringify([...nextArray, definition.example], null, 2),
+      seen.add(destination.value);
+      return true;
+    });
+  }, [composerDefinitionByKey, graphDestinations, routingReference]);
+  const composerDestinations = useMemo(
+    () => buildComposerDestinations(composerBlocks),
+    [buildComposerDestinations, composerBlocks],
+  );
+
+  const patchComposerBlock = (blockId: string, patch: Partial<ComposerBlock>) => {
+    writeComposerBlocks(
+      composerBlocks.map((block, index) =>
+        getBlockIdentity(block, index) === blockId ? { ...block, ...patch } : block,
+      ),
     );
   };
 
+  const duplicateComposerBlock = (blockId: string) => {
+    const sourceIndex = composerBlocks.findIndex(
+      (block, index) => getBlockIdentity(block, index) === blockId,
+    );
+
+    if (sourceIndex < 0) {
+      return;
+    }
+
+    const sourceBlock = composerBlocks[sourceIndex];
+    const copy = {
+      ...cloneJson(sourceBlock),
+      key:
+        typeof sourceBlock.key === "string" && sourceBlock.key.trim()
+          ? `${sourceBlock.key}-copy`
+          : undefined,
+      block_id: SmartWiringService.stableBlockId(
+        typeof sourceBlock.type === "string" ? sourceBlock.type : "block",
+        `${blockId}:copy:${composerBlocks.length}`,
+      ),
+    };
+    const nextBlocks = [...composerBlocks];
+    nextBlocks.splice(sourceIndex + 1, 0, copy);
+    writeComposerBlocks(nextBlocks);
+  };
+
+  const deleteComposerBlock = (blockId: string) => {
+    writeComposerBlocks(
+      composerBlocks.filter(
+        (block, index) => getBlockIdentity(block, index) !== blockId,
+      ),
+    );
+  };
+
+  const toggleComposerBlockHidden = (blockId: string) => {
+    writeComposerBlocks(
+      composerBlocks.map((block, index) =>
+        getBlockIdentity(block, index) === blockId
+          ? { ...block, is_hidden: !block.is_hidden }
+          : block,
+      ),
+    );
+  };
+
+  const handleComposerDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const reorderedBlocks = SmartWiringService.reorderBlocks({
+      blocks: composerBlocks,
+      activeBlockId: String(active.id),
+      overBlockId: String(over.id),
+    });
+
+    writeComposerBlocks(reorderedBlocks as ComposerBlock[]);
+  };
+
+  const handleInsertBlockExample = (definition: BuilderBlockDefinition) => {
+    const nextBlocks = SmartWiringService.insertBlock({
+      blocks: blocksText,
+      definition,
+      stepType: currentStepType,
+      successRedirect: routingReference?.items[0]?.path ?? null,
+    });
+
+    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+  };
+
+  const handleApplyReadyMadeRecipe = (recipe: SmartWiringRecipe) => {
+    const nextBlocks = SmartWiringService.applyRecipe({
+      blocks: blocksText,
+      recipe,
+      catalog: catalogBlocks,
+      stepType: currentStepType,
+      successRedirect: routingReference?.items[0]?.path ?? recipe.successRedirect ?? null,
+      replace: isBlankCanvas,
+    });
+
+    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+  };
+
+  const handleSyncSuccessRedirect = (successRedirect: string) => {
+    const nextBlocks = SmartWiringService.syncSuccessRedirect({
+      blocks: blocksText,
+      successRedirect,
+    });
+
+    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+  };
+
+  const handleInjectScaffold = (value: string) => {
+    const nextBlocks = SmartWiringService.syncSuccessRedirect({
+      blocks: value,
+      successRedirect: routingReference?.items[0]?.path ?? "/confirmado",
+    });
+
+    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+  };
+
   const selectedBlockDefinition =
+    compatibleCatalogBlocks.find(
+      (definition) => definition.key === selectedBlockKey,
+    ) ??
     catalogBlocks.find((definition) => definition.key === selectedBlockKey) ??
+    compatibleCatalogBlocks[0] ??
     catalogBlocks[0] ??
     null;
+  const selectedBlockIsCompatible = selectedBlockDefinition
+    ? SmartWiringService.isCompatible(selectedBlockDefinition, currentStepType)
+    : false;
+  const compatibleStepTypeLabel =
+    SmartWiringService.normalizeStepType(currentStepType) ?? "global";
+
+  const catalogHelpText = selectedBlockIsCompatible
+    ? `${compatibleCatalogBlocks.length} bloque${
+        compatibleCatalogBlocks.length === 1 ? "" : "s"
+      } compatible${compatibleCatalogBlocks.length === 1 ? "" : "s"} con ${compatibleStepTypeLabel}.`
+    : "Este bloque existe en el arsenal, pero no es ideal para el paso activo.";
+
+  const stringifyCapabilities = (definition: BuilderBlockDefinition) =>
+    definition.requiredCapabilities.length > 0
+      ? definition.requiredCapabilities.join(", ")
+      : "sin dependencias";
+
+  const stringifyOutcomes = (definition: BuilderBlockDefinition) =>
+    definition.emitsOutcomes.length > 0
+      ? definition.emitsOutcomes.join(", ")
+      : "sin eventos";
+
+  const renderRecipeButton = (recipe: SmartWiringRecipe) => (
+    <button
+      key={recipe.key}
+      type="button"
+      onClick={() => handleApplyReadyMadeRecipe(recipe)}
+      className={scaffoldButtonClassName}
+    >
+      <div className="space-y-2">
+        <p className="text-base font-semibold">{recipe.name}</p>
+        <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+          {recipe.description}
+        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+          {recipe.blockTypes.join(" + ")}
+        </p>
+      </div>
+      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-amber-300" />
+    </button>
+  );
 
   const handleCopyRoutingPath = async (path: string) => {
     try {
@@ -466,10 +826,6 @@ export function HybridJsonMediaEditor({
     } catch {
       setCopiedRoutingPath(null);
     }
-  };
-
-  const handleInjectScaffold = (value: string) => {
-    onBlocksTextChange(value);
   };
 
   const handleOpenPreview = (event: MouseEvent<HTMLButtonElement>) => {
@@ -486,6 +842,19 @@ export function HybridJsonMediaEditor({
     );
   };
 
+  const handleFormatJson = () => {
+    try {
+      const parsed = JSON.parse(blocksText) as unknown;
+      onBlocksTextChange(JSON.stringify(parsed, null, 2));
+      setFormatError(null);
+    } catch (error) {
+      console.error("Unable to format blocks JSON", error);
+      setFormatError(
+        "El JSON tiene errores de sintaxis. Corrígelo antes de formatear.",
+      );
+    }
+  };
+
   return (
     <>
       <input
@@ -496,62 +865,15 @@ export function HybridJsonMediaEditor({
         onChange={(event) => void onMediaUploadChange(event)}
       />
 
-      <section className={sectionClassName}>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <article className="rounded-[1.5rem] border border-app-warning-border bg-app-warning-bg p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-warning-text">
-              Ayuda rápida / blocksJson
-            </p>
-            <h2 className="mt-2 text-xl font-semibold text-app-text">
-              Cómo abrir la captación nativa
-            </h2>
-            <div className="mt-3 space-y-3 text-sm leading-6 text-app-text-muted">
-              <p>
-                Usa un bloque <code>lead_capture_form</code> si quieres que los
-                CTAs comerciales salten al formulario nativo con la ancla
-                <code>#public-capture-form</code>.
-              </p>
-              <p>
-                Si prefieres un drawer lateral, el bloque{" "}
-                <code>grand_slam_offer</code> ya abre{" "}
-                <code>PublicCaptureForm</code> automáticamente con el CTA
-                principal.
-              </p>
-            </div>
-          </article>
-
-          <article className="rounded-[1.5rem] border border-app-border bg-app-accent-soft p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
-              Ayuda rápida / mediaMap
-            </p>
-            <h2 className="mt-2 text-xl font-semibold text-app-text">
-              Qué llaves conviene mapear
-            </h2>
-            <div className="mt-3 space-y-3 text-sm leading-6 text-app-text-muted">
-              <p>
-                Sube los assets directo al CDN desde cada fila y deja{" "}
-                <code>mediaMap</code> solo como diccionario final de URLs
-                públicas.
-              </p>
-              <p>
-                Para VSL híbrido recomendamos arrancar con <code>hero</code>,{" "}
-                <code>product_box</code>, <code>gallery_1</code> y{" "}
-                <code>seo_cover</code>.
-              </p>
-            </div>
-          </article>
-        </div>
-      </section>
-
       <div className="space-y-6">
-        <details open className={sectionClassName}>
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+        <details className={sectionClassName}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
             <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
-                Bloques
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                Configuración de Desarrollador
               </p>
               {stepSwitcher ? (
-                <div className="mt-2 space-y-3">
+                <div className="mt-2 space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap gap-2">
                       {stepSwitcher.tabs.map((tab) => {
@@ -569,8 +891,8 @@ export function HybridJsonMediaEditor({
                             }}
                             className={
                               isActive
-                                ? "inline-flex items-center justify-center rounded-full bg-app-text px-4 py-2.5 text-sm font-semibold text-app-bg transition disabled:cursor-not-allowed disabled:opacity-60"
-                                : "inline-flex items-center justify-center rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text-muted transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+                                ? "inline-flex items-center justify-center rounded-full bg-app-text px-3 py-1.5 text-xs font-semibold text-app-bg transition disabled:cursor-not-allowed disabled:opacity-60"
+                                : "inline-flex items-center justify-center rounded-full border border-app-border bg-app-card px-3 py-1.5 text-xs font-semibold text-app-text-muted transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                             }
                           >
                             {tab.label}
@@ -587,23 +909,23 @@ export function HybridJsonMediaEditor({
                   </div>
 
                   {stepSwitcher.helperText ? (
-                    <p className="text-sm text-app-text-muted">
+                      <p className="text-xs text-app-text-muted">
                       {stepSwitcher.helperText}
                     </p>
                   ) : null}
                 </div>
               ) : (
-                <h2 className="mt-2 text-2xl font-semibold text-app-text">
+                <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
                   JSON engine del funnel
                 </h2>
               )}
             </div>
-            <ChevronDown className="h-5 w-5 text-app-text-soft" />
+            <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
           </summary>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-4 space-y-4">
             {stepSwitcher?.warningText ? (
-              <p className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+              <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
                 {stepSwitcher.warningText}
               </p>
             ) : null}
@@ -611,22 +933,22 @@ export function HybridJsonMediaEditor({
             {stepSpecificSettingsPanel}
 
             {routingReference && routingReference.items.length > 0 ? (
-              <article className="rounded-[1.5rem] border border-app-border bg-app-accent-soft p-6 text-left">
+              <article className="rounded-xl border border-cyan-500/15 bg-cyan-500/10 p-4 text-left">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="text-left">
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-accent">
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">
                       {routingReference.title}
                     </p>
-                    <h3 className="mt-2 text-lg font-semibold text-app-text">
+                    <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
                       URLs disponibles para redirección
                     </h3>
                     {routingReference.helperText ? (
-                      <p className="mt-2 text-sm leading-6 text-app-text-muted">
+                      <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
                         {routingReference.helperText}
                       </p>
                     ) : null}
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-app-card px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-app-accent ring-1 ring-app-border">
+                  <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-cyan-300 dark:ring-white/10">
                     {routingReference.items.length} paso
                     {routingReference.items.length === 1 ? "" : "s"}
                   </span>
@@ -639,20 +961,20 @@ export function HybridJsonMediaEditor({
                     return (
                       <div
                         key={item.id}
-                        className="flex flex-col gap-3 rounded-2xl border border-app-border bg-app-card px-4 py-3 md:flex-row md:items-center md:justify-between"
+                        className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/80 px-4 py-3 md:flex-row md:items-center md:justify-between dark:border-white/10 dark:bg-slate-900/80"
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-app-text">
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                               {item.label}
                             </p>
                             {item.badge ? (
-                              <span className="inline-flex items-center rounded-full bg-app-surface-muted px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                                 {item.badge}
                               </span>
                             ) : null}
                           </div>
-                          <code className="mt-2 block overflow-x-auto rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text">
+                          <code className="mt-2 block overflow-x-auto rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-900 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100">
                             {item.path}
                           </code>
                         </div>
@@ -669,6 +991,14 @@ export function HybridJsonMediaEditor({
                           )}
                           {isCopied ? "Copiado" : "Copiar"}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSyncSuccessRedirect(item.path)}
+                          className={secondaryButtonClassName}
+                        >
+                          <Wand2 className="h-4 w-4" />
+                          Sincronizar JSON
+                        </button>
                       </div>
                     );
                   })}
@@ -676,54 +1006,61 @@ export function HybridJsonMediaEditor({
               </article>
             ) : null}
 
-            <div className="mb-2 flex w-full items-center justify-between gap-3 border-b border-app-border pb-2">
+            <div className="mb-2 flex w-full items-center justify-between gap-3 border-b border-slate-200 pb-2 dark:border-white/10">
               <div className="flex min-w-0 flex-1 flex-col justify-start gap-1 text-left">
-                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-app-surface-muted px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-app-text-muted">
+                <span className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-200 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                   <FileJson className="h-3.5 w-3.5" />
                   CodeMirror JSON
                 </span>
-                <p className="text-sm font-semibold text-app-text">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   Codigo JSON
                 </p>
-                <span className="text-xs leading-5 text-app-text-soft">
+                <span className="text-xs leading-5 text-slate-500 dark:text-slate-400">
                   El guardado solo se habilita si el contenido es un JSON Array
                   válido.
                 </span>
               </div>
 
-              {historyPanel || previewDraftKey ? (
-                <div className="flex flex-wrap justify-end gap-3">
-                  {historyPanel ? (
-                    <button
-                      type="button"
-                      onClick={historyPanel.onOpen}
-                      className={secondaryButtonClassName}
-                    >
-                      <History className="h-4 w-4" />
-                      ⏳ Historial de Versiones
-                    </button>
-                  ) : null}
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleFormatJson}
+                  className={secondaryButtonClassName}
+                >
+                  <Wand2 className="h-4 w-4" />
+                  Formatear JSON
+                </button>
 
-                  {previewDraftKey ? (
-                    <button
-                      type="button"
-                      onClick={handleOpenPreview}
-                      className={secondaryButtonClassName}
-                    >
-                      👀 Ver Vista Previa
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+                {historyPanel ? (
+                  <button
+                    type="button"
+                    onClick={historyPanel.onOpen}
+                    className={secondaryButtonClassName}
+                  >
+                    <History className="h-4 w-4" />
+                    ⏳ Historial de Versiones
+                  </button>
+                ) : null}
+
+                {previewDraftKey ? (
+                  <button
+                    type="button"
+                    onClick={handleOpenPreview}
+                    className={secondaryButtonClassName}
+                  >
+                    👀 Ver Vista Previa
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             {editorContext ? (
-              <div className="sticky top-4 z-10 rounded-[1.5rem] border border-app-warning-border bg-app-warning-bg shadow-sm backdrop-blur">
+                <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 shadow-sm backdrop-blur">
                 <div className="flex w-full items-center justify-start px-4 py-3 text-left">
-                  <span className="mr-3 shrink-0 text-base leading-none text-app-warning-text">
+                  <span className="mr-3 shrink-0 text-base leading-none text-amber-300">
                     ⚠️
                   </span>
-                  <p className="text-sm font-semibold text-app-warning-text">
+                  <p className="text-sm font-semibold text-amber-300">
                     {`EDITANDO BORRADOR: ${editorContext.stepName} | Ruta: ${editorContext.stepPath}`}
                   </p>
                 </div>
@@ -731,19 +1068,30 @@ export function HybridJsonMediaEditor({
             ) : null}
 
             {isBlankCanvas ? (
-              <div className="rounded-[1.75rem] border border-dashed border-app-warning-border bg-[linear-gradient(180deg,var(--app-warning-bg)_0%,var(--app-card)_100%)] p-6 text-left">
+              <div className="rounded-xl border border-dashed border-amber-500/20 bg-amber-50 p-5 text-left dark:bg-[linear-gradient(180deg,rgba(245,158,11,0.12)_0%,rgba(15,23,42,0.85)_100%)]">
                 <div className="flex flex-col gap-5">
                   <div className="max-w-2xl space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-warning-text">
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">
                       Lienzo en blanco
                     </p>
-                    <h3 className="text-2xl font-semibold text-app-text">
+                    <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                       Arranca este paso con una estructura segura
                     </h3>
-                    <p className="text-sm leading-6 text-app-text-muted">
+                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
                       Evita copiar y pegar desde otro paso. Inyecta una base lista para editar y luego ajusta el JSON en CodeMirror.
                     </p>
                   </div>
+
+                  {readyMadeRecipes.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                        Sistemas Listos
+                      </p>
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        {readyMadeRecipes.map(renderRecipeButton)}
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="grid gap-4 lg:grid-cols-2">
                     <button
@@ -755,11 +1103,11 @@ export function HybridJsonMediaEditor({
                         <p className="text-base font-semibold">
                           ⚡ Inyectar Plantilla VSL / Captura
                         </p>
-                        <p className="text-sm leading-6 text-app-text-muted">
+                        <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
                           Carga un arranque con <code>hero</code>, <code>video</code> y <code>lead_capture_config</code>.
                         </p>
                       </div>
-                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-app-warning-text" />
+                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-amber-300" />
                     </button>
 
                     <button
@@ -771,61 +1119,158 @@ export function HybridJsonMediaEditor({
                         <p className="text-base font-semibold">
                           ⚡ Inyectar Plantilla Confirmación
                         </p>
-                        <p className="text-sm leading-6 text-app-text-muted">
+                        <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
                           Carga una base con <code>conversion_page_config</code> y <code>whatsapp_handoff_cta</code>.
                         </p>
                       </div>
-                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-app-success-text" />
+                      <Sparkles className="mt-1 h-5 w-5 shrink-0 text-emerald-300" />
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
-              <>
-                <div className="leadflow-json-editor overflow-hidden rounded-[1.5rem] border border-app-border bg-app-bg">
+              <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4 text-left dark:border-white/10 dark:bg-slate-950/40">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                      Block Composer
+                    </p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                      Pila visual del paso
+                    </h3>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-white/10">
+                    {composerBlocks.length} bloque
+                    {composerBlocks.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleComposerDragEnd}
+                >
+                  <SortableContext
+                    items={composerBlockIds}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="mt-4 space-y-3">
+                      {composerBlocks.map((block, index) => {
+                        const blockId = getBlockIdentity(block, index);
+                        const type =
+                          typeof block.type === "string" ? block.type : "unknown";
+                        const definition = composerDefinitionByKey.get(type) ?? null;
+
+                        return (
+                          <BlockCard
+                            key={blockId}
+                            block={block}
+                            blockId={blockId}
+                            definition={definition}
+                            fallbackName={type}
+                            icon={blockIconByType[type] ?? FileQuestion}
+                            stepType={currentStepType}
+                            destinations={composerDestinations}
+                            onPatch={(patch) => patchComposerBlock(blockId, patch)}
+                            onDuplicate={() => duplicateComposerBlock(blockId)}
+                            onDelete={() => deleteComposerBlock(blockId)}
+                            onToggleHidden={() =>
+                              toggleComposerBlockHidden(blockId)
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </article>
+            )}
+
+            <details className="rounded-[1.5rem] border border-slate-200 bg-white/90 p-4 text-left dark:border-white/10 dark:bg-slate-900/80">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
+                    Vista JSON (Dev)
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    Reflejo en tiempo real del Block Composer.
+                  </p>
+                </div>
+                <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+              </summary>
+
+              <div className="mt-4 space-y-3">
+                <div className="leadflow-json-editor h-[520px] min-h-[520px] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-950/80">
                   <CodeMirror
                     value={blocksText}
-                    height="420px"
+                    height="520px"
                     extensions={[json()]}
                     basicSetup={{
                       lineNumbers: true,
                       foldGutter: true,
                       highlightActiveLine: true,
                     }}
-                    onChange={onBlocksTextChange}
+                    onChange={(value) => {
+                      setFormatError(null);
+                      onBlocksTextChange(value);
+                    }}
                   />
                 </div>
 
+                {formatError ? (
+                  <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                    {formatError}
+                  </p>
+                ) : null}
+
                 {parsedBlocksError ? (
-                  <p className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">
+                  <p className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                     {parsedBlocksError}
                   </p>
                 ) : (
-                  <p className="rounded-2xl border border-app-success-border bg-app-success-bg px-4 py-3 text-sm text-app-success-text">
+                  <p className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
                     JSON válido. El engine detectó {parsedBlocksCount} bloque
                     {parsedBlocksCount === 1 ? "" : "s"} listo
                     {parsedBlocksCount === 1 ? "" : "s"} para persistir como{" "}
                     <code>blocksJson</code>.
                   </p>
                 )}
-              </>
-            )}
+              </div>
+            </details>
+
+            {!isBlankCanvas && readyMadeRecipes.length > 0 ? (
+              <article className="rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 p-5 text-left">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">
+                      Sistemas Listos
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      Recetas de 1 clic
+                    </h3>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 ring-1 ring-amber-500/20 dark:bg-slate-900 dark:text-amber-300">
+                    {compatibleStepTypeLabel}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  {readyMadeRecipes.map(renderRecipeButton)}
+                </div>
+              </article>
+            ) : null}
 
             {selectedBlockDefinition ? (
-              <article className="rounded-[1.5rem] border border-app-border bg-app-surface-muted p-6 text-left">
+              <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50/90 p-6 text-left dark:border-white/10 dark:bg-slate-900/80">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="text-left">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
-                      Catálogo / {selectedBlockDefinition.category}
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      Catálogo / {selectedBlockDefinition.category} / {compatibleStepTypeLabel}
                     </p>
-                    <h3 className="mt-2 text-xl font-semibold text-app-text">
+                    <h3 className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">
                       {selectedBlockDefinition.name}
                     </h3>
-                    <p className="mt-2 text-sm leading-6 text-app-text-muted">
-                      {catalogBlocks.length} bloque
-                      {catalogBlocks.length === 1 ? "" : "s"} disponible
-                      {catalogBlocks.length === 1 ? "" : "s"} en el arsenal
-                      JSON.
+                    <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      {catalogHelpText}
                     </p>
                   </div>
 
@@ -834,6 +1279,7 @@ export function HybridJsonMediaEditor({
                     onClick={() =>
                       handleInsertBlockExample(selectedBlockDefinition)
                     }
+                    disabled={!selectedBlockIsCompatible}
                     className={secondaryButtonClassName}
                   >
                     <Plus className="h-4 w-4" />
@@ -843,41 +1289,60 @@ export function HybridJsonMediaEditor({
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,20rem)_1fr] lg:items-start">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-app-text-muted">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                       Selector de bloque
                     </span>
                     <select
                       value={selectedBlockDefinition.key}
                       onChange={(event) => setSelectedBlockKey(event.target.value)}
-                      className="w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm font-medium text-app-text shadow-sm outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100"
                     >
-                      {catalogBlocks.map((definition) => (
-                        <option key={definition.key} value={definition.key}>
-                          {definition.name} ({definition.key})
-                        </option>
-                      ))}
+                      {compatibleCatalogBlocks.length > 0 ? (
+                        <optgroup label="Compatibles con este paso">
+                          {compatibleCatalogBlocks.map((definition) => (
+                            <option key={definition.key} value={definition.key}>
+                              {definition.name} ({definition.key})
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : null}
+                      {incompatibleCatalogBlocks.length > 0 ? (
+                        <optgroup label="No compatibles">
+                          {incompatibleCatalogBlocks.map((definition) => (
+                            <option
+                              key={definition.key}
+                              value={definition.key}
+                              disabled
+                            >
+                              {definition.name} ({definition.key})
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : null}
                     </select>
                   </label>
 
-                  <div className="rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm leading-6 text-app-text-muted">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-700 dark:border-white/10 dark:bg-slate-950/70 dark:text-slate-300">
                     <p>{selectedBlockDefinition.description}</p>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-soft">
-                      Clave runtime: {selectedBlockDefinition.key}
-                    </p>
+                    <div className="mt-3 grid gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 md:grid-cols-3">
+                      <p>Runtime: {selectedBlockDefinition.key}</p>
+                      <p>Necesita: {stringifyCapabilities(selectedBlockDefinition)}</p>
+                      <p>Emite: {stringifyOutcomes(selectedBlockDefinition)}</p>
+                    </div>
                   </div>
                 </div>
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-app-text-soft">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                       Schema
                     </p>
-                    <pre className="mt-2 overflow-x-auto rounded-2xl border border-app-border bg-app-bg p-4 text-xs leading-6 text-app-text">
+                    <pre className="mt-2 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100 p-4 text-xs leading-6 text-slate-900 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100">
                       {JSON.stringify(selectedBlockDefinition.schema, null, 2)}
                     </pre>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-app-text-soft">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                       Ejemplo
                     </p>
                     <pre className={codePanelClassName}>
@@ -890,20 +1355,20 @@ export function HybridJsonMediaEditor({
           </div>
         </details>
 
-        <details open className={sectionClassName}>
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
+        <details className={sectionClassName}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
             <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
                 Media
               </p>
-              <h2 className="mt-2 text-2xl font-semibold text-app-text">
+              <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 CDN bridge y media dictionary
               </h2>
             </div>
-            <ChevronDown className="h-5 w-5 text-app-text-soft" />
+            <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
           </summary>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-4 space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               {requiredMediaKeys.map((key) => (
                 <button
@@ -924,17 +1389,23 @@ export function HybridJsonMediaEditor({
               ))}
             </div>
 
-            <div className="overflow-x-auto rounded-[1.5rem] border border-app-border">
-              <table className="min-w-full divide-y divide-app-border text-left">
-                <thead className="bg-app-surface-muted">
-                  <tr className="text-xs font-semibold uppercase tracking-[0.22em] text-app-text-soft">
+            <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200 dark:border-white/10">
+              <table className="min-w-[56rem] table-fixed divide-y divide-slate-200 text-left dark:divide-app-border">
+                <colgroup>
+                  <col className="w-40" />
+                  <col className="w-[28rem]" />
+                  <col className="w-28" />
+                  <col className="w-56" />
+                </colgroup>
+                <thead className="bg-slate-100 dark:bg-slate-950/70">
+                  <tr className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
                     <th className="px-4 py-3">Key</th>
                     <th className="px-4 py-3">URL</th>
                     <th className="px-4 py-3">Preview</th>
                     <th className="px-4 py-3">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-app-border bg-app-card">
+                <tbody className="divide-y divide-slate-200 bg-white/80 dark:divide-white/10 dark:bg-slate-900/70">
                   {mediaRows.map((row, index) => (
                     <tr key={`${row.key}-${index}`}>
                       <td className="px-4 py-3 align-top">
@@ -958,7 +1429,7 @@ export function HybridJsonMediaEditor({
                           }
                           placeholder="https://cdn.kuruk.in/funnels/..."
                           disabled={uploadingRowIndex !== null}
-                          className={`${inputClassName} min-w-72`}
+                          className={`${inputClassName} w-full`}
                         />
                       </td>
                       <td className="px-4 py-3 align-top">
@@ -970,7 +1441,7 @@ export function HybridJsonMediaEditor({
                             className="h-16 w-16 rounded-xl object-cover"
                           />
                         ) : (
-                          <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-app-border text-xs text-app-text-soft">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
                             <Link2 className="h-4 w-4" />
                           </div>
                         )}
@@ -992,7 +1463,7 @@ export function HybridJsonMediaEditor({
                             type="button"
                             onClick={() => onRemoveMediaRow(index)}
                             disabled={uploadingRowIndex !== null}
-                            className="inline-flex items-center justify-center gap-2 rounded-full border border-app-danger-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-danger-text transition hover:bg-app-danger-bg"
+                            className="inline-flex items-center justify-center gap-2 rounded-full border border-red-500/20 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-500/10 dark:bg-slate-900 dark:text-red-300"
                           >
                             <Trash2 className="h-4 w-4" />
                             Quitar
@@ -1006,7 +1477,7 @@ export function HybridJsonMediaEditor({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs leading-6 text-app-text-soft">
+              <div className="text-xs leading-6 text-slate-500 dark:text-slate-400">
                 El media dictionary acepta URLs absolutas del CDN de
                 Leadflow/MinIO y mantiene compatibilidad con{" "}
                 <code>leadflow-media-resolver.ts</code>.
@@ -1023,11 +1494,11 @@ export function HybridJsonMediaEditor({
             </div>
 
             {mediaValidation ? (
-              <p className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text">
+              <p className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                 {mediaValidation}
               </p>
             ) : (
-              <p className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
+              <p className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-600 dark:border-white/10 dark:bg-slate-950/70 dark:text-slate-400">
                 Llaves sugeridas listas:{" "}
                 {mediaMapKeys.join(", ") ||
                   "todavía faltan hero, product_box, gallery_1 y seo_cover"}
@@ -1037,6 +1508,54 @@ export function HybridJsonMediaEditor({
           </div>
         </details>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsHelpOpen(true)}
+        className="fixed bottom-5 right-20 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/25 bg-white/90 text-cyan-700 shadow-lg shadow-slate-200/50 backdrop-blur transition hover:bg-cyan-50 dark:bg-slate-900/90 dark:text-cyan-200 dark:shadow-slate-950/30 dark:hover:bg-slate-800"
+        aria-label="Abrir ayuda rápida del editor"
+      >
+        <CircleHelp className="h-4 w-4" />
+      </button>
+
+      {isHelpOpen ? (
+        <div className="fixed inset-0 z-40 flex items-end justify-end bg-slate-900/20 p-4 backdrop-blur-sm md:items-start dark:bg-slate-950/40">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-200/50 dark:border-white/10 dark:bg-slate-900 dark:shadow-slate-950/40">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Ayuda rápida
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Tips del JSON engine
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHelpOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 space-y-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              <p>
+                Usa <code>lead_capture_form</code> si quieres disparar la captura
+                nativa con <code>#public-capture-form</code>.
+              </p>
+              <p>
+                El bloque <code>grand_slam_offer</code> puede abrir el formulario
+                nativo sin tener que cablear un drawer extra.
+              </p>
+              <p>
+                Para arrancar rápido, mapea primero <code>hero</code>,{" "}
+                <code>product_box</code>, <code>gallery_1</code> y{" "}
+                <code>seo_cover</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {historyPanel?.isOpen ? (
         <ModalShell

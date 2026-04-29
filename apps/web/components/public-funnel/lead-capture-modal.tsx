@@ -113,10 +113,24 @@ const getPhoneValidationError = (
   return null;
 };
 
-const resolveLeadCaptureRedirect = (successRedirect?: string) => {
+const resolveLeadCaptureRedirect = (
+  successRedirect?: string,
+  responseNextStepPath?: string | null,
+  publicationNextStepPath?: string | null,
+) => {
   const trimmedRedirect = successRedirect?.trim();
   if (trimmedRedirect) {
     return trimmedRedirect;
+  }
+
+  const trimmedResponseNextStepPath = responseNextStepPath?.trim();
+  if (trimmedResponseNextStepPath) {
+    return trimmedResponseNextStepPath;
+  }
+
+  const trimmedPublicationNextStepPath = publicationNextStepPath?.trim();
+  if (trimmedPublicationNextStepPath) {
+    return trimmedPublicationNextStepPath;
   }
 
   if (typeof window === "undefined") {
@@ -402,7 +416,11 @@ export function LeadCaptureModal({
       persistSubmissionContext(publicationId, response);
       setModalOpen(false);
       window.location.assign(
-        resolveLeadCaptureRedirect(modalConfig.successRedirect),
+        resolveLeadCaptureRedirect(
+          modalConfig.successRedirect,
+          response.nextStep?.path,
+          runtime.publication.nextStepPath,
+        ),
       );
     } catch (error) {
       setSubmitError(

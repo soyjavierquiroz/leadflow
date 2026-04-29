@@ -77,6 +77,8 @@ export type RuntimeLeadCaptureFormBlock = {
   helperText: string;
   privacyNote: string;
   successMode: "next_step" | "inline_message";
+  redirectUrl?: string;
+  outcome?: string;
   fields: RuntimeLeadCaptureField[];
   settings: {
     captureUrlContext: boolean;
@@ -563,25 +565,26 @@ const normalizeCompatibleExternalBlock = (
       }
       break;
     case "hook_and_promise":
+      const hookContent = asRecord(rawBlock.content);
       baseBlock.eyebrow = pickString(rawBlock, [
         "eyebrow",
         "badge",
         "kicker",
         "tag",
-      ]);
+      ]) || asString(hookContent?.top_bar);
       baseBlock.hook = pickString(rawBlock, [
         "hook",
         "title",
         "headline",
         "heading",
-      ]);
+      ]) || asString(hookContent?.headline);
       baseBlock.promise = pickString(rawBlock, [
         "promise",
         "description",
         "subheadline",
         "body",
         "copy",
-      ]);
+      ]) || asString(hookContent?.subheadline);
       baseBlock.items =
         normalizeTextItems(
           pickArrayValue(rawBlock, [
@@ -590,7 +593,7 @@ const normalizeCompatibleExternalBlock = (
             "points",
             "benefits",
             "supporting_points",
-          ]),
+          ]) ?? hookContent?.proof_points,
         ) as unknown as JsonValue;
       const hookCta = resolveCompatibleCtaConfig(rawBlock, {
         containerKeys: ["primary_cta", "primaryCta", "cta", "button"],
@@ -600,6 +603,9 @@ const normalizeCompatibleExternalBlock = (
       }
       if (hookCta?.label) {
         baseBlock.label = hookCta.label;
+      }
+      if (!baseBlock.label) {
+        baseBlock.label = asString(hookContent?.cta_button_text) || undefined;
       }
       if (hookCta?.action) {
         baseBlock.action = hookCta.action;
@@ -1465,6 +1471,19 @@ export const normalizeLeadCaptureFormBlock = (
       "inline_message"
         ? "inline_message"
         : "next_step",
+    redirectUrl:
+      asString(
+        block.redirect_url,
+        asString(block.redirectUrl, asString(block.success_redirect)),
+      ) ||
+      pickString(settings ?? {}, ["redirect_url", "redirectUrl", "success_redirect"]) ||
+      undefined,
+    outcome:
+      asString(block.outcome) ||
+      asString(block.flow_outcome) ||
+      asString(block.flowOutcome) ||
+      pickString(settings ?? {}, ["outcome", "flow_outcome", "flowOutcome"]) ||
+      undefined,
     fields:
       recordFields.length > 0
         ? recordFields
@@ -1564,16 +1583,43 @@ export const resolveCtaHref = (
   block: RuntimeBlock,
   runtime: PublicFunnelRuntimePayload,
 ) => {
+  const cta = asRecord(block.cta);
+  const ctaButton = asRecord(block.cta_button);
+  const primaryCta = asRecord(block.primary_cta);
+  const secondaryCta = asRecord(block.secondary_cta);
+  const button = asRecord(block.button);
+  const action = (
+    asString(block.action) ||
+    asString(cta?.action) ||
+    asString(ctaButton?.action) ||
+    asString(primaryCta?.action) ||
+    asString(secondaryCta?.action) ||
+    asString(button?.action)
+  ).toLowerCase();
+
+  if (action === "next_step_from_contract") {
+    const fromContract = resolveNextStepFromContract(
+      runtime,
+      resolveBlockOutcome(block),
+    );
+    if (fromContract) {
+      return fromContract;
+    }
+  }
+
   const directHref =
     asString(block.href) ||
     asString(block.url) ||
     asString(block.path) ||
-    asString(asRecord(block.cta)?.href);
+    asString(cta?.href) ||
+    asString(ctaButton?.href) ||
+    asString(primaryCta?.href) ||
+    asString(secondaryCta?.href) ||
+    asString(button?.href);
   if (directHref) {
     return directHref;
   }
 
-  const action = asString(block.action);
   if (action === "next_step") {
     return runtime.nextStep?.path ?? runtime.currentStep.path;
   }
@@ -1586,6 +1632,128 @@ export const resolveCtaHref = (
   }
 
   return runtime.currentStep.path;
+};
+
+export const resolveBlockOutcome = (block: RuntimeBlock) => {
+  const cta = asRecord(block.cta);
+  const ctaButton = asRecord(block.cta_button);
+  const primaryCta = asRecord(block.primary_cta);
+  const secondaryCta = asRecord(block.secondary_cta);
+  const button = asRecord(block.button);
+
+  return (
+    asString(block.outcome) ||
+    asString(block.flow_outcome) ||
+    asString(block.flowOutcome) ||
+    asString(cta?.outcome) ||
+    asString(ctaButton?.outcome) ||
+    asString(primaryCta?.outcome) ||
+    asString(secondaryCta?.outcome) ||
+    asString(button?.outcome) ||
+    "default"
+  ).toLowerCase();
+};
+
+const resolveStepPathById = (
+  runtime: PublicFunnelRuntimePayload,
+  stepId: string,
+) => runtime.steps.find((step) => step.id === stepId)?.path ?? null;
+
+const resolveFlowGraphContractPath = (
+  runtime: PublicFunnelRuntimePayload,
+  outcome = "default",
+) => {
+  const contract = asRecord(runtime.funnel.conversionContract);
+  const graph = asRecord(contract?.flowGraph);
+  const nodes = asRecord(graph?.nodes);
+  const currentNode =
+    asRecord(nodes?.[runtime.currentStep.id]) ??
+    Object.values(nodes ?? {}).reduce<Record<string, JsonValue> | null>(
+      (matchedNode, candidate) => {
+        if (matchedNode) {
+          return matchedNode;
+        }
+
+        const node = asRecord(candidate);
+        return node?.slug === runtime.currentStep.slug ? node : null;
+      },
+      null,
+    );
+  const exits = asRecord(asRecord(currentNode)?.exits);
+  const normalizedOutcome = outcome.trim().toLowerCase() || "default";
+  const exit =
+    asRecord(exits?.[normalizedOutcome]) ??
+    (normalizedOutcome === "default" ? null : asRecord(exits?.default));
+  const toStepId = asString(exit?.toStepId);
+
+  return toStepId ? resolveStepPathById(runtime, toStepId) : null;
+};
+
+const resolveContractTransitionRecord = (runtime: PublicFunnelRuntimePayload) => {
+  const contract = asRecord(runtime.funnel.conversionContract);
+  if (!contract) {
+    return null;
+  }
+
+  const transitions = asRecord(contract.transitions);
+  if (!transitions) {
+    return null;
+  }
+
+  const bySlug = asRecord(transitions[runtime.currentStep.slug]);
+  if (bySlug) {
+    return bySlug;
+  }
+
+  const byStepType = asRecord(transitions[runtime.currentStep.stepType]);
+  if (byStepType) {
+    return byStepType;
+  }
+
+  return asRecord(transitions.default);
+};
+
+export const resolveNextStepFromContract = (
+  runtime: PublicFunnelRuntimePayload,
+  outcome = "default",
+) => {
+  const flowGraphPath = resolveFlowGraphContractPath(runtime, outcome);
+  if (flowGraphPath) {
+    return flowGraphPath;
+  }
+
+  const transition = resolveContractTransitionRecord(runtime);
+  if (transition) {
+    const explicitPath =
+      asString(transition.path) ||
+      asString(transition.nextStepPath) ||
+      asString(transition.default);
+    if (explicitPath) {
+      return explicitPath;
+    }
+
+    const explicitStepSlug = asString(transition.stepSlug);
+    if (explicitStepSlug) {
+      const mappedStep = runtime.steps.find(
+        (step) => step.slug === explicitStepSlug,
+      );
+      if (mappedStep?.path) {
+        return mappedStep.path;
+      }
+    }
+
+    const explicitStepType = asString(transition.stepType);
+    if (explicitStepType) {
+      const mappedStep = runtime.steps.find(
+        (step) => step.stepType === explicitStepType,
+      );
+      if (mappedStep?.path) {
+        return mappedStep.path;
+      }
+    }
+  }
+
+  return runtime.nextStep?.path ?? runtime.publication.nextStepPath ?? null;
 };
 
 export const toStepLabel = (value: string) =>

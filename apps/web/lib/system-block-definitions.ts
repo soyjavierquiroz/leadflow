@@ -14,6 +14,10 @@ type RemoteBlockDefinitionRecord = {
   category: string;
   schemaJson: Record<string, unknown>;
   exampleJson: Record<string, unknown>;
+  compatibleStepTypes?: BuilderBlockDefinition["compatibleStepTypes"] | null;
+  requiredCapabilities?: BuilderBlockDefinition["requiredCapabilities"] | null;
+  emitsOutcomes?: BuilderBlockDefinition["emitsOutcomes"] | null;
+  autoWiring?: BuilderBlockDefinition["autoWiring"] | null;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -75,6 +79,10 @@ export const getSystemBlockDefinitions = async (): Promise<
           category: record.category,
           schema: toJsonRecord(record.schemaJson),
           example: toJsonRecord(record.exampleJson),
+          compatibleStepTypes: record.compatibleStepTypes ?? [],
+          requiredCapabilities: record.requiredCapabilities ?? [],
+          emitsOutcomes: record.emitsOutcomes ?? [],
+          autoWiring: record.autoWiring ?? [],
         });
 
         return accumulator;

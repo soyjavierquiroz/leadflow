@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RuntimeContextConfigSyncService } from '../runtime-context/runtime-context-config-sync.service';
 import { normalizePublicationPathPrefix } from '../shared/publication-resolution.utils';
 import type { JsonValue } from '../shared/domain.types';
 import { assertSupportedFunnelBlocksJson } from '../shared/funnel-block-validation';
@@ -65,6 +66,7 @@ type HybridPublicationDetail = {
     name: string;
     code: string;
     status: string;
+    conversionContract: JsonValue;
     settingsJson: JsonValue;
   };
   step: {
@@ -94,7 +96,10 @@ type FunnelStepHistoryEntry = {
 
 @Injectable()
 export class HybridFunnelPublicationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly runtimeContextConfigSyncService: RuntimeContextConfigSyncService,
+  ) {}
 
   async findForSystemTenant(
     teamId: string,
@@ -180,6 +185,7 @@ export class HybridFunnelPublicationsService {
         name: publication.funnelInstance.name,
         code: publication.funnelInstance.code,
         status: publication.funnelInstance.status,
+        conversionContract: publication.funnelInstance.conversionContract as JsonValue,
         settingsJson: publication.funnelInstance.settingsJson as JsonValue,
       },
       step: {
@@ -337,7 +343,7 @@ export class HybridFunnelPublicationsService {
           teamId: scope.teamId,
           funnelInstanceId: funnelInstance.id,
           stepType: 'landing',
-          slug: 'landing',
+          slug: 'captura',
           position: 1,
           isEntryStep: true,
           isConversionStep: false,
@@ -421,6 +427,11 @@ export class HybridFunnelPublicationsService {
       };
     });
 
+    await this.runtimeContextConfigSyncService.syncFunnelContextForInstance({
+      tenantId: scope.teamId,
+      funnelInstanceId: detail.funnelInstance.id,
+    });
+
     return {
       publication: {
         id: detail.publication.id,
@@ -440,6 +451,7 @@ export class HybridFunnelPublicationsService {
         name: detail.funnelInstance.name,
         code: detail.funnelInstance.code,
         status: detail.funnelInstance.status,
+        conversionContract: detail.funnelInstance.conversionContract as JsonValue,
         settingsJson: detail.funnelInstance.settingsJson as JsonValue,
       },
       step: {
@@ -777,6 +789,11 @@ export class HybridFunnelPublicationsService {
       };
     });
 
+    await this.runtimeContextConfigSyncService.syncFunnelContextForInstance({
+      tenantId: scope.teamId,
+      funnelInstanceId: detail.funnelInstance.id,
+    });
+
     return {
       publication: {
         id: detail.publication.id,
@@ -796,6 +813,7 @@ export class HybridFunnelPublicationsService {
         name: detail.funnelInstance.name,
         code: detail.funnelInstance.code,
         status: detail.funnelInstance.status,
+        conversionContract: detail.funnelInstance.conversionContract as JsonValue,
         settingsJson: detail.funnelInstance.settingsJson as JsonValue,
       },
       step: {

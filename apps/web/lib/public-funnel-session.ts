@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { webPublicConfig } from "@/lib/public-env";
 import type { PublicRuntimeEntryContext } from "@/lib/public-funnel-runtime.types";
 
@@ -94,11 +95,21 @@ export type LeadCaptureSubmissionPayload = {
   sourceChannel?: string | null;
 };
 
-type StoredSubmissionContext = {
+type LeadSnapshot = {
+  id: string;
+  fullName: string | null;
+  email: string | null;
+  phone: string | null;
+  companyName: string | null;
+  status: string;
+};
+
+export type StoredSubmissionContext = {
   publicationId: string;
-  visitorId: string;
-  anonymousId: string;
+  visitorId: string | null;
+  anonymousId: string | null;
   leadId: string;
+  leadSnapshot?: LeadSnapshot;
   assignment: LeadCaptureSubmissionResponse["assignment"];
   nextStep: LeadCaptureSubmissionResponse["nextStep"];
   handoff: LeadCaptureSubmissionResponse["handoff"];
@@ -112,7 +123,48 @@ const buildAnonymousIdKey = (publicationId: string) =>
 const buildSubmissionContextKey = (publicationId: string) =>
   `leadflow:publication:${publicationId}:submission-context`;
 
+const submissionContextChangedEvent = "leadflow:submission-context-changed";
+const hydrationStatusChangedEvent = "leadflow:submission-hydration-changed";
+
 const isBrowser = () => typeof window !== "undefined";
+
+type SubmissionHydrationStatus = "idle" | "loading" | "ready" | "error";
+
+type SubmissionHydrationState = {
+  status: SubmissionHydrationStatus;
+  ctxToken: string | null;
+  error: string | null;
+};
+
+const hydrationStateByPublication = new Map<string, SubmissionHydrationState>();
+const hydrationPromiseByPublication = new Map<
+  string,
+  Promise<StoredSubmissionContext | null>
+>();
+
+const emitSubmissionContextChanged = (publicationId: string) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(submissionContextChangedEvent, {
+      detail: { publicationId },
+    }),
+  );
+};
+
+const emitHydrationStateChanged = (publicationId: string) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(hydrationStatusChangedEvent, {
+      detail: { publicationId },
+    }),
+  );
+};
 
 export const getOrCreateAnonymousId = (publicationId: string) => {
   if (!isBrowser()) {
@@ -147,6 +199,14 @@ export const persistSubmissionContext = (
     visitorId: payload.visitor.id,
     anonymousId: payload.visitor.anonymousId,
     leadId: payload.lead.id,
+    leadSnapshot: {
+      id: payload.lead.id,
+      fullName: payload.lead.fullName,
+      email: payload.lead.email,
+      phone: payload.lead.phone,
+      companyName: payload.lead.companyName,
+      status: payload.lead.status,
+    },
     assignment: payload.assignment,
     nextStep: payload.nextStep,
     handoff: payload.handoff,
@@ -169,6 +229,7 @@ export const persistSubmissionContext = (
     buildSubmissionContextKey(publicationId),
     JSON.stringify(context),
   );
+  emitSubmissionContextChanged(publicationId);
 };
 
 export const readSubmissionContext = (publicationId: string) => {
@@ -189,6 +250,204 @@ export const readSubmissionContext = (publicationId: string) => {
     window.sessionStorage.removeItem(buildSubmissionContextKey(publicationId));
     return null;
   }
+};
+
+const readHydrationState = (publicationId: string): SubmissionHydrationState => {
+  return (
+    hydrationStateByPublication.get(publicationId) ?? {
+      status: "idle",
+      ctxToken: null,
+      error: null,
+    }
+  );
+};
+
+const setHydrationState = (
+  publicationId: string,
+  nextState: SubmissionHydrationState,
+) => {
+  hydrationStateByPublication.set(publicationId, nextState);
+  emitHydrationStateChanged(publicationId);
+};
+
+const readCtxTokenFromUrl = () => {
+  if (!isBrowser()) {
+    return null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("ctx")?.trim() || null;
+  return token || null;
+};
+
+const stripCtxTokenFromUrl = () => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("ctx")) {
+    return;
+  }
+
+  url.searchParams.delete("ctx");
+  window.history.replaceState({}, "", url.toString());
+};
+
+export const ensureHydratedSubmissionContext = async (publicationId: string) => {
+  if (!isBrowser()) {
+    return null;
+  }
+
+  const ctxToken = readCtxTokenFromUrl();
+  if (!ctxToken) {
+    setHydrationState(publicationId, {
+      status: "ready",
+      ctxToken: null,
+      error: null,
+    });
+    return readSubmissionContext(publicationId);
+  }
+
+  const currentState = readHydrationState(publicationId);
+  if (
+    currentState.status === "ready" &&
+    currentState.ctxToken === ctxToken
+  ) {
+    return readSubmissionContext(publicationId);
+  }
+
+  const existingPromise = hydrationPromiseByPublication.get(publicationId);
+  if (existingPromise && currentState.ctxToken === ctxToken) {
+    return existingPromise;
+  }
+
+  setHydrationState(publicationId, {
+    status: "loading",
+    ctxToken,
+    error: null,
+  });
+
+  const hydrationPromise = fetch(
+    `${webPublicConfig.urls.api}/v1/public/funnel-runtime/hydrate`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ctx: ctxToken }),
+    },
+  )
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(await parseErrorMessage(response));
+      }
+
+      const payload = (await response.json()) as {
+        publicationId: string;
+        targetStepPath: string;
+        submissionContext: StoredSubmissionContext;
+      };
+      const resolvedPublicationId = payload.publicationId || publicationId;
+
+      if (payload.submissionContext.anonymousId) {
+        window.localStorage.setItem(
+          buildAnonymousIdKey(resolvedPublicationId),
+          payload.submissionContext.anonymousId,
+        );
+      }
+
+      window.sessionStorage.setItem(
+        buildSubmissionContextKey(resolvedPublicationId),
+        JSON.stringify(payload.submissionContext),
+      );
+
+      stripCtxTokenFromUrl();
+      emitSubmissionContextChanged(resolvedPublicationId);
+      setHydrationState(resolvedPublicationId, {
+        status: "ready",
+        ctxToken,
+        error: null,
+      });
+
+      return payload.submissionContext;
+    })
+    .catch((error: unknown) => {
+      setHydrationState(publicationId, {
+        status: "error",
+        ctxToken,
+        error:
+          error instanceof Error
+            ? error.message
+            : "No pudimos rehidratar el contexto del lead.",
+      });
+      throw error;
+    })
+    .finally(() => {
+      hydrationPromiseByPublication.delete(publicationId);
+    });
+
+  hydrationPromiseByPublication.set(publicationId, hydrationPromise);
+  return hydrationPromise;
+};
+
+export const useSubmissionContext = (publicationId: string) => {
+  const [context, setContext] = useState<StoredSubmissionContext | null>(() =>
+    readSubmissionContext(publicationId),
+  );
+
+  useEffect(() => {
+    setContext(readSubmissionContext(publicationId));
+
+    if (!isBrowser()) {
+      return;
+    }
+
+    const handleChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ publicationId?: string }>).detail;
+      if (detail?.publicationId && detail.publicationId !== publicationId) {
+        return;
+      }
+
+      setContext(readSubmissionContext(publicationId));
+    };
+
+    window.addEventListener(submissionContextChangedEvent, handleChange);
+    return () =>
+      window.removeEventListener(submissionContextChangedEvent, handleChange);
+  }, [publicationId]);
+
+  return context;
+};
+
+export const useSubmissionHydration = (publicationId: string) => {
+  const [state, setState] = useState<SubmissionHydrationState>(() =>
+    readHydrationState(publicationId),
+  );
+
+  useEffect(() => {
+    setState(readHydrationState(publicationId));
+    void ensureHydratedSubmissionContext(publicationId).catch(() => undefined);
+
+    if (!isBrowser()) {
+      return;
+    }
+
+    const handleChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ publicationId?: string }>).detail;
+      if (detail?.publicationId && detail.publicationId !== publicationId) {
+        return;
+      }
+
+      setState(readHydrationState(publicationId));
+    };
+
+    window.addEventListener(hydrationStatusChangedEvent, handleChange);
+    return () =>
+      window.removeEventListener(hydrationStatusChangedEvent, handleChange);
+  }, [publicationId]);
+
+  return state;
 };
 
 const parseErrorMessage = async (response: Response) => {

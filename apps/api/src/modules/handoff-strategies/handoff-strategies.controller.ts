@@ -12,6 +12,11 @@ export class HandoffStrategiesController {
     private readonly handoffStrategiesService: HandoffStrategiesService,
   ) {}
 
+  @Get('presets')
+  findPresets() {
+    return this.handoffStrategiesService.listPresets();
+  }
+
   @Get()
   findAll(
     @CurrentAuthUser() user: AuthenticatedUser,

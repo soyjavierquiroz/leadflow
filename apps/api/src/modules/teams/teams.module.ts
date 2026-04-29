@@ -4,6 +4,7 @@ import { FunnelsModule } from '../funnels/funnels.module';
 import { WalletEngineModule } from '../finance/wallet-engine.module';
 import { MailModule } from '../mail/mail.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
+import { RuntimeContextModule } from '../runtime-context/runtime-context.module';
 import { TeamPrismaRepository } from '../../prisma/repositories/team-prisma.repository';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import { SystemApiGuard } from '../webhooks/system-api.guard';
@@ -24,6 +25,7 @@ import { TeamsService } from './teams.service';
     WalletEngineModule,
     FunnelsModule,
     MailModule,
+    RuntimeContextModule,
   ],
   controllers: [
     TeamsController,

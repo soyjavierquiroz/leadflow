@@ -79,6 +79,32 @@ Variables operativas críticas:
 - `N8N_AUTOMATION_WEBHOOK_BASE_URL`
 - `MESSAGING_AUTOMATION_WEBHOOK_BASE_URL`
 
+### 3.3 Kurukin AI Gateway y sesiones de orquestación
+
+La arquitectura vigente de Smart Wiring y Lego Maker separa claramente responsabilidades:
+
+- `apps/api/src/modules/ai-config` resuelve `runtimeContext`, arma el `system_prompt` y valida el alcance del usuario o `instance_name`.
+- La ejecución de IA vive en el Kurukin AI Gateway, tratado como servicio stateless externo al monorepo.
+- En producción el gateway se expone por la infraestructura de Kurukin (`ia.kuruk.in`); para redes internas o pruebas el backend admite override mediante `IA_GATEWAY_BASE_URL`, con fallback local a `http://ia_gateway:3000`.
+
+Contrato HTTP actual entre Leadflow y el gateway:
+
+- `POST /v1/session/init`
+- `POST /v1/execute`
+- `POST /v1/session/close`
+
+Leadflow no persiste la memoria conversacional del Smart Wiring dentro de la API. La sesión se direcciona con un ID canónico generado en `AiConfigService.buildOrchestrationSessionId()`:
+
+- formato: `${instanceName}-${funnelId}`
+
+La memoria efectiva de esa sesión vive en Redis del lado del gateway. El backend de Leadflow sigue siendo stateless respecto a la orquestación: solo reconstruye contexto, envía prompts y reutiliza el mismo `sessionId` mientras el editor permanezca activo.
+
+Impacto operativo:
+
+- reinicios de `web` o `api` no deberían destruir el estado de orquestación si el gateway y Redis siguen disponibles
+- el editor puede reintentar `execute` sobre la misma clave canónica
+- el cierre explícito de sesión evita dejar contexto huérfano en el gateway
+
 ### 3.1 Cloudflare SaaS Domains Troubleshooting
 
 Incidente consolidado:
@@ -220,6 +246,20 @@ Interpretación:
 
 - `web` sirve la superficie HTTP pública
 - `api` mantiene conectividad adicional hacia dependencias internas y automatización
+
+## Contrato de bloques del builder
+
+La capa de edición de funnels ahora usa un contrato más estricto entre catálogo, editor y runtime:
+
+- `BuilderBlockDefinitionV2` define `schema`, `example`, `compatibleStepTypes`, `requiredCapabilities`, `emitsOutcomes` y `autoWiring`.
+- `apps/web/components/team-operations/BlockCard.tsx` hace deep mapping recursivo sobre objetos JSON anidados para construir controles editables sin depender de listas manuales superficiales.
+- El caso más sensible es `hook_and_promise`, donde el editor ya cubre `content.top_bar`, `content.hook_text`, `content.cta_lead_in`, `content.proof_header` y `content.urgency_box.{text,mechanism}` además del resto del contrato visible en `registry.ts`.
+
+Resultado:
+
+- menos desalineación entre JSON, UI del builder y render público
+- menos campos huérfanos en bloques con estructuras anidadas
+- auto-wiring más predecible para `lead_capture_config` y bloques compatibles
 
 ## Fuente de verdad operativa
 

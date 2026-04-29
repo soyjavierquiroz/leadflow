@@ -71,7 +71,7 @@ export default async function AdminTenantFunnelBuilderPage({
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col text-left">
+    <div className="flex min-h-screen w-full flex-col bg-slate-50 text-left dark:bg-slate-950 dark:[background-image:var(--bg-glow-conferencia)] dark:bg-cover dark:bg-fixed dark:bg-center">
       <TeamVslPublicationEditor
         mode="system"
         teamId={teamId}

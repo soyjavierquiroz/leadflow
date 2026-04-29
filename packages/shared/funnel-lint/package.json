@@ -1,0 +1,16 @@
+{
+  "name": "@leadflow/funnel-lint",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "lint": "echo \"@leadflow/funnel-lint lint placeholder\"",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "echo \"@leadflow/funnel-lint test placeholder\""
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

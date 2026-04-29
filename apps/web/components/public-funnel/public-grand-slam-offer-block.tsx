@@ -666,6 +666,7 @@ export function PublicGrandSlamOfferBlock({
                 currentStepId={runtime.currentStep.id}
                 block={normalizedOrderBlock}
                 runtimeEntryContext={runtime.entryContext}
+                nextStepPath={runtime.publication.nextStepPath ?? runtime.nextStep?.path}
                 sectionId="public-order-drawer-form"
               />
             </div>

@@ -24,6 +24,38 @@ Piezas principales del monorepo:
 
 Los paquetes placeholder sin consumidores activos (`@leadflow/config`, `@leadflow/types`, `@leadflow/ui`) fueron retirados de la superficie versionada. La arquitectura compartida activa queda concentrada en mail y video.
 
+## IA y Smart Wiring
+
+La capa de orquestación de IA quedó separada del monorepo de forma explícita:
+
+- Leadflow resuelve contexto operativo, prompts y metadata de funnel desde `apps/api`.
+- La ejecución vive en el Kurukin AI Gateway como cerebro stateless. En producción la integración apunta al gateway expuesto por Kurukin (`ia.kuruk.in`); en entornos internos puede resolverse por la base `IA_GATEWAY_BASE_URL` o el servicio local `ia_gateway`.
+- La API ya no conserva memoria conversacional propia para Smart Wiring. Solo inicializa, ejecuta y cierra sesiones remotas mediante `POST /v1/runtime/session/init`, `POST /v1/runtime/execute-orchestration` y `POST /v1/runtime/session/close`.
+
+### Ciclo de vida de sesión
+
+El contrato operativo de sesión ahora usa un ID canónico:
+
+- formato: `${instanceName}-${funnelId}`
+- ejemplo: `drenvexman-funnel-1`
+- fuente: `AiConfigService.buildOrchestrationSessionId()`
+
+Leadflow genera ese `sessionId`, lo reusa durante toda la edición y lo cierra al terminar. La memoria efectiva de la sesión vive en Redis del lado del gateway, no en la API de Leadflow. Eso mantiene al backend stateless y hace que el estado de orquestación siga siendo recuperable por clave canónica.
+
+### Deep Mapping de bloques
+
+El builder de VSL ya no depende de mapeos superficiales por campo:
+
+- `BlockCard.tsx` recorre de forma recursiva `schema`, `example` y el bloque actual para construir inputs de hojas anidadas.
+- `hook_and_promise` recibe mapeo profundo para `content.top_bar`, `content.hook_text`, `content.cta_lead_in`, `content.proof_header` y `content.urgency_box.{text,mechanism}`.
+- Los arrays y objetos complejos se pueden editar como JSON, mientras que los destinos (`href`, `redirect`, `action`) siguen usando controles específicos del editor.
+
+### Contrato de bloques e infraestructura
+
+- `BuilderBlockDefinitionV2` pasa a ser la base tipada del catálogo de bloques, incluyendo compatibilidad por step, capacidades requeridas, outcomes y auto-wiring.
+- `registry.ts` y el runtime público convergen sobre el mismo contrato para evitar campos huérfanos entre JSON, editor y render.
+- La infraestructura productiva sigue consolidada en Docker Swarm detrás de Traefik, usando las redes externas `traefik_public` y `general_network` como punto único de exposición.
+
 ## Tenant vs Team
 
 En la base de datos actual, `Workspace` y `Team` no significan lo mismo:

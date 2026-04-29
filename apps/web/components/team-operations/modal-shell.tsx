@@ -19,7 +19,7 @@ export function ModalShell({
   children,
 }: ModalShellProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 px-4 py-6 backdrop-blur-md dark:bg-slate-950/55">
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-app-border bg-[linear-gradient(180deg,var(--app-surface)_0%,var(--app-card)_100%)] shadow-[0_32px_100px_rgba(15,23,42,0.24)]">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-app-border bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),_transparent_38%),linear-gradient(180deg,var(--app-surface)_0%,var(--app-card)_100%)] px-6 py-5 text-left">
           <div className="text-left">

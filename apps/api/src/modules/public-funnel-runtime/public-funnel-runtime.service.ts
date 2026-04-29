@@ -78,10 +78,26 @@ const asJsonRecord = (value: Prisma.JsonValue | null | undefined) =>
 
 const readNullableString = (
   value: RuntimePublicationRecord,
-  key: 'metaPixelId' | 'tiktokPixelId',
+  key:
+    | 'metaPixelId'
+    | 'tiktokPixelId'
+    | 'seoTitle'
+    | 'seoDescription'
+    | 'ogImageUrl'
+    | 'faviconUrl',
 ) => {
   const candidate = (value as RuntimePublicationRecord &
-    Partial<Record<'metaPixelId' | 'tiktokPixelId', unknown>>)[key];
+    Partial<
+      Record<
+        | 'metaPixelId'
+        | 'tiktokPixelId'
+        | 'seoTitle'
+        | 'seoDescription'
+        | 'ogImageUrl'
+        | 'faviconUrl',
+        unknown
+      >
+    >)[key];
 
   return typeof candidate === 'string' ? candidate : null;
 };
@@ -707,6 +723,13 @@ export class PublicFunnelRuntimeService {
         handoffStrategyId: publication.handoffStrategyId,
         metaPixelId: readNullableString(publication, 'metaPixelId'),
         tiktokPixelId: readNullableString(publication, 'tiktokPixelId'),
+        seoTitle: readNullableString(publication, 'seoTitle'),
+        seoDescription: readNullableString(publication, 'seoDescription'),
+        ogImageUrl: readNullableString(publication, 'ogImageUrl'),
+        faviconUrl: readNullableString(publication, 'faviconUrl'),
+        nextStepPath: nextStep?.path ?? null,
+        manifestVersion: publication.manifestVersion,
+        runtimeHealthStatus: publication.runtimeHealthStatus,
       },
       theme,
       funnel: {
@@ -714,6 +737,8 @@ export class PublicFunnelRuntimeService {
         name: publication.funnelInstance.name,
         code: publication.funnelInstance.code,
         status: publication.funnelInstance.status,
+        structuralType: publication.funnelInstance.structuralType,
+        conversionContract: publication.funnelInstance.conversionContract,
         settingsJson: publication.funnelInstance.settingsJson,
         mediaMap: publication.funnelInstance.mediaMap,
         template: {

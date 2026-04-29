@@ -66,3 +66,39 @@ export async function fetchPublicFunnelRuntime(params: {
     path: params.path,
   }) as PublicFunnelRuntimePayload;
 }
+
+export type PublicFunnelRuntimeResolution =
+  | {
+      status: 'ready';
+      runtime: PublicFunnelRuntimePayload;
+    }
+  | {
+      status: 'under_construction';
+      runtime: PublicFunnelRuntimePayload;
+    }
+  | {
+      status: 'not_found';
+    };
+
+export async function fetchPublicFunnelRuntimeResolution(params: {
+  host: string;
+  path: string;
+}): Promise<PublicFunnelRuntimeResolution> {
+  const runtime = await fetchPublicFunnelRuntime(params);
+
+  if (!runtime) {
+    return { status: 'not_found' };
+  }
+
+  if (runtime.publication.runtimeHealthStatus === 'broken') {
+    return {
+      status: 'under_construction',
+      runtime,
+    };
+  }
+
+  return {
+    status: 'ready',
+    runtime,
+  };
+}

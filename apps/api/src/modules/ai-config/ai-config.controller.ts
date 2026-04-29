@@ -6,10 +6,19 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { RequireRoles } from '../auth/roles.decorator';
 import { sanitizeNullableText } from '../shared/url.utils';
 import { AiConfigInternalApiGuard } from './ai-config-internal-api.guard';
 import { AiConfigService } from './ai-config.service';
-import type { ResolveFullRuntimeResponse } from './ai-config.types';
+import type {
+  CloseOrchestrationSessionResponse,
+  ExecuteOrchestrationResponse,
+  InitOrchestrationSessionResponse,
+  ResolveFullRuntimeResponse,
+} from './ai-config.types';
 
 const APP_KEY = 'leadflow_api' as const;
 const PLATFORM_KEY = 'kurukin' as const;
@@ -60,5 +69,64 @@ export class AiConfigController {
       config_version: runtimeContext.version,
       status: RUNTIME_STATUS,
     };
+  }
+
+  @Post('execute-orchestration')
+  @HttpCode(200)
+  @RequireRoles(UserRole.SUPER_ADMIN, UserRole.TEAM_ADMIN)
+  executeOrchestration(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Body()
+    body?: {
+      instance_name?: string | null;
+      prompt?: string | null;
+      session_id?: string | null;
+      intent?: string | null;
+    },
+  ): Promise<ExecuteOrchestrationResponse> {
+    return this.aiConfigService.executeOrchestrationForUser(user, {
+      instanceName: sanitizeNullableText(body?.instance_name),
+      prompt: body?.prompt,
+      sessionId: sanitizeNullableText(body?.session_id) ?? '',
+      intent: body?.intent,
+    });
+  }
+
+  @Post('session/init')
+  @HttpCode(200)
+  @RequireRoles(UserRole.SUPER_ADMIN, UserRole.TEAM_ADMIN)
+  initOrchestrationSession(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Body()
+    body?: {
+      instance_name?: string | null;
+      funnel_id?: string | null;
+      funnel_context?: Record<string, unknown> | null;
+      metadata?: Record<string, unknown> | null;
+    },
+  ): Promise<InitOrchestrationSessionResponse> {
+    return this.aiConfigService.initOrchestrationSessionForUser(user, {
+      instanceName: sanitizeNullableText(body?.instance_name),
+      funnelId: sanitizeNullableText(body?.funnel_id) ?? '',
+      funnelContext: body?.funnel_context,
+      metadata: body?.metadata,
+    });
+  }
+
+  @Post('session/close')
+  @HttpCode(200)
+  @RequireRoles(UserRole.SUPER_ADMIN, UserRole.TEAM_ADMIN)
+  closeOrchestrationSession(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Body()
+    body?: {
+      instance_name?: string | null;
+      session_id?: string | null;
+    },
+  ): Promise<CloseOrchestrationSessionResponse> {
+    return this.aiConfigService.closeOrchestrationSessionForUser(user, {
+      instanceName: sanitizeNullableText(body?.instance_name),
+      sessionId: sanitizeNullableText(body?.session_id) ?? '',
+    });
   }
 }

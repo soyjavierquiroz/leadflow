@@ -8,10 +8,14 @@ import {
 
 const chromeFreeAdminRoutes = new Set(["/admin/preview"]);
 
+const isChromeFreeAdminRoute = (pathname: string) =>
+  chromeFreeAdminRoutes.has(pathname) ||
+  /^\/admin\/tenants\/[^/]+\/funnels\/[^/]+\/builder$/.test(pathname);
+
 export function AdminShellFrame(props: AppShellLayoutProps) {
   const pathname = usePathname();
 
-  if (chromeFreeAdminRoutes.has(pathname)) {
+  if (isChromeFreeAdminRoute(pathname)) {
     return <>{props.children}</>;
   }
 

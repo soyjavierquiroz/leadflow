@@ -56,6 +56,41 @@ const isDomainOriginAllowed = async (
   return Boolean(matchingDomain);
 };
 
+const probeBootstrapDatabase = async (prisma: PrismaService) => {
+  try {
+    Logger.log('Running bootstrap database probe (SELECT 1).', 'Bootstrap');
+    await prisma.$queryRawUnsafe('SELECT 1');
+
+    const funnelInstanceColumns = await prisma.$queryRawUnsafe<
+      Array<{ column_name: string }>
+    >(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'FunnelInstance'
+          AND column_name IN ('structuralType', 'conversionContract')
+      `,
+    );
+
+    const resolvedColumns = funnelInstanceColumns.map((row) => row.column_name);
+    Logger.log(
+      `Bootstrap schema probe resolved FunnelInstance columns: ${
+        resolvedColumns.length > 0 ? resolvedColumns.join(', ') : 'none'
+      }.`,
+      'Bootstrap',
+    );
+  } catch (error) {
+    Logger.error(
+      `Bootstrap database probe failed: ${
+        error instanceof Error ? error.message : 'unknown error'
+      }`,
+      undefined,
+      'Bootstrap',
+    );
+  }
+};
+
 async function bootstrap() {
   const runtimeConfig = getApiRuntimeConfig();
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -78,6 +113,7 @@ async function bootstrap() {
   >();
 
   await app.register(cookie);
+  await probeBootstrapDatabase(prisma);
   fastify.addContentTypeParser(
     /^multipart\/form-data(?:;.*)?$/i,
     { parseAs: 'buffer', bodyLimit: 10_485_760 },

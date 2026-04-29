@@ -24,6 +24,13 @@ const asNumber = (value: unknown, fallback = 0) => {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 };
 
+const asNullableString = (value: unknown) =>
+  typeof value === 'string' ? value : null;
+
+const normalizeRuntimeHealthStatus = (value: unknown) => {
+  return value === 'warning' || value === 'broken' ? value : 'healthy';
+};
+
 const asJsonValue = (value: unknown, fallback: JsonValue): JsonValue => {
   if (
     value === null ||
@@ -203,13 +210,21 @@ export function normalizePublicFunnelRuntimePayload(
           ? publicationRecord.handoffStrategyId
           : null,
       metaPixelId:
-        typeof publicationRecord.metaPixelId === 'string'
-          ? publicationRecord.metaPixelId
-          : null,
+        asNullableString(publicationRecord.metaPixelId),
       tiktokPixelId:
-        typeof publicationRecord.tiktokPixelId === 'string'
-          ? publicationRecord.tiktokPixelId
-          : null,
+        asNullableString(publicationRecord.tiktokPixelId),
+      seoTitle: asNullableString(publicationRecord.seoTitle),
+      seoDescription: asNullableString(publicationRecord.seoDescription),
+      ogImageUrl: asNullableString(publicationRecord.ogImageUrl),
+      faviconUrl: asNullableString(publicationRecord.faviconUrl),
+      nextStepPath: asNullableString(publicationRecord.nextStepPath),
+      manifestVersion: Math.max(
+        1,
+        asNumber(publicationRecord.manifestVersion, 1),
+      ),
+      runtimeHealthStatus: normalizeRuntimeHealthStatus(
+        publicationRecord.runtimeHealthStatus,
+      ),
     },
     theme,
     funnel: {
@@ -217,6 +232,11 @@ export function normalizePublicFunnelRuntimePayload(
       name: asString(funnelRecord.name, 'Public Funnel'),
       code: asString(funnelRecord.code, 'public-funnel'),
       status: asString(funnelRecord.status, 'active'),
+      structuralType:
+        typeof funnelRecord.structuralType === 'string'
+          ? funnelRecord.structuralType
+          : null,
+      conversionContract: asJsonValue(funnelRecord.conversionContract, {}),
       settingsJson: asJsonValue(funnelRecord.settingsJson, {}),
       mediaMap: asJsonValue(funnelRecord.mediaMap, {}),
       template: {

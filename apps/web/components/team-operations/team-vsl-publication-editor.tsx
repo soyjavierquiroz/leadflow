@@ -7,23 +7,26 @@ import {
   useRef,
   useState,
   useTransition,
+  type ReactNode,
 } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Check,
   ChevronDown,
+  CircleHelp,
   FileJson,
   Globe,
-  Save,
   Sparkles,
 } from "lucide-react";
-
-import { SectionHeader } from "@/components/app-shell/section-header";
 import {
-  PublicationTrackingFields,
-  type PublicationTrackingFieldName,
-} from "@/components/forms/publication-tracking-fields";
+  readyMadeFunnelRecipes,
+  SmartWiringService,
+} from "../../../../packages/shared/funnel-orchestrator/src";
+
+import { ZenModeShell } from "@/components/app-shell/ZenModeShell";
+import { StepManagerSidebar } from "@/components/admin/funnel-builder/StepManagerSidebar";
+import type { FlowGraphV1 } from "../../../../packages/shared/funnel-lint/src";
+import type { PublicationTrackingFieldName } from "@/components/forms/publication-tracking-fields";
+import { PublicationInspectorDrawer } from "@/components/team-operations/PublicationInspectorDrawer";
 import {
   defaultBlocksSeed,
   HybridJsonMediaEditor,
@@ -31,6 +34,7 @@ import {
   type MediaRow,
   toMediaRows,
 } from "@/components/team-operations/hybrid-json-media-editor";
+import type { ComposerDestination } from "@/components/team-operations/BlockCard";
 import { buildHybridJsonPreviewDraftKey } from "@/components/team-operations/hybrid-json-preview-state";
 import type { BuilderBlockDefinition } from "@/lib/blocks/catalog";
 import { optimizeFunnelAssetImage } from "@/lib/media-optimizer";
@@ -41,28 +45,22 @@ import {
 } from "@/lib/public-step-layout";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
+import { webPublicConfig } from "@/lib/public-env";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
 import { teamOperationRequest } from "@/lib/team-operations";
-
-const primaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full bg-app-text px-4 py-2.5 text-sm font-semibold text-app-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
-
-const secondaryButtonClassName =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted disabled:cursor-not-allowed disabled:opacity-60";
+import {
+  type PublicationLintIssue,
+  type PublicationRuntimeHealthStatus,
+  usePublicationStore,
+} from "@/store/usePublicationStore";
 
 const sectionClassName =
-  "rounded-[2rem] border border-app-border bg-app-card p-6 text-left text-app-text shadow-[var(--ai-panel-shadow)] md:p-8";
+  "rounded-[2rem] border border-slate-200 bg-white/90 p-6 text-left text-slate-900 shadow-xl shadow-slate-200/50 md:p-8 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-100 dark:shadow-slate-950/30";
 
-const contentFrameClassName =
-  "flex w-full flex-1 flex-col gap-6 pb-24";
-
-const fieldLabelClassName = "text-sm font-medium text-app-text-muted";
+const fieldLabelClassName = "text-sm font-medium text-slate-700 dark:text-slate-300";
 
 const inputClassName =
-  "rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted disabled:text-app-text-soft";
-
-const stickyFooterBarClassName =
-  "sticky bottom-0 z-40 border-t border-app-border bg-app-bg";
+  "rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-400/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900/70 dark:disabled:text-slate-500";
 
 const defaultMediaRows = requiredMediaKeys.map((key) => ({
   key,
@@ -153,6 +151,7 @@ type HybridPublicationDetail = {
     name: string;
     code: string;
     status: string;
+    conversionContract: unknown;
     settingsJson: unknown;
   };
   step: {
@@ -169,6 +168,36 @@ type HybridPublicationDetail = {
     title: string;
     metaDescription: string;
   };
+};
+
+type ExecuteOrchestrationApiResponse = {
+  status: number;
+  sessionId: string;
+  runtimeContext: {
+    tenant?: {
+      id?: string;
+      code?: string;
+    };
+    member?: {
+      id?: string;
+    };
+  } | null;
+  data: unknown;
+};
+
+type InitOrchestrationSessionApiResponse = {
+  status: number;
+  sessionId: string;
+  runtimeContext: {
+    tenant?: {
+      id?: string;
+      code?: string;
+    };
+    member?: {
+      id?: string;
+    };
+  } | null;
+  data: unknown;
 };
 
 type FunnelStepHistoryVersion = {
@@ -326,6 +355,125 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+const readNestedValue = (value: unknown, path: string[]) => {
+  let current: unknown = value;
+
+  for (const key of path) {
+    const record = asRecord(current);
+    if (!record || !(key in record)) {
+      return undefined;
+    }
+
+    current = record[key];
+  }
+
+  return current;
+};
+
+const extractOrchestrationBlocks = (value: unknown) => {
+  const candidates = [
+    readNestedValue(value, ["blocks"]),
+    readNestedValue(value, ["blocks_json"]),
+    readNestedValue(value, ["output", "blocks"]),
+    readNestedValue(value, ["output", "blocks_json"]),
+    readNestedValue(value, ["result", "blocks"]),
+    readNestedValue(value, ["result", "blocks_json"]),
+    readNestedValue(value, ["funnel_context", "blocks"]),
+    readNestedValue(value, ["funnel_context", "blocks_json"]),
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
+const extractOrchestrationMediaMap = (value: unknown) => {
+  const candidates = [
+    readNestedValue(value, ["media_map"]),
+    readNestedValue(value, ["output", "media_map"]),
+    readNestedValue(value, ["result", "media_map"]),
+    readNestedValue(value, ["funnel_context", "media_map"]),
+  ];
+
+  for (const candidate of candidates) {
+    const record = asRecord(candidate);
+    if (record) {
+      return record;
+    }
+  }
+
+  return null;
+};
+
+const extractOrchestrationSettings = (value: unknown) => {
+  const candidates = [
+    readNestedValue(value, ["settings_json"]),
+    readNestedValue(value, ["output", "settings_json"]),
+    readNestedValue(value, ["result", "settings_json"]),
+    readNestedValue(value, ["funnel_context", "settings_json"]),
+  ];
+
+  for (const candidate of candidates) {
+    const record = asRecord(candidate);
+    if (record) {
+      return record;
+    }
+  }
+
+  return null;
+};
+
+const extractOrchestrationRecipeKey = (value: unknown) => {
+  const candidates = [
+    readNestedValue(value, ["recipe_key"]),
+    readNestedValue(value, ["recipeKey"]),
+    readNestedValue(value, ["output", "recipe_key"]),
+    readNestedValue(value, ["output", "recipeKey"]),
+    readNestedValue(value, ["result", "recipe_key"]),
+    readNestedValue(value, ["result", "recipeKey"]),
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return null;
+};
+
+const extractOrchestrationReplace = (value: unknown) => {
+  const candidates = [
+    readNestedValue(value, ["replace"]),
+    readNestedValue(value, ["output", "replace"]),
+    readNestedValue(value, ["result", "replace"]),
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "boolean") {
+      return candidate;
+    }
+  }
+
+  return false;
+};
+
+const extractFlowGraphFromContract = (value: unknown): FlowGraphV1 | null => {
+  const contract = asRecord(value);
+  const flowGraph = asRecord(contract?.flowGraph);
+  const nodes = asRecord(flowGraph?.nodes);
+
+  if (!flowGraph || !nodes || flowGraph.version !== 1) {
+    return null;
+  }
+
+  return flowGraph as unknown as FlowGraphV1;
+};
+
 const extractThemeFromSettings = (value: unknown) => {
   const record = asRecord(value);
   return resolveFunnelThemeId(record?.theme);
@@ -347,6 +495,38 @@ const toStepReferenceLabel = (
   return `Paso ${step.position} (${step.slug})`;
 };
 
+type StepManagerActiveStepEvent = CustomEvent<{
+  stepId?: string;
+  orderIndex?: number;
+  node?: {
+    stepId?: string;
+    slug?: string;
+    stepType?: string;
+  };
+}>;
+
+const syncStepRecordsWithGraph = (
+  steps: HybridPublicationStepDetail[],
+  graph: FlowGraphV1 | null,
+) => {
+  if (!graph || steps.length === 0) {
+    return steps;
+  }
+
+  return steps.map((step) => {
+    const node = graph.nodes[step.id];
+
+    if (!node || node.slug === step.slug) {
+      return step;
+    }
+
+    return {
+      ...step,
+      slug: node.slug,
+    };
+  });
+};
+
 export function TeamVslPublicationEditor({
   domains,
   templates,
@@ -356,9 +536,7 @@ export function TeamVslPublicationEditor({
   backHref = "/team/publications",
   backLabel = "Volver a publicaciones",
   editorHref,
-  headerEyebrow = "Team Admin / Publicaciones híbridas",
   headerTitle = "Crear o editar funnel VSL/Landing",
-  headerDescription = "Gestiona el blocksJson y el mediaMap como dos capas separadas del assembly engine. Guardamos la instancia, el landing step y la publicación activa en una sola transacción.",
   availableBlocks,
 }: TeamVslPublicationEditorProps) {
   const router = useRouter();
@@ -374,6 +552,10 @@ export function TeamVslPublicationEditor({
     [domains],
   );
   const [isPending, startTransition] = useTransition();
+  const [isOrchestrating, setIsOrchestrating] = useState(false);
+  const [orchestrationSessionId, setOrchestrationSessionId] = useState<
+    string | null
+  >(null);
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -383,6 +565,7 @@ export function TeamVslPublicationEditor({
   const [currentPublicationId, setCurrentPublicationId] = useState<
     string | null
   >(publicationId);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [funnelName, setFunnelName] = useState("");
   const [selectedDomainId, setSelectedDomainId] = useState(
     activeDomains[0]?.id ?? "",
@@ -396,6 +579,8 @@ export function TeamVslPublicationEditor({
     templateOptions[0]?.id ?? "",
   );
   const [selectedThemeId, setSelectedThemeId] = useState("default");
+  const [funnelInstanceId, setFunnelInstanceId] = useState<string | null>(null);
+  const [flowGraph, setFlowGraph] = useState<FlowGraphV1 | null>(null);
   const [seoTitle, setSeoTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [blocksText, setBlocksText] = useState(defaultBlocksSeed);
@@ -417,12 +602,28 @@ export function TeamVslPublicationEditor({
   const [historyVersions, setHistoryVersions] = useState<FunnelStepHistoryVersion[]>(
     [],
   );
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [activeStepTab, setActiveStepTab] = useState<EditorStepTabKey>("captura");
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
   const visibleTemplateOptions = useMemo(
     () => ensureSelectedTemplateOption(templateOptions, selectedTemplateId),
     [selectedTemplateId, templateOptions],
+  );
+  const setPublicationIdInStore = usePublicationStore(
+    (state) => state.setPublicationId,
+  );
+  const setBlocksTextInStore = usePublicationStore(
+    (state) => state.setBlocksText,
+  );
+  const setRuntimeHealthStatusInStore = usePublicationStore(
+    (state) => state.setRuntimeHealthStatus,
+  );
+  const setLintIssuesInStore = usePublicationStore(
+    (state) => state.setLintIssues,
+  );
+  const runtimeHealthStatus = usePublicationStore(
+    (state) => state.runtimeHealthStatus,
   );
 
   const publicationApiBasePath =
@@ -432,7 +633,10 @@ export function TeamVslPublicationEditor({
 
   useEffect(() => {
     if (!publicationId) {
+      setOrchestrationSessionId(null);
       setCurrentPublicationId(null);
+      setFunnelInstanceId(null);
+      setFlowGraph(null);
       setStepRecords([]);
       setStepDrafts({});
       setStepSettingsJson({});
@@ -451,8 +655,10 @@ export function TeamVslPublicationEditor({
       { method: "GET" },
     )
       .then((payload) => {
+        setOrchestrationSessionId(null);
         const nextStepRecords = normalizeStepRecords(payload.steps, payload.step);
         setCurrentPublicationId(payload.publication.id);
+        setFunnelInstanceId(payload.publication.funnelInstanceId);
         setFunnelName(payload.funnelInstance.name);
         setSelectedDomainId(payload.publication.domainId);
         setPathPrefix(payload.publication.pathPrefix);
@@ -469,6 +675,9 @@ export function TeamVslPublicationEditor({
         setStepSettingsJson(payload.step.settingsJson);
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
+        setFlowGraph(
+          extractFlowGraphFromContract(payload.funnelInstance.conversionContract),
+        );
       })
       .catch((error) => {
         setErrorMessage(
@@ -480,7 +689,7 @@ export function TeamVslPublicationEditor({
       .finally(() => setIsLoadingExisting(false));
   }, [publicationApiBasePath, publicationId]);
 
-  const showStepSwitcher = mode === "system" && Boolean(currentPublicationId);
+  const showStepSwitcher = Boolean(currentPublicationId) && stepRecords.length > 1;
 
   const captureStep = useMemo(
     () => pickPrimaryCaptureStep(stepRecords),
@@ -514,7 +723,7 @@ export function TeamVslPublicationEditor({
   const editorSettingsJson = activeDraft?.settingsJson ?? stepSettingsJson;
   const editorLayoutOverride = readStepLayoutOverride(editorSettingsJson);
   const editorContext = showStepSwitcher
-    ? {
+      ? {
         stepName: activeStepTabLabel,
         stepPath: activeStep
           ? buildPublicationStepPath(
@@ -525,6 +734,7 @@ export function TeamVslPublicationEditor({
           : activeStepTab === "captura"
             ? normalizePublicationPath(pathPrefix)
             : buildPublicationStepPath(pathPrefix, "confirmado", false),
+        stepType: activeStep?.stepType ?? activeStepTab,
       }
     : null;
   const previewDraftKey =
@@ -537,6 +747,50 @@ export function TeamVslPublicationEditor({
   const activeStepHistoryTitle = activeStep
     ? `${activeStepTabLabel} (${activeStep.slug})`
     : activeStepTabLabel;
+
+  useEffect(() => {
+    const handleStepManagerChange = (event: Event) => {
+      if (!showStepSwitcher) {
+        return;
+      }
+
+      const detail = (event as StepManagerActiveStepEvent).detail ?? {};
+      const candidateIds = new Set(
+        [detail.stepId, detail.node?.stepId, detail.node?.slug]
+          .filter((value): value is string => Boolean(value))
+          .map((value) => value.trim()),
+      );
+
+      const directMatch = stepTabs.find(
+        (tab) =>
+          tab.step &&
+          (candidateIds.has(tab.step.id) || candidateIds.has(tab.step.slug)),
+      );
+      const orderedFallback =
+        typeof detail.orderIndex === "number" ? stepTabs[detail.orderIndex] : null;
+      const targetTab = directMatch ?? (orderedFallback?.step ? orderedFallback : null);
+
+      if (!targetTab || targetTab.key === activeStepTab) {
+        return;
+      }
+
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      setActiveStepTab(targetTab.key);
+    };
+
+    window.addEventListener(
+      "leadflow:step-manager:active-step-change",
+      handleStepManagerChange,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "leadflow:step-manager:active-step-change",
+        handleStepManagerChange,
+      );
+    };
+  }, [activeStepTab, showStepSwitcher, stepTabs]);
 
   const updateEditorDraft = (patch: Partial<StepDraft>) => {
     if (!showStepSwitcher) {
@@ -651,6 +905,85 @@ export function TeamVslPublicationEditor({
     return null;
   }, [editorMediaRows]);
 
+  const lintIssues = useMemo<PublicationLintIssue[]>(() => {
+    const issues: PublicationLintIssue[] = [];
+
+    if (parsedBlocks.error) {
+      issues.push({
+        code: "BLOCKS_JSON_INVALID",
+        severity: "error",
+        message: parsedBlocks.error,
+      });
+    }
+
+    if (mediaValidation) {
+      issues.push({
+        code: "MEDIA_MAP_INVALID",
+        severity: "error",
+        message: mediaValidation,
+      });
+    }
+
+    return issues;
+  }, [mediaValidation, parsedBlocks.error]);
+
+  const derivedRuntimeHealthStatus = useMemo<PublicationRuntimeHealthStatus>(() => {
+    if (lintIssues.some((issue) => issue.severity === "error")) {
+      return "broken";
+    }
+
+    if (!parsedBlocks.value) {
+      return "warning";
+    }
+
+    return "healthy";
+  }, [lintIssues, parsedBlocks.value]);
+
+  const draftStorageId =
+    currentPublicationId ??
+    publicationId ??
+    `${mode}-${teamId ?? "local"}-new-vsl`;
+
+  useEffect(() => {
+    setPublicationIdInStore(draftStorageId);
+    setBlocksTextInStore(editorBlocksText);
+    setRuntimeHealthStatusInStore(derivedRuntimeHealthStatus);
+    setLintIssuesInStore(lintIssues);
+  }, [
+    derivedRuntimeHealthStatus,
+    draftStorageId,
+    editorBlocksText,
+    lintIssues,
+    setBlocksTextInStore,
+    setLintIssuesInStore,
+    setPublicationIdInStore,
+    setRuntimeHealthStatusInStore,
+  ]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        `leadflow_draft_${draftStorageId}`,
+        JSON.stringify({
+          activeStep: activeStep?.id ?? activeStepTab,
+          blocksText: editorBlocksText,
+          runtimeHealthStatus: derivedRuntimeHealthStatus,
+          lintIssues,
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    } catch {
+      // Draft persistence is best-effort; save/publish remains the source of truth.
+    }
+  }, [
+    activeStep?.id,
+    activeStepTab,
+    derivedRuntimeHealthStatus,
+    draftStorageId,
+    editorBlocksText,
+    lintIssues,
+  ]);
+
   const isSaveDisabled =
     isPending ||
     isLoadingExisting ||
@@ -688,9 +1021,182 @@ export function TeamVslPublicationEditor({
           label: toStepReferenceLabel(step, captureStepId, confirmStepId),
           path: buildPublicationStepPath(pathPrefix, step.slug, step.isEntryStep),
           badge: step.isEntryStep ? "Entrada" : step.slug,
-        })),
+      })),
     };
   }, [captureStep, confirmStep, pathPrefix, showStepSwitcher, stepRecords]);
+  const graphDestinations = useMemo<ComposerDestination[]>(() => {
+    if (!flowGraph) {
+      return [];
+    }
+
+    return Object.entries(flowGraph.nodes).map(([nodeId, node]) => ({
+      value: buildPublicationStepPath(
+        pathPrefix,
+        node.slug,
+        node.stepId === flowGraph.entryStepId,
+      ),
+      label: `FlowGraph: ${node.meta?.title ?? node.slug}`,
+      kind: "route",
+    }));
+  }, [flowGraph, pathPrefix]);
+
+  useEffect(() => {
+    if (!orchestrationSessionId) {
+      return;
+    }
+
+    return () => {
+      void fetch(`${webPublicConfig.urls.api}/v1/runtime/session/close`, {
+        method: "POST",
+        body: JSON.stringify({
+          session_id: orchestrationSessionId,
+        }),
+        credentials: "include",
+        keepalive: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }).catch(() => {
+        // Session cleanup on unload is best-effort.
+      });
+    };
+  }, [orchestrationSessionId]);
+
+  const orchestrationFunnelContext = useMemo(() => {
+    if (!parsedBlocks.value) {
+      return null;
+    }
+
+    const successRedirect = confirmStep
+      ? buildPublicationStepPath(
+          pathPrefix,
+          confirmStep.slug,
+          confirmStep.isEntryStep,
+        )
+      : "/confirmado";
+
+    return {
+      publication: {
+        id: currentPublicationId,
+        funnelInstanceId,
+        pathPrefix,
+        domainId: selectedDomainId,
+        seoTitle,
+        metaDescription,
+      },
+      funnel: {
+        id: funnelInstanceId,
+        name: funnelName,
+        templateId: selectedTemplateId,
+        themeId: selectedThemeId,
+      },
+      activeStep: {
+        id: activeStep?.id ?? null,
+        slug: activeStep?.slug ?? captureStep?.slug ?? "captura",
+        stepType: activeStep?.stepType ?? captureStep?.stepType ?? "landing",
+        label: activeStepTabLabel,
+        path: editorContext?.stepPath ?? normalizePublicationPath(pathPrefix),
+      },
+      graph: flowGraph,
+      stepRecords,
+      blocks: parsedBlocks.value,
+      mediaMap,
+      settingsJson: editorSettingsJson,
+      successRedirect,
+    };
+  }, [
+    activeStep?.id,
+    activeStep?.slug,
+    activeStep?.stepType,
+    activeStepTabLabel,
+    captureStep?.slug,
+    captureStep?.stepType,
+    confirmStep?.id,
+    confirmStep?.isEntryStep,
+    confirmStep?.slug,
+    currentPublicationId,
+    editorContext?.stepPath,
+    editorSettingsJson,
+    flowGraph,
+    funnelInstanceId,
+    funnelName,
+    mediaMap,
+    metaDescription,
+    parsedBlocks.value,
+    pathPrefix,
+    selectedDomainId,
+    selectedTemplateId,
+    selectedThemeId,
+    seoTitle,
+    stepRecords,
+  ]);
+
+  const initializeOrchestrationSession = async () => {
+    if (!currentPublicationId || !funnelInstanceId || !orchestrationFunnelContext) {
+      throw new Error("Guarda o carga una publicación antes de inicializar Smart Wiring.");
+    }
+
+    const response = await teamOperationRequest<InitOrchestrationSessionApiResponse>(
+      "/runtime/session/init",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          funnel_id: funnelInstanceId,
+          funnel_context: orchestrationFunnelContext,
+          metadata: {
+            publication_id: currentPublicationId,
+            funnel_instance_id: funnelInstanceId,
+            editor_mode: mode,
+            active_step_id: activeStep?.id ?? null,
+          },
+        }),
+      },
+    );
+
+    setOrchestrationSessionId(response.sessionId);
+    return response.sessionId;
+  };
+
+  useEffect(() => {
+    if (
+      orchestrationSessionId ||
+      !currentPublicationId ||
+      !funnelInstanceId ||
+      !orchestrationFunnelContext
+    ) {
+      return;
+    }
+
+    void teamOperationRequest<InitOrchestrationSessionApiResponse>(
+      "/runtime/session/init",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          funnel_id: funnelInstanceId,
+          funnel_context: orchestrationFunnelContext,
+          metadata: {
+            publication_id: currentPublicationId,
+            funnel_instance_id: funnelInstanceId,
+            editor_mode: mode,
+            active_step_id: activeStep?.id ?? null,
+          },
+        }),
+      },
+    )
+      .then((response) => {
+        setOrchestrationSessionId(response.sessionId);
+      })
+      .catch(() => {
+        // Warm-up is best-effort; Smart Wiring retries the handshake before execute.
+      });
+  }, [
+    activeStep?.id,
+    currentPublicationId,
+    funnelInstanceId,
+    mode,
+    orchestrationFunnelContext,
+    orchestrationSessionId,
+  ]);
 
   const handleMediaRowChange = (index: number, patch: Partial<MediaRow>) => {
     updateEditorDraft({
@@ -867,6 +1373,8 @@ export function TeamVslPublicationEditor({
         setMetaCapiToken(response.publication.metaCapiToken ?? "");
         setTiktokAccessToken(response.publication.tiktokAccessToken ?? "");
         const nextStepRecords = normalizeStepRecords(response.steps, response.step);
+        setOrchestrationSessionId(null);
+        setFunnelInstanceId(response.publication.funnelInstanceId);
         setSelectedThemeId(
           extractThemeFromSettings(response.funnelInstance.settingsJson),
         );
@@ -875,6 +1383,9 @@ export function TeamVslPublicationEditor({
         setStepSettingsJson(response.step.settingsJson);
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
+        setFlowGraph(
+          extractFlowGraphFromContract(response.funnelInstance.conversionContract),
+        );
         setSuccessMessage(
           currentPublicationId
             ? showStepSwitcher
@@ -924,50 +1435,228 @@ export function TeamVslPublicationEditor({
     }
   };
 
-  const footerStatusLabel = isPending
-    ? "Guardando cambios..."
-    : errorMessage
-      ? "Revisa los errores antes de guardar."
-      : successMessage
-        ? successMessage
-        : isSaveDisabled
-          ? "Completa los datos requeridos para habilitar el guardado."
-          : "Cambios listos para guardar.";
+  const handleGraphUpdated = (graph: FlowGraphV1) => {
+    setFlowGraph(graph);
+    setStepRecords((current) => {
+      const nextRecords = syncStepRecordsWithGraph(current, graph);
+      const nextCaptureStep = pickPrimaryCaptureStep(nextRecords);
+      const nextConfirmStep = pickPrimaryConfirmStep(
+        nextRecords,
+        nextCaptureStep?.id ?? null,
+      );
+
+      if (nextConfirmStep) {
+        const successRedirect = buildPublicationStepPath(
+          pathPrefix,
+          nextConfirmStep.slug,
+          nextConfirmStep.isEntryStep,
+        );
+
+        setStepDrafts((drafts) => {
+          const sourceEntries = nextRecords.map((step) => [
+            step.id,
+            drafts[step.id] ?? buildStepDraft(step),
+          ] as const);
+
+          return Object.fromEntries(
+            sourceEntries.map(([stepId, draft]) => [
+              stepId,
+              {
+                ...draft,
+                blocksText: SmartWiringService.serialize(
+                  SmartWiringService.syncSuccessRedirect({
+                    blocks: draft.blocksText,
+                    successRedirect,
+                  }),
+                ),
+              },
+            ]),
+          );
+        });
+      }
+
+      return nextRecords;
+    });
+  };
+
+  const handleSmartWiring = async () => {
+    if (!currentPublicationId || !funnelInstanceId) {
+      setErrorMessage("Guarda o carga una publicación antes de ejecutar Smart Wiring.");
+      return;
+    }
+
+    if (parsedBlocks.error || !Array.isArray(parsedBlocks.value)) {
+      setErrorMessage("Corrige el JSON de bloques antes de pedir Smart Wiring.");
+      return;
+    }
+
+    const userIntent =
+      "Optimiza el wiring del funnel actual, preserva el contrato de navegación y mejora la continuidad entre CTA, captura y confirmación.";
+    const successRedirect = confirmStep
+      ? buildPublicationStepPath(
+          pathPrefix,
+          confirmStep.slug,
+          confirmStep.isEntryStep,
+        )
+      : "/confirmado";
+
+    setIsOrchestrating(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const sessionId = await initializeOrchestrationSession();
+      const response = await teamOperationRequest<ExecuteOrchestrationApiResponse>(
+        "/runtime/execute-orchestration",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            session_id: sessionId,
+            intent: userIntent,
+          }),
+        },
+      );
+      const recipeKey = extractOrchestrationRecipeKey(response.data);
+      const replace = extractOrchestrationReplace(response.data);
+      const catalog = availableBlocks ?? [];
+      let nextBlocks: unknown = null;
+
+      if (recipeKey && catalog.length > 0) {
+        const recipe = readyMadeFunnelRecipes.find(
+          (candidate) => candidate.key === recipeKey,
+        );
+
+        if (recipe) {
+          nextBlocks = SmartWiringService.applyRecipe({
+            blocks: editorBlocksText,
+            recipe,
+            catalog,
+            stepType: editorContext?.stepType ?? activeStep?.stepType ?? null,
+            successRedirect,
+            replace,
+          });
+        }
+      }
+
+      if (!nextBlocks) {
+        const rawBlocks = extractOrchestrationBlocks(response.data);
+
+        if (!rawBlocks) {
+          throw new Error(
+            "La IA respondió sin un contrato de bloques aplicable para Smart Wiring.",
+          );
+        }
+
+        nextBlocks = SmartWiringService.syncSuccessRedirect({
+          blocks: rawBlocks,
+          successRedirect,
+        });
+      }
+
+      updateEditorDraft({
+        blocksText: SmartWiringService.serialize(nextBlocks),
+        mediaRows: toMediaRows(
+          extractOrchestrationMediaMap(response.data) ?? mediaMap,
+        ),
+        settingsJson:
+          extractOrchestrationSettings(response.data) ?? editorSettingsJson,
+      });
+      setSuccessMessage(
+        "Smart Wiring aplicó una nueva estructura visual sobre el paso activo.",
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos completar Smart Wiring.",
+      );
+    } finally {
+      setIsOrchestrating(false);
+    }
+  };
+
+  const quickHelpContent: ReactNode = (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
+          Captación nativa
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Usa <code>lead_capture_form</code> si quieres que los CTAs comerciales
+          salten al formulario nativo con la ancla <code>#public-capture-form</code>.
+        </p>
+      </div>
+      <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">
+          Media dictionary
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Sube assets al CDN solo cuando lo necesites. Las llaves base recomendadas
+          siguen siendo <code>hero</code>, <code>product_box</code>, <code>gallery_1</code> y <code>seo_cover</code>.
+        </p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex w-full flex-1 flex-col text-left">
-      <div className={contentFrameClassName}>
-        <SectionHeader
-          eyebrow={headerEyebrow}
-          title={headerTitle}
-          description={headerDescription}
-          actions={
-            <>
-              <Link href={backHref} className={secondaryButtonClassName}>
-                {backLabel}
-              </Link>
-            </>
-          }
+    <ZenModeShell
+      funnelName={funnelName || headerTitle}
+      publicationStatus={currentPublicationId ? "published" : "draft"}
+      runtimeHealthStatus={runtimeHealthStatus}
+      isPublishing={isPending}
+      publishDisabled={isSaveDisabled}
+      onPublish={handleSave}
+      onOpenInspector={() => setIsInspectorOpen(true)}
+      backHref={backHref}
+      backLabel={backLabel}
+      stepSelector={null}
+      inspector={
+        <PublicationInspectorDrawer
+          isOpen={isInspectorOpen}
+          onClose={() => setIsInspectorOpen(false)}
+          seoTitle={seoTitle}
+          metaDescription={metaDescription}
+          onSeoTitleChange={setSeoTitle}
+          onMetaDescriptionChange={setMetaDescription}
+          metaPixelId={metaPixelId}
+          tiktokPixelId={tiktokPixelId}
+          metaCapiToken={metaCapiToken}
+          tiktokAccessToken={tiktokAccessToken}
+          onTrackingChange={updateTrackingField}
+        />
+      }
+    >
+      <div className="min-h-full w-full bg-slate-50 dark:bg-slate-950 dark:[background-image:var(--bg-glow-conferencia)] dark:bg-cover dark:bg-fixed dark:bg-center">
+      <div className="flex min-h-full w-full gap-5 px-4 py-5 text-left text-slate-900 dark:text-slate-100 md:px-6">
+        <StepManagerSidebar
+          funnelInstanceId={funnelInstanceId}
+          graph={flowGraph}
+          runtimeHealthStatus={runtimeHealthStatus}
+          isOrchestrating={isOrchestrating}
+          onGraphUpdated={handleGraphUpdated}
+          onSmartWiring={handleSmartWiring}
         />
 
-        {errorMessage ? (
-          <OperationBanner tone="error" message={errorMessage} />
-        ) : null}
-        {successMessage ? (
-          <OperationBanner tone="success" message={successMessage} />
-        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 text-left">
+            {errorMessage ? (
+              <OperationBanner tone="error" message={errorMessage} />
+            ) : null}
+            {successMessage ? (
+              <OperationBanner tone="success" message={successMessage} />
+            ) : null}
 
         <section className="grid gap-4 md:grid-cols-3">
           <article className={sectionClassName}>
             <div className="flex items-center gap-3 text-left">
-              <div className="rounded-full bg-app-accent-soft p-2 text-app-accent">
+              <div className="rounded-full bg-cyan-500/15 p-2 text-cyan-300">
                 <Sparkles className="h-4 w-4" />
               </div>
               <div className="text-left">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                   Template activo
                 </p>
-                <p className="mt-1 text-sm font-semibold text-app-text">
+                <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {selectedTemplate?.name ?? "Selecciona un template"}
                 </p>
               </div>
@@ -975,14 +1664,14 @@ export function TeamVslPublicationEditor({
           </article>
           <article className={sectionClassName}>
             <div className="flex items-center gap-3 text-left">
-              <div className="rounded-full bg-app-warning-bg p-2 text-app-warning-text">
+              <div className="rounded-full bg-amber-500/15 p-2 text-amber-300">
                 <FileJson className="h-4 w-4" />
               </div>
               <div className="text-left">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                   Bloques válidos
                 </p>
-                <p className="mt-1 text-sm font-semibold text-app-text">
+                <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {parsedBlocks.value
                     ? `${parsedBlocks.value.length} bloques listos`
                     : "Corrige el JSON"}
@@ -992,14 +1681,14 @@ export function TeamVslPublicationEditor({
           </article>
           <article className={sectionClassName}>
             <div className="flex items-center gap-3 text-left">
-              <div className="rounded-full bg-app-success-bg p-2 text-app-success-text">
+              <div className="rounded-full bg-emerald-500/15 p-2 text-emerald-300">
                 <Globe className="h-4 w-4" />
               </div>
               <div className="text-left">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                   {showStepSwitcher ? "Paso activo" : "Publicación"}
                 </p>
-                <p className="mt-1 text-sm font-semibold text-app-text">
+                <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {showStepSwitcher
                     ? stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
                       "Paso activo"
@@ -1015,18 +1704,19 @@ export function TeamVslPublicationEditor({
         <details open className={sectionClassName}>
           <summary className="flex cursor-pointer list-none items-start justify-between gap-4">
             <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-app-text-soft">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
                 Configuración
               </p>
-              <h2 className="mt-2 text-2xl font-semibold text-app-text">
-                Header y metadata del funnel
+              <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                Configuración operativa del funnel
               </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-app-text-muted">
-                Define identidad, dominio, tema y SEO con una jerarquía más clara
-                antes de entrar al JSON operativo de cada paso.
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+                Mantén aquí solo los cables estructurales. SEO, tracking y
+                metadata viven en el inspector lateral para no competir con el
+                canvas de conversión.
               </p>
             </div>
-            <ChevronDown className="h-5 w-5 text-app-text-soft" />
+            <ChevronDown className="h-5 w-5 text-slate-500" />
           </summary>
 
           <div className="mt-6 grid gap-5 md:grid-cols-2">
@@ -1038,7 +1728,7 @@ export function TeamVslPublicationEditor({
                 placeholder="Dragon Vintage T9 - Jakawi Import"
                 className={inputClassName}
               />
-              <span className="text-xs leading-5 text-app-text-soft">
+              <span className="text-xs leading-5 text-slate-500">
                 Código interno sugerido:{" "}
                 {slugify(funnelName || "nuevo-funnel") || "nuevo-funnel"}
               </span>
@@ -1098,48 +1788,9 @@ export function TeamVslPublicationEditor({
                   </option>
                 ))}
               </select>
-              <span className="text-xs leading-5 text-app-text-soft">
+              <span className="text-xs leading-5 text-slate-500">
                 Este theme se guarda a nivel Funnel y el runtime público lo expone
                 en la raíz del payload.
-              </span>
-            </label>
-
-            <PublicationTrackingFields
-              value={{
-                metaPixelId,
-                tiktokPixelId,
-                metaCapiToken,
-                tiktokAccessToken,
-              }}
-              onChange={updateTrackingField}
-              description="Estos campos viven en la publicación y se envían junto al PATCH o POST del editor híbrido."
-              variant="vsl"
-            />
-
-            <label className="grid gap-2 md:col-span-2">
-              <span className={fieldLabelClassName}>SEO Title</span>
-              <input
-                value={seoTitle}
-                onChange={(event) => setSeoTitle(event.target.value)}
-                placeholder={funnelName || "Dragon Vintage T9 | Leadflow"}
-                className={inputClassName}
-              />
-              <span className="text-xs leading-5 text-app-text-soft">
-                Si lo dejas vacío, usamos automáticamente el nombre del funnel.
-              </span>
-            </label>
-
-            <label className="grid gap-2 md:col-span-2">
-              <span className={fieldLabelClassName}>Meta Description</span>
-              <textarea
-                value={metaDescription}
-                onChange={(event) => setMetaDescription(event.target.value)}
-                placeholder="Resumen comercial y beneficio principal de la landing para buscadores y shares."
-                rows={4}
-                className={inputClassName}
-              />
-              <span className="text-xs leading-5 text-app-text-soft">
-                Recomendado: 140-160 caracteres orientados al beneficio principal.
               </span>
             </label>
           </div>
@@ -1172,6 +1823,7 @@ export function TeamVslPublicationEditor({
           previewTheme={selectedThemeId}
           previewSettingsJson={editorSettingsJson}
           availableBlocks={availableBlocks}
+          graphDestinations={graphDestinations}
           stepSpecificSettingsPanel={
             <article className="rounded-[1.5rem] border border-app-border bg-app-surface-muted p-6 text-left">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -1227,60 +1879,45 @@ export function TeamVslPublicationEditor({
               : null
           }
           routingReference={routingReference}
-          stepSwitcher={
-            showStepSwitcher
-              ? {
-                  activeKey: activeStepTab,
-                  badge: activeStep?.slug ?? activeStepTab,
-                  disabled: isPending || uploadingRowIndex !== null,
-                  helperText:
-                    "Cada pestaña carga y guarda el JSON del FunnelStep activo del builder real.",
-                  tabs: stepTabs.map((tab) => ({
-                    key: tab.key,
-                    label: tab.label,
-                  })),
-                  warningText: !activeStep
-                    ? "Ese paso todavía no existe en la publicación. Puedes prepararlo aquí y al guardar lo crearemos."
-                    : null,
-                  onChange: (key) => {
-                    setErrorMessage(null);
-                    setSuccessMessage(null);
-                    setActiveStepTab(key as EditorStepTabKey);
-                  },
-                }
-              : null
-          }
+          stepSwitcher={null}
         />
-      </div>
-
-      <div className={stickyFooterBarClassName}>
-        <div className="flex h-[60px] w-full items-center justify-between gap-4 px-4 text-left md:px-6">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
-              Persistencia
-            </p>
-            <p className="truncate text-sm text-app-text-muted">
-              {footerStatusLabel}
-            </p>
           </div>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaveDisabled}
-            className={primaryButtonClassName}
-          >
-            {isPending ? (
-              <>Guardando...</>
-            ) : (
-              <>
-                <Check className="h-4 w-4" />
-                {currentPublicationId ? "Guardar cambios" : "Crear y publicar"}
-              </>
-            )}
-          </button>
         </div>
       </div>
-    </div>
+      <button
+        type="button"
+        onClick={() => setIsHelpOpen(true)}
+        className="fixed bottom-5 right-5 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-cyan-400/25 bg-white/90 text-cyan-700 shadow-xl shadow-slate-200/50 backdrop-blur transition hover:bg-cyan-50 dark:bg-slate-900/90 dark:text-cyan-200 dark:shadow-slate-950/40 dark:hover:bg-slate-800"
+        aria-label="Abrir ayuda rápida"
+      >
+        <CircleHelp className="h-5 w-5" />
+      </button>
+
+      {isHelpOpen ? (
+        <div className="fixed inset-0 z-40 flex items-end justify-end bg-slate-900/20 p-4 backdrop-blur-sm md:items-start dark:bg-slate-950/40">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-200/50 dark:border-white/10 dark:bg-slate-900 dark:shadow-slate-950/50">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-500">
+                  Ayuda rápida
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Cheatsheet del builder
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHelpOpen(false)}
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="mt-4">{quickHelpContent}</div>
+          </div>
+        </div>
+      ) : null}
+      </div>
+    </ZenModeShell>
   );
 }

@@ -1,19 +1,32 @@
 import {
+  BadGatewayException,
   BadRequestException,
+  GatewayTimeoutException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { normalizeMessagingPhone } from '../shared/messaging-channel.utils';
-import { sanitizeNullableText } from '../shared/url.utils';
+import {
+  normalizeBaseUrl,
+  sanitizeNullableText,
+} from '../shared/url.utils';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
   AiConfigEditorSnapshot,
   AiConfigRouteContextKey,
   AiRuntimeContext,
+  CloseOrchestrationSessionInput,
+  CloseOrchestrationSessionResponse,
+  ExecuteOrchestrationInput,
+  ExecuteOrchestrationResponse,
+  InitOrchestrationSessionInput,
+  InitOrchestrationSessionResponse,
 } from './ai-config.types';
 
 type JsonRecord = Record<string, unknown>;
@@ -21,6 +34,11 @@ type JsonRecord = Record<string, unknown>;
 const AI_RUNTIME_CONTEXT_VERSION = 'leadflow.ai-runtime-context.v1' as const;
 const AI_SERVICE_OWNER_KEY = 'lead-handler' as const;
 const AI_RUNTIME_CHANNEL = 'whatsapp' as const;
+const DEFAULT_GATEWAY_TIMEOUT_MS = 10_000;
+const DEFAULT_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+const IA_GATEWAY_SESSION_INIT_PATH = '/v1/session/init';
+const IA_GATEWAY_EXECUTE_PATH = '/v1/execute';
+const IA_GATEWAY_SESSION_CLOSE_PATH = '/v1/session/close';
 const AI_CONFIG_PLACEHOLDERS = [
   '{{name}}',
   '{{team_name}}',
@@ -88,6 +106,14 @@ const mergeJsonValues = (baseValue: unknown, overrideValue: unknown): unknown =>
   }
 
   return cloneJsonValue(overrideValue);
+};
+
+const stringifyJsonForPrompt = (value: unknown) => {
+  try {
+    return JSON.stringify(value ?? {}, null, 2);
+  } catch {
+    return '{}';
+  }
 };
 
 const toJsonRecord = (value: unknown): JsonRecord => {
@@ -159,6 +185,16 @@ const mergeDefaultCta = (input: {
   return Object.keys(current).length > 0 ? current : null;
 };
 
+const parsePositiveInt = (value: string | undefined, fallback: number) => {
+  const parsed = Number.parseInt(value ?? '', 10);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+};
+
 const buildMergedPrompt = (input: {
   tenantPrompt: string | null;
   memberPrompt: string | null;
@@ -197,6 +233,16 @@ const replacePromptPlaceholders = (
 @Injectable()
 export class AiConfigService {
   private readonly logger = new Logger(AiConfigService.name);
+  private readonly gatewayBaseUrl = normalizeBaseUrl(
+    process.env.IA_GATEWAY_BASE_URL ?? DEFAULT_GATEWAY_BASE_URL,
+  );
+  private readonly gatewayAuthToken = sanitizeNullableText(
+    process.env.GATEWAY_AUTH_TOKEN,
+  );
+  private readonly gatewayTimeoutMs = parsePositiveInt(
+    process.env.IA_GATEWAY_REQUEST_TIMEOUT_MS,
+    DEFAULT_GATEWAY_TIMEOUT_MS,
+  );
 
   constructor(
     private readonly prisma: PrismaService,
@@ -471,6 +517,266 @@ export class AiConfigService {
     };
   }
 
+  async initOrchestrationSession(
+    input: InitOrchestrationSessionInput,
+  ): Promise<InitOrchestrationSessionResponse> {
+    this.ensureGatewayConfigured();
+
+    const instanceName = sanitizeNullableText(input.instanceName);
+    const funnelId = sanitizeNullableText(input.funnelId);
+
+    if (!instanceName) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
+        message: 'instanceName is required to initialize the orchestration session.',
+      });
+    }
+
+    if (!funnelId) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_FUNNEL_REQUIRED',
+        message: 'funnelId is required to initialize the orchestration session.',
+      });
+    }
+
+    const runtimeContext = await this.resolveRuntimeContext(instanceName);
+    const sessionId = this.buildOrchestrationSessionId({
+      instanceName: runtimeContext.routing.instance_name,
+      funnelId,
+    });
+
+    try {
+      const { response, data } = await this.sendGatewayRequest({
+        path: IA_GATEWAY_SESSION_INIT_PATH,
+        runtimeContext,
+        body: {
+          sessionId,
+          system_prompt: this.buildGatewaySystemPrompt({
+            runtimeContext,
+            funnelContext: input.funnelContext ?? null,
+            metadata: input.metadata ?? null,
+          }),
+        },
+        errorCode: 'AI_GATEWAY_SESSION_INIT_FAILED',
+        errorMessage: 'IA Gateway session initialization failed.',
+      });
+
+      return {
+        status: response.status,
+        sessionId,
+        runtimeContext,
+        data,
+      };
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        error.name === 'AbortError'
+      ) {
+        throw new GatewayTimeoutException({
+          code: 'AI_GATEWAY_TIMEOUT',
+          message: 'IA Gateway session initialization timed out.',
+        });
+      }
+
+      if (error instanceof BadGatewayException) {
+        throw error;
+      }
+
+      throw new BadGatewayException({
+        code: 'AI_GATEWAY_UNREACHABLE',
+        message: 'IA Gateway session initialization request failed.',
+        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+      });
+    }
+  }
+
+  async executeOrchestration(
+    input: ExecuteOrchestrationInput,
+  ): Promise<ExecuteOrchestrationResponse> {
+    this.ensureGatewayConfigured();
+
+    const instanceName = sanitizeNullableText(input.instanceName);
+    const sessionId = sanitizeNullableText(input.sessionId);
+
+    if (!instanceName) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
+        message: 'instanceName is required to execute the orchestration.',
+      });
+    }
+
+    if (!sessionId) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_SESSION_REQUIRED',
+        message: 'sessionId is required to execute the orchestration.',
+      });
+    }
+
+    const runtimeContext = await this.resolveRuntimeContext(instanceName);
+    const prompt =
+      sanitizeNullableText(input.intent) ??
+      sanitizeNullableText(input.prompt) ??
+      runtimeContext.ai_agent.base_prompt;
+
+    try {
+      const { response, data } = await this.sendGatewayRequest({
+        path: IA_GATEWAY_EXECUTE_PATH,
+        runtimeContext,
+        body: {
+          sessionId,
+          prompt,
+        },
+        errorCode: 'AI_GATEWAY_EXECUTE_FAILED',
+        errorMessage: 'IA Gateway orchestration failed.',
+      });
+
+      return {
+        status: response.status,
+        sessionId,
+        runtimeContext,
+        data,
+      };
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        error.name === 'AbortError'
+      ) {
+        throw new GatewayTimeoutException({
+          code: 'AI_GATEWAY_TIMEOUT',
+          message: 'IA Gateway orchestration request timed out.',
+        });
+      }
+
+      if (error instanceof BadGatewayException) {
+        throw error;
+      }
+
+      throw new BadGatewayException({
+        code: 'AI_GATEWAY_UNREACHABLE',
+        message: 'IA Gateway orchestration request failed.',
+        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+      });
+    }
+  }
+
+  async closeOrchestrationSession(
+    input: CloseOrchestrationSessionInput,
+  ): Promise<CloseOrchestrationSessionResponse> {
+    this.ensureGatewayConfigured();
+
+    const instanceName = sanitizeNullableText(input.instanceName);
+    const sessionId = sanitizeNullableText(input.sessionId);
+
+    if (!instanceName) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
+        message: 'instanceName is required to close the orchestration session.',
+      });
+    }
+
+    if (!sessionId) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_SESSION_REQUIRED',
+        message: 'sessionId is required to close the orchestration session.',
+      });
+    }
+
+    const runtimeContext = await this.resolveRuntimeContext(instanceName);
+
+    try {
+      const { response, data } = await this.sendGatewayRequest({
+        path: IA_GATEWAY_SESSION_CLOSE_PATH,
+        runtimeContext,
+        body: {
+          sessionId,
+        },
+        errorCode: 'AI_GATEWAY_SESSION_CLOSE_FAILED',
+        errorMessage: 'IA Gateway session close failed.',
+      });
+
+      return {
+        status: response.status,
+        sessionId,
+        runtimeContext,
+        data,
+      };
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        error.name === 'AbortError'
+      ) {
+        throw new GatewayTimeoutException({
+          code: 'AI_GATEWAY_TIMEOUT',
+          message: 'IA Gateway session close timed out.',
+        });
+      }
+
+      if (error instanceof BadGatewayException) {
+        throw error;
+      }
+
+      throw new BadGatewayException({
+        code: 'AI_GATEWAY_UNREACHABLE',
+        message: 'IA Gateway session close request failed.',
+        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+      });
+    }
+  }
+
+  async executeOrchestrationForUser(
+    user: AuthenticatedUser,
+    input: Omit<ExecuteOrchestrationInput, 'instanceName'> & {
+      instanceName?: string | null;
+    },
+  ): Promise<ExecuteOrchestrationResponse> {
+    const resolvedInstanceName =
+      sanitizeNullableText(input.instanceName) ??
+      (await this.resolveInstanceNameForUser(user));
+
+    return this.executeOrchestration({
+      ...input,
+      instanceName: resolvedInstanceName,
+    });
+  }
+
+  async initOrchestrationSessionForUser(
+    user: AuthenticatedUser,
+    input: Omit<InitOrchestrationSessionInput, 'instanceName'> & {
+      instanceName?: string | null;
+    },
+  ): Promise<InitOrchestrationSessionResponse> {
+    const resolvedInstanceName =
+      sanitizeNullableText(input.instanceName) ??
+      (await this.resolveInstanceNameForUser(user));
+
+    return this.initOrchestrationSession({
+      ...input,
+      instanceName: resolvedInstanceName,
+    });
+  }
+
+  async closeOrchestrationSessionForUser(
+    user: AuthenticatedUser,
+    input: Omit<CloseOrchestrationSessionInput, 'instanceName'> & {
+      instanceName?: string | null;
+    },
+  ): Promise<CloseOrchestrationSessionResponse> {
+    const resolvedInstanceName =
+      sanitizeNullableText(input.instanceName) ??
+      (await this.resolveInstanceNameForUser(user));
+
+    return this.closeOrchestrationSession({
+      ...input,
+      instanceName: resolvedInstanceName,
+    });
+  }
+
   private async requireScopedSponsor(scope: {
     workspaceId: string;
     teamId: string;
@@ -495,6 +801,42 @@ export class AiConfigService {
     }
 
     return sponsor;
+  }
+
+  private async resolveInstanceNameForUser(user: AuthenticatedUser) {
+    const sponsorId = user.sponsorId;
+    const teamId = user.teamId;
+
+    if (!sponsorId || !teamId) {
+      throw new BadRequestException({
+        code: 'AI_ORCHESTRATION_INSTANCE_NOT_RESOLVABLE',
+        message:
+          'The current authenticated user is missing sponsor or team context required for orchestration.',
+      });
+    }
+
+    const channelInstance = await this.prisma.channelInstance.findFirst({
+      where: {
+        tenantId: teamId,
+        memberId: sponsorId,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      select: {
+        instanceName: true,
+      },
+    });
+
+    if (!channelInstance?.instanceName) {
+      throw new NotFoundException({
+        code: 'AI_ORCHESTRATION_CHANNEL_INSTANCE_NOT_FOUND',
+        message:
+          'No active channel instance was found for the current team admin to execute orchestration.',
+      });
+    }
+
+    return channelInstance.instanceName;
   }
 
   private buildPlaceholders(input: {
@@ -551,6 +893,122 @@ export class AiConfigService {
         status: 'unavailable',
         reason: message,
       };
+    }
+  }
+
+  private ensureGatewayConfigured() {
+    if (this.gatewayBaseUrl && this.gatewayAuthToken) {
+      return;
+    }
+
+    throw new ServiceUnavailableException({
+      code: 'AI_GATEWAY_NOT_CONFIGURED',
+      message:
+        'IA Gateway is not configured. Set GATEWAY_AUTH_TOKEN to execute orchestrations.',
+    });
+  }
+
+  private buildOrchestrationSessionId(input: {
+    instanceName: string;
+    funnelId: string;
+  }) {
+    return `${input.instanceName}-${input.funnelId}`;
+  }
+
+  private buildGatewaySystemPrompt(input: {
+    runtimeContext: AiRuntimeContext;
+    funnelContext: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
+  }) {
+    const sections = [
+      input.runtimeContext.ai_agent.base_prompt,
+      'Contexto operativo del runtime:',
+      stringifyJsonForPrompt({
+        tenant: input.runtimeContext.tenant,
+        member: input.runtimeContext.member,
+        placeholders: input.runtimeContext.placeholders,
+        route_contexts: input.runtimeContext.ai_agent.route_contexts,
+        cta_policy: input.runtimeContext.ai_agent.cta_policy,
+        ai_policy: input.runtimeContext.ai_agent.ai_policy,
+      }),
+    ];
+
+    if (input.funnelContext) {
+      sections.push(
+        'Estado actual del funnel:',
+        stringifyJsonForPrompt(input.funnelContext),
+      );
+    }
+
+    if (input.metadata) {
+      sections.push(
+        'Metadata de la sesión:',
+        stringifyJsonForPrompt(input.metadata),
+      );
+    }
+
+    sections.push(
+      'Responde con un contrato JSON aplicable por Leadflow para Smart Wiring.',
+    );
+
+    return sections.join('\n\n');
+  }
+
+  private async sendGatewayRequest(input: {
+    path: string;
+    runtimeContext: AiRuntimeContext;
+    body: Record<string, unknown>;
+    errorCode: string;
+    errorMessage: string;
+  }) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.gatewayTimeoutMs);
+
+    try {
+      const response = await fetch(
+        `${this.gatewayBaseUrl!.replace(/\/+$/, '')}${input.path}`,
+        {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${this.gatewayAuthToken}`,
+            'Content-Type': 'application/json',
+            'x-service-key': input.runtimeContext.routing.service_owner_key,
+          },
+          body: JSON.stringify(input.body),
+        },
+      );
+      const rawBody = await response.text();
+      const data = this.parseGatewayResponse(rawBody);
+
+      if (!response.ok) {
+        throw new BadGatewayException({
+          code: input.errorCode,
+          message: `${input.errorMessage} HTTP ${response.status}.`,
+          details: data,
+          upstreamStatus: response.status,
+        });
+      }
+
+      return {
+        response,
+        data,
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  private parseGatewayResponse(rawBody: string) {
+    if (!rawBody) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(rawBody) as unknown;
+    } catch {
+      return rawBody;
     }
   }
 }

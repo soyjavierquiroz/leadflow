@@ -6,6 +6,7 @@ import type {
   HandoffStrategy,
   HandoffStrategyRepository,
 } from './interfaces/handoff-strategy.interface';
+import { handoffStrategyPresets } from './handoff-strategy-presets';
 
 @Injectable()
 export class HandoffStrategiesService {
@@ -43,5 +44,9 @@ export class HandoffStrategiesService {
     }
 
     return this.repository.findAll();
+  }
+
+  listPresets() {
+    return handoffStrategyPresets;
   }
 }

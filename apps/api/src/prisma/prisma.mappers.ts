@@ -253,6 +253,8 @@ export const mapFunnelInstanceRecord = (
   code: record.code,
   thumbnailUrl: record.thumbnailUrl,
   status: record.status,
+  structuralType: record.structuralType,
+  conversionContract: toJson(record.conversionContract),
   rotationPoolId: record.rotationPoolId,
   trackingProfileId: record.trackingProfileId,
   handoffStrategyId: record.handoffStrategyId,

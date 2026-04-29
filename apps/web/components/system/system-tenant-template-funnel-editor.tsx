@@ -245,6 +245,7 @@ export function SystemTenantTemplateFunnelEditor({
   const editorContext = {
     stepName: activeStepTabLabel,
     stepPath: activeStep ? `/${activeStep.slug}` : `/${activeStepTab}`,
+    stepType: activeStep?.stepType ?? activeStepTab,
   };
 
   useEffect(() => {

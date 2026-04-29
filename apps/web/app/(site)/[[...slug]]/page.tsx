@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
+import { FunnelUnderConstruction } from '@/components/public-funnel/funnel-under-construction';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
 import { getSessionUser } from '@/lib/auth';
 import {
   fetchPublicFunnelRuntime,
+  fetchPublicFunnelRuntimeResolution,
   normalizeRuntimePath,
   resolveRuntimeHost,
   resolveRuntimePath,
@@ -68,17 +70,21 @@ const appendRuntimeQuery = (
 };
 
 const resolveSeoFromRuntime = (runtime: PublicFunnelRuntimePayload) => {
+  const publication = runtime.publication;
   const stepSettings = asRecord(runtime.currentStep.settingsJson);
   const funnelSettings = asRecord(runtime.funnel.settingsJson);
   const stepSeo = asRecord(stepSettings?.seo);
   const funnelSeo = asRecord(funnelSettings?.seo);
   const title =
+    (typeof publication.seoTitle === 'string' && publication.seoTitle.trim()) ||
     (typeof stepSeo?.title === 'string' && stepSeo.title.trim()) ||
     (typeof stepSettings?.title === 'string' && stepSettings.title.trim()) ||
     (typeof funnelSeo?.title === 'string' && funnelSeo.title.trim()) ||
     (typeof funnelSettings?.title === 'string' && funnelSettings.title.trim()) ||
     runtime.funnel.name;
   const description =
+    (typeof publication.seoDescription === 'string' &&
+      publication.seoDescription.trim()) ||
     (typeof stepSeo?.metaDescription === 'string' &&
       stepSeo.metaDescription.trim()) ||
     (typeof stepSettings?.metaDescription === 'string' &&
@@ -95,8 +101,16 @@ const resolveSeoFromRuntime = (runtime: PublicFunnelRuntimePayload) => {
     (typeof funnelSettings?.description === 'string' &&
       funnelSettings.description.trim()) ||
     undefined;
+  const ogImage =
+    typeof publication.ogImageUrl === 'string' && publication.ogImageUrl.trim()
+      ? publication.ogImageUrl.trim()
+      : undefined;
+  const favicon =
+    typeof publication.faviconUrl === 'string' && publication.faviconUrl.trim()
+      ? publication.faviconUrl.trim()
+      : undefined;
 
-  return { title, description };
+  return { title, description, ogImage, favicon };
 };
 
 const loadRuntimeSafely = async (host: string, path: string) => {
@@ -141,6 +155,12 @@ export async function generateMetadata({
   return {
     title: seo.title,
     description: seo.description,
+    icons: seo.favicon
+      ? {
+          icon: seo.favicon,
+          shortcut: seo.favicon,
+        }
+      : undefined,
     alternates: {
       canonical: canonicalUrl,
     },
@@ -150,11 +170,13 @@ export async function generateMetadata({
       url: canonicalUrl,
       siteName: runtime.domain.host,
       type: 'website',
+      images: seo.ogImage ? [seo.ogImage] : undefined,
     },
     twitter: {
       card: 'summary_large_image',
       title: seo.title,
       description: seo.description,
+      images: seo.ogImage ? [seo.ogImage] : undefined,
     },
   };
 }
@@ -181,11 +203,27 @@ export default async function SiteRuntimePage({
     redirect(user?.homePath ?? '/login');
   }
 
-  const runtime = await loadRuntimeSafely(host, runtimePath);
+  const runtimeResolution = await fetchPublicFunnelRuntimeResolution({
+    host,
+    path: runtimePath,
+  }).catch((error) => {
+    console.error('[site-runtime] Failed to load public funnel runtime', {
+      host,
+      path: runtimePath,
+      error,
+    });
+    return { status: 'not_found' as const };
+  });
 
-  if (!runtime) {
+  if (runtimeResolution.status === 'not_found') {
     notFound();
   }
+
+  if (runtimeResolution.status === 'under_construction') {
+    return <FunnelUnderConstruction runtime={runtimeResolution.runtime} />;
+  }
+
+  const runtime = runtimeResolution.runtime;
 
   if (
     normalizeRuntimePath(path) !==

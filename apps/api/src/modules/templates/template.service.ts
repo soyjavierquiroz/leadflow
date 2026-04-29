@@ -2,9 +2,14 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, type FunnelTemplate as PrismaFunnelTemplate } from '@prisma/client';
+import {
+  FunnelStepType,
+  Prisma,
+  type FunnelTemplate as PrismaFunnelTemplate,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { mapFunnelRecord, mapFunnelTemplateRecord } from '../../prisma/prisma.mappers';
 import type { JsonValue } from '../shared/domain.types';
@@ -22,7 +27,64 @@ type FunnelCodeLookupClient =
 
 @Injectable()
 export class TemplateService {
+  private readonly logger = new Logger(TemplateService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  async getStepDefaults(input: {
+    workspaceId: string;
+    templateKey?: string | null;
+    stepType: FunnelStepType;
+  }): Promise<{
+    blocksJson: JsonValue;
+    mediaMap: JsonValue;
+    settingsJson: JsonValue;
+  }> {
+    const templateKey = this.sanitizeOptionalText(input.templateKey);
+
+    if (templateKey) {
+      try {
+        this.logger.debug(
+          `Resolving step defaults from templateKey="${templateKey}" for workspace ${input.workspaceId} and stepType ${input.stepType}.`,
+        );
+
+        const template = await this.prisma.funnelTemplate.findFirst({
+          where: {
+            status: {
+              in: ['active', 'draft'],
+            },
+            OR: [
+              { id: templateKey },
+              { code: templateKey },
+              { name: { equals: templateKey, mode: 'insensitive' } },
+            ],
+            AND: [
+              {
+                OR: [{ workspaceId: input.workspaceId }, { workspaceId: null }],
+              },
+            ],
+          },
+          orderBy: [{ workspaceId: 'desc' }, { updatedAt: 'desc' }],
+        });
+
+        if (template) {
+          return {
+            blocksJson: template.blocksJson as JsonValue,
+            mediaMap: template.mediaMap as JsonValue,
+            settingsJson: template.settingsJson as JsonValue,
+          };
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Template lookup failed for templateKey="${templateKey}" in workspace ${input.workspaceId}. Falling back to in-memory defaults. ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+        );
+      }
+    }
+
+    return this.buildStepDefaults(templateKey, input.stepType);
+  }
 
   async create(dto: CreateTemplateDto) {
     const name = this.sanitizeRequiredText(dto.name, 'name');
@@ -177,6 +239,48 @@ export class TemplateService {
       blocks: template.blocksJson,
       mediaMap: template.mediaMap,
     };
+  }
+
+  private buildStepDefaults(
+    templateKey: string | null,
+    stepType: FunnelStepType,
+  ): {
+    blocksJson: JsonValue;
+    mediaMap: JsonValue;
+    settingsJson: JsonValue;
+  } {
+    const normalizedTemplateKey =
+      templateKey?.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_') ??
+      stepType;
+    const title = this.humanizeTemplateKey(normalizedTemplateKey);
+
+    return {
+      blocksJson: [
+        {
+          type: 'hero',
+          key: `${normalizedTemplateKey}_hero`,
+          eyebrow: 'Nuevo paso',
+          headline: title,
+          subheadline:
+            'Este paso fue creado desde el Step Manager. Ajusta el copy y conecta sus salidas en el FlowGraph.',
+        },
+      ],
+      mediaMap: {},
+      settingsJson: {
+        source: 'step-manager-defaults',
+        templateKey: normalizedTemplateKey,
+        title,
+        stepType,
+      },
+    };
+  }
+
+  private humanizeTemplateKey(value: string) {
+    return value
+      .split(/[-_]+/g)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
   }
 
   private async findTemplateRecord(templateId: string) {

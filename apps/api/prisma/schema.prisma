@@ -117,6 +117,12 @@ enum FunnelInstanceStatus {
   archived
 }
 
+enum FunnelStructuralType {
+  generic
+  two_step_conversion
+  multi_step_conversion
+}
+
 enum FunnelStepType {
   landing
   lead_capture
@@ -134,6 +140,12 @@ enum FunnelPublicationStatus {
   draft
   active
   archived
+}
+
+enum FunnelRuntimeHealthStatus {
+  healthy
+  warning
+  broken
 }
 
 enum TrackingProvider {
@@ -680,6 +692,8 @@ model FunnelInstance {
   code                 String
   thumbnailUrl         String?
   status               FunnelInstanceStatus
+  structuralType       FunnelStructuralType @default(generic)
+  conversionContract   Json                 @default("{}")
   rotationPoolId       String?
   trackingProfileId    String?
   handoffStrategyId    String?
@@ -701,6 +715,7 @@ model FunnelInstance {
   automationDispatches AutomationDispatch[]
 
   @@unique([teamId, code])
+  @@index([teamId, structuralType])
 }
 
 model FunnelStep {
@@ -747,6 +762,12 @@ model FunnelPublication {
   funnelInstanceId     String
   trackingProfileId    String?
   handoffStrategyId    String?
+  seoTitle             String?
+  seoDescription       String?
+  ogImageUrl           String?
+  faviconUrl           String?
+  manifestVersion      Int                     @default(1)
+  runtimeHealthStatus  FunnelRuntimeHealthStatus @default(healthy)
   metaPixelId          String?
   tiktokPixelId        String?
   metaCapiToken        String?
@@ -770,6 +791,7 @@ model FunnelPublication {
 
   @@unique([domainId, pathPrefix])
   @@index([domainId, status, pathPrefix])
+  @@index([runtimeHealthStatus, status])
 }
 
 model TrackingProfile {

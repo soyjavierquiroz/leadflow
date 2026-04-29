@@ -89,3 +89,43 @@ export type AiConfigEditorSnapshot = {
   availablePlaceholders: string[];
   updatedAt: string | null;
 };
+
+export type InitOrchestrationSessionInput = {
+  instanceName?: string | null;
+  funnelId: string;
+  funnelContext?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type InitOrchestrationSessionResponse = {
+  status: number;
+  sessionId: string;
+  runtimeContext: AiRuntimeContext;
+  data: unknown;
+};
+
+export type ExecuteOrchestrationInput = {
+  instanceName?: string | null;
+  sessionId: string;
+  prompt?: string | null;
+  intent?: string | null;
+};
+
+export type ExecuteOrchestrationResponse = {
+  status: number;
+  sessionId: string;
+  runtimeContext: AiRuntimeContext;
+  data: unknown;
+};
+
+export type CloseOrchestrationSessionInput = {
+  instanceName?: string | null;
+  sessionId: string;
+};
+
+export type CloseOrchestrationSessionResponse = {
+  status: number;
+  sessionId: string;
+  runtimeContext: AiRuntimeContext;
+  data: unknown;
+};

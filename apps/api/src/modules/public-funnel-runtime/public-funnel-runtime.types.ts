@@ -48,6 +48,13 @@ export type PublicRuntimePayload = {
     handoffStrategyId: string | null;
     metaPixelId: string | null;
     tiktokPixelId: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    ogImageUrl: string | null;
+    faviconUrl: string | null;
+    nextStepPath: string | null;
+    manifestVersion: number;
+    runtimeHealthStatus: 'healthy' | 'warning' | 'broken';
   };
   theme: string | null;
   funnel: {
@@ -55,6 +62,8 @@ export type PublicRuntimePayload = {
     name: string;
     code: string;
     status: string;
+    structuralType: string | null;
+    conversionContract: RuntimeJsonValue;
     settingsJson: RuntimeJsonValue;
     mediaMap: RuntimeJsonValue;
     template: {

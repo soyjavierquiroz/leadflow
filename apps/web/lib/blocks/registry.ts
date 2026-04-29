@@ -1,4 +1,10 @@
 import type { FC } from "react";
+import type {
+  AutoWiringRule,
+  BusinessOutcome,
+  FunnelCapability,
+  FunnelStepType,
+} from "../../../../packages/shared/funnel-orchestrator/src";
 
 import {
   PublicAnnouncementBlockBridge,
@@ -12,14 +18,20 @@ import {
 import { ParadigmShift } from "@/components/blocks/paradigm-shift";
 import type { JsonValue } from "@/lib/public-funnel-runtime.types";
 
-export type BuilderBlockDefinition = {
+export type BuilderBlockDefinitionV2 = {
   key: string;
   name: string;
   description: string;
   category: string;
   schema: Record<string, JsonValue>;
   example: Record<string, JsonValue>;
+  compatibleStepTypes: FunnelStepType[];
+  requiredCapabilities: FunnelCapability[];
+  emitsOutcomes: BusinessOutcome[];
+  autoWiring: AutoWiringRule[];
 };
+
+export type BuilderBlockDefinition = BuilderBlockDefinitionV2;
 
 export interface BaseFunnelBlock {
   type: string;
@@ -41,6 +53,7 @@ export interface VideoPlayerBlock extends BaseFunnelBlock {
 }
 
 const baseFunnelBlockSchema: Record<string, JsonValue> = {
+  block_id: "stable string",
   key: "string",
   is_boxed: false,
 };
@@ -59,12 +72,130 @@ const withBaseFunnelBlockExample = (
   ...example,
 });
 
+type BuilderBlockDefinitionInput = Omit<
+  BuilderBlockDefinitionV2,
+  "compatibleStepTypes" | "requiredCapabilities" | "emitsOutcomes" | "autoWiring"
+> &
+  Partial<
+    Pick<
+      BuilderBlockDefinitionV2,
+      "compatibleStepTypes" | "requiredCapabilities" | "emitsOutcomes" | "autoWiring"
+    >
+  >;
+
+const CONTENT_STEP_TYPES: FunnelStepType[] = [
+  "landing",
+  "lead_capture",
+  "vsl",
+  "presentation",
+  "qualification",
+  "cta_bridge",
+];
+
+const HANDOFF_STEP_TYPES: FunnelStepType[] = [
+  "thank_you",
+  "confirmation",
+  "handoff",
+  "redirect",
+];
+
+const ALL_STEP_TYPES: FunnelStepType[] = [
+  ...CONTENT_STEP_TYPES,
+  ...HANDOFF_STEP_TYPES,
+];
+
+const defaultCompatibleStepTypes = (
+  definition: BuilderBlockDefinitionInput,
+): FunnelStepType[] => {
+  if (definition.compatibleStepTypes?.length) {
+    return definition.compatibleStepTypes;
+  }
+
+  if (definition.category === "handoff") {
+    return HANDOFF_STEP_TYPES;
+  }
+
+  if (definition.key === "lead_capture_config") {
+    return [...CONTENT_STEP_TYPES, "confirmation"];
+  }
+
+  return ALL_STEP_TYPES;
+};
+
+const defaultRequiredCapabilities = (
+  definition: BuilderBlockDefinitionInput,
+): FunnelCapability[] => {
+  if (definition.requiredCapabilities?.length) {
+    return definition.requiredCapabilities;
+  }
+
+  if (
+    definition.key === "lead_capture_form" ||
+    definition.key === "lead_capture_config" ||
+    definition.key === "hook_and_promise" ||
+    definition.key === "sticky_conversion_bar" ||
+    definition.key === "cta" ||
+    definition.key === "grand_slam_offer"
+  ) {
+    return ["lead_capture"];
+  }
+
+  return [];
+};
+
+const defaultEmitsOutcomes = (
+  definition: BuilderBlockDefinitionInput,
+): BusinessOutcome[] => {
+  if (definition.emitsOutcomes?.length) {
+    return definition.emitsOutcomes;
+  }
+
+  if (definition.key === "lead_capture_form") {
+    return ["submit_success"];
+  }
+
+  if (definition.category === "conversion") {
+    return ["cta_click"];
+  }
+
+  return ["view"];
+};
+
+const defaultAutoWiring = (
+  definition: BuilderBlockDefinitionInput,
+): AutoWiringRule[] => {
+  if (definition.autoWiring?.length) {
+    return definition.autoWiring;
+  }
+
+  if (
+    definition.key === "hook_and_promise" ||
+    definition.key === "sticky_conversion_bar" ||
+    definition.key === "cta" ||
+    definition.key === "grand_slam_offer"
+  ) {
+    return [
+      {
+        when: "inserted",
+        ensureBlockType: "lead_capture_config",
+        bindFields: { action: "open_lead_capture_modal" },
+      },
+    ];
+  }
+
+  return [];
+};
+
 const defineBlock = (
-  definition: BuilderBlockDefinition,
+  definition: BuilderBlockDefinitionInput,
 ): BuilderBlockDefinition => ({
   ...definition,
   schema: withBaseFunnelBlockSchema(definition.schema),
   example: withBaseFunnelBlockExample(definition.example),
+  compatibleStepTypes: defaultCompatibleStepTypes(definition),
+  requiredCapabilities: defaultRequiredCapabilities(definition),
+  emitsOutcomes: defaultEmitsOutcomes(definition),
+  autoWiring: defaultAutoWiring(definition),
 });
 
 export const stickyConversionBarDefinition = defineBlock({
@@ -201,15 +332,23 @@ export const builderBlockDefinitionsByKey: Record<
     schema: {
       type: "hook_and_promise",
       key: "string",
-      eyebrow_text: "string",
-      headline: "string",
-      subheadline: "string",
-      hook_text: "string",
+      content: {
+        top_bar: "string",
+        headline: "string",
+        hook_text: "string",
+        subheadline: "string",
+        proof_header: "string",
+        urgency_box: {
+          text: "string",
+          mechanism: "string",
+        },
+        cta_button_text: "string",
+        cta_lead_in: "string",
+        cta_footer: "string",
+      },
       primary_benefit_bullets: ["string"],
+      proof_points: ["string"],
       trust_badges: ["string"],
-      primary_cta_text: "string",
-      cta_lead_in: "string",
-      helper_text: "string",
       action: "hook_primary | open_lead_capture_modal",
       href: "#public-capture-form",
       media_key: "hero",
@@ -217,21 +356,33 @@ export const builderBlockDefinitionsByKey: Record<
     example: {
       type: "hook_and_promise",
       key: "hook-main",
-      eyebrow_text: "edicion limitada",
-      headline: "Perfila tu barba en casa con acabado profesional",
-      subheadline:
-        "Una propuesta clara, creíble y fácil de accionar desde el primer scroll.",
-      hook_text:
-        "Si ya probaste máquinas comunes y no logras líneas limpias, aquí cambia el resultado.",
+      content: {
+        top_bar: "edicion limitada",
+        headline: "Perfila tu barba en casa con acabado profesional",
+        hook_text:
+          "Si ya probaste máquinas comunes y no logras líneas limpias, aquí cambia el resultado.",
+        subheadline:
+          "Una propuesta clara, creíble y fácil de accionar desde el primer scroll.",
+        proof_header: "Creado para quienes ya probaron otras alternativas",
+        urgency_box: {
+          text: "Tu oportunidad activa depende de avanzar mientras esta evaluación sigue disponible.",
+          mechanism:
+            "El siguiente paso ordena la recomendación y evita que sigas probando soluciones sin contexto.",
+        },
+        cta_button_text: "Quiero mi Dragon T9",
+        cta_lead_in: "En pocos minutos sabrás si es para ti.",
+        cta_footer: "Te llevamos al siguiente paso sin romper el tracking.",
+      },
       primary_benefit_bullets: [
         "Define contornos con precisión",
         "Reduce volumen en minutos",
         "Mantiene continuidad hacia la captura",
       ],
+      proof_points: [
+        "Resultados más consistentes desde el primer uso.",
+        "Menos fricción entre interés y decisión.",
+      ],
       trust_badges: ["envio rapido", "pago seguro", "garantia"],
-      primary_cta_text: "Quiero mi Dragon T9",
-      cta_lead_in: "En pocos minutos sabrás si es para ti.",
-      helper_text: "Te llevamos al siguiente paso sin romper el tracking.",
       action: "scroll_to_capture",
       href: "#public-capture-form",
       media_key: "hero",
@@ -393,6 +544,7 @@ export const builderBlockDefinitionsByKey: Record<
           subtext: "Respuesta prioritaria por WhatsApp.",
         },
       },
+      success_redirect: "/gracias",
     },
   }),
   lead_capture_form: defineBlock({
@@ -412,6 +564,7 @@ export const builderBlockDefinitionsByKey: Record<
       helper_text: "string",
       privacy_note: "string",
       success_mode: "next_step | inline_message",
+      outcome: "default | submit_success | accept | decline",
       fields: [
         {
           name: "full_name",
@@ -442,6 +595,7 @@ export const builderBlockDefinitionsByKey: Record<
       helper_text: "Te contactaremos por el canal configurado.",
       privacy_note: "Usamos tus datos solo para continuar esta conversacion.",
       success_mode: "next_step",
+      outcome: "submit_success",
       fields: [
         {
           name: "full_name",
@@ -672,6 +826,7 @@ export const builderBlockDefinitionsByKey: Record<
       label: "string",
       href: "#public-capture-form",
       action: "string",
+      outcome: "default | submit_success | accept | decline",
       items: ["string"],
     },
     example: {
@@ -682,7 +837,8 @@ export const builderBlockDefinitionsByKey: Record<
       description: "Un CTA claro para mover al usuario sin ambiguedad.",
       label: "Quiero continuar",
       href: "#public-capture-form",
-      action: "cta_primary",
+      action: "next_step_from_contract",
+      outcome: "default",
       items: [
         "Mantiene tracking de click",
         "Respeta la navegacion actual",
@@ -1223,6 +1379,7 @@ export const builderBlockDefinitionsByKey: Record<
       label: "string",
       href: "#public-capture-form",
       action: "offer_cta",
+      outcome: "default | accept | decline",
     },
     example: {
       type: "offer_pricing",
@@ -1244,7 +1401,8 @@ export const builderBlockDefinitionsByKey: Record<
       ],
       label: "Quiero esta oferta",
       href: "#public-capture-form",
-      action: "offer_cta",
+      action: "next_step_from_contract",
+      outcome: "accept",
     },
   }),
   grand_slam_offer: defineBlock({
