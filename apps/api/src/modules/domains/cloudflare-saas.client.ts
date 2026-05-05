@@ -13,6 +13,7 @@ import type {
 type CloudflareEnvelope = {
   success: boolean;
   result?: unknown;
+  result_info?: unknown;
   errors?: unknown[];
   messages?: unknown[];
 };
@@ -97,6 +98,49 @@ export class CloudflareSaasClient {
       response,
       'No pudimos crear el custom hostname en Cloudflare.',
     );
+  }
+
+  async listCustomHostnamesByHostname(
+    hostname: string,
+  ): Promise<CloudflareCustomHostnameSnapshot[]> {
+    const response = await this.request(
+      `/custom_hostnames?hostname=${encodeURIComponent(hostname)}&per_page=50`,
+      {
+        method: 'GET',
+      },
+    );
+    const payload = response.data as CloudflareEnvelope | null;
+
+    if (!payload?.success || !Array.isArray(payload.result)) {
+      const errorMessage =
+        Array.isArray(payload?.errors) && payload.errors.length > 0
+          ? JSON.stringify(payload.errors)
+          : 'No pudimos listar custom hostnames en Cloudflare.';
+
+      throw new CloudflareSaasClientError(errorMessage, response.status, {
+        payload: response.data,
+        url: response.url,
+      });
+    }
+
+    return payload.result
+      .map((item) => normalizeCloudflareCustomHostnameSnapshot(item))
+      .filter(
+        (item): item is CloudflareCustomHostnameSnapshot =>
+          Boolean(item?.id) && item?.hostname === hostname,
+      );
+  }
+
+  async deleteCustomHostnamesByHostname(hostname: string) {
+    const matches = await this.listCustomHostnamesByHostname(hostname);
+
+    for (const match of matches) {
+      if (match.id) {
+        await this.deleteCustomHostname(match.id);
+      }
+    }
+
+    return matches.length;
   }
 
   async getCustomHostname(

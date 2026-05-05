@@ -34,12 +34,13 @@ type JsonRecord = Record<string, unknown>;
 const AI_RUNTIME_CONTEXT_VERSION = 'leadflow.ai-runtime-context.v1' as const;
 const AI_SERVICE_OWNER_KEY = 'lead-handler' as const;
 const AI_RUNTIME_CHANNEL = 'whatsapp' as const;
-const DEFAULT_GATEWAY_TIMEOUT_MS = 10_000;
-const DEFAULT_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+const DEFAULT_GATEWAY_TIMEOUT_MS = 90_000;
+const DEFAULT_GATEWAY_BASE_URL = 'http://ia-gateway_ia-gateway:3000';
+const SWARM_GATEWAY_BASE_URL = 'http://ia-gateway_ia-gateway:3000';
 const DEFAULT_DEVELOPMENT_ORCHESTRATION_INSTANCE_NAME =
   'default-constructor' as const;
 const DEFAULT_DEVELOPMENT_ORCHESTRATION_PROMPT =
-  'Actua como el constructor de Smart Wiring de Leadflow y responde con un contrato JSON claro, conservador y aplicable por el builder.' as const;
+  'Actua como el electricista de Smart Wiring de Leadflow. Prioriza estructura sobre copy, valida esquemas, corrige wiring y responde con JSON aplicable por el builder.' as const;
 const IA_GATEWAY_SESSION_INIT_PATH = '/v1/session/init';
 const IA_GATEWAY_EXECUTE_PATH = '/v1/execute';
 const IA_GATEWAY_SESSION_CLOSE_PATH = '/v1/session/close';
@@ -197,6 +198,121 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
   }
 
   return parsed;
+};
+
+const readNetworkErrorCode = (error: unknown): string | null => {
+  if (typeof error !== 'object' || error === null) {
+    return null;
+  }
+
+  if ('code' in error && typeof error.code === 'string') {
+    return error.code;
+  }
+
+  if (
+    'cause' in error &&
+    typeof error.cause === 'object' &&
+    error.cause !== null &&
+    'code' in error.cause &&
+    typeof error.cause.code === 'string'
+  ) {
+    return error.cause.code;
+  }
+
+  return null;
+};
+
+const slugifySmartWiringToken = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const normalizeBlockIdFromContext = (block: JsonRecord, index: number) => {
+  const explicitId = sanitizeNullableText(block.block_id as any);
+
+  if (explicitId) {
+    return explicitId;
+  }
+
+  const preferredKey = sanitizeNullableText(block.key as any);
+  if (preferredKey) {
+    return slugifySmartWiringToken(preferredKey);
+  }
+
+  const type = sanitizeNullableText(block.type as any) ?? 'block';
+  const normalizedType = slugifySmartWiringToken(type) || 'block';
+  return `${normalizedType}_${index + 1}`;
+};
+
+const extractSmartWiringBlocks = (value: unknown): JsonRecord[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is JsonRecord => isPlainObject(item))
+    .map((item) => ({ ...item }));
+};
+
+const extractSmartWiringEdges = (value: unknown): JsonRecord[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is JsonRecord => isPlainObject(item))
+    .map((item) => ({ ...item }));
+};
+
+const buildSequentialRecoveryEdges = (blocks: JsonRecord[]) => {
+  if (blocks.length < 2) {
+    return [];
+  }
+
+  return blocks.slice(0, -1).map((block, index) => ({
+    from_block_id: normalizeBlockIdFromContext(block, index),
+    to_block_id: normalizeBlockIdFromContext(blocks[index + 1]!, index + 1),
+    outcome: 'default',
+    rationale: 'recovery_sequential_order',
+  }));
+};
+
+const normalizeOrchestrationFunnelContext = (
+  value: Record<string, unknown> | null | undefined,
+) => {
+  const context = toJsonRecord(value);
+  const normalizedBlocks = extractSmartWiringBlocks(context.blocks).map(
+    (block, index) => ({
+      ...block,
+      block_id: normalizeBlockIdFromContext(block, index),
+    }),
+  );
+  const currentEdges = extractSmartWiringEdges(context.edges);
+  const needsRecovery = normalizedBlocks.length > 1 && currentEdges.length === 0;
+  const recoveryEdges = needsRecovery
+    ? buildSequentialRecoveryEdges(normalizedBlocks)
+    : currentEdges;
+
+  return {
+    ...context,
+    blocks: normalizedBlocks,
+    edges: recoveryEdges,
+    smart_wiring: {
+      mode: needsRecovery ? 'recovery' : 'validate',
+      structure_priority: 'edges_first',
+      validate_block_ids: true,
+      preserve_content: true,
+      recovery_strategy: needsRecovery ? 'sequential_block_order' : null,
+      diagnostics: {
+        block_count: normalizedBlocks.length,
+        edge_count: currentEdges.length,
+        recovery_edge_count: recoveryEdges.length,
+        missing_graph_detected: needsRecovery,
+      },
+    },
+  };
 };
 
 const buildMergedPrompt = (input: {
@@ -616,19 +732,23 @@ export class AiConfigService {
       instanceName: runtimeContext.routing.instance_name,
       funnelId,
     });
+    const normalizedFunnelContext = normalizeOrchestrationFunnelContext(
+      input.funnelContext,
+    );
+    const payload = {
+      sessionId,
+      system_prompt: this.buildGatewaySystemPrompt({
+        runtimeContext,
+        funnelContext: normalizedFunnelContext,
+        metadata: input.metadata ?? null,
+      }),
+    };
 
     try {
       const { response, data } = await this.sendGatewayRequest({
         path: IA_GATEWAY_SESSION_INIT_PATH,
         runtimeContext,
-        body: {
-          sessionId,
-          system_prompt: this.buildGatewaySystemPrompt({
-            runtimeContext,
-            funnelContext: input.funnelContext ?? null,
-            metadata: input.metadata ?? null,
-          }),
-        },
+        body: payload,
         errorCode: 'AI_GATEWAY_SESSION_INIT_FAILED',
         errorMessage: 'IA Gateway session initialization failed.',
       });
@@ -656,6 +776,68 @@ export class AiConfigService {
         throw error;
       }
 
+      const networkErrorCode = readNetworkErrorCode(error);
+
+      if (networkErrorCode === 'ENOTFOUND') {
+        const fallbackBaseUrl = this.resolveSwarmGatewayBaseUrl();
+
+        if (fallbackBaseUrl && fallbackBaseUrl !== this.gatewayBaseUrl) {
+          this.logger.warn(
+            `IA Gateway DNS lookup failed against ${this.gatewayBaseUrl}; retrying session init against ${fallbackBaseUrl}.`,
+          );
+
+          try {
+            const { response, data } = await this.sendGatewayRequest({
+              path: IA_GATEWAY_SESSION_INIT_PATH,
+              runtimeContext,
+              body: payload,
+              errorCode: 'AI_GATEWAY_SESSION_INIT_FAILED',
+              errorMessage: 'IA Gateway session initialization failed.',
+              baseUrlOverride: fallbackBaseUrl,
+            });
+
+            return {
+              status: response.status,
+              sessionId,
+              runtimeContext,
+              data,
+            };
+          } catch (retryError) {
+            const retryNetworkErrorCode = readNetworkErrorCode(retryError);
+
+            throw new BadGatewayException({
+              code: 'AI_GATEWAY_UNREACHABLE',
+              message: 'IA Gateway session initialization request failed.',
+              details: {
+                message:
+                  retryError instanceof Error
+                    ? retryError.message
+                    : 'Unknown upstream error.',
+                networkErrorCode: retryNetworkErrorCode ?? networkErrorCode,
+                attemptedBaseUrl: fallbackBaseUrl,
+              },
+            });
+          }
+        }
+      }
+
+      if (
+        networkErrorCode === 'ETIMEDOUT' ||
+        networkErrorCode === 'ENOTFOUND' ||
+        networkErrorCode === 'ECONNREFUSED'
+      ) {
+        throw new BadGatewayException({
+          code: 'AI_GATEWAY_UNREACHABLE',
+          message: 'IA Gateway session initialization request failed.',
+          details: {
+            message:
+              error instanceof Error ? error.message : 'Unknown upstream error.',
+            networkErrorCode,
+            attemptedBaseUrl: this.gatewayBaseUrl,
+          },
+        });
+      }
+
       throw new BadGatewayException({
         code: 'AI_GATEWAY_UNREACHABLE',
         message: 'IA Gateway session initialization request failed.',
@@ -681,6 +863,14 @@ export class AiConfigService {
       sanitizeNullableText(input.intent) ??
       sanitizeNullableText(input.prompt) ??
       runtimeContext.ai_agent.base_prompt;
+    const funnelId = this.readFunnelIdFromSessionId({
+      sessionId,
+      instanceName: runtimeContext.routing.instance_name,
+    });
+
+    this.logger.log(
+      `Iniciando orquestacion pesada para funnel ${funnelId ?? 'unknown'}... esperando hasta ${Math.round(this.gatewayTimeoutMs / 1000)}s`,
+    );
 
     try {
       const { response, data } = await this.sendGatewayRequest({
@@ -1165,6 +1355,20 @@ export class AiConfigService {
   }) {
     const sections = [
       input.runtimeContext.ai_agent.base_prompt,
+      'Reglas obligatorias del contrato:',
+      [
+        'Solo puedes responder en formato JSON.',
+        'No puedes responder con markdown, prose, backticks ni explicaciones fuera del JSON.',
+        'Prioriza estructura sobre copy. Tu tarea principal es validar el cableado, no redactar texto.',
+        'Responde como validador de esquemas: verifica consistencia de block_id, continuidad de edges y preservacion conservadora del JSON existente.',
+        'Debes devolver un objeto JSON con las claves mode, blocks y edges.',
+        'Cada bloque debe seguir estrictamente el esquema BuilderBlockDefinitionV2.',
+        'Es obligatorio incluir autoWiring, compatibleStepTypes, requiredCapabilities y emitsOutcomes en cada definicion de bloque cuando corresponda.',
+        'No inventes block_id nuevos si ya existe uno valido; si falta, normalizalo de forma estable.',
+        'Si el funnel llega sin grafo o con edges vacios, entra en mode="recovery" y propone conexiones logicas usando el orden actual de los bloques.',
+        'Para bloques como hook_and_promise, la estructura de content debe permanecer anidada y completa dentro del JSON final.',
+        'Si no conoces un valor exacto, usa un valor conservador valido para el esquema en lugar de omitir la propiedad.',
+      ].join('\n'),
       'Contexto operativo del runtime:',
       stringifyJsonForPrompt({
         tenant: input.runtimeContext.tenant,
@@ -1191,7 +1395,7 @@ export class AiConfigService {
     }
 
     sections.push(
-      'Responde con un contrato JSON aplicable por Leadflow para Smart Wiring.',
+      'Responde con un contrato JSON aplicable por Leadflow para Smart Wiring, priorizando wiring y consistencia estructural.',
     );
 
     return sections.join('\n\n');
@@ -1203,25 +1407,29 @@ export class AiConfigService {
     body: Record<string, unknown>;
     errorCode: string;
     errorMessage: string;
+    baseUrlOverride?: string;
   }) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.gatewayTimeoutMs);
+    const baseUrl = input.baseUrlOverride ?? this.gatewayBaseUrl;
+    const requestUrl = `${baseUrl!.replace(/\/+$/, '')}${input.path}`;
 
     try {
-      const response = await fetch(
-        `${this.gatewayBaseUrl!.replace(/\/+$/, '')}${input.path}`,
-        {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${this.gatewayAuthToken}`,
-            'Content-Type': 'application/json',
-            'x-service-key': input.runtimeContext.routing.service_owner_key,
-          },
-          body: JSON.stringify(input.body),
-        },
+      this.logger.log(
+        `IA Gateway handshake request ${input.path}: ${JSON.stringify(input.body)}`,
       );
+
+      const response = await fetch(requestUrl, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${this.gatewayAuthToken}`,
+          'Content-Type': 'application/json',
+          'x-service-key': input.runtimeContext.routing.service_owner_key,
+        },
+        body: JSON.stringify(input.body),
+      });
       const rawBody = await response.text();
       const data = this.parseGatewayResponse(rawBody);
 
@@ -1253,5 +1461,24 @@ export class AiConfigService {
     } catch {
       return rawBody;
     }
+  }
+
+  private resolveSwarmGatewayBaseUrl() {
+    const normalizedSwarmBaseUrl = normalizeBaseUrl(SWARM_GATEWAY_BASE_URL);
+    return normalizedSwarmBaseUrl ?? null;
+  }
+
+  private readFunnelIdFromSessionId(input: {
+    sessionId: string;
+    instanceName: string;
+  }) {
+    const prefix = `${input.instanceName}-`;
+
+    if (!input.sessionId.startsWith(prefix)) {
+      return null;
+    }
+
+    const funnelId = sanitizeNullableText(input.sessionId.slice(prefix.length));
+    return funnelId ?? null;
   }
 }

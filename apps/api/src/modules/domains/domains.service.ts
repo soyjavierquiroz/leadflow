@@ -627,32 +627,7 @@ export class DomainsService {
     }
 
     try {
-      const snapshot =
-        domain.cloudflareCustomHostnameId && options.mode !== 'create'
-          ? options.mode === 'update'
-            ? await this.cloudflareSaasClient.updateCustomHostname(
-                domain.cloudflareCustomHostnameId,
-                {
-                  hostname: domain.host,
-                  domainType: domain.domainType,
-                  verificationMethod: domain.verificationMethod,
-                },
-              )
-            : await this.cloudflareSaasClient.refreshCustomHostname(
-                domain.cloudflareCustomHostnameId,
-                {
-                  hostname: domain.host,
-                  domainType: domain.domainType,
-                  verificationMethod: domain.verificationMethod,
-                },
-              )
-          : options.allowCreate
-            ? await this.cloudflareSaasClient.createCustomHostname({
-                hostname: domain.host,
-                domainType: domain.domainType,
-                verificationMethod: domain.verificationMethod,
-              })
-            : null;
+      const snapshot = await this.syncCloudflareSnapshot(domain, options);
 
       if (!snapshot) {
         return await this.applyDerivedState(domain);
@@ -685,6 +660,84 @@ export class DomainsService {
         lastCloudflareSyncAt: new Date().toISOString(),
       });
     }
+  }
+
+  private async syncCloudflareSnapshot(
+    domain: DomainEntity,
+    options: {
+      mode: 'create' | 'update' | 'refresh';
+      allowCreate: boolean;
+    },
+  ) {
+    const create = () =>
+      this.cloudflareSaasClient.createCustomHostname({
+        hostname: domain.host,
+        domainType: domain.domainType,
+        verificationMethod: domain.verificationMethod,
+      });
+
+    if (domain.cloudflareCustomHostnameId && options.mode !== 'create') {
+      return options.mode === 'update'
+        ? await this.cloudflareSaasClient.updateCustomHostname(
+            domain.cloudflareCustomHostnameId,
+            {
+              hostname: domain.host,
+              domainType: domain.domainType,
+              verificationMethod: domain.verificationMethod,
+            },
+          )
+        : await this.cloudflareSaasClient.refreshCustomHostname(
+            domain.cloudflareCustomHostnameId,
+            {
+              hostname: domain.host,
+              domainType: domain.domainType,
+              verificationMethod: domain.verificationMethod,
+            },
+          );
+    }
+
+    if (!options.allowCreate) {
+      return null;
+    }
+
+    try {
+      return await create();
+    } catch (error) {
+      if (!this.isDuplicateCloudflareHostnameError(error)) {
+        throw error;
+      }
+
+      await this.cloudflareSaasClient.deleteCustomHostnamesByHostname(
+        domain.host,
+      );
+
+      return await create();
+    }
+  }
+
+  private isDuplicateCloudflareHostnameError(error: unknown) {
+    if (!(error instanceof CloudflareSaasClientError)) {
+      return false;
+    }
+
+    const details = error.details as
+      | {
+          payload?: {
+            errors?: Array<{ code?: unknown; message?: unknown }>;
+          };
+        }
+      | undefined;
+
+    return (
+      error.status === 409 &&
+      Array.isArray(details?.payload?.errors) &&
+      details.payload.errors.some(
+        (item) =>
+          item.code === 1406 ||
+          (typeof item.message === 'string' &&
+            item.message.toLowerCase().includes('duplicate custom hostname')),
+      )
+    );
   }
 
   private async applyDerivedState(domain: DomainEntity): Promise<DomainEntity> {

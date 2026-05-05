@@ -1,6 +1,8 @@
 import { AiConfigService } from './ai-config.service';
 
 describe('AiConfigService', () => {
+  const swarmGatewayBaseUrl = 'http://ia-gateway_ia-gateway:3000';
+
   const buildService = () => {
     const prisma = {
       channelInstance: {
@@ -239,7 +241,7 @@ describe('AiConfigService', () => {
     const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
 
     process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
-    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+    process.env.IA_GATEWAY_BASE_URL = swarmGatewayBaseUrl;
 
     const previousFetch = global.fetch;
     const { prisma, walletEngineService, service } = buildService();
@@ -317,7 +319,7 @@ describe('AiConfigService', () => {
       );
 
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://ia_gateway:3000/v1/session/init',
+        `${swarmGatewayBaseUrl}/v1/session/init`,
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining(
@@ -337,7 +339,7 @@ describe('AiConfigService', () => {
     const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
 
     process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
-    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+    process.env.IA_GATEWAY_BASE_URL = swarmGatewayBaseUrl;
 
     const previousFetch = global.fetch;
     const { prisma, walletEngineService, service } = buildService();
@@ -421,7 +423,7 @@ describe('AiConfigService', () => {
       );
 
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://ia_gateway:3000/v1/session/init',
+        `${swarmGatewayBaseUrl}/v1/session/init`,
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -443,7 +445,7 @@ describe('AiConfigService', () => {
     const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
 
     process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
-    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+    process.env.IA_GATEWAY_BASE_URL = swarmGatewayBaseUrl;
 
     const previousFetch = global.fetch;
     const { prisma, walletEngineService, service } = buildService();
@@ -517,7 +519,7 @@ describe('AiConfigService', () => {
       );
 
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://ia_gateway:3000/v1/execute',
+        `${swarmGatewayBaseUrl}/v1/execute`,
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
@@ -538,7 +540,7 @@ describe('AiConfigService', () => {
     const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
 
     process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
-    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+    process.env.IA_GATEWAY_BASE_URL = swarmGatewayBaseUrl;
 
     const previousFetch = global.fetch;
     const { prisma, walletEngineService, service } = buildService();
@@ -599,13 +601,104 @@ describe('AiConfigService', () => {
       );
 
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://ia_gateway:3000/v1/session/close',
+        `${swarmGatewayBaseUrl}/v1/session/close`,
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
             sessionId: 'drenvexman-funnel-1',
           }),
         }),
+      );
+    } finally {
+      global.fetch = previousFetch;
+      process.env.GATEWAY_AUTH_TOKEN = originalGatewayToken;
+      process.env.IA_GATEWAY_BASE_URL = originalGatewayBaseUrl;
+    }
+  });
+
+  it('retries session init against the swarm service name when DNS lookup fails with ENOTFOUND', async () => {
+    const originalGatewayToken = process.env.GATEWAY_AUTH_TOKEN;
+    const originalGatewayBaseUrl = process.env.IA_GATEWAY_BASE_URL;
+
+    process.env.GATEWAY_AUTH_TOKEN = 'gateway-token';
+    process.env.IA_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+
+    const previousFetch = global.fetch;
+    const { prisma, walletEngineService, service } = buildService();
+    const fetchMock = jest
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new TypeError('fetch failed'), {
+          cause: { code: 'ENOTFOUND' },
+        }),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: jest
+          .fn()
+          .mockResolvedValue(JSON.stringify({ ok: true, session_ready: true })),
+      });
+
+    try {
+      global.fetch = fetchMock as never;
+
+      prisma.channelInstance.findUnique.mockResolvedValue({
+        id: 'channel-1',
+        instanceName: 'drenvexman',
+        tenantId: 'team-1',
+        memberId: 'sponsor-1',
+        provider: 'evolution',
+        tenant: {
+          id: 'team-1',
+          name: 'Freddy Team',
+          code: 'freddy',
+        },
+        member: {
+          id: 'sponsor-1',
+          teamId: 'team-1',
+          displayName: 'Ana Sponsor',
+          email: 'ana@example.com',
+          phone: '+52 55 1234 5678',
+          publicSlug: 'ana-sponsor',
+        },
+      });
+      prisma.aiAgentConfig.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'tenant-config-1',
+          basePrompt: 'Hola {{name}}',
+          routeContexts: null,
+          ctaPolicy: null,
+          aiPolicy: null,
+        });
+      walletEngineService.isConfigured.mockReturnValue(false);
+
+      await expect(
+        service.initOrchestrationSession({
+          instanceName: 'drenvexman',
+          funnelId: 'funnel-1',
+        }),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          status: 200,
+          sessionId: 'drenvexman-funnel-1',
+          data: {
+            ok: true,
+            session_ready: true,
+          },
+        }),
+      );
+
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        'http://ia_gateway:3000/v1/session/init',
+        expect.any(Object),
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        `${swarmGatewayBaseUrl}/v1/session/init`,
+        expect.any(Object),
       );
     } finally {
       global.fetch = previousFetch;
