@@ -380,6 +380,8 @@ type HybridJsonMediaEditorProps = {
   onAddMediaRow: (key?: string) => void;
   onUploadMediaClick: (index: number) => void;
   onRemoveMediaRow: (index: number) => void;
+  hardDeleteAssets?: boolean;
+  onHardDeleteAssetsChange?: (value: boolean) => void;
   previewTheme?: string;
   previewSettingsJson?: unknown;
   previewDraftKey?: string | null;
@@ -444,6 +446,8 @@ export function HybridJsonMediaEditor({
   onAddMediaRow,
   onUploadMediaClick,
   onRemoveMediaRow,
+  hardDeleteAssets = false,
+  onHardDeleteAssetsChange,
   previewTheme = "default",
   previewSettingsJson = null,
   previewDraftKey = null,
@@ -1477,6 +1481,20 @@ export function HybridJsonMediaEditor({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
+              {onHardDeleteAssetsChange ? (
+                <label className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 dark:text-red-300">
+                  <input
+                    type="checkbox"
+                    checked={hardDeleteAssets}
+                    onChange={(event) =>
+                      onHardDeleteAssetsChange(event.target.checked)
+                    }
+                    disabled={uploadingRowIndex !== null}
+                    className="h-4 w-4 rounded border-red-500/30 text-red-600"
+                  />
+                  Eliminar archivo físico de MinIO
+                </label>
+              ) : null}
               <div className="text-xs leading-6 text-slate-500 dark:text-slate-400">
                 El media dictionary acepta URLs absolutas del CDN de
                 Leadflow/MinIO y mantiene compatibilidad con{" "}

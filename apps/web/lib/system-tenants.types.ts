@@ -136,8 +136,16 @@ export type SystemTemplateRecord = LooseRecord & {
   updatedAt: string;
 };
 
+export type SystemUnifiedFunnelLibraryRecord = LooseRecord & {
+  legacyTemplates: SystemFunnelTemplateRecord[];
+  modernTemplates: SystemTemplateRecord[];
+};
+
 export type SystemTemplateDeploymentResponse = LooseRecord & {
   funnel: SystemTenantFunnelRecord;
+  funnelInstanceId: string;
+  newFunnelId: string;
+  builderUrl: string;
   template: SystemTemplateRecord;
   team: LooseRecord & {
     id: string;
@@ -145,6 +153,29 @@ export type SystemTemplateDeploymentResponse = LooseRecord & {
     name: string;
     code: string;
   };
+};
+
+const readDeploymentString = (value: unknown) =>
+  typeof value === "string" ? value.trim() : "";
+
+export const buildSystemTemplateDeploymentBuilderUrl = (
+  deployment: SystemTemplateDeploymentResponse,
+  fallbackTeamId = "",
+) => {
+  const teamId =
+    readDeploymentString(deployment.team.id) ||
+    readDeploymentString(fallbackTeamId);
+  const funnelId =
+    readDeploymentString(deployment.newFunnelId) ||
+    readDeploymentString(deployment.funnel.id);
+
+  if (!teamId || !funnelId) {
+    throw new Error(
+      "El deploy no devolvio teamId/funnelId suficientes para abrir el Builder.",
+    );
+  }
+
+  return `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(funnelId)}/builder`;
 };
 
 export type SystemTenantDetailRecord = SystemTenantRecord & {

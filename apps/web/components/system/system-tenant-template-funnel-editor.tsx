@@ -530,7 +530,9 @@ export function SystemTenantTemplateFunnelEditor({
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={`Super Admin / Tenant / ${tenant.code} / Template Funnel`}
+        eyebrow={`Super Admin / Tenant / ${tenant.code} / ${
+          funnel.isTemplate ? "Template Funnel" : "Funnel Operativo"
+        }`}
         title={`Editor de ${name || funnel.name}`}
         description="Este funnel nació desde el Template Engine global y ahora separa edición por paso entre captura y confirmación."
         actions={

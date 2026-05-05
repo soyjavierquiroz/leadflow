@@ -62,6 +62,8 @@ export function SystemTemplateEditor({
   const [mediaRows, setMediaRows] = useState<MediaRow[]>(
     toMediaRows(initialTemplate?.mediaMap),
   );
+  const [hardDeleteAssets, setHardDeleteAssets] = useState(false);
+  const [shouldHardDeleteAssets, setShouldHardDeleteAssets] = useState(false);
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
 
@@ -202,6 +204,7 @@ export function SystemTemplateEditor({
           description: description.trim() || null,
           blocks: parsedBlocks.value,
           mediaMap,
+          ...(shouldHardDeleteAssets ? { hardDeleteAssets: true } : {}),
         };
 
         const record = await authenticatedOperationRequest<SystemTemplateRecord>(
@@ -219,6 +222,7 @@ export function SystemTemplateEditor({
             ? "Template global actualizado."
             : "Template global creado y listo para despliegue.",
         );
+        setShouldHardDeleteAssets(false);
 
         if (!initialTemplate) {
           router.replace(`/admin/templates/${encodeURIComponent(record.id)}/edit`);
@@ -376,10 +380,16 @@ export function SystemTemplateEditor({
         onAddMediaRow={handleAddMediaRow}
         onUploadMediaClick={handleUploadMediaClick}
         onRemoveMediaRow={(index) =>
-          setMediaRows((current) =>
-            current.filter((_, rowIndex) => rowIndex !== index),
-          )
+          setMediaRows((current) => {
+            if (hardDeleteAssets && current[index]?.value.trim()) {
+              setShouldHardDeleteAssets(true);
+            }
+
+            return current.filter((_, rowIndex) => rowIndex !== index);
+          })
         }
+        hardDeleteAssets={hardDeleteAssets}
+        onHardDeleteAssetsChange={setHardDeleteAssets}
       />
 
       <section className={sectionClassName}>

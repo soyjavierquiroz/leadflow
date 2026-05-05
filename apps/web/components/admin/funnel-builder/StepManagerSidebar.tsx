@@ -28,6 +28,9 @@ import { teamOperationRequest } from "@/lib/team-operations";
 
 type StepManagerSidebarProps = {
   funnelInstanceId?: string | null;
+  teamId?: string | null;
+  funnelId?: string | null;
+  mode?: "team" | "system";
   graph?: FlowGraphV1 | null;
   runtimeHealthStatus?: FunnelRuntimeHealthStatus;
   isOrchestrating?: boolean;
@@ -210,6 +213,9 @@ const dispatchActiveStepChange = (
 
 export function StepManagerSidebar({
   funnelInstanceId,
+  teamId,
+  funnelId,
+  mode = "team",
   graph,
   runtimeHealthStatus,
   isOrchestrating = false,
@@ -230,6 +236,7 @@ export function StepManagerSidebar({
   );
   const [isPending, startTransition] = useTransition();
   const [isSlugPending, startSlugTransition] = useTransition();
+  const [isApplyingBlueprint, setIsApplyingBlueprint] = useState(false);
   const orderedNodes = useMemo(() => getOrderedNodes(localGraph), [localGraph]);
   const stepManagerReport = useMemo(
     () =>
@@ -388,6 +395,13 @@ export function StepManagerSidebar({
   const handleApplyBlueprint = (
     blueprint: (typeof blueprintOptions)[number],
   ) => {
+    if (mode === "system" && (!teamId || !funnelId)) {
+      setErrorMessage(
+        "No hay contexto de tenant suficiente para aplicar el blueprint.",
+      );
+      return;
+    }
+
     if (!funnelInstanceId) {
       setErrorMessage("No hay funnelInstanceId disponible para aplicar un blueprint.");
       return;
@@ -395,17 +409,25 @@ export function StepManagerSidebar({
 
     setErrorMessage(null);
     startTransition(async () => {
+      setIsApplyingBlueprint(true);
       try {
+        const requestPath =
+          mode === "system" && teamId && funnelId
+            ? `/system/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(funnelId)}/apply-blueprint`
+            : `/funnels/${encodeURIComponent(funnelInstanceId)}/apply-blueprint`;
         const response = await teamOperationRequest<{
           graph: FlowGraphV1;
-        }>(`/funnels/${encodeURIComponent(funnelInstanceId)}/apply-blueprint`, {
+        }>(requestPath, {
           method: "POST",
           body: JSON.stringify({
             type: blueprint.type,
             mode:
-              localGraph && Object.keys(localGraph.nodes).length > 0
-                ? "merge"
-                : "replace",
+              mode === "system"
+                ? "replace"
+                : localGraph && Object.keys(localGraph.nodes).length > 0
+                  ? "merge"
+                  : "replace",
+            allowDestructiveOverwrite: mode === "system",
           }),
         });
 
@@ -417,6 +439,8 @@ export function StepManagerSidebar({
             ? error.message
             : "No pudimos aplicar el sistema listo.",
         );
+      } finally {
+        setIsApplyingBlueprint(false);
       }
     });
   };
@@ -542,6 +566,7 @@ export function StepManagerSidebar({
             <button
               type="button"
               onClick={() => setIsBlueprintMenuOpen((current) => !current)}
+              disabled={isApplyingBlueprint}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:border-amber-400 hover:text-amber-500 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-amber-500/40 dark:hover:text-amber-300"
               aria-label="Abrir blueprints"
               title="Abrir blueprints"
@@ -593,7 +618,7 @@ export function StepManagerSidebar({
                 key={blueprint.type}
                 type="button"
                 onClick={() => handleApplyBlueprint(blueprint)}
-                disabled={isPending}
+                disabled={isPending || isApplyingBlueprint}
                 className="flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-white/10 dark:bg-slate-800 dark:hover:border-cyan-500/40 dark:hover:bg-slate-800/90"
               >
                 <span className="text-lg">{blueprint.icon}</span>
@@ -836,7 +861,12 @@ export function StepManagerSidebar({
                   key={blueprint.type}
                   type="button"
                   onClick={() => handleApplyBlueprint(blueprint)}
-                  disabled={isPending || !funnelInstanceId}
+                  disabled={
+                    isPending ||
+                    isApplyingBlueprint ||
+                    !funnelInstanceId ||
+                    (mode === "system" && (!teamId || !funnelId))
+                  }
                   className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-slate-800/90 dark:hover:border-cyan-400/30 dark:hover:bg-slate-800"
                 >
                   <div className="flex items-start gap-3">

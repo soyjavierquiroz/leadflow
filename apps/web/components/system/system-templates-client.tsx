@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/app-shell/data-table";
 import { KpiCard } from "@/components/app-shell/kpi-card";
@@ -11,10 +11,11 @@ import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
 import { AVAILABLE_TEMPLATE_STYLES } from "@/lib/template-registry";
-import type {
-  SystemTemplateDeploymentResponse,
-  SystemTemplateRecord,
-  SystemTenantRecord,
+import {
+  buildSystemTemplateDeploymentBuilderUrl,
+  type SystemTemplateDeploymentResponse,
+  type SystemTemplateRecord,
+  type SystemTenantRecord,
 } from "@/lib/system-tenants.types";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
@@ -27,11 +28,6 @@ type DeployTargetState = {
   id: string;
   name: string;
 } | null;
-
-type ToastState = {
-  title: string;
-  description: string | null;
-};
 
 const primaryButtonClassName =
   "rounded-full bg-[var(--app-text)] px-4 py-2.5 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
@@ -66,7 +62,6 @@ export function SystemTemplatesClient({
   teams,
 }: SystemTemplatesClientProps) {
   const router = useRouter();
-  const toastTimeoutRef = useRef<number | null>(null);
   const [rows, setRows] = useState(() =>
     sortRows(initialRows.filter(isOfficialTemplateRow)),
   );
@@ -74,36 +69,14 @@ export function SystemTemplatesClient({
     tone: "success" | "error";
     message: string;
   } | null>(null);
-  const [toast, setToast] = useState<ToastState | null>(null);
   const [deployTarget, setDeployTarget] = useState<DeployTargetState>(null);
   const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id ?? "");
+  const [deployCloneName, setDeployCloneName] = useState("");
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     setRows(sortRows(initialRows.filter(isOfficialTemplateRow)));
   }, [initialRows]);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimeoutRef.current !== null) {
-        window.clearTimeout(toastTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const showToast = (title: string, description?: string | null) => {
-    if (toastTimeoutRef.current !== null) {
-      window.clearTimeout(toastTimeoutRef.current);
-    }
-
-    setToast({
-      title,
-      description: description ?? null,
-    });
-    toastTimeoutRef.current = window.setTimeout(() => {
-      setToast(null);
-    }, 6000);
-  };
 
   const activeCount = rows.filter((item) => item.status === "active").length;
   const draftCount = rows.filter((item) => item.status === "draft").length;
@@ -120,6 +93,7 @@ export function SystemTemplatesClient({
   const openDeployModal = (row: SystemTemplateRecord) => {
     setFeedback(null);
     setSelectedTeamId(sortedTeams[0]?.id ?? "");
+    setDeployCloneName("");
     setDeployTarget({
       id: row.id,
       name: row.name,
@@ -135,11 +109,20 @@ export function SystemTemplatesClient({
     }
 
     const teamId = selectedTeamId.trim();
+    const cloneName = deployCloneName.trim();
 
     if (!teamId) {
       setFeedback({
         tone: "error",
         message: "Selecciona una agencia antes de desplegar el template.",
+      });
+      return;
+    }
+
+    if (!cloneName) {
+      setFeedback({
+        tone: "error",
+        message: "Nombra el funnel antes de desplegar el template.",
       });
       return;
     }
@@ -151,16 +134,13 @@ export function SystemTemplatesClient({
             `/system/templates/${encodeURIComponent(deployTarget.id)}/deploy`,
             {
               method: "POST",
-              body: JSON.stringify({ teamId }),
+              body: JSON.stringify({ teamId, cloneName }),
             },
           );
 
         setDeployTarget(null);
-        showToast(
-          "Template desplegado.",
-          `${payload.funnel.name} ya quedó creado en ${payload.team.name}.`,
-        );
-        router.refresh();
+        setDeployCloneName("");
+        router.push(buildSystemTemplateDeploymentBuilderUrl(payload, teamId));
       } catch (error) {
         setFeedback({
           tone: "error",
@@ -192,17 +172,6 @@ export function SystemTemplatesClient({
 
       {feedback ? (
         <OperationBanner tone={feedback.tone} message={feedback.message} />
-      ) : null}
-
-      {toast ? (
-        <div className="fixed right-4 top-4 z-50 w-full max-w-sm rounded-[1.5rem] border border-[var(--app-success-border)] bg-[var(--app-surface)] p-4 shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
-          <p className="text-sm font-semibold text-[var(--app-text)]">{toast.title}</p>
-          {toast.description ? (
-            <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
-              {toast.description}
-            </p>
-          ) : null}
-        </div>
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -372,7 +341,10 @@ export function SystemTemplatesClient({
           eyebrow="Super Admin / Templates"
           title={`Desplegar ${deployTarget.name}`}
           description="Selecciona la agencia destino. El backend creará un nuevo funnel asignado a ese tenant usando los blocks y la metadata del template."
-          onClose={() => setDeployTarget(null)}
+          onClose={() => {
+            setDeployTarget(null);
+            setDeployCloneName("");
+          }}
         >
           <form className="space-y-5" onSubmit={handleDeploySubmit}>
             <label className="block">
@@ -394,16 +366,34 @@ export function SystemTemplatesClient({
               </select>
             </label>
 
+            <label className="block">
+              <span className="text-sm font-medium text-[var(--app-text)]">
+                Nombre del clon
+              </span>
+              <input
+                type="text"
+                value={deployCloneName}
+                onChange={(event) => setDeployCloneName(event.target.value)}
+                placeholder="Ej: Campaña Mayo"
+                disabled={isPending}
+                className={fieldClassName}
+              />
+            </label>
+
             <div className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-card)] px-4 py-4 text-sm leading-6 text-[var(--app-muted)]">
               Este despliegue crea un nuevo funnel del tenant usando el contrato
               <code> POST /v1/system/templates/:templateId/deploy</code> con el
-              <code> teamId</code> seleccionado.
+              <code> teamId</code> seleccionado y el nombre definido antes de
+              crear.
             </div>
 
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setDeployTarget(null)}
+                onClick={() => {
+                  setDeployTarget(null);
+                  setDeployCloneName("");
+                }}
                 disabled={isPending}
                 className={secondaryButtonClassName}
               >
@@ -411,7 +401,11 @@ export function SystemTemplatesClient({
               </button>
               <button
                 type="submit"
-                disabled={isPending || sortedTeams.length === 0}
+                disabled={
+                  isPending ||
+                  sortedTeams.length === 0 ||
+                  !deployCloneName.trim()
+                }
                 className={primaryButtonClassName}
               >
                 {isPending ? "Desplegando..." : "Desplegar"}

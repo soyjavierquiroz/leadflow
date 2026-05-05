@@ -5,6 +5,7 @@ import { getSystemPublications } from "@/lib/system-publications";
 import {
   getSystemTenant,
   getSystemTenantDomains,
+  getSystemTenantFunnel,
   getWorkspaceFunnelTemplates,
 } from "@/lib/system-tenants";
 
@@ -47,14 +48,15 @@ export default async function AdminTenantFunnelBuilderPage({
   params,
 }: AdminTenantFunnelBuilderPageProps) {
   const { teamId, funnelId } = await params;
-  const [tenant, domains, publications, blockDefinitions] = await Promise.all([
+  const [tenant, funnel, domains, publications, blockDefinitions] = await Promise.all([
     getSystemTenant(teamId),
+    getSystemTenantFunnel(teamId, funnelId),
     getSystemTenantDomains(teamId),
     getSystemPublications(),
     getSystemBlockDefinitions(),
   ]);
 
-  if (!tenant) {
+  if (!tenant || !funnel) {
     notFound();
   }
 
@@ -62,26 +64,23 @@ export default async function AdminTenantFunnelBuilderPage({
 
   const publication = pickBuilderPublication(
     publications.filter(
-      (row) => row.teamId === teamId && row.funnel.legacyFunnelId === funnelId,
+      (row) => row.teamId === teamId && row.funnel.id === funnelId,
     ),
   );
-
-  if (!publication) {
-    notFound();
-  }
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-slate-50 text-left dark:bg-slate-950 dark:[background-image:var(--bg-glow-conferencia)] dark:bg-cover dark:bg-fixed dark:bg-center">
       <TeamVslPublicationEditor
         mode="system"
         teamId={teamId}
-        initialPublicationId={publication.id}
+        initialFunnel={funnel}
+        initialPublicationId={publication?.id ?? null}
         editorHref={`/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(funnelId)}/builder`}
         backHref={`/admin/tenants/${encodeURIComponent(teamId)}`}
         backLabel="Volver al tenant"
         headerEyebrow={`Super Admin / Tenant / ${tenant.code}`}
         headerTitle={`Funnel Builder de ${tenant.name}`}
-        headerDescription="Esta vista reutiliza el builder híbrido real del embudo publicado, incluyendo media dictionary, blocksJson y configuración SEO."
+        headerDescription="Constructor visual operativo del funnel, con steps, bloques, media dictionary y Smart Wiring con IA."
         domains={domains.filter((item) => item.status === "active")}
         templates={templates.filter((item) => item.status !== "archived")}
         availableBlocks={blockDefinitions}
