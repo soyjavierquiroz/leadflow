@@ -5,4 +5,5 @@ export class UpdateTemplateDto {
   readonly description?: string | null;
   readonly blocks?: JsonValue;
   readonly mediaMap?: JsonValue;
+  readonly hardDeleteAssets?: boolean;
 }

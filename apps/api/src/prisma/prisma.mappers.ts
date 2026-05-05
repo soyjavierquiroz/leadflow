@@ -248,7 +248,7 @@ export const mapFunnelInstanceRecord = (
   workspaceId: record.workspaceId,
   teamId: record.teamId,
   templateId: record.templateId,
-  legacyFunnelId: record.legacyFunnelId,
+  funnelId: record.funnelId,
   name: record.name,
   code: record.code,
   thumbnailUrl: record.thumbnailUrl,

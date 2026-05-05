@@ -22,6 +22,7 @@ const supportedFunnelBlockTypes = [
   'thank_you_reveal',
   'conversion_page_config',
   'sponsor_reveal_placeholder',
+  'mobile_gallery',
   'social_proof',
   'social_proof_grid',
   'risk_reversal',

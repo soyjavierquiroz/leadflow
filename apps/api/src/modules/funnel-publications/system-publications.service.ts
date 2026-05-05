@@ -53,7 +53,11 @@ const systemPublicationSelect = {
   funnelInstance: {
     select: {
       id: true,
-      legacyFunnelId: true,
+      funnel: {
+        select: {
+          id: true,
+        },
+      },
       name: true,
       code: true,
       status: true,
@@ -103,6 +107,7 @@ export class SystemPublicationsService {
       isActive,
     });
 
+    await this.assertPublishableFunnel(scope.funnel.id);
     await this.assertPathConflict(scope.domain.id, normalizedPath);
 
     const record = await this.prisma.$transaction(async (tx) => {
@@ -182,6 +187,8 @@ export class SystemPublicationsService {
       funnelId: nextFunnelId,
       isActive,
     });
+
+    await this.assertPublishableFunnel(scope.funnel.id);
 
     if (
       scope.domain.teamId !== existing.teamId ||
@@ -366,6 +373,20 @@ export class SystemPublicationsService {
     }
   }
 
+  private async assertPublishableFunnel(funnelInstanceId: string) {
+    const stepCount = await this.prisma.funnelStep.count({
+      where: { funnelInstanceId },
+    });
+
+    if (stepCount === 0) {
+      throw new ConflictException({
+        code: 'FUNNEL_HAS_NO_STEPS',
+        message:
+          'This funnel has no steps. Add at least one step before publishing it.',
+      });
+    }
+  }
+
   private normalizePath(value?: string | null) {
     if (value === undefined || value === null) {
       return '/';
@@ -450,8 +471,7 @@ export class SystemPublicationsService {
         status: record.domain.status,
       },
       funnel: {
-        id: record.funnelInstance.id,
-        legacyFunnelId: record.funnelInstance.legacyFunnelId,
+        id: record.funnelInstance.funnel?.id ?? record.funnelInstance.id,
         name: record.funnelInstance.name,
         code: record.funnelInstance.code,
         status: record.funnelInstance.status,

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Logger,
   Param,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import type { ApplyBlueprintDto } from '../funnels/dto/apply-blueprint.dto';
 import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-funnel.dto';
 import type { UpdateSystemTenantFunnelStepDto } from './dto/update-system-tenant-funnel-step.dto';
@@ -79,6 +81,19 @@ export class SystemTeamsController {
     return this.teamsService.getSystemTenantFunnel(id, funnelId);
   }
 
+  @Post('tenants/:id/funnels/:funnelId/clone')
+  cloneTenantFunnel(
+    @Param('id') id: string,
+    @Param('funnelId') funnelId: string,
+    @Body() body: { newName?: string },
+  ) {
+    return this.teamsService.cloneSystemTenantFunnel(
+      id,
+      funnelId,
+      body?.newName,
+    );
+  }
+
   @Patch('tenants/:id/funnels/:funnelId')
   updateTenantFunnel(
     @Param('id') id: string,
@@ -98,6 +113,27 @@ export class SystemTeamsController {
       }`,
     );
     return this.teamsService.updateSystemTenantFunnel(id, funnelId, dto);
+  }
+
+  @Delete('tenants/:id/funnels/:funnelId')
+  deleteTenantFunnel(
+    @Param('id') id: string,
+    @Param('funnelId') funnelId: string,
+  ) {
+    return this.teamsService.deleteSystemTenantFunnel(id, funnelId);
+  }
+
+  @Post('tenants/:id/funnels/:funnelId/apply-blueprint')
+  applyTenantFunnelBlueprint(
+    @Param('id') id: string,
+    @Param('funnelId') funnelId: string,
+    @Body() dto: ApplyBlueprintDto,
+  ) {
+    return this.teamsService.applySystemTenantFunnelBlueprint(
+      id,
+      funnelId,
+      dto,
+    );
   }
 
   @Patch('tenants/:id/funnels/:funnelId/steps/:stepId')

@@ -22,6 +22,9 @@ export class FunnelsController {
       funnelInstanceId,
       dto.type,
       dto.mode,
+      {
+        allowDestructiveOverwrite: dto.allowDestructiveOverwrite,
+      },
     );
   }
 }
