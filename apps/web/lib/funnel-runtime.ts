@@ -3,6 +3,11 @@ import { webPublicConfig } from '@/lib/public-env';
 import type { PublicFunnelRuntimePayload } from '@/lib/public-funnel-runtime.types';
 import { normalizePublicFunnelRuntimePayload } from '@/lib/public-funnel-runtime-safety';
 
+export {
+  resolveFlowGraphContractPath,
+  resolveRuntimeNextStepPath,
+} from '@/lib/funnel-runtime-routing';
+
 const normalizeHost = (value: string) => value.trim().toLowerCase().replace(/:\d+$/, '');
 
 export const normalizeRuntimePath = (value?: string | null) => {
@@ -11,7 +16,9 @@ export const normalizeRuntimePath = (value?: string | null) => {
   }
 
   const trimmed = value.trim();
-  const normalized = trimmed.replace(/\/+/g, '/').replace(/\/$/, '');
+  const withoutQuery = trimmed.split('?')[0] ?? '/';
+  const withoutHash = withoutQuery.split('#')[0] ?? '/';
+  const normalized = withoutHash.replace(/\/+/g, '/').replace(/\/$/, '');
 
   if (!normalized || normalized === '.') {
     return '/';
@@ -40,6 +47,21 @@ export const resolveRuntimePath = (segments: string[] | undefined) => {
   );
 };
 
+export const resolvePathBasedAttribution = (path: string) => {
+  const segments = normalizeRuntimePath(path).split('/').filter(Boolean);
+  const slug = segments[1]?.trim() || null;
+
+  if (segments[0] === 'promo' && slug) {
+    return { type: 'promo' as const, slug };
+  }
+
+  if (segments[0] === 'ref' && slug) {
+    return { type: 'ref' as const, slug };
+  }
+
+  return { type: 'organic' as const, slug: null };
+};
+
 export async function fetchPublicFunnelRuntime(params: {
   host: string;
   path: string;
@@ -61,7 +83,17 @@ export async function fetchPublicFunnelRuntime(params: {
     throw new Error(`Public runtime request failed with ${response.status}.`);
   }
 
-  return normalizePublicFunnelRuntimePayload(await response.json(), {
+  const data = await response.json();
+  console.log(
+    'Fired Data:',
+    JSON.stringify(
+      Array.isArray(data?.currentStep?.blocksJson)
+        ? data.currentStep.blocksJson[1]
+        : data?.blocks?.[1] ?? null,
+    ),
+  );
+
+  return normalizePublicFunnelRuntimePayload(data, {
     host: params.host,
     path: params.path,
   }) as PublicFunnelRuntimePayload;

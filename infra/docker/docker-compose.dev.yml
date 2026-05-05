@@ -115,6 +115,9 @@ services:
       WALLET_ENGINE_INTERNAL_URL: "${WALLET_ENGINE_INTERNAL_URL:-http://kurukin-wallet_wallet-api:3000}"
       WALLET_ENGINE_API_KEY: "${WALLET_ENGINE_API_KEY:-}"
       # ---------------------------------------------------------
+      IA_GATEWAY_BASE_URL: "${IA_GATEWAY_BASE_URL:-http://ia-gateway_ia-gateway:3000}"
+      GATEWAY_AUTH_TOKEN: "${IA_GATEWAY_AUTH_TOKEN}" # El código busca 'GATEWAY_AUTH_TOKEN'
+      IA_GATEWAY_REQUEST_TIMEOUT_MS: "${IA_GATEWAY_REQUEST_TIMEOUT_MS:-90000}"
     networks:
       - traefik_public
       - general_network

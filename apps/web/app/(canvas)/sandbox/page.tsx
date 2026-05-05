@@ -92,6 +92,13 @@ const immunotecFunnelData = [
       "Tu cuerpo es una máquina increíble de autocuración, pero tiene un límite físico. Cuando el estrés oxidativo supera tus reservas de Glutatión, el sistema simplemente se apaga.",
   },
   {
+    key: "mobile-gallery-main",
+    type: "mobile_gallery",
+    block_id: "mobile_gallery_z9k2p1",
+    is_boxed: true,
+    settings: {},
+  },
+  {
     type: "grand_slam_offer",
     block_id: "offer_inmuno_cards",
     cta_text: "AGENDAR CONSULTA GRATUITA",

@@ -22,6 +22,16 @@ type LeadCaptureModalConfig = {
 
 type LeadCaptureBlockProps = {
   modal_config?: LeadCaptureModalConfig;
+  handoffEnabled?: boolean;
+  handoff_enabled?: boolean;
+  handoffDuration?: number;
+  handoff_duration?: number;
+  handoffTitle?: string;
+  handoff_title?: string;
+  handoffSubtitle?: string;
+  handoff_subtitle?: string;
+  loaderType?: "pulse" | "spinner" | "progress";
+  loader_type?: "pulse" | "spinner" | "progress";
   [key: string]: unknown;
 };
 

@@ -38,7 +38,9 @@ export const normalizePublicRuntimePath = (value?: string | null) => {
   }
 
   const trimmed = value.trim();
-  const normalized = trimmed.replace(/\/+/g, '/').replace(/\/$/, '');
+  const withoutQuery = trimmed.split('?')[0] ?? '/';
+  const withoutHash = withoutQuery.split('#')[0] ?? '/';
+  const normalized = withoutHash.replace(/\/+/g, '/').replace(/\/$/, '');
 
   if (!normalized || normalized === '.') {
     return '/';
@@ -55,6 +57,21 @@ export const resolvePublicRuntimePath = (slug: string[] | undefined) => {
   return normalizePublicRuntimePath(
     slug.map((segment) => segment.trim()).filter(Boolean).join('/'),
   );
+};
+
+export const resolvePublicPathBasedAttribution = (path: string) => {
+  const segments = normalizePublicRuntimePath(path).split('/').filter(Boolean);
+  const slug = segments[1]?.trim() || null;
+
+  if (segments[0] === 'promo' && slug) {
+    return { type: 'promo' as const, slug };
+  }
+
+  if (segments[0] === 'ref' && slug) {
+    return { type: 'ref' as const, slug };
+  }
+
+  return { type: 'organic' as const, slug: null };
 };
 
 export async function fetchPublicRuntimeResolution(params: {
@@ -78,5 +95,10 @@ export async function fetchPublicRuntimeResolution(params: {
     throw new Error(`Public runtime resolution failed with ${response.status}.`);
   }
 
-  return (await response.json()) as PublicRuntimeResolution;
+  const data = (await response.json()) as PublicRuntimeResolution & {
+    blocks?: unknown[];
+  };
+  console.log('Fired Data:', JSON.stringify(data?.blocks?.[1] ?? null));
+
+  return data as PublicRuntimeResolution;
 }

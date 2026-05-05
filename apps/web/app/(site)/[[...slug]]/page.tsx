@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { FunnelUnderConstruction } from '@/components/public-funnel/funnel-under-construction';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
+import { PublicRuntimeLeadSubmitProvider } from '@/components/public-runtime/public-runtime-lead-submit-provider';
 import { getSessionUser } from '@/lib/auth';
 import {
   fetchPublicFunnelRuntime,
@@ -22,8 +23,6 @@ type SiteRuntimePageProps = {
   }>;
   searchParams: Promise<{
     previewHost?: string;
-    awid?: string;
-    ref?: string;
   }>;
 };
 
@@ -45,29 +44,6 @@ const canonicalSiteHost = (() => {
 
 const isCanonicalAppHomeRequest = (host: string, path: string) =>
   normalizeRuntimePath(path) === '/' && normalizeHost(host) === canonicalSiteHost;
-
-const appendRuntimeQuery = (
-  path: string,
-  query: {
-    awid?: string;
-    ref?: string;
-  },
-) => {
-  const params = new URLSearchParams();
-
-  if (query.awid?.trim()) {
-    params.set('awid', query.awid.trim());
-  }
-
-  if (query.ref?.trim()) {
-    params.set('ref', query.ref.trim());
-  }
-
-  const serialized = params.toString();
-  return serialized
-    ? `${path}${path.includes('?') ? '&' : '?'}${serialized}`
-    : path;
-};
 
 const resolveSeoFromRuntime = (runtime: PublicFunnelRuntimePayload) => {
   const publication = runtime.publication;
@@ -141,7 +117,7 @@ export async function generateMetadata({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtime = await loadRuntimeSafely(host, appendRuntimeQuery(path, query));
+  const runtime = await loadRuntimeSafely(host, path);
 
   if (!runtime) {
     return {};
@@ -196,7 +172,6 @@ export default async function SiteRuntimePage({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtimePath = appendRuntimeQuery(path, query);
 
   if (!previewHost && isCanonicalAppHomeRequest(host, path)) {
     const user = await getSessionUser();
@@ -205,11 +180,11 @@ export default async function SiteRuntimePage({
 
   const runtimeResolution = await fetchPublicFunnelRuntimeResolution({
     host,
-    path: runtimePath,
+    path,
   }).catch((error) => {
     console.error('[site-runtime] Failed to load public funnel runtime', {
       host,
-      path: runtimePath,
+      path,
       error,
     });
     return { status: 'not_found' as const };
@@ -233,8 +208,12 @@ export default async function SiteRuntimePage({
   }
 
   return (
-    <>
+    <PublicRuntimeLeadSubmitProvider
+      hostname={runtime.domain.host}
+      path={runtime.request.path}
+      runtime={runtime}
+    >
       <FunnelRuntimePage runtime={runtime} previewHost={previewHost} />
-    </>
+    </PublicRuntimeLeadSubmitProvider>
   );
 }

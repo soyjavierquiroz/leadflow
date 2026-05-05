@@ -97,6 +97,10 @@ function buildPreviewRuntime(
       forcedSponsorId: null,
       adWheelId: null,
       browserPixelsEnabled: true,
+      attributionType: "organic",
+      attributionSlug: null,
+      runtimePathPrefix: null,
+      referralQueryParam: null,
     },
     publication: {
       id: "preview-publication",
@@ -128,7 +132,7 @@ function buildPreviewRuntime(
           },
         },
       },
-      settingsJson: {},
+      settingsJson,
       mediaMap,
       template: {
         id: resolvedTemplateId,
@@ -138,7 +142,7 @@ function buildPreviewRuntime(
         funnelType: "hybrid",
         blocksJson: blocks as JsonValue,
         mediaMap,
-        settingsJson: {},
+        settingsJson,
         allowedOverridesJson: {},
       },
     },
@@ -151,7 +155,15 @@ function buildPreviewRuntime(
       autoRedirect: false,
       autoRedirectDelayMs: null,
       messageTemplate: null,
+      sponsor: null,
+      whatsappPhone: null,
+      whatsappMessage: null,
+      whatsappUrl: null,
     },
+    leadId: null,
+    assignment: null,
+    advisor: null,
+    assignedSponsor: null,
     currentStep,
     nextStep: {
       id: "preview-next-step",
@@ -209,10 +221,38 @@ export function BlockRenderer({
   const isCenteredLayout = isCenteredPublicStepLayout({
     settingsJson: runtime.currentStep.settingsJson,
   });
+  const unsupportedBlocks = parsedBlocks
+    .map((block, index) => ({
+      block,
+      index,
+      normalizedType: normalizeRuntimeBlockType(block.type),
+    }))
+    .filter(({ normalizedType }) => !BlockRegistry[normalizedType]);
 
   const renderBlock = (block: RuntimeBlock, index: number) => {
     const { type, ...props } = block;
     const normalizedType = normalizeRuntimeBlockType(type);
+
+    console.log("Rendering block:", normalizedType, {
+      originalType: type,
+      blockId: block.block_id ?? block.key ?? `${type}-${index}`,
+    });
+
+    if (normalizedType === "mobile_gallery") {
+      return (
+        <div
+          key={`${type}-${index}`}
+          className="block w-full py-6 lg:hidden"
+        >
+          <StickyMediaGallery
+            runtime={runtime}
+            blocks={parsedBlocks}
+            inFlow={true}
+          />
+        </div>
+      );
+    }
+
     const BlockComponent = BlockRegistry[normalizedType];
 
     if (!BlockComponent) {
@@ -238,9 +278,25 @@ export function BlockRenderer({
   };
 
   return (
-    <PublicRuntimeLeadSubmitProvider hostname={previewHost} path={previewPath}>
+    <PublicRuntimeLeadSubmitProvider
+      hostname={previewHost}
+      path={previewPath}
+      runtime={runtime}
+    >
       <FunnelThemeProvider runtime={runtime}>
         <div className="pb-12">
+          {unsupportedBlocks.length > 0 ? (
+            <div className="pointer-events-none fixed right-4 top-4 z-[120] flex max-w-sm flex-col gap-3">
+              {unsupportedBlocks.map(({ block, index }) => (
+                <div
+                  key={`unsupported-${block.block_id ?? block.key ?? block.type}-${index}`}
+                  className="rounded-2xl border border-red-300 bg-red-50/95 px-4 py-3 text-sm font-medium text-red-700 shadow-2xl shadow-red-900/10 backdrop-blur"
+                >
+                  Unsupported block: {block.type}
+                </div>
+              ))}
+            </div>
+          ) : null}
           {isBlankLayout ? (
             <div>{visibleBlocks.map((block, index) => renderBlock(block, index))}</div>
           ) : isSingleColumnLayout ? (
@@ -258,6 +314,7 @@ export function BlockRenderer({
             </>
           ) : (
             <SplitMediaFocusLayout
+              runtime={runtime}
               announcementSlot={
                 announcementBlock ? renderBlock(announcementBlock, -1) : null
               }
