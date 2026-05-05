@@ -41,7 +41,7 @@ const flowPublicationInclude = {
   handoffStrategy: true,
   funnelInstance: {
     include: {
-      legacyFunnel: true,
+      funnel: true,
       handoffStrategy: true,
       rotationPool: {
         include: {
@@ -346,6 +346,7 @@ export class LeadCaptureAssignmentService {
         this.prisma,
         publication,
         dto.sourceUrl ?? null,
+        dto.entryContext,
       );
       const hasExistingOpenAssignment =
         entryContext.trafficLayer === 'PAID_WHEEL'
@@ -818,9 +819,9 @@ export class LeadCaptureAssignmentService {
         originAdWheelId?: string | null;
       },
   ): Promise<LeadCaptureResult> {
-    const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
+    const funnelId = publication.funnelInstance.funnelId;
 
-    if (!legacyFunnelId) {
+    if (!funnelId) {
       throw new ConflictException({
         code: 'LEGACY_FUNNEL_REQUIRED',
         message:
@@ -842,7 +843,7 @@ export class LeadCaptureAssignmentService {
       },
       create: {
         workspaceId: publication.workspaceId,
-        funnelId: legacyFunnelId,
+        funnelId: funnelId,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         visitorId: visitor.id,
@@ -858,7 +859,7 @@ export class LeadCaptureAssignmentService {
         tags,
       },
       update: {
-        funnelId: legacyFunnelId,
+        funnelId: funnelId,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         sourceChannel,
@@ -1051,9 +1052,11 @@ export class LeadCaptureAssignmentService {
       }
     }
 
-    const assignee = await this.resolveRoundRobinAssigneeOrThrow(tx, publication);
-    const assignmentReason = assignee.reason;
-    const selectedAdvisor = assignee.user;
+    const selectedAdvisor = await this.resolveFallbackTeamAdminOrThrow(
+      tx,
+      publication,
+    );
+    const assignmentReason = 'fallback';
     const selectedSponsor = selectedAdvisor.sponsor;
     const assignmentRotationPoolId = null;
 
@@ -1064,9 +1067,9 @@ export class LeadCaptureAssignmentService {
       });
     }
 
-    const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
+    const funnelId = publication.funnelInstance.funnelId;
 
-    if (!legacyFunnelId) {
+    if (!funnelId) {
       throw new ConflictException({
         code: 'LEGACY_FUNNEL_REQUIRED',
         message:
@@ -1087,7 +1090,7 @@ export class LeadCaptureAssignmentService {
         leadId: lead.id,
         sponsorId: selectedSponsor.id,
         teamId: publication.teamId,
-        funnelId: legacyFunnelId,
+        funnelId: funnelId,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         rotationPoolId: assignmentRotationPoolId,
@@ -1349,7 +1352,7 @@ export class LeadCaptureAssignmentService {
     }
 
     const fallbackPoolId =
-      publication.funnelInstance.legacyFunnel?.defaultRotationPoolId;
+      publication.funnelInstance.funnel?.defaultRotationPoolId;
     if (!fallbackPoolId) {
       throw new ConflictException({
         code: 'ROTATION_POOL_NOT_CONFIGURED',
@@ -1556,7 +1559,23 @@ export class LeadCaptureAssignmentService {
     tx: TransactionClient | PrismaService,
     publication: FlowPublicationRecord,
     sourceUrl: string | null,
+    submittedEntryContext?: SubmitPublicLeadCaptureDto['entryContext'],
   ) {
+    if (submittedEntryContext) {
+      return {
+        entryMode: submittedEntryContext.entryMode,
+        trafficLayer: submittedEntryContext.trafficLayer,
+        forcedSponsorId: submittedEntryContext.forcedSponsorId,
+        adWheelId: submittedEntryContext.adWheelId,
+        browserPixelsEnabled: submittedEntryContext.browserPixelsEnabled,
+        attributionType: submittedEntryContext.attributionType ?? 'organic',
+        attributionSlug: submittedEntryContext.attributionSlug ?? null,
+        runtimePathPrefix:
+          submittedEntryContext.runtimePathPrefix ?? publication.pathPrefix,
+        referralQueryParam: null,
+      };
+    }
+
     const requestedPath =
       this.extractRequestedPathFromSourceUrl(sourceUrl) ?? publication.pathPrefix;
 
@@ -1805,9 +1824,9 @@ export class LeadCaptureAssignmentService {
     reservation: PaidWheelReservation,
     input: AssignmentRoutingInput,
   ): Promise<AssignmentResolution> {
-    const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
+    const funnelId = publication.funnelInstance.funnelId;
 
-    if (!legacyFunnelId) {
+    if (!funnelId) {
       throw new ConflictException({
         code: 'LEGACY_FUNNEL_REQUIRED',
         message:
@@ -1824,7 +1843,7 @@ export class LeadCaptureAssignmentService {
         leadId: lead.id,
         sponsorId: reservation.sponsor.id,
         teamId: publication.teamId,
-        funnelId: legacyFunnelId,
+        funnelId: funnelId,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         rotationPoolId: null,
@@ -1980,9 +1999,9 @@ export class LeadCaptureAssignmentService {
       publication,
       forcedSponsorId,
     );
-    const legacyFunnelId = publication.funnelInstance.legacyFunnelId;
+    const funnelId = publication.funnelInstance.funnelId;
 
-    if (!legacyFunnelId) {
+    if (!funnelId) {
       throw new ConflictException({
         code: 'LEGACY_FUNNEL_REQUIRED',
         message:
@@ -1999,7 +2018,7 @@ export class LeadCaptureAssignmentService {
         leadId: lead.id,
         sponsorId: sponsor.id,
         teamId: publication.teamId,
-        funnelId: legacyFunnelId,
+        funnelId: funnelId,
         funnelInstanceId: publication.funnelInstanceId,
         funnelPublicationId: publication.id,
         rotationPoolId: null,
@@ -2526,14 +2545,7 @@ export class LeadCaptureAssignmentService {
       step.isEntryStep,
     );
 
-    if (!entryContext?.referralQueryParam) {
-      return path;
-    }
-
-    const separator = path.includes('?') ? '&' : '?';
-    return `${path}${separator}ref=${encodeURIComponent(
-      entryContext.referralQueryParam,
-    )}`;
+    return path;
   }
 
   private toDbSource(value: string): PrismaLeadSourceChannel {

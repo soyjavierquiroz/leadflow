@@ -21,6 +21,10 @@ export type PublicRuntimeEntryContext = {
   forcedSponsorId: string | null;
   adWheelId: string | null;
   browserPixelsEnabled: boolean;
+  attributionType: "promo" | "ref" | "organic";
+  attributionSlug: string | null;
+  runtimePathPrefix: string | null;
+  referralQueryParam: string | null;
 };
 
 export type PublicFunnelRuntimePayload = {
@@ -106,7 +110,46 @@ export type PublicFunnelRuntimePayload = {
     autoRedirect: boolean;
     autoRedirectDelayMs: number | null;
     messageTemplate: string | null;
+    sponsor: {
+      id: string;
+      displayName: string;
+      email: string | null;
+      phone: string | null;
+      avatarUrl: string | null;
+    } | null;
+    whatsappPhone: string | null;
+    whatsappMessage: string | null;
+    whatsappUrl: string | null;
   };
+  leadId: string | null;
+  assignment: {
+    id: string;
+    status: string;
+    reason: string;
+    assignedAt: string;
+    sponsor: {
+      id: string;
+      displayName: string;
+      email: string | null;
+      phone: string | null;
+      avatarUrl: string | null;
+    } | null;
+  } | null;
+  advisor: {
+    name: string;
+    role: string | null;
+    phone: string | null;
+    photoUrl: string | null;
+    bio: string | null;
+    whatsappUrl: string | null;
+  } | null;
+  assignedSponsor: {
+    id: string;
+    displayName: string;
+    email: string | null;
+    phone: string | null;
+    avatarUrl: string | null;
+  } | null;
   currentStep: {
     id: string;
     slug: string;

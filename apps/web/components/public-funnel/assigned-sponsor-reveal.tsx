@@ -1,364 +1,82 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { StatusBadge } from "@/components/app-shell/status-badge";
+import Image from "next/image";
+import { useMemo } from "react";
 import {
-  buildCtaClassName,
-  PublicChecklistItem,
-  PublicEyebrow,
-  PublicPill,
   RichHeadline,
   PublicSectionSurface,
-  PublicStatCard,
-  cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
-import { buildWhatsappUrl, normalizeWhatsappPhone } from "@/lib/public-handoff";
 import { useSubmissionContext } from "@/lib/public-funnel-session";
-import {
-  emitPublicRuntimeEvent,
-  getOrCreateRuntimeSessionId,
-  hasTrackedRuntimeEvent,
-  markRuntimeEventTracked,
-} from "@/lib/public-runtime-tracking";
+import { buildWhatsappUrl, normalizeWhatsappPhone } from "@/lib/public-handoff";
 
 type AssignedSponsorRevealProps = {
   isBoxed?: boolean;
   runtime: PublicFunnelRuntimePayload;
-  title: string;
-  description?: string;
+  title?: string;
+  subtitlePrefix?: string;
 };
 
-const buildHandoffMarker = (
-  eventName: "cta_clicked" | "handoff_completed",
-  publicationId: string,
-  stepId: string,
-  assignmentId: string,
-  suffix: string,
-) => [eventName, publicationId, stepId, assignmentId, suffix].join(":");
-
-const getInitials = (value: string | null | undefined) => {
-  if (!value) {
-    return "LF";
-  }
-
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((item) => item[0]?.toUpperCase() ?? "")
-    .join("");
-};
+const DEFAULT_ADVISOR_PHOTO = "/assets/default-advisor.svg";
+const DEFAULT_TITLE = "¡Felicidades! Te has registrado con éxito";
+const DEFAULT_SUBTITLE_PREFIX = "Tu asesor asignado es: {{advisorName}}";
 
 export function AssignedSponsorReveal({
   isBoxed = false,
   runtime,
   title,
-  description,
+  subtitlePrefix,
 }: AssignedSponsorRevealProps) {
-  const autoRedirectStartedRef = useRef(false);
   const context = useSubmissionContext(runtime.publication.id);
 
-  const assignment = context?.assignment ?? null;
-  const sponsor = useMemo(() => {
-    return context?.handoff?.sponsor ?? assignment?.sponsor ?? null;
-  }, [assignment?.sponsor, context?.handoff?.sponsor]);
-  const whatsappPhone = useMemo(() => {
-    return (
-      context?.handoff?.whatsappPhone ??
-      normalizeWhatsappPhone(context?.handoff?.sponsor?.phone ?? sponsor?.phone)
-    );
-  }, [
-    context?.handoff?.sponsor?.phone,
-    context?.handoff?.whatsappPhone,
-    sponsor?.phone,
-  ]);
-  const whatsappMessage = context?.handoff?.whatsappMessage ?? null;
-  const whatsappUrl =
-    context?.handoff?.whatsappUrl ??
-    buildWhatsappUrl(whatsappPhone, whatsappMessage);
-  const handoffMode = context?.handoff?.mode ?? runtime.handoff.mode;
-  const handoffButtonLabel =
-    context?.handoff?.buttonLabel ??
-    runtime.handoff.buttonLabel ??
-    "Continuar por WhatsApp";
-  const redirectDelaySeconds = Math.max(
-    1,
-    Math.round((runtime.handoff.autoRedirectDelayMs ?? 1200) / 1000),
-  );
-
-  const trackHandoff = useCallback(
-    ({
-      href,
-      label,
-      source,
-    }: {
-      href: string;
-      label: string;
-      source: "button_click" | "auto_redirect";
-    }) => {
-      if (!context?.assignment) {
-        return;
-      }
-
-      const ctaMarker = buildHandoffMarker(
-        "cta_clicked",
-        runtime.publication.id,
-        runtime.currentStep.id,
-        context.assignment.id,
-        source,
-      );
-      if (!hasTrackedRuntimeEvent(ctaMarker)) {
-        markRuntimeEventTracked(ctaMarker);
-        void emitPublicRuntimeEvent({
-          eventName: "cta_clicked",
-          publicationId: runtime.publication.id,
-          stepId: runtime.currentStep.id,
-          anonymousId: context.anonymousId,
-          visitorId: context.visitorId,
-          leadId: context.leadId,
-          assignmentId: context.assignment.id,
-          currentPath: runtime.request.path,
-          ctaLabel: label,
-          ctaHref: href,
-          ctaAction: "whatsapp_handoff",
-          metadata: {
-            sessionId: getOrCreateRuntimeSessionId(),
-            handoffMode,
-            handoffSource: source,
-          },
-        });
-      }
-
-      const completionMarker = buildHandoffMarker(
-        "handoff_completed",
-        runtime.publication.id,
-        runtime.currentStep.id,
-        context.assignment.id,
-        source,
-      );
-      if (!hasTrackedRuntimeEvent(completionMarker)) {
-        markRuntimeEventTracked(completionMarker);
-        void emitPublicRuntimeEvent({
-          eventName: "handoff_completed",
-          publicationId: runtime.publication.id,
-          stepId: runtime.currentStep.id,
-          anonymousId: context.anonymousId,
-          visitorId: context.visitorId,
-          leadId: context.leadId,
-          assignmentId: context.assignment.id,
-          currentPath: runtime.request.path,
-          ctaLabel: label,
-          ctaHref: href,
-          ctaAction: "whatsapp_handoff",
-          metadata: {
-            sessionId: getOrCreateRuntimeSessionId(),
-            handoffMode,
-            handoffSource: source,
-          },
-        });
-      }
-    },
-    [
-      context,
-      handoffMode,
-      runtime.currentStep.id,
-      runtime.publication.id,
-      runtime.request.path,
-    ],
-  );
-
-  useEffect(() => {
-    if (
-      !context?.assignment ||
-      !whatsappUrl ||
-      handoffMode !== "immediate_whatsapp" ||
-      !runtime.handoff.autoRedirect ||
-      autoRedirectStartedRef.current
-    ) {
-      return;
+  const advisor = useMemo(() => {
+    const contextSponsor = context?.lastAssignment?.sponsor;
+    if (contextSponsor) {
+      return {
+        name: contextSponsor.displayName,
+        role: null,
+        phone: contextSponsor.phone,
+        photoUrl: contextSponsor.avatarUrl,
+        bio: null,
+        whatsappUrl: buildWhatsappUrl(
+          normalizeWhatsappPhone(contextSponsor.phone),
+          context?.handoff?.whatsappMessage ?? null,
+        ),
+      };
     }
 
-    autoRedirectStartedRef.current = true;
+    return null;
+  }, [context]);
 
-    const timeout = window.setTimeout(() => {
-      trackHandoff({
-        href: whatsappUrl,
-        label: handoffButtonLabel,
-        source: "auto_redirect",
-      });
-      window.location.assign(whatsappUrl);
-    }, runtime.handoff.autoRedirectDelayMs ?? 1200);
-
-    return () => window.clearTimeout(timeout);
-  }, [
-    context?.assignment,
-    handoffButtonLabel,
-    handoffMode,
-    runtime.handoff.autoRedirect,
-    runtime.handoff.autoRedirectDelayMs,
-    trackHandoff,
-    whatsappUrl,
-  ]);
-
-  const handleWhatsappClick = () => {
-    if (!whatsappUrl) {
-      return;
-    }
-
-    trackHandoff({
-      href: whatsappUrl,
-      label: handoffButtonLabel,
-      source: "button_click",
-    });
+  const renderText = (rawText: string | undefined) => {
+    if (!rawText) return "";
+    return rawText.replace(/\{\{\s*advisorName\s*\}\}/g, advisor?.name || "");
   };
 
   return (
-    <PublicSectionSurface isBoxed={isBoxed} tone="warm">
-      <div className="flex flex-wrap items-center gap-3">
-        <PublicPill tone="warm">Reveal & Handoff</PublicPill>
-        <PublicPill>Paso final visible</PublicPill>
-      </div>
-
-      <h2 className="mt-5 text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">
-        <RichHeadline text={title} />
-      </h2>
-      <p className="font-subheadline mt-4 max-w-2xl text-base leading-7 text-slate-700">
-        {description ||
-          "Presentamos al sponsor asignado y dejamos evidente cómo continúa la conversación, para que el cierre del funnel no se sienta técnico ni ambiguo."}
-      </p>
-
-      <div className="mt-6 md:p-1">
-        {assignment && sponsor ? (
-          <>
-            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-[1.8rem] border border-amber-200 bg-amber-50/60 p-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-lg font-semibold text-white">
-                      {getInitials(sponsor.displayName)}
-                    </div>
-                    <div>
-                      <PublicEyebrow tone="warm">Sponsor asignado</PublicEyebrow>
-                      <p className="mt-2 text-2xl font-semibold text-slate-950">
-                        {sponsor.displayName}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
-                        Tu oportunidad ya tiene owner y el siguiente paso es
-                        continuar la conversación por el canal indicado.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge value={assignment.status} />
-                    <PublicPill tone="warm">
-                      {handoffMode === "immediate_whatsapp"
-                        ? "WhatsApp inmediato"
-                        : "Thank you + WhatsApp"}
-                    </PublicPill>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-3 md:grid-cols-3">
-                  <PublicStatCard
-                    label="Email"
-                    value={sponsor.email ?? "Sin email"}
-                    description="Dato visible para continuidad operativa."
-                    tone="warm"
-                  />
-                  <PublicStatCard
-                    label="WhatsApp"
-                    value={sponsor.phone ?? "Sin teléfono"}
-                    description="Se usa para construir el handoff real."
-                    tone="warm"
-                  />
-                  <PublicStatCard
-                    label="Assignment"
-                    value={assignment.id.slice(0, 8)}
-                    description="Contexto persistido en la sesión del runtime."
-                    tone="warm"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-[1.8rem] border border-slate-200 bg-slate-50 p-5">
-                <PublicEyebrow tone="neutral">Qué pasa ahora</PublicEyebrow>
-                <div className="mt-5 grid gap-3">
-                  <PublicChecklistItem accent="warm">
-                    Tu lead ya fue capturado y asociado a esta sesión.
-                  </PublicChecklistItem>
-                  <PublicChecklistItem accent="warm">
-                    El sponsor asignado ya puede continuar la conversación.
-                  </PublicChecklistItem>
-                  <PublicChecklistItem accent="warm">
-                    El CTA final mantiene tracking y continuidad del handoff.
-                  </PublicChecklistItem>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {[
-                "Assignment resuelto y asociado a esta sesión.",
-                "Sponsor visible con datos de continuidad.",
-                "CTA listo para pasar a WhatsApp o fallback definido.",
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
-
-            {whatsappUrl ? (
-              <div className="mt-5 rounded-[1.85rem] border border-emerald-200 bg-emerald-50 p-5">
-                <p className="text-sm leading-6 text-emerald-950">
-                  {handoffMode === "immediate_whatsapp"
-                    ? `Vamos a abrir WhatsApp automáticamente en ${redirectDelaySeconds}s para continuar con tu sponsor asignado.`
-                    : "Tu sponsor ya está listo para continuar contigo por WhatsApp."}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <a
-                    href={whatsappUrl}
-                    className={cx(
-                      buildCtaClassName("primary"),
-                      "bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-600",
-                    )}
-                    onClick={handleWhatsappClick}
-                  >
-                    {handoffButtonLabel}
-                  </a>
-                  <p className="text-sm text-emerald-900">
-                    {runtime.handoff.autoRedirect &&
-                    handoffMode === "immediate_whatsapp"
-                        ? "Redirigiendo ahora..."
-                        : "Si no se abre automáticamente, usa el botón."}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm leading-6 text-slate-700">
-                  El sponsor fue asignado correctamente, pero todavía no tenemos
-                  un número de WhatsApp disponible para continuar el handoff en
-                  esta sesión.
-                </p>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-            <p className="text-sm font-medium text-slate-700">
-              Todavía no hay un sponsor asignado en esta sesión.
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Completa el formulario del funnel para resolver el assignment y
-              ver aquí el reveal con el CTA de handoff.
-            </p>
-          </div>
-        )}
+    <PublicSectionSurface isBoxed={isBoxed} tone="warm" className="min-h-0">
+      <div className="mx-auto flex min-h-0 max-w-2xl flex-col items-center justify-center gap-4 text-center">
+        <div className="shrink-0">
+          <h2 className="font-headline text-4xl font-black leading-[0.95] tracking-tighter [color:var(--theme-text-strong)] [font-family:var(--font-header)] md:text-5xl">
+            <RichHeadline text={renderText(title || DEFAULT_TITLE)} />
+          </h2>
+          <p className="mt-3 text-xl font-medium leading-snug [color:var(--theme-text-muted)] [font-family:var(--font-body)]">
+            {renderText(subtitlePrefix || DEFAULT_SUBTITLE_PREFIX)}
+          </p>
+        </div>
+        <a
+          href={advisor?.whatsappUrl ?? undefined}
+          aria-disabled={!advisor?.whatsappUrl}
+          className="relative aspect-square w-full max-w-[min(78vw,40vh,22rem)] max-h-[40vh] shrink overflow-hidden rounded-theme border bg-[var(--theme-base-surface)] shadow-[var(--theme-surface-section-shadow)] [border-color:var(--theme-base-divider)] md:max-w-[min(24rem,40vh)]"
+        >
+          <Image
+            src={advisor?.photoUrl || DEFAULT_ADVISOR_PHOTO}
+            alt={advisor?.name || "Asesor"}
+            fill
+            sizes="(min-width: 768px) 384px, min(78vw, 352px)"
+            className="object-cover"
+          />
+        </a>
       </div>
     </PublicSectionSurface>
   );

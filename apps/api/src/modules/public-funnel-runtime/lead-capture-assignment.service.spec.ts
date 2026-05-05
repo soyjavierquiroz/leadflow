@@ -14,7 +14,7 @@ const buildPublication = () =>
       id: 'funnel-1',
       name: 'Demo Funnel',
       handoffStrategy: null,
-      legacyFunnelId: 'legacy-funnel-1',
+      funnelId: 'legacy-funnel-1',
       steps: [
         {
           id: 'step-1',
@@ -54,7 +54,10 @@ describe('LeadCaptureAssignmentService', () => {
         forcedSponsorId: null,
         adWheelId: null,
         browserPixelsEnabled: true,
+        attributionType: 'organic',
+        attributionSlug: null,
         runtimePathPrefix: null,
+        referralQueryParam: null,
       }),
     } as any;
     const mailerService = {
@@ -538,8 +541,14 @@ describe('LeadCaptureAssignmentService', () => {
         funnelStepId: 'step-1',
         entryContext: {
           entryMode: 'organic_asesor',
+          trafficLayer: 'DIRECT',
           forcedSponsorId: 'sponsor-1',
+          adWheelId: null,
           browserPixelsEnabled: false,
+          attributionType: 'ref',
+          attributionSlug: 'asesor-1',
+          runtimePathPrefix: '/ref/asesor-1',
+          referralQueryParam: null,
         },
       },
     );
@@ -597,14 +606,16 @@ describe('LeadCaptureAssignmentService', () => {
         forcedSponsorId: 'sponsor-1',
         adWheelId: null,
         browserPixelsEnabled: false,
-        runtimePathPrefix: '/demo/ref/asesor-uno',
+        attributionType: 'ref',
+        attributionSlug: 'asesor-uno',
+        runtimePathPrefix: '/ref/asesor-uno',
       },
     );
 
     expect(nextStep).toEqual({
       id: 'step-2',
       slug: 'gracias',
-      path: '/demo/ref/asesor-uno/gracias',
+      path: '/ref/asesor-uno/gracias',
       stepType: 'thank_you',
     });
   });
@@ -736,6 +747,8 @@ describe('LeadCaptureAssignmentService', () => {
             forcedSponsorId: null,
             adWheelId: 'wheel-1',
             browserPixelsEnabled: true,
+            attributionType: 'promo',
+            attributionSlug: 'wheel-1',
             runtimePathPrefix: null,
             referralQueryParam: null,
           },

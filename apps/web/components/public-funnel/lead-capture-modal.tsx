@@ -32,6 +32,7 @@ import {
   persistSubmissionContext,
   submitPublicLeadCapture,
 } from "@/lib/public-funnel-session";
+import { resolveRuntimeNextStepPath } from "@/lib/funnel-runtime-routing";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import {
   createRuntimeEventId,
@@ -52,6 +53,11 @@ export type LeadCaptureModalConfig = {
   ctaText: string;
   ctaSubtext?: string;
   successRedirect?: string;
+  handoffEnabled?: boolean;
+  handoffDuration?: number;
+  handoffTitle?: string;
+  handoffSubtitle?: string;
+  loaderType?: "pulse" | "spinner" | "progress";
 };
 
 type LeadCaptureModalProps = {
@@ -65,6 +71,7 @@ type LeadCaptureModalProps = {
   runtime: PublicFunnelRuntimePayload;
   sourceChannel?: string | null;
   tags?: string[];
+  blockOutcome?: string | null;
   renderTrigger?: boolean;
   open?: boolean;
   onOpenChange?: (nextOpen: boolean) => void;
@@ -113,40 +120,6 @@ const getPhoneValidationError = (
   return null;
 };
 
-const resolveLeadCaptureRedirect = (
-  successRedirect?: string,
-  responseNextStepPath?: string | null,
-  publicationNextStepPath?: string | null,
-) => {
-  const trimmedRedirect = successRedirect?.trim();
-  if (trimmedRedirect) {
-    return trimmedRedirect;
-  }
-
-  const trimmedResponseNextStepPath = responseNextStepPath?.trim();
-  if (trimmedResponseNextStepPath) {
-    return trimmedResponseNextStepPath;
-  }
-
-  const trimmedPublicationNextStepPath = publicationNextStepPath?.trim();
-  if (trimmedPublicationNextStepPath) {
-    return trimmedPublicationNextStepPath;
-  }
-
-  if (typeof window === "undefined") {
-    return "/gracias";
-  }
-
-  const normalizedPath = window.location.pathname.replace(/\/+$/, "");
-  if (!normalizedPath) {
-    return "/gracias";
-  }
-
-  return normalizedPath.endsWith("/gracias")
-    ? normalizedPath
-    : `${normalizedPath}/gracias`;
-};
-
 const captureModalScopeStyle = {
   "--jakawi-text-main": "#0f172a",
   "--jakawi-text-muted": "#64748b",
@@ -178,6 +151,7 @@ export function LeadCaptureModal({
   runtime,
   sourceChannel,
   tags,
+  blockOutcome,
   renderTrigger = true,
   open: controlledOpen,
   onOpenChange,
@@ -378,9 +352,7 @@ export function LeadCaptureModal({
         },
       });
 
-      const submitLeadCapture =
-        runtimeLeadSubmit?.submitLeadCapture ?? submitPublicLeadCapture;
-      const response = await submitLeadCapture({
+      const submissionPayload = {
         publicationId,
         currentStepId,
         anonymousId,
@@ -407,21 +379,44 @@ export function LeadCaptureModal({
         },
         tags: ["lead-capture-modal", ...(tags ?? [])],
         sourceChannel: sourceChannel ?? "lead_capture_modal",
-      });
+      };
+      const response = runtimeLeadSubmit?.submitLeadCapture
+        ? await runtimeLeadSubmit.submitLeadCapture(submissionPayload, {
+            block: {
+              type: "lead_capture_config",
+              outcome: blockOutcome ?? "submit_success",
+              successRedirect: modalConfig.successRedirect,
+              handoffEnabled: modalConfig.handoffEnabled,
+              handoffDuration: modalConfig.handoffDuration,
+              handoffTitle: modalConfig.handoffTitle,
+              handoffSubtitle: modalConfig.handoffSubtitle,
+              loaderType: modalConfig.loaderType,
+            },
+          })
+        : await submitPublicLeadCapture(submissionPayload);
 
       if (response.success === false) {
         throw new Error("No pudimos asignarte un asesor en este momento.");
       }
 
-      persistSubmissionContext(publicationId, response);
+      if (!runtimeLeadSubmit?.submitLeadCapture) {
+        persistSubmissionContext(publicationId, response);
+      }
+
       setModalOpen(false);
-      window.location.assign(
-        resolveLeadCaptureRedirect(
-          modalConfig.successRedirect,
-          response.nextStep?.path,
-          runtime.publication.nextStepPath,
-        ),
-      );
+      if (!runtimeLeadSubmit?.submitLeadCapture) {
+        const redirectPath =
+          response.nextStep?.path?.trim() ||
+          resolveRuntimeNextStepPath({
+            runtime,
+            outcome: blockOutcome ?? "submit_success",
+            successRedirect: modalConfig.successRedirect,
+          });
+
+        if (redirectPath) {
+          window.location.assign(redirectPath);
+        }
+      }
     } catch (error) {
       setSubmitError(
         error instanceof Error

@@ -45,7 +45,7 @@ describe('reveal-handoff utils', () => {
       leadName: 'Lead Demo',
       leadEmail: 'lead@example.com',
       leadPhone: '+15550000001',
-      funnelName: 'Sales Core Capture',
+      funnelName: 'Demo Capture',
       publicationPath: '/gracias',
     });
 

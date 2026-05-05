@@ -42,6 +42,7 @@ import {
 } from "@/components/public-funnel/vsl-core-sections";
 import { StickyConversionBar } from "@/components/public-funnel/sticky-conversion-bar";
 import { HandoffCta } from "@/components/public-funnel/handoff-cta";
+import { StickyMediaGallery } from "@/components/public-funnel/sticky-media-gallery";
 import type {
   PublicFunnelRuntimePayload,
   RuntimeBlock,
@@ -63,7 +64,6 @@ import {
   normalizeLeadCaptureFormBlock,
   normalizeRuntimeBlockType,
   resolveCtaHref,
-  resolveNextStepFromContract,
   toStepLabel,
 } from "@/components/public-funnel/runtime-block-utils";
 import { PublicGrandSlamOfferBlock } from "@/components/public-funnel/public-grand-slam-offer-block";
@@ -1915,6 +1915,13 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
 }
 
 function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
+  const settings = asRecord(props.block.settings) ?? asRecord(props.block.settingsJson);
+  const resolvedRevealTitle =
+    asString(settings?.title).trim() ||
+    "¡Felicidades! Te has registrado con éxito";
+  const resolvedSubtitlePrefix =
+    asString(settings?.subtitlePrefix).trim() ||
+    "Tu asesor asignado es: {{advisorName}}";
   const variant = asString(props.block.variant, "confirmation_reveal");
   const title = asString(
     props.block.headline,
@@ -1926,14 +1933,6 @@ function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
       props.block.description,
       "Capturamos tu lead y ahora te mostramos quién continúa contigo dentro del flujo.",
     ),
-  );
-  const revealTitle = asString(
-    props.block.reveal_headline,
-    "Sponsor asignado en esta sesión",
-  );
-  const revealDescription = asString(
-    props.block.reveal_subheadline,
-    "El runtime usa el assignment real guardado en sesión para mostrar continuidad y handoff.",
   );
 
   return (
@@ -1952,8 +1951,8 @@ function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
       <AssignedSponsorReveal
         isBoxed={props.block.is_boxed === true}
         runtime={props.runtime}
-        title={revealTitle}
-        description={revealDescription}
+        title={resolvedRevealTitle}
+        subtitlePrefix={resolvedSubtitlePrefix}
       />
     </div>
   );
@@ -1964,25 +1963,54 @@ function HandoffCtaBlockAdapter({
   runtime,
   surfaceProps,
 }: PublicBlockAdapterProps) {
+  const settings = asRecord(block.settings) ?? asRecord(block.settingsJson);
   return (
     <HandoffCta
       isBoxed={surfaceProps?.isBoxed}
       runtime={runtime}
-      headline={asString(
-        block.headline,
-        asString(block.title, "Continuar por WhatsApp"),
-      )}
-      subheadline={
-        asString(block.subheadline, asString(block.description)) || undefined
-      }
-      buttonText={
-        asString(block.button_text, asString(block.buttonText)) || undefined
-      }
-      helperText={
-        asString(block.helper_text, asString(block.helperText)) || undefined
-      }
-      variant={asString(block.variant) || undefined}
+      headline={asString(settings?.headline).trim() || undefined}
+      buttonPrefix={asString(settings?.buttonPrefix).trim() || undefined}
+      redirectText={asString(settings?.redirectText).trim() || undefined}
+      whatsappText={asString(settings?.whatsappText).trim() || undefined}
+      autoRedirectSeconds={asNumber(settings?.autoRedirectSeconds, 5) || 5}
+      buttonColor={asString(settings?.buttonColor) || undefined}
     />
+  );
+}
+
+function MobileGalleryBlockAdapter({
+  block,
+  runtime,
+  blocks,
+}: PublicBlockAdapterProps) {
+  const settings = asRecord(block.settings) ?? asRecord(block.settingsJson);
+  const headline = asString(
+    settings?.headline,
+    asString(block.headline, asString(block.title)),
+  ).trim();
+  const text = asString(
+    settings?.text,
+    asString(settings?.description, asString(block.text, asString(block.description))),
+  ).trim();
+
+  return (
+    <div className="block w-full py-6 lg:hidden">
+      {headline || text ? (
+        <div className="mx-auto mb-5 w-full max-w-3xl px-4 text-center sm:px-6">
+          {headline ? (
+            <h2 className={cx("text-2xl font-semibold tracking-tight text-slate-950", flatBlockTitleClassName)}>
+              <RichHeadline text={headline} />
+            </h2>
+          ) : null}
+          {text ? (
+            <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
+              {text}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      <StickyMediaGallery runtime={runtime} blocks={blocks} inFlow />
+    </div>
   );
 }
 
@@ -2241,15 +2269,8 @@ export function PublicBlockAdapter({
             publicationId={runtime.publication.id}
             currentStepId={runtime.currentStep.id}
             block={normalizeLeadCaptureFormBlock(block)}
+            runtime={runtime}
             runtimeEntryContext={runtime.entryContext}
-            nextStepPath={
-              resolveNextStepFromContract(
-                runtime,
-                normalizeLeadCaptureFormBlock(block).outcome ?? "submit_success",
-              ) ??
-              runtime.publication.nextStepPath ??
-              runtime.nextStep?.path
-            }
             isBoxed={surfaceProps.isBoxed}
           />
         );
@@ -2279,15 +2300,21 @@ export function PublicBlockAdapter({
             blocks={blocks}
           />
         );
-      case "sponsor_reveal_placeholder":
+      case "sponsor_reveal_placeholder": {
+        const sponsorRevealSettings =
+          asRecord(block.settings) ?? asRecord(block.settingsJson);
         return (
           <AssignedSponsorReveal
             isBoxed={surfaceProps.isBoxed}
             runtime={runtime}
-            title={asString(block.title, "Sponsor asignado")}
-            description={asString(block.description) || undefined}
+            title={asString(sponsorRevealSettings?.title).trim() || undefined}
+            subtitlePrefix={
+              asString(sponsorRevealSettings?.subtitlePrefix).trim() ||
+              undefined
+            }
           />
         );
+      }
       case "social_proof":
         return (
           <SocialProofBlockAdapter
@@ -2347,6 +2374,8 @@ export function PublicBlockAdapter({
             surfaceProps={surfaceProps}
           />
         );
+      case "mobile_gallery":
+        return <MobileGalleryBlockAdapter block={block} runtime={runtime} blocks={blocks} />;
       case "offer_pricing":
         return (
           <OfferBlockAdapter

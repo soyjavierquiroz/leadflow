@@ -1,5 +1,7 @@
 import type { LeadCaptureModalConfig } from "@/components/public-funnel/lead-capture-modal";
 import {
+  asBoolean,
+  asNumber,
   asRecord,
   asString,
 } from "@/components/public-funnel/runtime-block-utils";
@@ -68,5 +70,56 @@ export function resolveLeadCaptureModalConfig(
       leadCaptureConfigBlock?.success_redirect,
       asString(modalConfigRecord.success_redirect),
     ),
+    handoffEnabled: asBoolean(
+      leadCaptureConfigBlock?.handoffEnabled ??
+        leadCaptureConfigBlock?.handoff_enabled ??
+        modalConfigRecord.handoffEnabled ??
+        modalConfigRecord.handoff_enabled,
+      true,
+    ),
+    handoffDuration: Math.max(
+      0,
+      asNumber(
+        leadCaptureConfigBlock?.handoffDuration ??
+          leadCaptureConfigBlock?.handoff_duration ??
+          modalConfigRecord.handoffDuration ??
+          modalConfigRecord.handoff_duration,
+        1500,
+      ),
+    ),
+    handoffTitle:
+      asString(
+        leadCaptureConfigBlock?.handoffTitle,
+        asString(
+          leadCaptureConfigBlock?.handoff_title,
+          asString(modalConfigRecord.handoffTitle),
+        ),
+      ) ||
+      asString(modalConfigRecord.handoff_title, "¡Registro exitoso!"),
+    handoffSubtitle:
+      asString(
+        leadCaptureConfigBlock?.handoffSubtitle,
+        asString(
+          leadCaptureConfigBlock?.handoff_subtitle,
+          asString(modalConfigRecord.handoffSubtitle),
+        ),
+      ) ||
+      asString(
+        modalConfigRecord.handoff_subtitle,
+        "Asignando tu asesor experto...",
+      ),
+    loaderType: (() => {
+      const rawLoaderType =
+        asString(
+          leadCaptureConfigBlock?.loaderType,
+          asString(
+            leadCaptureConfigBlock?.loader_type,
+            asString(modalConfigRecord.loaderType),
+          ),
+        ) || asString(modalConfigRecord.loader_type, "pulse");
+      return rawLoaderType === "spinner" || rawLoaderType === "progress"
+        ? rawLoaderType
+        : "pulse";
+    })(),
   };
 }

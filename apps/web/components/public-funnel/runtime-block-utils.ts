@@ -4,6 +4,7 @@ import type {
   RuntimeBlock,
 } from "@/lib/public-funnel-runtime.types";
 import { applyTemplatePresetToBlock } from "@/components/public-funnel/template-presets";
+import { resolveRuntimeNextStepPath } from "@/lib/funnel-runtime-routing";
 
 export type RuntimeFaqItem = {
   question: string;
@@ -79,6 +80,11 @@ export type RuntimeLeadCaptureFormBlock = {
   successMode: "next_step" | "inline_message";
   redirectUrl?: string;
   outcome?: string;
+  handoffEnabled: boolean;
+  handoffDuration: number;
+  handoffTitle: string;
+  handoffSubtitle: string;
+  loaderType: "pulse" | "spinner" | "progress";
   fields: RuntimeLeadCaptureField[];
   settings: {
     captureUrlContext: boolean;
@@ -264,7 +270,9 @@ const resolveCompatibleCtaConfig = (
 };
 
 export const normalizeRuntimeBlockType = (value: string) => {
-  switch (value) {
+  const sanitizedValue = value.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+
+  switch (sanitizedValue) {
     case "form_placeholder":
       return "lead_capture_form";
     case "hero_block":
@@ -290,7 +298,7 @@ export const normalizeRuntimeBlockType = (value: string) => {
     case "marquee":
       return "announcement";
     default:
-      return value;
+      return sanitizedValue;
   }
 };
 
@@ -1484,6 +1492,45 @@ export const normalizeLeadCaptureFormBlock = (
       asString(block.flowOutcome) ||
       pickString(settings ?? {}, ["outcome", "flow_outcome", "flowOutcome"]) ||
       undefined,
+    handoffEnabled: asBoolean(
+      block.handoffEnabled ??
+        block.handoff_enabled ??
+        settings?.handoffEnabled ??
+        settings?.handoff_enabled,
+      true,
+    ),
+    handoffDuration: Math.max(
+      0,
+      asNumber(
+        block.handoffDuration ??
+          block.handoff_duration ??
+          settings?.handoffDuration ??
+          settings?.handoff_duration,
+        1500,
+      ),
+    ),
+    handoffTitle:
+      asString(
+        block.handoffTitle,
+        asString(block.handoff_title, asString(settings?.handoffTitle)),
+      ) ||
+      asString(settings?.handoff_title, "¡Registro exitoso!"),
+    handoffSubtitle:
+      asString(
+        block.handoffSubtitle,
+        asString(block.handoff_subtitle, asString(settings?.handoffSubtitle)),
+      ) ||
+      asString(settings?.handoff_subtitle, "Asignando tu asesor experto..."),
+    loaderType: (() => {
+      const rawLoaderType =
+        asString(
+          block.loaderType,
+          asString(block.loader_type, asString(settings?.loaderType)),
+        ) || asString(settings?.loader_type, "pulse");
+      return rawLoaderType === "spinner" || rawLoaderType === "progress"
+        ? rawLoaderType
+        : "pulse";
+    })(),
     fields:
       recordFields.length > 0
         ? recordFields
@@ -1654,106 +1701,15 @@ export const resolveBlockOutcome = (block: RuntimeBlock) => {
   ).toLowerCase();
 };
 
-const resolveStepPathById = (
-  runtime: PublicFunnelRuntimePayload,
-  stepId: string,
-) => runtime.steps.find((step) => step.id === stepId)?.path ?? null;
-
-const resolveFlowGraphContractPath = (
-  runtime: PublicFunnelRuntimePayload,
-  outcome = "default",
-) => {
-  const contract = asRecord(runtime.funnel.conversionContract);
-  const graph = asRecord(contract?.flowGraph);
-  const nodes = asRecord(graph?.nodes);
-  const currentNode =
-    asRecord(nodes?.[runtime.currentStep.id]) ??
-    Object.values(nodes ?? {}).reduce<Record<string, JsonValue> | null>(
-      (matchedNode, candidate) => {
-        if (matchedNode) {
-          return matchedNode;
-        }
-
-        const node = asRecord(candidate);
-        return node?.slug === runtime.currentStep.slug ? node : null;
-      },
-      null,
-    );
-  const exits = asRecord(asRecord(currentNode)?.exits);
-  const normalizedOutcome = outcome.trim().toLowerCase() || "default";
-  const exit =
-    asRecord(exits?.[normalizedOutcome]) ??
-    (normalizedOutcome === "default" ? null : asRecord(exits?.default));
-  const toStepId = asString(exit?.toStepId);
-
-  return toStepId ? resolveStepPathById(runtime, toStepId) : null;
-};
-
-const resolveContractTransitionRecord = (runtime: PublicFunnelRuntimePayload) => {
-  const contract = asRecord(runtime.funnel.conversionContract);
-  if (!contract) {
-    return null;
-  }
-
-  const transitions = asRecord(contract.transitions);
-  if (!transitions) {
-    return null;
-  }
-
-  const bySlug = asRecord(transitions[runtime.currentStep.slug]);
-  if (bySlug) {
-    return bySlug;
-  }
-
-  const byStepType = asRecord(transitions[runtime.currentStep.stepType]);
-  if (byStepType) {
-    return byStepType;
-  }
-
-  return asRecord(transitions.default);
-};
-
 export const resolveNextStepFromContract = (
   runtime: PublicFunnelRuntimePayload,
   outcome = "default",
 ) => {
-  const flowGraphPath = resolveFlowGraphContractPath(runtime, outcome);
-  if (flowGraphPath) {
-    return flowGraphPath;
-  }
-
-  const transition = resolveContractTransitionRecord(runtime);
-  if (transition) {
-    const explicitPath =
-      asString(transition.path) ||
-      asString(transition.nextStepPath) ||
-      asString(transition.default);
-    if (explicitPath) {
-      return explicitPath;
-    }
-
-    const explicitStepSlug = asString(transition.stepSlug);
-    if (explicitStepSlug) {
-      const mappedStep = runtime.steps.find(
-        (step) => step.slug === explicitStepSlug,
-      );
-      if (mappedStep?.path) {
-        return mappedStep.path;
-      }
-    }
-
-    const explicitStepType = asString(transition.stepType);
-    if (explicitStepType) {
-      const mappedStep = runtime.steps.find(
-        (step) => step.stepType === explicitStepType,
-      );
-      if (mappedStep?.path) {
-        return mappedStep.path;
-      }
-    }
-  }
-
-  return runtime.nextStep?.path ?? runtime.publication.nextStepPath ?? null;
+  return resolveRuntimeNextStepPath({
+    runtime,
+    outcome,
+    warnOnJsonFallback: false,
+  });
 };
 
 export const toStepLabel = (value: string) =>

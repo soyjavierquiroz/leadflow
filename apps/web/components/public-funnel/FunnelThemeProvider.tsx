@@ -143,6 +143,11 @@ export function FunnelThemeProvider({
   const theme = getFunnelThemeDefinition(themeId);
   const eyebrowPill = theme.primitives.eyebrow.pill;
   const style: FunnelThemeStyle = {
+    '--font-header': theme.tokens.fonts.headline,
+    '--font-body': theme.tokens.fonts.body,
+    '--color-primary': theme.tokens.action.primary,
+    '--theme-radius': theme.tokens.radius.xl,
+    '--radius-theme': 'var(--theme-radius)',
     '--funnel-font-sans': theme.tokens.fonts.sans,
     '--funnel-font-display': theme.tokens.fonts.display,
     '--funnel-font-headline': theme.tokens.fonts.headline,

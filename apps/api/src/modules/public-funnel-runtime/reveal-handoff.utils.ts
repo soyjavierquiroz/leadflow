@@ -136,6 +136,7 @@ export const buildPublicWhatsappMessage = (input: {
 
   const message = fillTemplate(input.template, {
     sponsorName: input.sponsorName,
+    advisorName: input.sponsorName,
     leadName: input.leadName?.trim() || 'un nuevo lead',
     leadEmail: input.leadEmail?.trim() || 'sin email',
     leadPhone: input.leadPhone?.trim() || 'sin telefono',

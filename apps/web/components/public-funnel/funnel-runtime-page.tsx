@@ -31,6 +31,26 @@ type FunnelRuntimePageProps = {
   previewHost?: string;
 };
 
+const getPublicBlockWrapperClassName = (blockType: string) => {
+  switch (blockType) {
+    case "sponsor_reveal_placeholder":
+    case "thank_you_reveal":
+      return "min-h-0 flex-1";
+    case "whatsapp_handoff_cta":
+      return "shrink-0";
+    default:
+      return "shrink-0";
+  }
+};
+
+const isFullscreenHandoffStep = (blocks: Array<{ type: string }>) => {
+  const blockTypes = new Set(blocks.map((block) => block.type));
+  return (
+    blockTypes.has("sponsor_reveal_placeholder") &&
+    blockTypes.has("whatsapp_handoff_cta")
+  );
+};
+
 export function FunnelRuntimePage({
   runtime,
   previewHost,
@@ -46,6 +66,7 @@ export function FunnelRuntimePage({
   const parsedBlocks = parseRuntimeBlocks(currentStep?.blocksJson ?? []);
   const blocks = parsedBlocks.blocks;
   const hasRenderableBlocks = blocks.length > 0;
+  const isCompactHandoffStep = isFullscreenHandoffStep(blocks);
   const stepLayout = resolvePublicStepLayout({
     blocks,
     settingsJson: currentStep?.settingsJson,
@@ -84,15 +105,25 @@ export function FunnelRuntimePage({
       renderedContent = (
         <main className="min-h-screen bg-white">
           <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
-          <div className="min-h-screen">
+          <div
+            className={
+              isCompactHandoffStep
+                ? "flex h-dvh flex-col overflow-hidden"
+                : "min-h-screen"
+            }
+          >
             {blocks.map((block, index) => (
-              <PublicBlockAdapter
+              <div
                 key={`${block.type}-${index}`}
-                block={block}
-                runtime={runtime}
-                blocks={blocks}
-                layoutVariant="single_column"
-              />
+                className={getPublicBlockWrapperClassName(block.type)}
+              >
+                <PublicBlockAdapter
+                  block={block}
+                  runtime={runtime}
+                  blocks={blocks}
+                  layoutVariant="single_column"
+                />
+              </div>
             ))}
           </div>
         </main>
@@ -103,19 +134,27 @@ export function FunnelRuntimePage({
           <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
           <div
             className={
-              isCenteredStepLayout
-                ? "flex min-h-screen w-full flex-col px-4 py-0 md:px-6 md:py-0"
-                : "min-h-screen px-4 py-6 md:px-6 md:py-10"
+              isCompactHandoffStep
+                ? isCenteredStepLayout
+                  ? "flex h-dvh w-full flex-col overflow-hidden px-4 py-0 md:px-6 md:py-0"
+                  : "flex h-dvh flex-col overflow-hidden px-4 py-4 md:px-6 md:py-6"
+                : isCenteredStepLayout
+                  ? "flex min-h-screen w-full flex-col px-4 py-0 md:px-6 md:py-0"
+                  : "min-h-screen px-4 py-6 md:px-6 md:py-10"
             }
           >
             {blocks.map((block, index) => (
-              <PublicBlockAdapter
+              <div
                 key={`${block.type}-${index}`}
-                block={block}
-                runtime={runtime}
-                blocks={blocks}
-                layoutVariant="single_column"
-              />
+                className={getPublicBlockWrapperClassName(block.type)}
+              >
+                <PublicBlockAdapter
+                  block={block}
+                  runtime={runtime}
+                  blocks={blocks}
+                  layoutVariant="single_column"
+                />
+              </div>
             ))}
           </div>
         </main>
@@ -128,6 +167,7 @@ export function FunnelRuntimePage({
 
           <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen">
             <SplitMediaFocusLayout
+              runtime={runtime}
               mediaSlot={
                 <StickyMediaGallery
                   runtime={runtime}

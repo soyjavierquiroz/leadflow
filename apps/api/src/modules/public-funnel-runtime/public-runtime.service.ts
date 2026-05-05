@@ -56,7 +56,7 @@ export class PublicRuntimeService {
             id: true,
             name: true,
             code: true,
-            legacyFunnel: {
+            funnel: {
               select: {
                 id: true,
                 name: true,
@@ -77,7 +77,7 @@ export class PublicRuntimeService {
     }
 
     const funnel =
-      publication.funnelInstance.legacyFunnel ?? publication.domain.linkedFunnel;
+      publication.funnelInstance.funnel ?? publication.domain.linkedFunnel;
 
     if (!funnel) {
       throw new NotFoundException({
@@ -150,6 +150,15 @@ export class PublicRuntimeService {
       publicationId: runtime.publication.id,
       currentStepId: runtime.currentStep.id,
       anonymousId: dto.anonymousId?.trim() || `runtime-anon-${randomUUID()}`,
+      entryContext: dto.entryContext
+        ? {
+            ...dto.entryContext,
+            runtimePathPrefix:
+              dto.entryContext.runtimePathPrefix ??
+              runtime.request.publicationPathPrefix,
+            referralQueryParam: null,
+          }
+        : undefined,
       sourceChannel: dto.sourceChannel ?? 'form',
       sourceUrl: dto.sourceUrl?.trim() ?? fallbackSourceUrl,
       utmSource: dto.utmSource ?? null,

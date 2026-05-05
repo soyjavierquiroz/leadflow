@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -20,7 +21,14 @@ import {
   normalizeStepSlug,
   resolveRelativeStepPath,
 } from './public-funnel-runtime.utils';
-import { resolvePublicHandoffConfig } from './reveal-handoff.utils';
+import { IdentityTokenService } from './identity-token.service';
+import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
+import {
+  buildPublicWhatsappMessage,
+  buildPublicWhatsappUrl,
+  normalizeWhatsappPhone,
+  resolvePublicHandoffConfig,
+} from './reveal-handoff.utils';
 
 const publicRuntimeInclude = {
   domain: true,
@@ -48,16 +56,14 @@ const publicRuntimeInclude = {
   },
 } satisfies Prisma.FunnelPublicationInclude;
 
-const PERSONAL_LINK_PATH_PREFIX = '/a';
-
 type RuntimePublicationRecord = Prisma.FunnelPublicationGetPayload<{
   include: typeof publicRuntimeInclude;
 }>;
 
-type PersonalLinkRoute = {
-  kind: 'prefixed' | 'root';
-  sponsorSlug: string;
+type PromoPathRoute = {
+  campaignSlug: string;
   runtimePathPrefix: string;
+  publicationResolutionPath: string;
 };
 
 type AdvisorRefPathRoute = {
@@ -71,10 +77,96 @@ type ResolvedRuntimeEntryContext = PublicRuntimeEntryContext & {
   referralQueryParam: string | null;
 };
 
+type RuntimeAssignmentPayload = {
+  id: string;
+  status: string;
+  reason: string;
+  assignedAt: string;
+  sponsor: {
+    id: string;
+    displayName: string;
+    email: string | null;
+    phone: string | null;
+    avatarUrl: string | null;
+  };
+} | null;
+
+type RuntimeAdvisorPayload = {
+  name: string;
+  role: string | null;
+  phone: string | null;
+  photoUrl: string | null;
+  bio: string | null;
+  whatsappUrl: string | null;
+} | null;
+
+type RuntimeSponsorContext = {
+  leadId: string | null;
+  assignment: RuntimeAssignmentPayload;
+  advisor: RuntimeAdvisorPayload;
+  assignedSponsor: NonNullable<RuntimeAssignmentPayload>['sponsor'] | null;
+  handoff: {
+    sponsor: NonNullable<RuntimeAssignmentPayload>['sponsor'] | null;
+    whatsappPhone: string | null;
+    whatsappMessage: string | null;
+    whatsappUrl: string | null;
+  };
+} | null;
+
 const asJsonRecord = (value: Prisma.JsonValue | null | undefined) =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, Prisma.JsonValue>)
     : null;
+
+const readJsonString = (value: Prisma.JsonValue | null | undefined) =>
+  typeof value === 'string' ? value.trim() : '';
+
+const findRuntimeBlockSetting = (
+  value: Prisma.JsonValue | null | undefined,
+  blockType: string,
+  settingKey: string,
+): string => {
+  const visit = (node: Prisma.JsonValue | null | undefined): string => {
+    if (!node) {
+      return '';
+    }
+
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const found = visit(item);
+        if (found) {
+          return found;
+        }
+      }
+      return '';
+    }
+
+    const record = asJsonRecord(node);
+    if (!record) {
+      return '';
+    }
+
+    if (readJsonString(record.type) === blockType) {
+      const settings =
+        asJsonRecord(record.settings) ?? asJsonRecord(record.settingsJson);
+      const settingValue = readJsonString(settings?.[settingKey]);
+      if (settingValue) {
+        return settingValue;
+      }
+    }
+
+    for (const child of Object.values(record)) {
+      const found = visit(child);
+      if (found) {
+        return found;
+      }
+    }
+
+    return '';
+  };
+
+  return visit(value);
+};
 
 const readNullableString = (
   value: RuntimePublicationRecord,
@@ -117,62 +209,32 @@ const pathSegments = (path: string) =>
     .map((segment) => segment.trim())
     .filter(Boolean);
 
-const parsePersonalLinkRoute = (path: string): PersonalLinkRoute | null => {
+const slugifyCampaignName = (value: string | null | undefined) =>
+  normalizePersonalLinkSegment(
+    (value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, ''),
+  );
+
+const parsePromoPathRoute = (path: string): PromoPathRoute | null => {
   const segments = pathSegments(path);
 
-  if (segments[0] !== 'a') {
-    const sponsorSlug = normalizePersonalLinkSegment(segments[0]);
-    if (!sponsorSlug) {
-      return null;
-    }
-
-    return {
-      kind: 'root',
-      sponsorSlug,
-      runtimePathPrefix: `/${sponsorSlug}`,
-    };
-  }
-
-  const sponsorSlug = normalizePersonalLinkSegment(segments[1]);
-  if (!sponsorSlug) {
+  if (segments[0] !== 'promo') {
     return null;
   }
+
+  const campaignSlug = normalizePersonalLinkSegment(segments[1]);
+  if (!campaignSlug) {
+    return null;
+  }
+
+  const publicationSegments = segments.slice(2);
 
   return {
-    kind: 'prefixed',
-    sponsorSlug,
-    runtimePathPrefix: `${PERSONAL_LINK_PATH_PREFIX}/${sponsorSlug}`,
-  };
-};
-
-const parseAdvisorRefPathRoute = (
-  path: string,
-): AdvisorRefPathRoute | null => {
-  const segments = pathSegments(path);
-  const refIndex = segments.findIndex((segment) => segment === 'ref');
-
-  if (refIndex < 0) {
-    return null;
-  }
-
-  const sponsorSlug = normalizePersonalLinkSegment(segments[refIndex + 1]);
-  if (!sponsorSlug) {
-    return null;
-  }
-
-  const publicationSegments = [
-    ...segments.slice(0, refIndex),
-    ...segments.slice(refIndex + 2),
-  ];
-  const runtimePrefixSegments = [
-    ...segments.slice(0, refIndex),
-    'ref',
-    sponsorSlug,
-  ];
-
-  return {
-    sponsorSlug,
-    runtimePathPrefix: `/${runtimePrefixSegments.join('/')}`,
+    campaignSlug,
+    runtimePathPrefix: `/promo/${campaignSlug}`,
     publicationResolutionPath:
       publicationSegments.length > 0
         ? `/${publicationSegments.join('/')}`
@@ -180,7 +242,33 @@ const parseAdvisorRefPathRoute = (
   };
 };
 
-const extractQueryParam = (
+const parseAdvisorRefPathRoute = (
+  path: string,
+): AdvisorRefPathRoute | null => {
+  const segments = pathSegments(path);
+
+  if (segments[0] !== 'ref') {
+    return null;
+  }
+
+  const sponsorSlug = normalizePersonalLinkSegment(segments[1]);
+  if (!sponsorSlug) {
+    return null;
+  }
+
+  const publicationSegments = segments.slice(2);
+
+  return {
+    sponsorSlug,
+    runtimePathPrefix: `/ref/${sponsorSlug}`,
+    publicationResolutionPath:
+      publicationSegments.length > 0
+        ? `/${publicationSegments.join('/')}`
+        : '/',
+  };
+};
+
+const extractRawQueryParam = (
   value: string | null | undefined,
   key: string,
 ) => {
@@ -191,37 +279,14 @@ const extractQueryParam = (
   const trimmed = value.trim();
 
   try {
-    return normalizePersonalLinkSegment(new URL(trimmed).searchParams.get(key));
+    return new URL(trimmed).searchParams.get(key)?.trim() || null;
   } catch {
     const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 
     try {
-      return normalizePersonalLinkSegment(
-        new URL(path, 'https://runtime.local').searchParams.get(key),
-      );
-    } catch {
-      return null;
-    }
-  }
-};
-
-const extractAwid = (value: string | null | undefined) => {
-  if (!value?.trim()) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-
-  try {
-    return normalizePersonalLinkSegment(
-      new URL(trimmed).searchParams.get('awid'),
-    );
-  } catch {
-    const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-
-    try {
-      return normalizePersonalLinkSegment(
-        new URL(path, 'https://runtime.local').searchParams.get('awid'),
+      return (
+        new URL(path, 'https://runtime.local').searchParams.get(key)?.trim() ||
+        null
       );
     } catch {
       return null;
@@ -233,7 +298,10 @@ const extractAwid = (value: string | null | undefined) => {
 export class PublicFunnelRuntimeService {
   private readonly logger = new Logger(PublicFunnelRuntimeService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly identityTokenService: IdentityTokenService,
+  ) {}
 
   async resolveByHostAndPath(
     host: string,
@@ -241,14 +309,12 @@ export class PublicFunnelRuntimeService {
   ): Promise<PublicRuntimePayload> {
     const normalizedHost = normalizeHost(host);
     const normalizedPath = normalizePath(path);
+    const promoPathRoute = parsePromoPathRoute(path);
     const advisorRefPathRoute = parseAdvisorRefPathRoute(path);
-    const queryReferralSlug = extractQueryParam(path, 'ref');
-    const personalLinkRoute =
-      advisorRefPathRoute || queryReferralSlug
-        ? null
-        : parsePersonalLinkRoute(normalizedPath);
     const publicationResolutionPath =
-      advisorRefPathRoute?.publicationResolutionPath ?? normalizedPath;
+      promoPathRoute?.publicationResolutionPath ??
+      advisorRefPathRoute?.publicationResolutionPath ??
+      normalizedPath;
 
     if (!normalizedHost) {
       throw new BadRequestException({
@@ -272,38 +338,22 @@ export class PublicFunnelRuntimeService {
       include: publicRuntimeInclude,
     });
 
-    let preResolvedEntryContext: ResolvedRuntimeEntryContext | null = null;
-    const rootPublication = personalLinkRoute
-      ? publications.find((publication) => publication.pathPrefix === '/')
+    const promoPublication = promoPathRoute
+      ? await this.resolvePromoPublication(publications, promoPathRoute)
       : null;
 
-    if (rootPublication) {
-      preResolvedEntryContext = await this.resolveEntryContextForPublication({
-        workspaceId: rootPublication.workspaceId,
-        teamId: rootPublication.teamId,
-        publicationId: rootPublication.id,
-        publicationPathPrefix: rootPublication.pathPrefix,
-        requestedPath: path,
-      });
-    }
-
     const matchingPublication =
-      preResolvedEntryContext?.trafficLayer === 'DIRECT'
-        ? rootPublication
-        : publications
-            .filter((publication) => {
-              if (personalLinkRoute?.kind === 'prefixed') {
-                return publication.pathPrefix === '/';
-              }
-
-              return matchesPublicationPath(
-                publicationResolutionPath,
-                publication.pathPrefix,
-              );
-            })
-            .sort((left, right) =>
-              comparePublicationPathPrefix(left.pathPrefix, right.pathPrefix),
-            )[0];
+      promoPublication ??
+      publications
+        .filter((publication) =>
+          matchesPublicationPath(
+            publicationResolutionPath,
+            publication.pathPrefix,
+          ),
+        )
+        .sort((left, right) =>
+          comparePublicationPathPrefix(left.pathPrefix, right.pathPrefix),
+        )[0];
 
     if (!matchingPublication) {
       throw new NotFoundException({
@@ -312,23 +362,62 @@ export class PublicFunnelRuntimeService {
       });
     }
 
-    const entryContext =
-      preResolvedEntryContext?.trafficLayer === 'DIRECT' &&
-      matchingPublication.id === rootPublication?.id
-        ? preResolvedEntryContext
-        : await this.resolveEntryContextForPublication({
-            workspaceId: matchingPublication.workspaceId,
-            teamId: matchingPublication.teamId,
-            publicationId: matchingPublication.id,
-            publicationPathPrefix: matchingPublication.pathPrefix,
-            requestedPath: path,
-          });
+    const entryContext = await this.resolveEntryContextForPublication({
+      workspaceId: matchingPublication.workspaceId,
+      teamId: matchingPublication.teamId,
+      publicationId: matchingPublication.id,
+      publicationPathPrefix: matchingPublication.pathPrefix,
+      requestedPath: path,
+    });
 
     return this.buildRuntimePayload(
       matchingPublication,
       normalizedHost,
       normalizedPath,
       entryContext,
+    );
+  }
+
+  private async resolvePromoPublication(
+    publications: RuntimePublicationRecord[],
+    promoPathRoute: PromoPathRoute,
+  ) {
+    const publicationIds = publications.map((publication) => publication.id);
+    if (publicationIds.length === 0) {
+      return null;
+    }
+
+    const now = new Date();
+    const candidateWheels = await this.prisma.adWheel.findMany({
+      where: {
+        publicationId: {
+          in: publicationIds,
+        },
+        status: 'ACTIVE',
+        startDate: {
+          lte: now,
+        },
+        endDate: {
+          gte: now,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        publicationId: true,
+      },
+    });
+    const wheel = candidateWheels.find(
+      (candidate) =>
+        normalizePersonalLinkSegment(candidate.id) ===
+          promoPathRoute.campaignSlug ||
+        slugifyCampaignName(candidate.name) === promoPathRoute.campaignSlug,
+    );
+
+    return (
+      publications.find(
+        (publication) => publication.id === wheel?.publicationId,
+      ) ?? null
     );
   }
 
@@ -341,19 +430,62 @@ export class PublicFunnelRuntimeService {
     tx?: Prisma.TransactionClient | PrismaService;
   }): Promise<ResolvedRuntimeEntryContext> {
     const normalizedPath = normalizePath(input.requestedPath);
+    const promoPathRoute = parsePromoPathRoute(input.requestedPath);
     const advisorRefPathRoute = parseAdvisorRefPathRoute(input.requestedPath);
-    const queryReferralSlug = extractQueryParam(input.requestedPath, 'ref');
-    const personalLinkRoute =
-      advisorRefPathRoute || queryReferralSlug
-        ? null
-        : parsePersonalLinkRoute(normalizedPath);
     const prismaClient = input.tx ?? this.prisma;
+    const promoPrefixMatchesPublication = Boolean(promoPathRoute);
     const pathReferralPrefixMatchesPublication = advisorRefPathRoute
       ? matchesPublicationPath(
           advisorRefPathRoute.publicationResolutionPath,
           input.publicationPathPrefix,
         )
       : false;
+
+    if (promoPathRoute && promoPrefixMatchesPublication) {
+      const now = new Date();
+      const adWheelCandidates = await prismaClient.adWheel.findMany({
+        where: {
+          teamId: input.teamId,
+          publicationId: input.publicationId,
+          status: 'ACTIVE',
+          startDate: {
+            lte: now,
+          },
+          endDate: {
+            gte: now,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+      const adWheel = adWheelCandidates.find(
+        (candidate) =>
+          normalizePersonalLinkSegment(candidate.id) ===
+            promoPathRoute.campaignSlug ||
+          slugifyCampaignName(candidate.name) === promoPathRoute.campaignSlug,
+      );
+
+      if (adWheel) {
+        return {
+          entryMode: 'paid_ads',
+          trafficLayer: 'PAID_WHEEL',
+          forcedSponsorId: null,
+          adWheelId: adWheel.id,
+          browserPixelsEnabled: true,
+          attributionType: 'promo',
+          attributionSlug: promoPathRoute.campaignSlug,
+          runtimePathPrefix: promoPathRoute.runtimePathPrefix,
+          referralQueryParam: null,
+        };
+      }
+
+      throw new NotFoundException({
+        code: 'PUBLIC_PROMO_NOT_FOUND',
+        message: `No active promo campaign matched ${normalizedPath}.`,
+      });
+    }
 
     if (advisorRefPathRoute && pathReferralPrefixMatchesPublication) {
       const sponsor = await prismaClient.sponsor.findFirst({
@@ -377,6 +509,8 @@ export class PublicFunnelRuntimeService {
           forcedSponsorId: sponsor.id,
           adWheelId: null,
           browserPixelsEnabled: false,
+          attributionType: 'ref',
+          attributionSlug: advisorRefPathRoute.sponsorSlug,
           runtimePathPrefix: advisorRefPathRoute.runtimePathPrefix,
           referralQueryParam: null,
         };
@@ -388,182 +522,17 @@ export class PublicFunnelRuntimeService {
       });
     }
 
-    if (personalLinkRoute && input.publicationPathPrefix === '/') {
-      const sponsor = await prismaClient.sponsor.findFirst({
-        where: {
-          workspaceId: input.workspaceId,
-          teamId: input.teamId,
-          publicSlug: personalLinkRoute.sponsorSlug,
-          isActive: true,
-          status: 'active',
-          availabilityStatus: 'available',
-        } as Prisma.SponsorWhereInput,
-        select: {
-          id: true,
-        },
-      });
-
-      if (sponsor) {
-        return {
-          entryMode: 'organic_asesor',
-          trafficLayer: 'DIRECT',
-          forcedSponsorId: sponsor.id,
-          adWheelId: null,
-          browserPixelsEnabled: false,
-          runtimePathPrefix: personalLinkRoute.runtimePathPrefix,
-          referralQueryParam: null,
-        };
-      }
-
-      if (personalLinkRoute.kind === 'prefixed') {
-        throw new NotFoundException({
-          code: 'PUBLIC_SPONSOR_NOT_FOUND',
-          message: `No active public sponsor matched ${normalizedPath}.`,
-        });
-      }
-    }
-
-    if (queryReferralSlug) {
-      const sponsor = await prismaClient.sponsor.findFirst({
-        where: {
-          workspaceId: input.workspaceId,
-          teamId: input.teamId,
-          publicSlug: queryReferralSlug,
-          isActive: true,
-          status: 'active',
-          availabilityStatus: 'available',
-        } as Prisma.SponsorWhereInput,
-        select: {
-          id: true,
-        },
-      });
-
-      if (sponsor) {
-        return {
-          entryMode: 'organic_asesor',
-          trafficLayer: 'DIRECT',
-          forcedSponsorId: sponsor.id,
-          adWheelId: null,
-          browserPixelsEnabled: false,
-          runtimePathPrefix: null,
-          referralQueryParam: queryReferralSlug,
-        };
-      }
-    }
-
-    const requestedAdWheelId = extractAwid(input.requestedPath);
-    if (requestedAdWheelId) {
-      const now = new Date();
-      try {
-        const adWheel = await prismaClient.adWheel.findFirst({
-          where: {
-            id: requestedAdWheelId,
-            teamId: input.teamId,
-          },
-          select: {
-            id: true,
-            publicationId: true,
-            status: true,
-            startDate: true,
-            endDate: true,
-          },
-        });
-
-        const publicationMatches =
-          adWheel?.publicationId === input.publicationId ||
-          adWheel?.publicationId === null;
-        const dateWindowMatches =
-          adWheel && adWheel.startDate <= now && adWheel.endDate >= now;
-
-        if (
-          adWheel &&
-          publicationMatches &&
-          adWheel.status === 'ACTIVE' &&
-          dateWindowMatches
-        ) {
-          return {
-            entryMode: 'paid_ads',
-            trafficLayer: 'PAID_WHEEL',
-            forcedSponsorId: null,
-            adWheelId: adWheel.id,
-            browserPixelsEnabled: true,
-            runtimePathPrefix: null,
-            referralQueryParam: null,
-          };
-        }
-
-        this.logger.warn(
-          `[WHEEL_DEBUG] awid ${requestedAdWheelId} rejected in entry context. Motivo: ${this.describeAdWheelEntryRejection(
-            adWheel,
-            input.publicationId,
-            now,
-          )}. publicationId=${input.publicationId} teamId=${input.teamId}`,
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Ad wheel entry context resolution failed; falling back to direct organic. publicationId=${input.publicationId} awid=${requestedAdWheelId} message=${
-            error instanceof Error ? error.message : 'unknown error'
-          }`,
-        );
-
-        return {
-          entryMode: 'paid_ads',
-          trafficLayer: 'DIRECT',
-          forcedSponsorId: null,
-          adWheelId: null,
-          browserPixelsEnabled: true,
-          runtimePathPrefix: null,
-          referralQueryParam: null,
-        };
-      }
-    }
-
     return {
       entryMode: 'paid_ads',
       trafficLayer: 'ORGANIC',
       forcedSponsorId: null,
       adWheelId: null,
       browserPixelsEnabled: true,
+      attributionType: 'organic',
+      attributionSlug: null,
       runtimePathPrefix: null,
       referralQueryParam: null,
     };
-  }
-
-  private describeAdWheelEntryRejection(
-    adWheel: {
-      id: string;
-      publicationId: string | null;
-      status: string;
-      startDate: Date;
-      endDate: Date;
-    } | null,
-    publicationId: string,
-    now: Date,
-  ) {
-    if (!adWheel) {
-      return 'adWheel_not_found_for_team';
-    }
-
-    if (
-      adWheel.publicationId !== null &&
-      adWheel.publicationId !== publicationId
-    ) {
-      return `publication_mismatch expected=${publicationId} actual=${adWheel.publicationId}`;
-    }
-
-    if (adWheel.status !== 'ACTIVE') {
-      return `status_not_ACTIVE actual=${adWheel.status}`;
-    }
-
-    if (adWheel.startDate > now) {
-      return `startDate_in_future startDate=${adWheel.startDate.toISOString()} now=${now.toISOString()}`;
-    }
-
-    if (adWheel.endDate < now) {
-      return `endDate_expired endDate=${adWheel.endDate.toISOString()} now=${now.toISOString()}`;
-    }
-
-    return 'unknown_entry_context_rejection';
   }
 
   async getPublicationRuntime(
@@ -596,6 +565,8 @@ export class PublicFunnelRuntimeService {
         forcedSponsorId: null,
         adWheelId: null,
         browserPixelsEnabled: true,
+        attributionType: 'organic',
+        attributionSlug: null,
         runtimePathPrefix: null,
         referralQueryParam: null,
       },
@@ -616,24 +587,14 @@ export class PublicFunnelRuntimeService {
     return this.resolveByHostAndPath(runtime.domain.host, requestedPath);
   }
 
-  private buildRuntimePayload(
+  private async buildRuntimePayload(
     publication: RuntimePublicationRecord,
     requestedHost: string,
     requestedPath: string,
     entryContext: ResolvedRuntimeEntryContext,
-  ): PublicRuntimePayload {
+  ): Promise<PublicRuntimePayload> {
     const effectivePublicationPathPrefix =
       entryContext.runtimePathPrefix ?? publication.pathPrefix;
-    const decorateStepPath = (stepPath: string) => {
-      if (!entryContext.referralQueryParam) {
-        return stepPath;
-      }
-
-      const separator = stepPath.includes('?') ? '&' : '?';
-      return `${stepPath}${separator}ref=${encodeURIComponent(
-        entryContext.referralQueryParam,
-      )}`;
-    };
     const relativeStepPath = resolveRelativeStepPath(
       requestedPath,
       effectivePublicationPathPrefix,
@@ -642,12 +603,10 @@ export class PublicFunnelRuntimeService {
     const steps = publication.funnelInstance.steps.map((step) => ({
       slug: normalizeStepSlug(step.slug),
       id: step.id,
-      path: decorateStepPath(
-        buildPublicationStepPath(
-          effectivePublicationPathPrefix,
-          step.slug,
-          step.isEntryStep,
-        ),
+      path: buildPublicationStepPath(
+        effectivePublicationPathPrefix,
+        step.slug,
+        step.isEntryStep,
       ),
       stepType: step.stepType,
       position: step.position,
@@ -687,7 +646,23 @@ export class PublicFunnelRuntimeService {
       publication.trackingProfile ?? publication.funnelInstance.trackingProfile;
     const effectiveHandoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
-    const handoff = resolvePublicHandoffConfig(effectiveHandoffStrategy);
+    const baseHandoff = resolvePublicHandoffConfig(effectiveHandoffStrategy);
+    const handoffWhatsappText = findRuntimeBlockSetting(
+      currentStep.blocksJson as Prisma.JsonValue,
+      'whatsapp_handoff_cta',
+      'whatsappText',
+    );
+    const handoff = {
+      ...baseHandoff,
+      messageTemplate: handoffWhatsappText || baseHandoff.messageTemplate,
+    };
+    const runtimeSponsorContext = await this.resolveRuntimeSponsorContext({
+      publication,
+      requestedHost,
+      requestedPath,
+      currentStepPath: currentStep.path,
+      handoff,
+    });
     const theme = this.extractFunnelTheme(
       publication.funnelInstance.settingsJson as Prisma.JsonValue,
     );
@@ -714,6 +689,10 @@ export class PublicFunnelRuntimeService {
         forcedSponsorId: entryContext.forcedSponsorId,
         adWheelId: entryContext.adWheelId,
         browserPixelsEnabled: entryContext.browserPixelsEnabled,
+        attributionType: entryContext.attributionType,
+        attributionSlug: entryContext.attributionSlug,
+        runtimePathPrefix: entryContext.runtimePathPrefix,
+        referralQueryParam: null,
       },
       publication: {
         id: publication.id,
@@ -782,11 +761,444 @@ export class PublicFunnelRuntimeService {
             settingsJson: effectiveHandoffStrategy.settingsJson,
           }
         : null,
-      handoff,
+      handoff: {
+        ...handoff,
+        sponsor: runtimeSponsorContext?.handoff.sponsor ?? null,
+        whatsappPhone: runtimeSponsorContext?.handoff.whatsappPhone ?? null,
+        whatsappMessage: runtimeSponsorContext?.handoff.whatsappMessage ?? null,
+        whatsappUrl: runtimeSponsorContext?.handoff.whatsappUrl ?? null,
+      },
+      leadId: runtimeSponsorContext?.leadId ?? null,
+      assignment: runtimeSponsorContext?.assignment ?? null,
+      advisor: runtimeSponsorContext?.advisor ?? null,
+      assignedSponsor: runtimeSponsorContext?.assignedSponsor ?? null,
       currentStep,
       nextStep,
       previousStep,
       steps,
+    } as PublicRuntimePayload;
+  }
+
+  private async resolveRuntimeSponsorContext(input: {
+    publication: RuntimePublicationRecord;
+    requestedHost: string;
+    requestedPath: string;
+    currentStepPath: string;
+    handoff: ReturnType<typeof resolvePublicHandoffConfig>;
+  }): Promise<RuntimeSponsorContext> {
+    const trackedLeadContext = await this.resolveTrackedLeadContext(input);
+    if (trackedLeadContext) {
+      return trackedLeadContext;
+    }
+
+    const entryContextLead = await this.resolveEntryContextAssignmentContext({
+      publication: input.publication,
+      entryContext: input.publication
+        ? await this.resolveEntryContextForPublication({
+            workspaceId: input.publication.workspaceId,
+            teamId: input.publication.teamId,
+            publicationId: input.publication.id,
+            publicationPathPrefix: input.publication.pathPrefix,
+            requestedPath: input.requestedPath,
+          })
+        : null,
+      currentStepPath: input.currentStepPath,
+      handoff: input.handoff,
+    });
+
+    if (entryContextLead) {
+      return entryContextLead;
+    }
+
+    throw new ConflictException({
+      code: 'ASSIGNED_SPONSOR_REQUIRED',
+      message: `No assigned sponsor could be resolved for publication ${input.publication.id}.`,
+    });
+  }
+
+  private async resolveTrackedLeadContext(input: {
+    publication: RuntimePublicationRecord;
+    requestedPath: string;
+    currentStepPath: string;
+    handoff: ReturnType<typeof resolvePublicHandoffConfig>;
+  }): Promise<RuntimeSponsorContext> {
+    const ctxToken = extractRawQueryParam(input.requestedPath, 'ctx');
+    if (!ctxToken) {
+      return null;
+    }
+
+    try {
+      const token = this.identityTokenService.verifyToken(ctxToken);
+      if (token.publicationId !== input.publication.id) {
+        return null;
+      }
+
+      const lead = await this.prisma.lead.findUnique({
+        where: {
+          id: token.leadId,
+        },
+        include: {
+          currentAssignment: {
+            include: {
+              sponsor: true,
+            },
+          },
+        },
+      });
+
+      if (!lead?.currentAssignment?.sponsor) {
+        throw new ConflictException({
+          code: 'LEAD_ASSIGNMENT_REQUIRED',
+          message: `Lead ${token.leadId} does not have an active assignment.`,
+        });
+      }
+
+      return this.buildRuntimeSponsorContextFromAssignment({
+        leadId: lead.id,
+        leadName: lead.fullName,
+        leadEmail: lead.email,
+        leadPhone: lead.phone,
+        sponsor: lead.currentAssignment.sponsor,
+        advisor: {
+          id: lead.currentAssignment.sponsor.id,
+          sponsorId: lead.currentAssignment.sponsor.id,
+          name: lead.currentAssignment.sponsor.displayName,
+          role: 'Asesor',
+          bio: 'Asesor',
+          phone: lead.currentAssignment.sponsor.phone,
+          photoUrl: lead.currentAssignment.sponsor.avatarUrl,
+        },
+        assignment: {
+          id: lead.currentAssignment.id,
+          status: lead.currentAssignment.status,
+          reason: lead.currentAssignment.reason,
+          assignedAt: lead.currentAssignment.assignedAt,
+        },
+        publicationName: input.publication.funnelInstance.name,
+        publicationPath: input.currentStepPath,
+        handoff: input.handoff,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Runtime ctx hydration failed for publication ${input.publication.id}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return null;
+    }
+  }
+
+  private async resolveEntryContextAssignmentContext(input: {
+    publication: RuntimePublicationRecord;
+    entryContext: ResolvedRuntimeEntryContext | null;
+    currentStepPath: string;
+    handoff: ReturnType<typeof resolvePublicHandoffConfig>;
+  }): Promise<RuntimeSponsorContext | null> {
+    if (!input.entryContext) {
+      return null;
+    }
+
+    const engine = this.getAssignmentEngineBridge();
+    const tx = this.prisma;
+    const publication = input.publication as any;
+
+    if (input.entryContext.forcedSponsorId) {
+      const sponsor = await (engine as any).resolveForcedSponsorOrThrow(
+        tx,
+        publication,
+        input.entryContext.forcedSponsorId,
+      );
+      const advisor =
+        (await (engine as any).resolveAssignedAdvisorBySponsorId(
+          tx,
+          publication,
+          sponsor.id,
+        )) ?? (engine as any).toPublicAssignedAdvisorFromSponsor(sponsor);
+
+      return this.buildRuntimeSponsorContextFromAssignment({
+        leadId: null,
+        leadName: null,
+        leadEmail: null,
+        leadPhone: null,
+        sponsor,
+        advisor,
+        assignment: {
+          id: `runtime-forced-${sponsor.id}`,
+          status: 'assigned',
+          reason: 'manual',
+          assignedAt: new Date(),
+        },
+        publicationName: input.publication.funnelInstance.name,
+        publicationPath: input.currentStepPath,
+        handoff: input.handoff,
+      });
+    }
+
+    if (
+      input.entryContext.trafficLayer === 'PAID_WHEEL' &&
+      input.entryContext.adWheelId
+    ) {
+      try {
+        const sponsor = await this.resolveActivePaidWheelSponsorOrThrow({
+          publication: input.publication,
+          adWheelId: input.entryContext.adWheelId,
+        });
+        const advisor =
+          (await (engine as any).resolveAssignedAdvisorBySponsorId(
+            tx,
+            publication,
+            sponsor.id,
+          )) ?? (engine as any).toPublicAssignedAdvisorFromSponsor(sponsor);
+
+        return this.buildRuntimeSponsorContextFromAssignment({
+          leadId: null,
+          leadName: null,
+          leadEmail: null,
+          leadPhone: null,
+          sponsor,
+          advisor,
+          assignment: {
+            id: `runtime-wheel-${sponsor.id}`,
+            status: 'assigned',
+            reason: 'rotation',
+            assignedAt: new Date(),
+          },
+          publicationName: input.publication.funnelInstance.name,
+          publicationPath: input.currentStepPath,
+          handoff: input.handoff,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Paid wheel runtime resolution fallback triggered for publication ${input.publication.id}: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
+    }
+
+    const directAdvisor = await this.resolveDirectRuntimeAdvisorOrThrow(
+      input.publication,
+    );
+    const sponsor = directAdvisor.sponsor;
+
+    if (!sponsor) {
+      throw new ConflictException({
+        code: 'ADVISOR_SPONSOR_REQUIRED',
+        message: `Resolved advisor ${directAdvisor.id} does not have an active sponsor.`,
+      });
+    }
+
+    return this.buildRuntimeSponsorContextFromAssignment({
+      leadId: null,
+      leadName: null,
+      leadEmail: null,
+      leadPhone: null,
+      sponsor,
+      advisor: {
+        id: directAdvisor.id,
+        sponsorId: sponsor.id,
+        name: sponsor.displayName ?? directAdvisor.fullName,
+        role: directAdvisor.role === 'TEAM_ADMIN' ? 'Propietario del equipo' : 'Asesor',
+        bio: directAdvisor.role === 'TEAM_ADMIN' ? 'Propietario del equipo' : 'Asesor',
+        phone: sponsor.phone ?? null,
+        photoUrl: sponsor.avatarUrl ?? null,
+      },
+      assignment: {
+        id: `runtime-direct-${sponsor.id}`,
+        status: 'assigned',
+        reason: directAdvisor.role === 'TEAM_ADMIN' ? 'fallback' : 'rotation',
+        assignedAt: new Date(),
+      },
+      publicationName: input.publication.funnelInstance.name,
+      publicationPath: input.currentStepPath,
+      handoff: input.handoff,
+    });
+  }
+
+  private buildRuntimeSponsorContextFromAssignment(input: {
+    leadId: string | null;
+    leadName: string | null;
+    leadEmail: string | null;
+    leadPhone: string | null;
+    sponsor: {
+      id: string;
+      displayName: string;
+      email: string | null;
+      phone: string | null;
+      avatarUrl: string | null;
+    };
+    advisor: {
+      id: string;
+      sponsorId: string;
+      name: string;
+      role: string;
+      bio: string;
+      phone: string | null;
+      photoUrl: string | null;
+    };
+    assignment: {
+      id: string;
+      status: string;
+      reason: string;
+      assignedAt: Date;
+    };
+    publicationName: string;
+    publicationPath: string;
+    handoff: ReturnType<typeof resolvePublicHandoffConfig>;
+  }): RuntimeSponsorContext {
+    const sponsor = {
+      id: input.sponsor.id,
+      displayName: input.sponsor.displayName,
+      email: input.sponsor.email,
+      phone: input.sponsor.phone,
+      avatarUrl: input.sponsor.avatarUrl,
+    };
+    const whatsappPhone = normalizeWhatsappPhone(input.sponsor.phone);
+    const whatsappMessage = buildPublicWhatsappMessage({
+      template: input.handoff.messageTemplate,
+      sponsorName: input.sponsor.displayName,
+      leadName: input.leadName,
+      leadEmail: input.leadEmail,
+      leadPhone: input.leadPhone,
+      funnelName: input.publicationName,
+      publicationPath: input.publicationPath,
+    });
+    const whatsappUrl = buildPublicWhatsappUrl(whatsappPhone, whatsappMessage);
+
+    return {
+      leadId: input.leadId,
+      assignment: {
+        id: input.assignment.id,
+        status: input.assignment.status,
+        reason: input.assignment.reason,
+        assignedAt: input.assignment.assignedAt.toISOString(),
+        sponsor,
+      },
+      advisor: {
+        name: input.advisor.name,
+        role: input.advisor.role,
+        phone: input.advisor.phone,
+        photoUrl: input.advisor.photoUrl,
+        bio: input.advisor.bio,
+        whatsappUrl,
+      },
+      assignedSponsor: sponsor,
+      handoff: {
+        sponsor,
+        whatsappPhone,
+        whatsappMessage,
+        whatsappUrl,
+      },
+    };
+  }
+
+  private getAssignmentEngineBridge() {
+    return Object.create(LeadCaptureAssignmentService.prototype) as any;
+  }
+
+  private async resolveDirectRuntimeAdvisorOrThrow(
+    publication: RuntimePublicationRecord,
+  ) {
+    const engine = this.getAssignmentEngineBridge();
+    return (engine as any).resolveFallbackTeamAdminOrThrow(
+      this.prisma,
+      publication,
+    );
+  }
+
+  private async resolveActivePaidWheelSponsorOrThrow(input: {
+    publication: RuntimePublicationRecord;
+    adWheelId: string;
+  }) {
+    const now = new Date();
+    const [wheel] = await this.prisma.$queryRaw<
+      Array<{
+        currentTurnPosition: number;
+        sequenceVersion: number;
+      }>
+    >(Prisma.sql`
+      SELECT
+        aw."currentTurnPosition",
+        aw."sequenceVersion"
+      FROM "AdWheel" aw
+      WHERE aw.id = ${input.adWheelId}
+        AND aw."teamId" = ${input.publication.teamId}
+        AND (aw."publicationId" = ${input.publication.id} OR aw."publicationId" IS NULL)
+        AND aw.status = 'ACTIVE'
+        AND aw."startDate" <= ${now}
+        AND aw."endDate" >= ${now}
+      LIMIT 1
+    `);
+
+    if (!wheel) {
+      throw new ConflictException({
+        code: 'NO_ACTIVE_AD_WHEEL',
+        message: `Ad wheel ${input.adWheelId} is not active for publication ${input.publication.id}.`,
+      });
+    }
+
+    const totalTurns = await this.prisma.adWheelTurn.count({
+      where: {
+        adWheelId: input.adWheelId,
+        sequenceVersion: wheel.sequenceVersion,
+      },
+    });
+
+    if (totalTurns === 0) {
+      throw new ConflictException({
+        code: 'NO_ACTIVE_AD_WHEEL_TURNS',
+        message: `Ad wheel ${input.adWheelId} does not have turns available for publication ${input.publication.id}.`,
+      });
+    }
+
+    const currentPosition =
+      ((Math.max(1, wheel.currentTurnPosition) - 1) % totalTurns) + 1;
+    const [turn] = await this.prisma.$queryRaw<
+      Array<{
+        sponsorId: string;
+        displayName: string;
+        email: string | null;
+        phone: string | null;
+        avatarUrl: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        awt."sponsorId",
+        s."displayName",
+        s.email,
+        s.phone,
+        s."avatarUrl"
+      FROM "AdWheelTurn" awt
+      INNER JOIN "Sponsor" s
+        ON s.id = awt."sponsorId"
+      INNER JOIN "AdWheelParticipant" awp
+        ON awp."adWheelId" = awt."adWheelId"
+       AND awp."sponsorId" = awt."sponsorId"
+      WHERE awt."adWheelId" = ${input.adWheelId}
+        AND awt."sequenceVersion" = ${wheel.sequenceVersion}
+        AND s."isActive" = true
+        AND s.status = 'active'
+        AND s."availabilityStatus" = 'available'
+        AND awp."seatCount" > 0
+      ORDER BY
+        CASE WHEN awt.position >= ${currentPosition} THEN 0 ELSE 1 END,
+        awt.position ASC
+      LIMIT 1
+    `);
+
+    if (!turn) {
+      throw new ConflictException({
+        code: 'NO_ELIGIBLE_AD_WHEEL_SPONSOR',
+        message: `Ad wheel ${input.adWheelId} could not resolve an eligible sponsor for publication ${input.publication.id}.`,
+      });
+    }
+
+    return {
+      id: turn.sponsorId,
+      displayName: turn.displayName,
+      email: turn.email,
+      phone: turn.phone,
+      avatarUrl: turn.avatarUrl,
     };
   }
 
