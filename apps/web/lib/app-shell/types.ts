@@ -50,7 +50,7 @@ export type FunnelInstanceRecord = {
   workspaceId: string;
   teamId: string;
   templateId: string;
-  legacyFunnelId: string | null;
+  funnelId: string | null;
   name: string;
   code: string;
   thumbnailUrl: string | null;

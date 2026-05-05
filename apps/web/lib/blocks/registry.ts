@@ -953,8 +953,10 @@ export const builderBlockDefinitionsByKey: Record<
       variant: "confirmation_reveal",
       headline: "string",
       subheadline: "string",
-      reveal_headline: "string",
-      reveal_subheadline: "string",
+      settings: {
+        title: "string",
+        subtitlePrefix: "string",
+      },
     },
     example: {
       type: "thank_you_reveal",
@@ -962,9 +964,10 @@ export const builderBlockDefinitionsByKey: Record<
       variant: "confirmation_reveal",
       headline: "Gracias, ya estas dentro",
       subheadline: "Tu lead fue registrado y el siguiente paso ya esta listo.",
-      reveal_headline: "Asesor asignado para esta sesion",
-      reveal_subheadline:
-        "Mostramos continuidad real usando el assignment resuelto por el runtime.",
+      settings: {
+        title: "¡Felicidades! Te has registrado con éxito",
+        subtitlePrefix: "Tu asesor asignado es: {{advisorName}}",
+      },
     },
   }),
   conversion_page_config: defineBlock({
@@ -1019,15 +1022,41 @@ export const builderBlockDefinitionsByKey: Record<
     schema: {
       type: "sponsor_reveal_placeholder",
       key: "string",
-      title: "string",
-      description: "string",
+      settings: {
+        title: "string",
+        subtitlePrefix: "string",
+      },
     },
     example: {
       type: "sponsor_reveal_placeholder",
       key: "sponsor-reveal-main",
-      title: "Tu sponsor asignado aparecera aqui",
-      description:
-        "El runtime completa este espacio usando el assignment guardado en sesion.",
+      settings: {
+        title: "¡Felicidades! Te has registrado con éxito",
+        subtitlePrefix: "Tu asesor asignado es: {{advisorName}}",
+      },
+    },
+  }),
+  mobile_gallery: defineBlock({
+    key: "mobile_gallery",
+    name: "Mobile Gallery",
+    description:
+      "Galeria fluida solo para mobile que inserta la media del funnel dentro del flujo del contenido.",
+    category: "media",
+    schema: {
+      type: "mobile_gallery",
+      key: "string",
+      settings: {
+        headline: "string",
+        text: "string",
+      },
+    },
+    example: {
+      type: "mobile_gallery",
+      key: "mobile-gallery-main",
+      settings: {
+        headline: "Así se ve el resultado en personas reales",
+        text: "Desliza la galería para ver referencias rápidas antes de continuar.",
+      },
     },
   }),
   social_proof: defineBlock({
@@ -1476,20 +1505,26 @@ export const builderBlockDefinitionsByKey: Record<
     schema: {
       type: "whatsapp_handoff_cta",
       key: "string",
-      headline: "string",
-      subheadline: "string",
-      button_text: "string",
-      helper_text: "string",
-      variant: "handoff_primary",
+      settings: {
+        headline: "string",
+        buttonPrefix: "string",
+        redirectText: "string",
+        whatsappText: "string",
+        autoRedirectSeconds: "number",
+        buttonColor: "string",
+      },
     },
     example: {
       type: "whatsapp_handoff_cta",
       key: "whatsapp-handoff-main",
-      headline: "Continua ahora por WhatsApp",
-      subheadline: "Tu asesor asignado recibira el contexto de esta sesion.",
-      button_text: "Abrir WhatsApp",
-      helper_text: "Si no abre de inmediato, este bloque mantiene el handoff visible.",
-      variant: "handoff_primary",
+      settings: {
+        headline: "Continua ahora por WhatsApp",
+        buttonPrefix: "Continuar con {{advisorName}}",
+        redirectText: "{{advisorName}} te está esperando. Redirigiendo en {{seconds}}",
+        whatsappText: "Hola soy {{leadName}}, deseo más información",
+        autoRedirectSeconds: 5,
+        buttonColor: "#25D366",
+      },
     },
   }),
   step_by_step: defineBlock({
@@ -1593,6 +1628,7 @@ export const defaultBuilderBlockDefinitions = [
   builderBlockDefinitionsByKey.thank_you_reveal,
   builderBlockDefinitionsByKey.conversion_page_config,
   builderBlockDefinitionsByKey.sponsor_reveal_placeholder,
+  builderBlockDefinitionsByKey.mobile_gallery,
   builderBlockDefinitionsByKey.whatsapp_handoff_cta,
 ];
 
@@ -1620,6 +1656,7 @@ export const BlockRegistry: Record<string, FC<any>> = {
   thank_you_reveal: PublicStickyRuntimeBlockBridge,
   conversion_page_config: PublicStickyRuntimeBlockBridge,
   sponsor_reveal_placeholder: PublicStickyRuntimeBlockBridge,
+  mobile_gallery: PublicStickyRuntimeBlockBridge,
   social_proof: PublicStickyRuntimeBlockBridge,
   social_proof_grid: PublicStickyRuntimeBlockBridge,
   risk_reversal: PublicStickyRuntimeBlockBridge,
