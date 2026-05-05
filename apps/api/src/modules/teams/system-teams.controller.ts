@@ -16,6 +16,8 @@ import type { UpdateSystemTenantFunnelDto } from './dto/update-system-tenant-fun
 import type { UpdateSystemTenantFunnelStepDto } from './dto/update-system-tenant-funnel-step.dto';
 import type { UpdateSystemTenantDto } from './dto/update-system-tenant.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
+import type { SystemKreditInjectionDto } from './dto/system-kredit-injection.dto';
+import { SystemKreditsService } from './system-kredits.service';
 import { SystemTenantAccessGuard } from './system-tenant-access.guard';
 import { TeamsService } from './teams.service';
 
@@ -24,11 +26,34 @@ import { TeamsService } from './teams.service';
 export class SystemTeamsController {
   private static readonly logger = new Logger(SystemTeamsController.name);
 
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(
+    private readonly teamsService: TeamsService,
+    private readonly systemKreditsService: SystemKreditsService,
+  ) {}
 
   @Get('tenants')
   listTenants(@Query('includeArchived') includeArchived?: string) {
     return this.teamsService.listSystemTenants(includeArchived === 'true');
+  }
+
+  @Get('kredits/directory')
+  listKreditDirectory() {
+    return this.systemKreditsService.listUserDirectory();
+  }
+
+  @Post('kredits/injections')
+  injectKredits(
+    @CurrentAuthUser() user: AuthenticatedUser | undefined,
+    @Body() dto: SystemKreditInjectionDto,
+  ) {
+    return this.systemKreditsService.injectCredits({
+      adminUserId: user?.id ?? '',
+      targetType: dto.targetType,
+      targetId: dto.targetId,
+      amountDecimal: dto.amountDecimal,
+      reason: dto.reason,
+      note: dto.note,
+    });
   }
 
   @Post('dev/wipe-leads')

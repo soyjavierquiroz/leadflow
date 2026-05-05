@@ -178,7 +178,7 @@ describe('WalletEngineService', () => {
       'http://wallet-engine:3000/wallets/credit',
       {
         account_id: 'account-kredit-1',
-        amount: '5000000',
+        amount: '5.000000',
         unit_code: 'KREDIT',
         unit_scale: 6,
         reference_type: 'welcome_bonus',
@@ -242,6 +242,32 @@ describe('WalletEngineService', () => {
             {
               account_id: 'account-kredit-1',
               unit_code: 'KREDIT',
+              unit_scale: 6,
+              balance: '5.000000',
+              held_amount: '0.000000',
+              available_balance: '5.000000',
+              updated_at: '2026-04-01T00:00:00.000Z',
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(service.getSponsorKredits('account-kredit-1')).resolves.toBe(
+      '5.000000',
+    );
+  });
+
+  it('normalizes legacy KREDIT balances to scale 6', async () => {
+    const { service, httpService } = createService();
+
+    httpService.get.mockReturnValue(
+      of(
+        buildAxiosResponse({
+          balances: [
+            {
+              account_id: 'account-kredit-1',
+              unit_code: 'KREDIT',
               unit_scale: 0,
               balance: '5000000',
               held_amount: '0',
@@ -254,7 +280,68 @@ describe('WalletEngineService', () => {
     );
 
     await expect(service.getSponsorKredits('account-kredit-1')).resolves.toBe(
-      '5000000',
+      '5.000000',
+    );
+  });
+
+  it('credits KREDIT accounts using normalized decimal strings', async () => {
+    const { service, httpService } = createService();
+
+    httpService.post.mockReturnValue(
+      of(
+        buildAxiosResponse({
+          ledger_entry: {
+            id: 'ledger-kredit-1',
+            account_id: 'account-kredit-1',
+            movement_type: 'credit',
+            amount: '3.500000',
+            balance_after: '8.500000',
+            unit_code: 'KREDIT',
+            unit_scale: 6,
+            reference_type: 'admin_credit',
+            reference_id: 'admin-user-1-sponsor-sponsor-1',
+            idempotency_key: 'credit-key-1',
+            meta_json: {},
+            created_at: '2026-04-01T00:00:00.000Z',
+          },
+          balance: {
+            account_id: 'account-kredit-1',
+            unit_code: 'KREDIT',
+            unit_scale: 6,
+            balance: '8.500000',
+            held_amount: '0.000000',
+            available_balance: '8.500000',
+            updated_at: '2026-04-01T00:00:00.000Z',
+          },
+        }),
+      ),
+    );
+
+    await service.creditKredits('account-kredit-1', '3.5', {
+      referenceType: 'admin_credit',
+      referenceId: 'admin-user-1-sponsor-sponsor-1',
+      idempotencyKey: 'credit-key-1',
+      meta: {
+        adminUserId: 'admin-user-1',
+      },
+    });
+
+    expect(httpService.post).toHaveBeenCalledWith(
+      'http://wallet-engine:3000/wallets/credit',
+      expect.objectContaining({
+        account_id: 'account-kredit-1',
+        amount: '3.500000',
+        unit_code: 'KREDIT',
+        unit_scale: 6,
+        reference_type: 'admin_credit',
+        reference_id: 'admin-user-1-sponsor-sponsor-1',
+      }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer wallet-secret',
+          'Idempotency-Key': 'credit-key-1',
+        }),
+      }),
     );
   });
 

@@ -112,6 +112,65 @@ Mantenimiento para equipos heredados:
 docker exec -it $(docker ps --filter name=leadflow_api -q | head -n 1) sh -lc 'cd /app/apps/api && npx ts-node src/scripts/seed-default-pools.ts'
 ```
 
+## Modulo Admin de Kredits
+
+Leadflow ya expone un modulo administrativo de Kredits para que `SUPER_ADMIN`
+pueda auditar saldos visibles y disparar cargas manuales desde el panel
+`/admin/kredits`.
+
+Capacidades actuales:
+
+- directorio maestro `User -> Sponsor -> Team -> Workspace` con saldo visible
+- carga manual a nivel `sponsor` o `team`
+- trazabilidad contable por `referenceId` y `meta.adminUserId`
+- scripts operativos para creditos y debitos manuales desde la API
+
+### Contrato critico de montos
+
+El contrato con `kurukin-wallet-engine` cambio de forma explicita:
+
+- antes, varios flujos internos trataban `amount` como unidades menores crudas
+- ahora, el engine recibe siempre `string` decimal en la API externa
+- la interpretacion real depende de `unit_code + unit_scale`
+
+Para `KREDIT` con `unit_scale = 6`:
+
+- correcto: `"3.000000"` para acreditar 3 Kredits
+- correcto: `"3.5"` o `"3.500000"` para acreditar 3.5 Kredits
+- incorrecto: `"3000000"` si la intencion era acreditar 3.0
+
+`"3000000"` con `unit_scale = 6` significa `3000000.000000`, no `3.000000`.
+Ese fue el origen del error de escala que este modulo corrige.
+
+Regla operativa:
+
+- DB del wallet-engine: `BIGINT` en minor units
+- API del wallet-engine: `amount` como decimal string
+- Leadflow debe convertir o normalizar antes de llamar `/wallets/credit` o
+  `/wallets/debit`
+
+### Endpoints admin de Kredits
+
+Backend disponible hoy:
+
+- `GET /v1/system/kredits/directory`
+- `POST /v1/system/kredits/injections`
+
+Semantica:
+
+- `GET /v1/system/kredits/directory` devuelve el listado maestro con
+  `userId`, `userName`, `email`, `sponsorId`, `teamId`, `workspaceId` y
+  `kreditBalance`
+- `POST /v1/system/kredits/injections` recibe `targetType`, `targetId` y
+  `amountDecimal` como string; opcionalmente `reason` y `note`
+- el backend hace `upsert` de la cuenta, normaliza el decimal a escala 6,
+  ejecuta el credito y devuelve `referenceId` auditable
+
+Scripts operativos relacionados:
+
+- `apps/api/src/scripts/manual-credit-kredits.ts`
+- `apps/api/src/scripts/manual-debit-kredits.ts`
+
 ## Base de conocimiento RAG
 
 La arquitectura RAG end-to-end queda dividida entre Leadflow, n8n y Runtime Context Central:

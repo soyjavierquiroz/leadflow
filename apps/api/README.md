@@ -68,6 +68,53 @@ La ingesta RAG acepta `multipart/form-data` y reenvia el PDF al webhook interno 
 
 `KnowledgeService` conserva los metadatos no reservados y los pasa a n8n para que el workflow resuelva el stack correcto. Para borrado fisico, `deleteDocumentById()` llama Runtime Context Central con `DELETE /v1/knowledge/:document_id?tenant_id=<uuid>` y sin body JSON.
 
+## Kredits Admin
+
+Leadflow ya incluye una superficie administrativa de Kredits consumida por la
+UI de `/admin/kredits`.
+
+Endpoints operativos:
+
+- `GET /v1/system/kredits/directory`
+- `POST /v1/system/kredits/injections`
+
+Contrato de `POST /v1/system/kredits/injections`:
+
+- `targetType`: `team` o `sponsor`
+- `targetId`: id del `Team` o `Sponsor`
+- `amountDecimal`: string decimal
+- `reason` opcional
+- `note` opcional
+
+Ejemplo de request:
+
+```json
+{
+  "targetType": "sponsor",
+  "targetId": "8d0d3d3f-1111-2222-3333-444444444444",
+  "amountDecimal": "3.500000",
+  "reason": "manual top-up",
+  "note": "support case"
+}
+```
+
+### Cambio critico de contrato en wallet-engine
+
+El `wallet-engine` de Kurukin recibe montos como decimal string, no como
+minor units crudos.
+
+Regla correcta:
+
+- `amount: "3.000000"` con `unit_code=KREDIT` y `unit_scale=6` acredita 3 Kredits
+
+Regla incorrecta:
+
+- `amount: "3000000"` con `unit_scale=6` no significa 3 Kredits
+- significa `3000000.000000`
+
+Por eso Leadflow ahora normaliza todos los montos KREDIT antes de invocar el
+engine y evita enviar enteros de minor units como payload externo.
+
 ## Configuracion por entorno
 Definida en `src/config/runtime.ts`.
 

@@ -63,7 +63,18 @@ export type WalletEngineDebitResult = {
   balance: WalletEngineBalance;
 };
 
+export type WalletEngineCreditResult = WalletEngineDebitResult;
+
 export type WalletEngineDebitOptions = {
+  idempotencyKey?: string;
+};
+
+export type WalletEngineCreditOptions = {
+  featureKey?: string;
+  referenceType?: string;
+  referenceId?: string;
+  reason?: string;
+  meta?: Record<string, unknown>;
   idempotencyKey?: string;
 };
 
@@ -94,6 +105,7 @@ const SEAT_DEBIT_FEATURE_KEY = 'ads_wheel.seat';
 const KREDIT_UNIT_CODE = 'KREDIT';
 const KREDIT_UNIT_SCALE = 6;
 const INITIAL_WELCOME_CREDITS_AMOUNT = '5000000';
+const DECIMAL_AMOUNT_PATTERN = /^-?\d+(?:\.\d+)?$/;
 
 const sanitizeNullableText = (value: string | null | undefined) => {
   if (value === undefined || value === null) {
@@ -103,6 +115,67 @@ const sanitizeNullableText = (value: string | null | undefined) => {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 };
+
+const formatMinorUnitString = (value: string, scale: number) => {
+  const normalized = sanitizeNullableText(value);
+
+  if (!normalized || !/^-?\d+$/.test(normalized)) {
+    throw new ServiceUnavailableException(
+      'Wallet engine amount must be expressed as integer minor units.',
+    );
+  }
+
+  const negative = normalized.startsWith('-');
+  const digits = negative ? normalized.slice(1) : normalized;
+  const paddedDigits = digits.padStart(scale + 1, '0');
+  const whole = paddedDigits.slice(0, -scale) || '0';
+  const fraction = paddedDigits.slice(-scale);
+
+  return `${negative ? '-' : ''}${whole}.${fraction}`;
+};
+
+const normalizeDecimalAmountString = (value: string, scale: number) => {
+  const normalized = sanitizeNullableText(value);
+
+  if (!normalized || !DECIMAL_AMOUNT_PATTERN.test(normalized)) {
+    throw new ServiceUnavailableException(
+      'Wallet engine amount must be expressed as a decimal string.',
+    );
+  }
+
+  if (!Number.isInteger(scale) || scale < 0 || scale > 9) {
+    throw new ServiceUnavailableException(
+      'Wallet engine unit scale must be an integer between 0 and 9.',
+    );
+  }
+
+  const negative = normalized.startsWith('-');
+  const unsignedValue = negative ? normalized.slice(1) : normalized;
+  const [wholeRaw, fractionRaw = ''] = unsignedValue.split('.');
+
+  if (fractionRaw.length > scale) {
+    throw new ServiceUnavailableException(
+      `Wallet engine amount exceeds the allowed ${scale} decimal places.`,
+    );
+  }
+
+  const whole = wholeRaw.replace(/^0+(?=\d)/, '') || '0';
+
+  if (scale === 0) {
+    if (fractionRaw.length > 0) {
+      throw new ServiceUnavailableException(
+        'Wallet engine amount does not allow decimal places for this unit.',
+      );
+    }
+
+    return `${negative ? '-' : ''}${whole}`;
+  }
+
+  return `${negative ? '-' : ''}${whole}.${fractionRaw.padEnd(scale, '0')}`;
+};
+
+const isPositiveDecimalAmountString = (value: string) =>
+  !value.startsWith('-') && !/^0(?:\.0+)?$/.test(value);
 
 const normalizeBaseUrl = (value: string | null | undefined) => {
   const sanitized = sanitizeNullableText(value);
@@ -223,7 +296,10 @@ export class WalletEngineService {
       '/wallets/credit',
       {
         account_id: normalizedAccountId,
-        amount: INITIAL_WELCOME_CREDITS_AMOUNT,
+        amount: formatMinorUnitString(
+          INITIAL_WELCOME_CREDITS_AMOUNT,
+          KREDIT_UNIT_SCALE,
+        ),
         unit_code: KREDIT_UNIT_CODE,
         unit_scale: KREDIT_UNIT_SCALE,
         reference_type: 'welcome_bonus',
@@ -243,7 +319,68 @@ export class WalletEngineService {
       (balance) => balance.unit_code === KREDIT_UNIT_CODE,
     );
 
-    return kredietBalance?.balance ?? '0';
+    if (!kredietBalance) {
+      return normalizeDecimalAmountString('0', KREDIT_UNIT_SCALE);
+    }
+
+    return this.normalizeDecimalAmountForScale(
+      kredietBalance.balance,
+      kredietBalance.unit_scale,
+      KREDIT_UNIT_SCALE,
+    );
+  }
+
+  normalizeKreditAmount(amount: string) {
+    return normalizeDecimalAmountString(amount, KREDIT_UNIT_SCALE);
+  }
+
+  async creditKredits(
+    accountId: string,
+    amount: string,
+    options?: WalletEngineCreditOptions,
+  ): Promise<WalletEngineCreditResult> {
+    const normalizedAccountId = this.requireText(accountId, 'accountId');
+    const normalizedAmount = this.normalizeKreditAmount(amount);
+
+    if (!isPositiveDecimalAmountString(normalizedAmount)) {
+      throw new ServiceUnavailableException(
+        'Wallet engine amount must be greater than zero.',
+      );
+    }
+
+    const normalizedReferenceType = options?.referenceType
+      ? this.requireText(options.referenceType, 'referenceType')
+      : 'admin_credit';
+    const normalizedReferenceId = options?.referenceId
+      ? this.requireText(options.referenceId, 'referenceId')
+      : this.buildIdempotencyKey('kredit-credit-ref', [
+          normalizedAccountId,
+          normalizedAmount,
+        ]);
+    const normalizedIdempotencyKey = options?.idempotencyKey
+      ? this.requireText(options.idempotencyKey, 'idempotencyKey')
+      : this.buildIdempotencyKey('kredit-credit', [
+          normalizedAccountId,
+          normalizedAmount,
+          normalizedReferenceType,
+          normalizedReferenceId,
+        ]);
+
+    return await this.post<WalletEngineCreditResult>(
+      '/wallets/credit',
+      {
+        account_id: normalizedAccountId,
+        amount: normalizedAmount,
+        unit_code: KREDIT_UNIT_CODE,
+        unit_scale: KREDIT_UNIT_SCALE,
+        feature_key: options?.featureKey,
+        reference_type: normalizedReferenceType,
+        reference_id: normalizedReferenceId,
+        reason: options?.reason,
+        meta: options?.meta ?? {},
+      },
+      normalizedIdempotencyKey,
+    );
   }
 
   async debitSeat(
@@ -372,6 +509,28 @@ export class WalletEngineService {
     );
 
     return normalized.slice(0, maxLength);
+  }
+
+  private normalizeDecimalAmountForScale(
+    value: string,
+    sourceScale: number,
+    targetScale: number,
+  ) {
+    const sourceAmount = normalizeDecimalAmountString(value, sourceScale);
+
+    if (sourceScale === targetScale) {
+      return sourceAmount;
+    }
+
+    const negative = sourceAmount.startsWith('-');
+    const unsignedValue = negative ? sourceAmount.slice(1) : sourceAmount;
+    const [whole, fraction = ''] = unsignedValue.split('.');
+    const minorUnits = `${whole}${fraction}`.replace(/^0+(?=\d)/, '') || '0';
+
+    return normalizeDecimalAmountString(
+      formatMinorUnitString(`${negative ? '-' : ''}${minorUnits}`, targetScale),
+      targetScale,
+    );
   }
 
   private toBalanceList(

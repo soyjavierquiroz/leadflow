@@ -19,6 +19,11 @@ const adminNav = [
     icon: "users",
   },
   {
+    href: "/admin/kredits",
+    label: "Kredits",
+    icon: "bar-chart-3",
+  },
+  {
     href: "/admin/templates",
     label: "Templates",
     icon: "layout-template",
