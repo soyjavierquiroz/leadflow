@@ -365,7 +365,7 @@ async function main() {
     },
   });
 
-  const legacyFunnel = await prisma.funnel.upsert({
+  const funnel = await prisma.funnel.upsert({
     where: {
       workspaceId_code: {
         workspaceId: workspace.id,
@@ -405,7 +405,7 @@ async function main() {
     update: {
       workspaceId: workspace.id,
       teamId: team.id,
-      linkedFunnelId: legacyFunnel.id,
+      linkedFunnelId: funnel.id,
       host: IMMUNOTEC_HOST,
       normalizedHost: normalizeHost(IMMUNOTEC_HOST),
       status: 'active',
@@ -426,7 +426,7 @@ async function main() {
     create: {
       workspaceId: workspace.id,
       teamId: team.id,
-      linkedFunnelId: legacyFunnel.id,
+      linkedFunnelId: funnel.id,
       host: IMMUNOTEC_HOST,
       normalizedHost: normalizeHost(IMMUNOTEC_HOST),
       status: 'active',
@@ -456,7 +456,7 @@ async function main() {
     update: {
       workspaceId: workspace.id,
       templateId: funnelTemplate.id,
-      legacyFunnelId: legacyFunnel.id,
+      funnelId: funnel.id,
       name: IMMUNOTEC_FUNNEL_NAME,
       status: 'active',
       rotationPoolId: null,
@@ -487,7 +487,7 @@ async function main() {
       workspaceId: workspace.id,
       teamId: team.id,
       templateId: funnelTemplate.id,
-      legacyFunnelId: legacyFunnel.id,
+      funnelId: funnel.id,
       name: IMMUNOTEC_FUNNEL_NAME,
       code: IMMUNOTEC_FUNNEL_CODE,
       status: 'active',

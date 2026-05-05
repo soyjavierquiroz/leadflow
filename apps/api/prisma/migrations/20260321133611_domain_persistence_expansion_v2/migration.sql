@@ -97,7 +97,7 @@ CREATE TABLE "FunnelInstance" (
     "workspaceId" TEXT NOT NULL,
     "teamId" TEXT NOT NULL,
     "templateId" TEXT NOT NULL,
-    "legacyFunnelId" TEXT,
+    "funnelId" TEXT,
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "status" "FunnelInstanceStatus" NOT NULL,
@@ -203,7 +203,7 @@ CREATE UNIQUE INDEX "Domain_host_key" ON "Domain"("host");
 CREATE UNIQUE INDEX "FunnelTemplate_code_key" ON "FunnelTemplate"("code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "FunnelInstance_legacyFunnelId_key" ON "FunnelInstance"("legacyFunnelId");
+CREATE UNIQUE INDEX "FunnelInstance_funnelId_key" ON "FunnelInstance"("funnelId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "FunnelInstance_teamId_code_key" ON "FunnelInstance"("teamId", "code");
@@ -248,7 +248,7 @@ ALTER TABLE "FunnelInstance" ADD CONSTRAINT "FunnelInstance_teamId_fkey" FOREIGN
 ALTER TABLE "FunnelInstance" ADD CONSTRAINT "FunnelInstance_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "FunnelTemplate"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "FunnelInstance" ADD CONSTRAINT "FunnelInstance_legacyFunnelId_fkey" FOREIGN KEY ("legacyFunnelId") REFERENCES "Funnel"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "FunnelInstance" ADD CONSTRAINT "FunnelInstance_funnelId_fkey" FOREIGN KEY ("funnelId") REFERENCES "Funnel"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "FunnelInstance" ADD CONSTRAINT "FunnelInstance_rotationPoolId_fkey" FOREIGN KEY ("rotationPoolId") REFERENCES "RotationPool"("id") ON DELETE SET NULL ON UPDATE CASCADE;

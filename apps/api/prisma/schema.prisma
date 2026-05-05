@@ -607,7 +607,7 @@ model Funnel {
   workspace             Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   defaultTeam           Team?               @relation("TeamDefaultFunnels", fields: [defaultTeamId], references: [id], onDelete: SetNull)
   defaultRotationPool   RotationPool?       @relation("PoolDefaultFunnels", fields: [defaultRotationPoolId], references: [id], onDelete: SetNull)
-  funnelInstanceBridge  FunnelInstance?     @relation("LegacyFunnelLink")
+  funnelInstanceBridge  FunnelInstance?     @relation("FunnelInstanceFunnelLink")
   linkedDomains         Domain[]            @relation("DomainLinkedFunnel")
   leads                 Lead[]
   assignments           Assignment[]
@@ -687,7 +687,7 @@ model FunnelInstance {
   workspaceId          String
   teamId               String
   templateId           String
-  legacyFunnelId       String?              @unique
+  funnelId             String?              @unique
   name                 String
   code                 String
   thumbnailUrl         String?
@@ -704,7 +704,7 @@ model FunnelInstance {
   workspace            Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team                 Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
   template             FunnelTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  legacyFunnel         Funnel?              @relation("LegacyFunnelLink", fields: [legacyFunnelId], references: [id], onDelete: SetNull)
+  funnel               Funnel?              @relation("FunnelInstanceFunnelLink", fields: [funnelId], references: [id], onDelete: SetNull)
   rotationPool         RotationPool?        @relation(fields: [rotationPoolId], references: [id], onDelete: SetNull)
   trackingProfile      TrackingProfile?     @relation(fields: [trackingProfileId], references: [id], onDelete: SetNull)
   handoffStrategy      HandoffStrategy?     @relation("InstanceHandoffStrategy", fields: [handoffStrategyId], references: [id], onDelete: SetNull)
