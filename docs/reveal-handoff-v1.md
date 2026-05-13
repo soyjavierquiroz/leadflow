@@ -2,6 +2,8 @@
 
 Fecha: 2026-03-21 (UTC)
 
+Actualizacion: 2026-05-13 (UTC)
+
 ## Objetivo
 
 Cerrar el ciclo visible del funnel publico en Leadflow:
@@ -50,6 +52,14 @@ Equivalencias con el modelo actual:
 4. La web persiste ese contexto en `sessionStorage`.
 5. El bloque `sponsor_reveal_placeholder` lee la sesion, revela el sponsor asignado y construye el CTA operativo.
 
+Actualizacion 2026-05-13:
+
+- `apps/web/lib/public-funnel-assigned-sponsor.ts` centraliza la resolucion del asesor visible.
+- La prioridad es: sponsor de la captura en sesion, `lastAssignment`, sponsor de `handoff`, sponsor/advisor del runtime.
+- Los bloques `sponsor_reveal_placeholder`, `thank_you_reveal` y `whatsapp_handoff_cta` ya no resuelven sponsors por separado.
+- La UI espera hidratacion cliente antes de revelar o redirigir para evitar mostrar un advisor estatico distinto al assignment real.
+- Si se detecta discrepancia entre advisor previo en sesion y advisor del runtime, se registra warning `[Wheels-Sync]`.
+
 ## Como se construye el enlace a WhatsApp
 
 El generador v1:
@@ -81,9 +91,21 @@ Variables soportadas en el mensaje:
 
 - el usuario llega al thank-you
 - el reveal muestra sponsor y fallback visual
-- la pagina dispara redirect automatico a WhatsApp despues de un delay corto
+- la pagina dispara redirect automatico a WhatsApp despues de hidratacion cliente y de un delay corto
 - si el redirect no ocurre, queda un CTA manual disponible
 - `cta_clicked` y `handoff_completed` se emiten cuando se ejecuta el redirect o el click manual
+
+## Limpieza de contexto de sesion
+
+La sesion publica queda scopeada por `publicationId`:
+
+- `leadflow:publication:<publicationId>:anonymous-id`
+- `leadflow:publication:<publicationId>:submission-context`
+- `leadflow:publication:<publicationId>:entry-context`
+
+Si la hidratacion detecta mismatch de publicacion, lead inexistente o publicacion invalida, la web limpia la sesion afectada, remueve `ctx` de la URL y recarga la ruta actual.
+
+El contexto de entry pagado solo se reutiliza si la URL actual mantiene evidencia de campana (`/promo/*`, `/p/*`, click ids o `utm_source=ads`). Esto evita que una sesion pagada vieja contamine visitas organicas posteriores.
 
 ## Tracking conectado en esta fase
 

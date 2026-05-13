@@ -17,6 +17,8 @@ export class SubmitRuntimeLeadDto {
   readonly fbclid?: string | null;
   readonly gclid?: string | null;
   readonly ttclid?: string | null;
+  readonly clientIpAddress?: string | null;
+  readonly clientUserAgent?: string | null;
   readonly firstName?: string | null;
   readonly lastName?: string | null;
   readonly fullName?: string | null;

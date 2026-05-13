@@ -1,6 +1,9 @@
+"use client";
+
 import { AssignedSponsorReveal } from "@/components/public-funnel/assigned-sponsor-reveal";
 import { ParadigmShift } from "@/components/blocks/paradigm-shift";
 import { X } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   buildCtaClassName,
   flatBlockTitleClassName,
@@ -43,6 +46,7 @@ import {
 import { StickyConversionBar } from "@/components/public-funnel/sticky-conversion-bar";
 import { HandoffCta } from "@/components/public-funnel/handoff-cta";
 import { StickyMediaGallery } from "@/components/public-funnel/sticky-media-gallery";
+import { useResolvedPublicFunnelHandoffState } from "@/lib/public-funnel-assigned-sponsor";
 import type {
   PublicFunnelRuntimePayload,
   RuntimeBlock,
@@ -93,6 +97,16 @@ const authorityReferenceCatalog = {
     meta: "Compendium of Pharmaceuticals",
   },
 } as const;
+
+function useHasHydrated() {
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  return hasHydrated;
+}
 
 function resolveModalAwareCtaHref(
   action: string | null,
@@ -1916,6 +1930,11 @@ function ThankYouBlockAdapter({ block, runtime }: PublicBlockAdapterProps) {
 
 function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
   const settings = asRecord(props.block.settings) ?? asRecord(props.block.settingsJson);
+  const hasHydrated = useHasHydrated();
+  const handoffState = useResolvedPublicFunnelHandoffState(
+    props.runtime.publication.id,
+    props.runtime,
+  );
   const resolvedRevealTitle =
     asString(settings?.title).trim() ||
     "¡Felicidades! Te has registrado con éxito";
@@ -1950,7 +1969,7 @@ function ThankYouRevealBlockAdapter(props: PublicBlockAdapterProps) {
       />
       <AssignedSponsorReveal
         isBoxed={props.block.is_boxed === true}
-        runtime={props.runtime}
+        advisor={hasHydrated ? handoffState.advisor : null}
         title={resolvedRevealTitle}
         subtitlePrefix={resolvedSubtitlePrefix}
       />
@@ -1964,16 +1983,52 @@ function HandoffCtaBlockAdapter({
   surfaceProps,
 }: PublicBlockAdapterProps) {
   const settings = asRecord(block.settings) ?? asRecord(block.settingsJson);
+  const hasHydrated = useHasHydrated();
+  const handoffState = useResolvedPublicFunnelHandoffState(
+    runtime.publication.id,
+    runtime,
+  );
   return (
     <HandoffCta
       isBoxed={surfaceProps?.isBoxed}
-      runtime={runtime}
+      advisor={hasHydrated ? handoffState.advisor : null}
+      leadName={hasHydrated ? handoffState.leadName : null}
+      handoff={
+        hasHydrated
+          ? handoffState
+          : {
+              whatsappPhone: null,
+              whatsappMessage: null,
+              whatsappUrl: null,
+            }
+      }
       headline={asString(settings?.headline).trim() || undefined}
       buttonPrefix={asString(settings?.buttonPrefix).trim() || undefined}
       redirectText={asString(settings?.redirectText).trim() || undefined}
       whatsappText={asString(settings?.whatsappText).trim() || undefined}
       autoRedirectSeconds={asNumber(settings?.autoRedirectSeconds, 5) || 5}
       buttonColor={asString(settings?.buttonColor) || undefined}
+    />
+  );
+}
+
+function SponsorRevealBlockAdapter(props: PublicBlockAdapterProps) {
+  const sponsorRevealSettings =
+    asRecord(props.block.settings) ?? asRecord(props.block.settingsJson);
+  const hasHydrated = useHasHydrated();
+  const handoffState = useResolvedPublicFunnelHandoffState(
+    props.runtime.publication.id,
+    props.runtime,
+  );
+
+  return (
+    <AssignedSponsorReveal
+      isBoxed={props.surfaceProps?.isBoxed}
+      advisor={hasHydrated ? handoffState.advisor : null}
+      title={asString(sponsorRevealSettings?.title).trim() || undefined}
+      subtitlePrefix={
+        asString(sponsorRevealSettings?.subtitlePrefix).trim() || undefined
+      }
     />
   );
 }
@@ -2300,21 +2355,15 @@ export function PublicBlockAdapter({
             blocks={blocks}
           />
         );
-      case "sponsor_reveal_placeholder": {
-        const sponsorRevealSettings =
-          asRecord(block.settings) ?? asRecord(block.settingsJson);
+      case "sponsor_reveal_placeholder":
         return (
-          <AssignedSponsorReveal
-            isBoxed={surfaceProps.isBoxed}
+          <SponsorRevealBlockAdapter
+            block={block}
             runtime={runtime}
-            title={asString(sponsorRevealSettings?.title).trim() || undefined}
-            subtitlePrefix={
-              asString(sponsorRevealSettings?.subtitlePrefix).trim() ||
-              undefined
-            }
+            blocks={blocks}
+            surfaceProps={surfaceProps}
           />
         );
-      }
       case "social_proof":
         return (
           <SocialProofBlockAdapter

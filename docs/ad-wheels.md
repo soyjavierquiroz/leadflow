@@ -2,6 +2,8 @@
 
 Documentacion tecnica del modulo `ad-wheels` y de la asignacion publica sobre trafico `PAID_WHEEL`.
 
+Actualizacion: 2026-05-13 (UTC)
+
 ## Resumen del modelo actual
 
 El motor de ruedas ya no consume inventario de asientos por lead asignado.
@@ -74,6 +76,30 @@ Guardrails principales:
 - avance atomico de `currentTurnPosition` dentro de la misma transaccion que crea la asignacion.
 
 Con eso evitamos que dos leads simultaneos reserven el mismo turno.
+
+## Resolucion desde el runtime publico
+
+Una captura publica solo entra a rueda pagada cuando la API puede justificar la atribucion:
+
+- el path normalizado empieza con `/promo/` o `/p/`;
+- existe una `AdWheel` activa para `teamId + publicationId`;
+- la rueda esta dentro de su ventana `startDate/endDate`;
+- no hay una asignacion abierta previa para el mismo `anonymousId` en esa publicacion.
+
+Si hay evidencia pagada por URL (`fbclid`, `ttclid`, `gclid` o `utm_source=ads`) pero no hay rueda activa, el lead queda como `PAID_ADS` y usa fallback operativo del team. Si no hay evidencia pagada, el flujo se normaliza como `ORGANIC` o `DIRECT`.
+
+El backend descarta `originAdWheelId` obsoletos antes de persistir el lead para evitar errores de FK y registra `WHEEL_DEBUG`.
+
+## CAPI para ruedas pagadas
+
+Cuando la captura termina en `PAID_WHEEL`, `CapiManagerService` puede reportar la conversion:
+
+- Meta CAPI usa `fbclid` y envia `Lead`;
+- TikTok Events API usa `ttclid` y envia `SubmitForm`;
+- email y telefono se hashean con SHA-256;
+- IP y user agent salen del payload o de headers de request.
+
+El dispatch es best-effort: un fallo externo no revierte la asignacion ni el lead.
 
 ## Cambios de modelo relevantes
 

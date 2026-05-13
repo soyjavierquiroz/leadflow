@@ -19,6 +19,8 @@ export class SubmitPublicLeadCaptureDto {
   readonly fbclid?: string | null;
   readonly gclid?: string | null;
   readonly ttclid?: string | null;
+  readonly clientIpAddress?: string | null;
+  readonly clientUserAgent?: string | null;
   readonly fullName?: string | null;
   readonly email?: string | null;
   readonly phone?: string | null;

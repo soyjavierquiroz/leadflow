@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Query } from '@nestjs/common';
 import type { SubmitRuntimeLeadDto } from './dto/submit-runtime-lead.dto';
 import { PublicRuntimeService } from './public-runtime.service';
 
@@ -15,7 +15,10 @@ export class PublicRuntimeController {
   }
 
   @Post('submit')
-  submitLead(@Body() dto: SubmitRuntimeLeadDto) {
-    return this.publicRuntimeService.submitLead(dto);
+  submitLead(
+    @Body() dto: SubmitRuntimeLeadDto,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.publicRuntimeService.submitLead(dto, headers);
   }
 }

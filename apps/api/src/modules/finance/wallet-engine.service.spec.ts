@@ -5,7 +5,7 @@ import type {
 } from 'axios';
 import { BadGatewayException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import {
   readWalletEngineException,
   WalletEngineService,
@@ -165,6 +165,43 @@ describe('WalletEngineService', () => {
         }),
       }),
     );
+  });
+
+  it('retries idempotent wallet writes before surfacing an upstream failure', async () => {
+    const { service, httpService } = createService();
+
+    jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    httpService.post
+      .mockReturnValueOnce(throwError(() => ({ message: 'socket hang up' })))
+      .mockReturnValueOnce(
+        throwError(() => ({
+          response: {
+            status: 503,
+            data: {
+              error: {
+                message: 'temporarily unavailable',
+              },
+            },
+          },
+          message: 'temporarily unavailable',
+        })),
+      )
+      .mockReturnValueOnce(
+        of(
+          buildAxiosResponse({
+            account_id: 'account-kredit-1',
+            platform_key: 'kurukin',
+            product_key: 'leadflow',
+            tenant_id: 'sponsor-1',
+          }),
+        ),
+      );
+
+    await expect(service.upsertAccount('sponsor-1')).resolves.toEqual({
+      accountId: 'account-kredit-1',
+    });
+
+    expect(httpService.post).toHaveBeenCalledTimes(3);
   });
 
   it('credits the welcome KREDIT bonus with an explicit idempotency key', async () => {

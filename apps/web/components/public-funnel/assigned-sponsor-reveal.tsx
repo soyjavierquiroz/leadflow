@@ -1,18 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo } from "react";
 import {
   RichHeadline,
   PublicSectionSurface,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
-import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
-import { useSubmissionContext } from "@/lib/public-funnel-session";
-import { buildWhatsappUrl, normalizeWhatsappPhone } from "@/lib/public-handoff";
+import type { ResolvedPublicFunnelAdvisor } from "@/lib/public-funnel-assigned-sponsor";
 
 type AssignedSponsorRevealProps = {
   isBoxed?: boolean;
-  runtime: PublicFunnelRuntimePayload;
+  advisor: ResolvedPublicFunnelAdvisor | null;
   title?: string;
   subtitlePrefix?: string;
 };
@@ -23,31 +20,10 @@ const DEFAULT_SUBTITLE_PREFIX = "Tu asesor asignado es: {{advisorName}}";
 
 export function AssignedSponsorReveal({
   isBoxed = false,
-  runtime,
+  advisor,
   title,
   subtitlePrefix,
 }: AssignedSponsorRevealProps) {
-  const context = useSubmissionContext(runtime.publication.id);
-
-  const advisor = useMemo(() => {
-    const contextSponsor = context?.lastAssignment?.sponsor;
-    if (contextSponsor) {
-      return {
-        name: contextSponsor.displayName,
-        role: null,
-        phone: contextSponsor.phone,
-        photoUrl: contextSponsor.avatarUrl,
-        bio: null,
-        whatsappUrl: buildWhatsappUrl(
-          normalizeWhatsappPhone(contextSponsor.phone),
-          context?.handoff?.whatsappMessage ?? null,
-        ),
-      };
-    }
-
-    return null;
-  }, [context]);
-
   const renderText = (rawText: string | undefined) => {
     if (!rawText) return "";
     return rawText.replace(/\{\{\s*advisorName\s*\}\}/g, advisor?.name || "");

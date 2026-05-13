@@ -11,6 +11,7 @@ export type SystemTenantRecord = LooseRecord & {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  emailNotificationsEnabled: boolean;
   managerUserId: string | null;
   managerEmail: string | null;
   lastAssignedUserId?: string | null;
@@ -193,6 +194,7 @@ export type SystemTenantDetailRecord = SystemTenantRecord & {
     defaultCurrency: string;
     primaryLocale: string;
     primaryDomain: string | null;
+    emailNotificationsEnabled: boolean;
   };
 };
 

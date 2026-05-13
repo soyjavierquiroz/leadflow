@@ -233,6 +233,7 @@ export function normalizePublicFunnelRuntimePayload(
       trafficLayer:
         entryContextRecord.trafficLayer === 'DIRECT' ||
         entryContextRecord.trafficLayer === 'PAID_WHEEL' ||
+        entryContextRecord.trafficLayer === 'PAID_ADS' ||
         entryContextRecord.trafficLayer === 'ORGANIC'
           ? entryContextRecord.trafficLayer
           : 'ORGANIC',

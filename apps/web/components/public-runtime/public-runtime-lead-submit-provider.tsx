@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
+  clearEntryContext,
   persistEntryContext,
   persistSubmissionContext,
   submitRuntimeLeadCapture,
@@ -144,6 +145,11 @@ export function PublicRuntimeLeadSubmitProvider({
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
+    if (runtime.entryContext.attributionType === "organic") {
+      clearEntryContext(runtime.publication.id);
+      return;
+    }
+
     persistEntryContext(runtime.publication.id, runtime.entryContext);
   }, [runtime.entryContext, runtime.publication.id]);
 

@@ -71,7 +71,7 @@ type TeamLeadInboxRecord = Prisma.LeadGetPayload<{
 }>;
 
 type TeamLeadSupervisionStatus = 'orphaned' | 'stagnant' | 'active' | 'closed';
-type TeamLeadTrafficLayer = 'DIRECT' | 'PAID_WHEEL' | 'ORGANIC';
+type TeamLeadTrafficLayer = 'DIRECT' | 'PAID_WHEEL' | 'PAID_ADS' | 'ORGANIC';
 
 export type TeamLeadInboxItem = {
   id: string;
@@ -116,7 +116,10 @@ const byNewestFirst = (left: string, right: string) =>
 const normalizeTrafficLayer = (
   value: string | null | undefined,
 ): TeamLeadTrafficLayer =>
-  value === 'DIRECT' || value === 'PAID_WHEEL' || value === 'ORGANIC'
+  value === 'DIRECT' ||
+  value === 'PAID_WHEEL' ||
+  value === 'PAID_ADS' ||
+  value === 'ORGANIC'
     ? value
     : 'ORGANIC';
 

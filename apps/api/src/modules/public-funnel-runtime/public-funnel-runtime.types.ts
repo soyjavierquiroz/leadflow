@@ -17,7 +17,7 @@ export type PublicRuntimeStep = {
 
 export type PublicRuntimeEntryContext = {
   entryMode: 'organic_asesor' | 'paid_ads';
-  trafficLayer: 'DIRECT' | 'PAID_WHEEL' | 'ORGANIC';
+  trafficLayer: 'DIRECT' | 'PAID_WHEEL' | 'PAID_ADS' | 'ORGANIC';
   forcedSponsorId: string | null;
   adWheelId: string | null;
   browserPixelsEnabled: boolean;
@@ -25,6 +25,32 @@ export type PublicRuntimeEntryContext = {
   attributionSlug: string | null;
   runtimePathPrefix: string | null;
   referralQueryParam: string | null;
+};
+
+export type AttributionDecisionTrafficLayer =
+  | 'DIRECT'
+  | 'PAID_WHEEL'
+  | 'PAID_ADS'
+  | 'ORGANIC';
+
+export type AttributionDecision = {
+  entryMode: PublicRuntimeEntryContext['entryMode'];
+  trafficLayer: AttributionDecisionTrafficLayer;
+  forcedSponsorId: string | null;
+  adWheelId: string | null;
+  attributionType: PublicRuntimeEntryContext['attributionType'];
+  attributionSlug: string | null;
+  runtimePathPrefix: string | null;
+  referralQueryParam: string | null;
+  sourceUrl: string | null;
+  requestedPath: string;
+  pathMatchesCampaign: boolean;
+  fbclid: string | null;
+  gclid: string | null;
+  ttclid: string | null;
+  hasPaidClickId: boolean;
+  clientIpAddress: string | null;
+  clientUserAgent: string | null;
 };
 
 export type PublicRuntimePayload = {

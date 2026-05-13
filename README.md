@@ -148,6 +148,8 @@ Regla operativa:
 - API del wallet-engine: `amount` como decimal string
 - Leadflow debe convertir o normalizar antes de llamar `/wallets/credit` o
   `/wallets/debit`
+- Las escrituras idempotentes hacia el engine se reintentan hasta 3 veces ante
+  errores de red, `429` o `5xx`.
 
 ### Endpoints admin de Kredits
 

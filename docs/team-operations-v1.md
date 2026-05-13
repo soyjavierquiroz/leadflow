@@ -173,7 +173,14 @@ Patrones UI usados:
 
 ## Persistencia
 
-En esta fase no fue necesaria una migracion nueva.
+Actualizacion 2026-05-13:
+
+- `Workspace.emailNotificationsEnabled Boolean @default(true)` permite silenciar emails de asignacion por tenant sin pausar capturas.
+- Migracion: `apps/api/prisma/migrations/20260507110000_workspace_email_notifications_toggle/migration.sql`.
+- La UI de system tenants expone el checkbox `Habilitar correos del tenant`.
+- Si el valor es `false`, el runtime registra `MAIL_SILENCED` y omite el email al asesor.
+
+Para Team Operations base no fue necesaria una migracion nueva.
 
 El modelo actual ya soportaba la operacion requerida gracias a:
 

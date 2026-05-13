@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  LeadStatus,
   LeadSourceChannel as PrismaLeadSourceChannel,
   Prisma,
 } from '@prisma/client';
@@ -20,8 +21,12 @@ import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto
 import type { CapturePublicLeadDto } from './dto/capture-public-lead.dto';
 import type { AutoAssignPublicLeadDto } from './dto/auto-assign-public-lead.dto';
 import type { SubmitPublicLeadCaptureDto } from './dto/submit-public-lead-capture.dto';
-import type { PublicRuntimeEntryContext } from './public-funnel-runtime.types';
-import { buildPublicationStepPath } from './public-funnel-runtime.utils';
+import type {
+  AttributionDecision,
+  PublicRuntimeEntryContext,
+} from './public-funnel-runtime.types';
+import { buildPublicationStepPath, normalizePath } from './public-funnel-runtime.utils';
+import { CapiManagerService } from './capi-manager.service';
 import { pickNextRotationMember } from './lead-capture-assignment.utils';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
 import {
@@ -162,6 +167,12 @@ type RuntimeAttributionPayload = {
   ttclid?: string | null;
 };
 
+type RequestAuditHeaders = Record<string, string | string[] | undefined>;
+type RequestAuditContext = {
+  clientIpAddress: string | null;
+  clientUserAgent: string | null;
+};
+
 type SubmissionEntryContext = PublicRuntimeEntryContext & {
   runtimePathPrefix: string | null;
   referralQueryParam: string | null;
@@ -200,6 +211,7 @@ export class LeadCaptureAssignmentService {
     private readonly leadDispatcherService: LeadDispatcherService,
     private readonly publicFunnelRuntimeService: PublicFunnelRuntimeService,
     private readonly mailerService: MailerService,
+    private readonly capiManagerService: CapiManagerService,
   ) {}
 
   async registerVisitor(dto: RegisterPublicVisitorDto) {
@@ -323,36 +335,63 @@ export class LeadCaptureAssignmentService {
     }
   }
 
-  async submitLeadCapture(dto: SubmitPublicLeadCaptureDto) {
+  async submitLeadCapture(
+    dto: SubmitPublicLeadCaptureDto,
+    requestHeaders?: RequestAuditHeaders,
+  ) {
     let failureContext: AssignmentFailureTrackingContext | null = null;
+    const requestAuditContext = this.resolveRequestAuditContext(requestHeaders);
+    const enrichedDto: SubmitPublicLeadCaptureDto = {
+      ...dto,
+      clientIpAddress:
+        dto.clientIpAddress ?? requestAuditContext.clientIpAddress,
+      clientUserAgent:
+        dto.clientUserAgent ?? requestAuditContext.clientUserAgent,
+    };
+
+    console.log('[ATTR_AUDIT] submitLeadCapture:entrada', {
+      publicationId: enrichedDto.publicationId,
+      headers: this.pickAuditHeaders(requestHeaders),
+    });
 
     try {
       const publication = await this.getPublicationContextOrThrow(
         this.prisma,
-        dto.publicationId,
+        enrichedDto.publicationId,
       );
       const currentStep = publication.funnelInstance.steps.find(
-        (step) => step.id === dto.currentStepId,
+        (step) => step.id === enrichedDto.currentStepId,
       );
 
       if (!currentStep) {
         throw new NotFoundException({
           code: 'STEP_NOT_FOUND',
-          message: `Step ${dto.currentStepId} does not belong to publication ${dto.publicationId}.`,
+          message: `Step ${enrichedDto.currentStepId} does not belong to publication ${enrichedDto.publicationId}.`,
         });
       }
 
       let entryContext = await this.resolveSubmissionEntryContext(
         this.prisma,
         publication,
-        dto.sourceUrl ?? null,
-        dto.entryContext,
+        enrichedDto.sourceUrl ?? null,
+        enrichedDto.entryContext,
+        {
+          sourceUrl: enrichedDto.sourceUrl ?? null,
+          utmSource: enrichedDto.utmSource ?? null,
+          utmCampaign: enrichedDto.utmCampaign ?? null,
+          utmMedium: enrichedDto.utmMedium ?? null,
+          utmContent: enrichedDto.utmContent ?? null,
+          utmTerm: enrichedDto.utmTerm ?? null,
+          fbclid: enrichedDto.fbclid ?? null,
+          gclid: enrichedDto.gclid ?? null,
+          ttclid: enrichedDto.ttclid ?? null,
+        },
       );
       const hasExistingOpenAssignment =
         entryContext.trafficLayer === 'PAID_WHEEL'
           ? await this.hasExistingOpenAssignmentForAnonymousId(
               publication,
-              dto.anonymousId,
+              enrichedDto.anonymousId,
             )
           : false;
 
@@ -361,15 +400,33 @@ export class LeadCaptureAssignmentService {
         hasExistingOpenAssignment
       ) {
         this.logger.warn(
-          `[WHEEL_DEBUG] Fallback disparado para awid ${entryContext.adWheelId}. Motivo: anonymous_id_has_existing_open_assignment anonymousId=${dto.anonymousId}. publicationId=${publication.id} teamId=${publication.teamId}`,
+          `[WHEEL_DEBUG] Fallback disparado para awid ${entryContext.adWheelId}. Motivo: anonymous_id_has_existing_open_assignment anonymousId=${enrichedDto.anonymousId}. publicationId=${publication.id} teamId=${publication.teamId}`,
         );
         entryContext = this.toPaidWheelFallbackEntryContext(entryContext);
       }
 
+      const attributionDecision = this.buildAttributionDecision({
+        publication,
+        entryContext,
+        attribution: {
+          sourceUrl: enrichedDto.sourceUrl ?? null,
+          utmSource: enrichedDto.utmSource ?? null,
+          utmCampaign: enrichedDto.utmCampaign ?? null,
+          utmMedium: enrichedDto.utmMedium ?? null,
+          utmContent: enrichedDto.utmContent ?? null,
+          utmTerm: enrichedDto.utmTerm ?? null,
+          fbclid: enrichedDto.fbclid ?? null,
+          gclid: enrichedDto.gclid ?? null,
+          ttclid: enrichedDto.ttclid ?? null,
+        },
+        clientIpAddress: enrichedDto.clientIpAddress ?? null,
+        clientUserAgent: enrichedDto.clientUserAgent ?? null,
+      });
+
       const result = await this.prisma.$transaction(async (tx) => {
         const captureTags = Array.from(
           new Set([
-            ...(dto.tags ?? []),
+            ...(enrichedDto.tags ?? []),
             ...(entryContext.trafficLayer === 'DIRECT'
               ? ['source: organic']
               : []),
@@ -380,18 +437,18 @@ export class LeadCaptureAssignmentService {
           tx,
           publication,
           {
-            anonymousId: dto.anonymousId,
+            anonymousId: enrichedDto.anonymousId,
             kind: 'identified',
-            sourceChannel: dto.sourceChannel ?? 'form',
-            sourceUrl: dto.sourceUrl ?? null,
-            utmSource: dto.utmSource ?? null,
-            utmCampaign: dto.utmCampaign ?? null,
-            utmMedium: dto.utmMedium ?? null,
-            utmContent: dto.utmContent ?? null,
-            utmTerm: dto.utmTerm ?? null,
-            fbclid: dto.fbclid ?? null,
-            gclid: dto.gclid ?? null,
-            ttclid: dto.ttclid ?? null,
+            sourceChannel: enrichedDto.sourceChannel ?? 'form',
+            sourceUrl: enrichedDto.sourceUrl ?? null,
+            utmSource: enrichedDto.utmSource ?? null,
+            utmCampaign: enrichedDto.utmCampaign ?? null,
+            utmMedium: enrichedDto.utmMedium ?? null,
+            utmContent: enrichedDto.utmContent ?? null,
+            utmTerm: enrichedDto.utmTerm ?? null,
+            fbclid: enrichedDto.fbclid ?? null,
+            gclid: enrichedDto.gclid ?? null,
+            ttclid: enrichedDto.ttclid ?? null,
           },
         );
 
@@ -400,27 +457,28 @@ export class LeadCaptureAssignmentService {
           publication,
           visitor,
           {
-            publicationId: dto.publicationId,
+            publicationId: enrichedDto.publicationId,
             visitorId: visitor.id,
-            anonymousId: dto.anonymousId,
-            sourceChannel: dto.sourceChannel ?? 'form',
-            fullName: dto.fullName ?? null,
-            email: dto.email ?? null,
-            phone: dto.phone ?? null,
-            companyName: dto.companyName ?? null,
-            fieldValues: dto.fieldValues ?? {},
-            sourceUrl: dto.sourceUrl ?? null,
-            utmSource: dto.utmSource ?? null,
-            utmCampaign: dto.utmCampaign ?? null,
-            utmMedium: dto.utmMedium ?? null,
-            utmContent: dto.utmContent ?? null,
-            utmTerm: dto.utmTerm ?? null,
-            fbclid: dto.fbclid ?? null,
-            gclid: dto.gclid ?? null,
-            ttclid: dto.ttclid ?? null,
+            anonymousId: enrichedDto.anonymousId,
+            sourceChannel: enrichedDto.sourceChannel ?? 'form',
+            fullName: enrichedDto.fullName ?? null,
+            email: enrichedDto.email ?? null,
+            phone: enrichedDto.phone ?? null,
+            companyName: enrichedDto.companyName ?? null,
+            fieldValues: enrichedDto.fieldValues ?? {},
+            sourceUrl: enrichedDto.sourceUrl ?? null,
+            utmSource: enrichedDto.utmSource ?? null,
+            utmCampaign: enrichedDto.utmCampaign ?? null,
+            utmMedium: enrichedDto.utmMedium ?? null,
+            utmContent: enrichedDto.utmContent ?? null,
+            utmTerm: enrichedDto.utmTerm ?? null,
+            fbclid: enrichedDto.fbclid ?? null,
+            gclid: enrichedDto.gclid ?? null,
+            ttclid: enrichedDto.ttclid ?? null,
             tags: captureTags,
-            triggerEventId: dto.submissionEventId ?? null,
-            trafficLayer: entryContext.trafficLayer,
+            triggerEventId: enrichedDto.submissionEventId ?? null,
+            trafficLayer:
+              entryContext.trafficLayer as SubmissionEntryContext['trafficLayer'],
             originAdWheelId: entryContext.adWheelId ?? null,
           },
         );
@@ -429,8 +487,8 @@ export class LeadCaptureAssignmentService {
           workspaceId: publication.workspaceId,
           publicationId: publication.id,
           funnelInstanceId: publication.funnelInstanceId,
-          funnelStepId: dto.currentStepId,
-          triggerEventId: dto.submissionEventId ?? null,
+          funnelStepId: enrichedDto.currentStepId,
+          triggerEventId: enrichedDto.submissionEventId ?? null,
           leadId: leadResult.wasCreated ? null : leadResult.lead.id,
         };
 
@@ -440,15 +498,15 @@ export class LeadCaptureAssignmentService {
             publication,
             leadResult.lead,
             {
-              triggerEventId: dto.submissionEventId ?? null,
-              funnelStepId: dto.currentStepId,
-              entryContext,
+              triggerEventId: enrichedDto.submissionEventId ?? null,
+              funnelStepId: enrichedDto.currentStepId,
+              entryContext: entryContext as SubmissionEntryContext,
             },
           );
         const nextStep = this.resolveNextStepAfterCaptureFromPublication(
           publication,
-          dto.currentStepId,
-          entryContext,
+          enrichedDto.currentStepId,
+          entryContext as SubmissionEntryContext,
         );
         const publicCaptureContext = this.buildPublicCaptureContext({
           publication,
@@ -470,6 +528,7 @@ export class LeadCaptureAssignmentService {
           handoff: publicCaptureContext.handoff,
           advisorPayload: publicCaptureContext.advisor,
           assignedAdvisorPayload: publicCaptureContext.assigned_advisor,
+          attributionDecision,
         };
       });
 
@@ -481,9 +540,9 @@ export class LeadCaptureAssignmentService {
             automation: {
               assignmentId: result.assignment.id,
               triggerType: 'public_submission_assignment_created',
-              triggerEventId: dto.submissionEventId ?? null,
-              anonymousId: dto.anonymousId,
-              currentStepId: dto.currentStepId,
+              triggerEventId: enrichedDto.submissionEventId ?? null,
+              anonymousId: enrichedDto.anonymousId,
+              currentStepId: enrichedDto.currentStepId,
               nextStepPath: result.nextStep?.path ?? null,
             },
           });
@@ -493,6 +552,20 @@ export class LeadCaptureAssignmentService {
             error instanceof Error ? error.stack : String(error),
           );
         }
+      }
+
+      try {
+        this.dispatchLeadCapturedSideEffects({
+          publication,
+          lead: result.lead,
+          attributionDecision: result.attributionDecision,
+          submissionEventId: enrichedDto.submissionEventId ?? null,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Lead capture CAPI side effects failed before queueing. leadId=${result.lead.id}`,
+          error instanceof Error ? error.stack : String(error),
+        );
       }
 
       return {
@@ -587,6 +660,11 @@ export class LeadCaptureAssignmentService {
           team: {
             select: {
               name: true,
+              workspace: {
+                select: {
+                  emailNotificationsEnabled: true,
+                },
+              },
             },
           },
         },
@@ -595,6 +673,13 @@ export class LeadCaptureAssignmentService {
       const advisorEmail = assignment?.sponsor.email?.trim();
 
       if (!assignment || !advisorEmail) {
+        return;
+      }
+
+      if (assignment.team.workspace.emailNotificationsEnabled === false) {
+        this.logger.log(
+          '🔇 [MAIL_SILENCED] Notificación omitida por configuración del Tenant.',
+        );
         return;
       }
 
@@ -640,6 +725,50 @@ export class LeadCaptureAssignmentService {
     void this.messagingAutomationService
       .dispatchAssignmentAutomation(input.automation)
       .catch(() => undefined);
+  }
+
+  private dispatchLeadCapturedSideEffects(input: {
+    publication: FlowPublicationRecord;
+    lead: {
+      id: string;
+      email: string | null;
+      phone: string | null;
+      fullName: string | null;
+    };
+    attributionDecision: AttributionDecision;
+    submissionEventId?: string | null;
+  }) {
+    const eventId =
+      input.submissionEventId?.trim() || `lead-capi-${input.lead.id}`;
+
+    void this.capiManagerService
+      .dispatchLeadConversion({
+        publication: {
+          id: input.publication.id,
+          teamId: input.publication.teamId,
+          metaPixelId: input.publication.metaPixelId ?? null,
+          metaCapiToken: input.publication.metaCapiToken ?? null,
+          tiktokPixelId: input.publication.tiktokPixelId ?? null,
+          tiktokAccessToken: input.publication.tiktokAccessToken ?? null,
+          domainHost: input.publication.domain.host,
+          pathPrefix: input.publication.pathPrefix,
+        },
+        lead: {
+          id: input.lead.id,
+          email: input.lead.email,
+          phone: input.lead.phone,
+          fullName: input.lead.fullName,
+        },
+        attributionDecision: input.attributionDecision,
+        eventId,
+      })
+      .catch((error: unknown) => {
+        this.logger.error(
+          `[CAPI_ERROR] Lead conversion dispatch failed. leadId=${input.lead.id} publicationId=${input.publication.id} message=${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      });
   }
 
   private async getPublicationContextOrThrow(
@@ -815,7 +944,7 @@ export class LeadCaptureAssignmentService {
     input: CapturePublicLeadDto &
       RuntimeAttributionPayload & {
         fieldValues?: Record<string, string | null>;
-        trafficLayer?: 'DIRECT' | 'PAID_WHEEL' | 'ORGANIC' | null;
+        trafficLayer?: 'DIRECT' | 'PAID_WHEEL' | 'PAID_ADS' | 'ORGANIC' | null;
         originAdWheelId?: string | null;
       },
   ): Promise<LeadCaptureResult> {
@@ -831,13 +960,44 @@ export class LeadCaptureAssignmentService {
 
     const tags = Array.from(new Set(input.tags ?? []));
     const sourceChannel = this.toDbSource(input.sourceChannel ?? 'form');
+    const requestedOriginAdWheelId = input.originAdWheelId ?? null;
+    const validatedOriginAdWheelId = requestedOriginAdWheelId
+      ? (
+          await tx.adWheel.findUnique({
+            where: {
+              id: requestedOriginAdWheelId,
+            },
+            select: {
+              id: true,
+            },
+          })
+        )?.id ?? null
+      : null;
     const existing = await tx.lead.findUnique({
       where: {
         visitorId: visitor.id,
       },
     });
     const wasCreated = !existing;
-    const lead = await tx.lead.upsert({
+
+    if (requestedOriginAdWheelId && !validatedOriginAdWheelId) {
+      this.logger.warn(
+        `[WHEEL_DEBUG] Lead capture dropped stale originAdWheelId before persistence. publicationId=${publication.id} visitorId=${visitor.id} adWheelId=${requestedOriginAdWheelId}`,
+      );
+    }
+
+    console.log('[ATTR_AUDIT] captureLeadInTransaction:persistencia', {
+      publicationId: publication.id,
+      visitorId: visitor.id,
+      existingLeadId: existing?.id ?? null,
+      dbWrite: {
+        trafficLayer: input.trafficLayer ?? null,
+        originAdWheelId: validatedOriginAdWheelId,
+      },
+    });
+    const buildLeadUpsertArgs = (
+      safeOriginAdWheelId: string | null,
+    ): Prisma.LeadUpsertArgs => ({
       where: {
         visitorId: visitor.id,
       },
@@ -852,10 +1012,10 @@ export class LeadCaptureAssignmentService {
         email: input.email ?? null,
         phone: input.phone ?? null,
         companyName: input.companyName ?? null,
-        status: 'captured',
+        status: 'captured' as LeadStatus,
         currentAssignmentId: null,
         trafficLayer: input.trafficLayer ?? null,
-        originAdWheelId: input.originAdWheelId ?? null,
+        originAdWheelId: safeOriginAdWheelId,
         tags,
       },
       update: {
@@ -871,10 +1031,14 @@ export class LeadCaptureAssignmentService {
         originAdWheelId:
           input.originAdWheelId === undefined
             ? existing?.originAdWheelId
-            : input.originAdWheelId,
+            : safeOriginAdWheelId,
         tags: tags.length > 0 ? tags : existing?.tags,
       },
     });
+
+    const lead = await tx.lead.upsert(
+      buildLeadUpsertArgs(validatedOriginAdWheelId),
+    );
 
     await tx.visitor.update({
       where: { id: visitor.id },
@@ -1025,31 +1189,13 @@ export class LeadCaptureAssignmentService {
       effectiveRoutingInput?.entryContext?.trafficLayer === 'PAID_WHEEL' &&
       effectiveRoutingInput.entryContext.adWheelId
     ) {
-      try {
-        return await this.assignLeadToPaidWheelCycleInTransaction(
-          tx,
-          publication,
-          lead,
-          effectiveRoutingInput.entryContext.adWheelId,
-          effectiveRoutingInput,
-        );
-      } catch (error) {
-        const { code, message } = this.getConflictErrorDetails(error);
-
-        if (!code || !ASSIGNMENT_FALLBACK_ERROR_CODES.has(code)) {
-          throw error;
-        }
-
-        this.logger.warn(
-          `[WHEEL_DEBUG] Fallback disparado para awid ${effectiveRoutingInput.entryContext.adWheelId}. Motivo: paid_cycle_assignment_failed code=${code} message=${message ?? 'Unable to advance paid wheel cursor.'}. publicationId=${publication.id} teamId=${publication.teamId}`,
-        );
-        effectiveRoutingInput = {
-          ...effectiveRoutingInput,
-          entryContext: this.toPaidWheelFallbackEntryContext(
-            effectiveRoutingInput.entryContext,
-          ),
-        };
-      }
+      return this.assignLeadToPaidWheelCycleInTransaction(
+        tx,
+        publication,
+        lead,
+        effectiveRoutingInput.entryContext.adWheelId,
+        effectiveRoutingInput,
+      );
     }
 
     const selectedAdvisor = await this.resolveFallbackTeamAdminOrThrow(
@@ -1083,6 +1229,8 @@ export class LeadCaptureAssignmentService {
     const trafficLayer =
       effectiveRoutingInput?.entryContext?.trafficLayer === 'DIRECT'
         ? 'DIRECT'
+        : effectiveRoutingInput?.entryContext?.trafficLayer === 'PAID_ADS'
+          ? 'PAID_ADS'
         : 'ORGANIC';
     const assignment = await tx.assignment.create({
       data: {
@@ -1555,38 +1703,211 @@ export class LeadCaptureAssignmentService {
     return this.toPublicAssignedAdvisor(user);
   }
 
+  private pickAuditHeaders(headers?: RequestAuditHeaders) {
+    return {
+      userAgent: this.readAuditHeader(headers, 'user-agent'),
+      referer:
+        this.readAuditHeader(headers, 'referer') ??
+        this.readAuditHeader(headers, 'referrer'),
+    };
+  }
+
+  private resolveRequestAuditContext(
+    headers?: RequestAuditHeaders,
+  ): RequestAuditContext {
+    return {
+      clientIpAddress: this.resolveClientIpAddress(headers),
+      clientUserAgent: this.readAuditHeader(headers, 'user-agent'),
+    };
+  }
+
+  private resolveClientIpAddress(headers?: RequestAuditHeaders) {
+    const cloudflareIp = this.readAuditHeader(headers, 'cf-connecting-ip');
+    if (cloudflareIp?.trim()) {
+      return cloudflareIp.trim();
+    }
+
+    const forwardedFor = this.readAuditHeader(headers, 'x-forwarded-for');
+    if (forwardedFor?.trim()) {
+      const firstForwardedIp = forwardedFor
+        .split(',')
+        .map((segment) => segment.trim())
+        .find(Boolean);
+
+      if (firstForwardedIp) {
+        return firstForwardedIp;
+      }
+    }
+
+    const realIp = this.readAuditHeader(headers, 'x-real-ip');
+    return realIp?.trim() || null;
+  }
+
+  private readAuditHeader(
+    headers: RequestAuditHeaders | undefined,
+    name: string,
+  ) {
+    const value = headers?.[name.toLowerCase()] ?? headers?.[name];
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+
+    return value ?? null;
+  }
+
   private async resolveSubmissionEntryContext(
     tx: TransactionClient | PrismaService,
     publication: FlowPublicationRecord,
     sourceUrl: string | null,
     submittedEntryContext?: SubmitPublicLeadCaptureDto['entryContext'],
-  ) {
-    if (submittedEntryContext) {
-      return {
-        entryMode: submittedEntryContext.entryMode,
-        trafficLayer: submittedEntryContext.trafficLayer,
-        forcedSponsorId: submittedEntryContext.forcedSponsorId,
-        adWheelId: submittedEntryContext.adWheelId,
-        browserPixelsEnabled: submittedEntryContext.browserPixelsEnabled,
-        attributionType: submittedEntryContext.attributionType ?? 'organic',
-        attributionSlug: submittedEntryContext.attributionSlug ?? null,
-        runtimePathPrefix:
-          submittedEntryContext.runtimePathPrefix ?? publication.pathPrefix,
-        referralQueryParam: null,
-      };
-    }
-
+    attribution?: RuntimeAttributionPayload,
+  ): Promise<SubmissionEntryContext> {
     const requestedPath =
       this.extractRequestedPathFromSourceUrl(sourceUrl) ?? publication.pathPrefix;
+    const requestedPathname = this.extractPathnameFromRequestedPath(requestedPath);
+    const baseEntryContext = submittedEntryContext
+      ? {
+          entryMode: submittedEntryContext.entryMode,
+          trafficLayer: submittedEntryContext.trafficLayer,
+          forcedSponsorId: submittedEntryContext.forcedSponsorId,
+          adWheelId: submittedEntryContext.adWheelId,
+          browserPixelsEnabled: submittedEntryContext.browserPixelsEnabled,
+          attributionType: submittedEntryContext.attributionType ?? 'organic',
+          attributionSlug: submittedEntryContext.attributionSlug ?? null,
+          runtimePathPrefix:
+            submittedEntryContext.runtimePathPrefix ?? publication.pathPrefix,
+          referralQueryParam: null,
+        }
+      : await this.publicFunnelRuntimeService.resolveEntryContextForPublication({
+          tx,
+          workspaceId: publication.workspaceId,
+          teamId: publication.teamId,
+          publicationId: publication.id,
+          publicationPathPrefix: publication.pathPrefix,
+          requestedPath,
+        });
 
-    return this.publicFunnelRuntimeService.resolveEntryContextForPublication({
-      tx,
-      workspaceId: publication.workspaceId,
-      teamId: publication.teamId,
+    if (
+      baseEntryContext.trafficLayer === 'DIRECT' &&
+      this.matchesAdvisorRefPath(requestedPathname)
+    ) {
+      console.log('[ATTR_AUDIT] resolveSubmissionEntryContext:resolucion', {
+        publicationId: publication.id,
+        requestedPath,
+        returnedEntryContext: baseEntryContext,
+      });
+      return baseEntryContext;
+    }
+
+    const hasPaidWheelPath = this.matchesPaidWheelCampaignPath(requestedPathname);
+    const hasPaidUrlEvidence = this.hasPaidUrlEvidence(attribution, sourceUrl);
+
+    if (!hasPaidWheelPath && !hasPaidUrlEvidence) {
+      const organicEntryContext = this.toOrganicEntryContext(baseEntryContext);
+
+      console.log('[ATTR_AUDIT] resolveSubmissionEntryContext:resolucion', {
+        publicationId: publication.id,
+        requestedPath,
+        returnedEntryContext: organicEntryContext,
+      });
+
+      return organicEntryContext;
+    }
+
+    if (!hasPaidWheelPath && hasPaidUrlEvidence) {
+      const resolvedEntryContext = this.toPaidAdsEntryContext(
+        baseEntryContext,
+        attribution,
+      );
+
+      console.log('[ATTR_AUDIT] resolveSubmissionEntryContext:resolucion', {
+        publicationId: publication.id,
+        requestedPath,
+        returnedEntryContext: resolvedEntryContext,
+      });
+
+      return resolvedEntryContext;
+    }
+
+    const activeAdWheel = await this.findActivePublicationAdWheel(tx, publication);
+
+    if (!activeAdWheel) {
+      const organicEntryContext = this.toOrganicEntryContext(baseEntryContext);
+
+      console.log('[ATTR_AUDIT] resolveSubmissionEntryContext:resolucion', {
+        publicationId: publication.id,
+        requestedPath,
+        activeAdWheel,
+        returnedEntryContext: organicEntryContext,
+      });
+
+      return organicEntryContext;
+    }
+
+    const resolvedEntryContext = {
+      ...baseEntryContext,
+      entryMode: 'paid_ads' as const,
+      trafficLayer: 'PAID_WHEEL' as const,
+      forcedSponsorId: null,
+      adWheelId: activeAdWheel.id,
+      browserPixelsEnabled: true,
+      attributionType: 'promo' as const,
+      attributionSlug: baseEntryContext.attributionSlug ?? activeAdWheel.id,
+    };
+
+    console.log('[ATTR_AUDIT] resolveSubmissionEntryContext:resolucion', {
       publicationId: publication.id,
-      publicationPathPrefix: publication.pathPrefix,
-      requestedPath,
+      activeAdWheel,
+      returnedEntryContext: resolvedEntryContext,
     });
+
+    return resolvedEntryContext;
+  }
+
+  private buildAttributionDecision(input: {
+    publication: FlowPublicationRecord;
+    entryContext: SubmissionEntryContext;
+    attribution: RuntimeAttributionPayload;
+    clientIpAddress?: string | null;
+    clientUserAgent?: string | null;
+  }): AttributionDecision {
+    const requestedPath = normalizePath(
+      this.extractRequestedPathFromSourceUrl(input.attribution.sourceUrl ?? null) ??
+        input.entryContext.runtimePathPrefix ??
+        input.publication.pathPrefix,
+    );
+    const fbclid = input.attribution.fbclid?.trim() || null;
+    const gclid = input.attribution.gclid?.trim() || null;
+    const ttclid = input.attribution.ttclid?.trim() || null;
+    const requestedPathname = this.extractPathnameFromRequestedPath(requestedPath);
+    const hasPaidUrlEvidence = this.hasPaidUrlEvidence(
+      input.attribution,
+      input.attribution.sourceUrl ?? null,
+    );
+
+    return {
+      entryMode: input.entryContext.entryMode,
+      trafficLayer: input.entryContext.trafficLayer,
+      forcedSponsorId: input.entryContext.forcedSponsorId,
+      adWheelId: input.entryContext.adWheelId,
+      attributionType: input.entryContext.attributionType,
+      attributionSlug: input.entryContext.attributionSlug,
+      runtimePathPrefix: input.entryContext.runtimePathPrefix,
+      referralQueryParam: input.entryContext.referralQueryParam,
+      sourceUrl: input.attribution.sourceUrl ?? null,
+      requestedPath,
+      pathMatchesCampaign:
+        this.matchesPaidWheelCampaignPath(requestedPathname) ||
+        (!this.matchesPaidWheelCampaignPath(requestedPathname) &&
+          input.entryContext.trafficLayer === 'PAID_ADS' &&
+          hasPaidUrlEvidence),
+      fbclid,
+      gclid,
+      ttclid,
+      hasPaidClickId: Boolean(fbclid || ttclid),
+      clientIpAddress: input.clientIpAddress?.trim() || null,
+      clientUserAgent: input.clientUserAgent?.trim() || null,
+    };
   }
 
   private extractRequestedPathFromSourceUrl(sourceUrl: string | null) {
@@ -1602,6 +1923,121 @@ export class LeadCaptureAssignmentService {
     } catch {
       return trimmed.startsWith('/') ? trimmed : null;
     }
+  }
+
+  private extractPathnameFromRequestedPath(path: string) {
+    const trimmed = path.trim();
+    const withoutQuery = trimmed.split('?')[0] ?? '/';
+    const withoutHash = withoutQuery.split('#')[0] ?? '/';
+    return normalizePath(withoutHash);
+  }
+
+  private matchesPaidWheelCampaignPath(path: string) {
+    const normalizedPath = normalizePath(path);
+    return normalizedPath.startsWith('/promo/') || normalizedPath.startsWith('/p/');
+  }
+
+  private matchesAdvisorRefPath(path: string) {
+    const normalizedPath = normalizePath(path);
+    return normalizedPath.startsWith('/ref/');
+  }
+
+  private hasPaidUrlEvidence(
+    attribution?: RuntimeAttributionPayload,
+    sourceUrl?: string | null,
+  ) {
+    const urlSearchParams = this.extractSearchParamsFromSourceUrl(sourceUrl);
+    const utmSource =
+      attribution?.utmSource?.trim().toLowerCase() ||
+      urlSearchParams?.get('utm_source')?.trim().toLowerCase() ||
+      null;
+
+    return Boolean(
+      attribution?.fbclid?.trim() ||
+        attribution?.ttclid?.trim() ||
+        attribution?.gclid?.trim() ||
+        urlSearchParams?.get('fbclid')?.trim() ||
+        urlSearchParams?.get('ttclid')?.trim() ||
+        urlSearchParams?.get('gclid')?.trim() ||
+        utmSource === 'ads',
+    );
+  }
+
+  private extractSearchParamsFromSourceUrl(sourceUrl?: string | null) {
+    if (!sourceUrl?.trim()) {
+      return null;
+    }
+
+    try {
+      const parsedUrl = new URL(sourceUrl);
+      return parsedUrl.searchParams;
+    } catch {
+      if (!sourceUrl.startsWith('/')) {
+        return null;
+      }
+
+      const relativeUrl = new URL(sourceUrl, 'https://leadflow.local');
+      return relativeUrl.searchParams;
+    }
+  }
+
+  private toOrganicEntryContext(
+    entryContext: SubmissionEntryContext,
+  ): SubmissionEntryContext {
+    return {
+      ...entryContext,
+      trafficLayer: 'ORGANIC' as const,
+      forcedSponsorId: null,
+      adWheelId: null,
+      attributionType: 'organic' as const,
+      attributionSlug: null,
+    };
+  }
+
+  private toPaidAdsEntryContext(
+    entryContext: SubmissionEntryContext,
+    attribution?: RuntimeAttributionPayload,
+  ): SubmissionEntryContext {
+    return {
+      ...entryContext,
+      entryMode: 'paid_ads' as const,
+      trafficLayer: 'PAID_ADS' as const,
+      forcedSponsorId: null,
+      adWheelId: null,
+      browserPixelsEnabled: true,
+      attributionType: 'organic' as const,
+      attributionSlug:
+        attribution?.utmCampaign?.trim() ||
+        attribution?.utmSource?.trim() ||
+        'ads',
+    };
+  }
+
+  private async findActivePublicationAdWheel(
+    tx: TransactionClient | PrismaService,
+    publication: FlowPublicationRecord,
+  ) {
+    const now = new Date();
+
+    return tx.adWheel.findFirst({
+      where: {
+        teamId: publication.teamId,
+        publicationId: publication.id,
+        status: 'ACTIVE',
+        startDate: {
+          lte: now,
+        },
+        endDate: {
+          gte: now,
+        },
+      },
+      select: {
+        id: true,
+      },
+      orderBy: {
+        startDate: 'desc',
+      },
+    });
   }
 
   private async reservePaidWheelCycleTurnInTransaction(
@@ -1703,7 +2139,7 @@ export class LeadCaptureAssignmentService {
       return null;
     }
 
-    const nextPosition = (turn.position % totalTurns) + 1;
+    const nextPosition = (currentPosition % totalTurns) + 1;
     await tx.adWheel.update({
       where: {
         id: adWheelId,
@@ -1776,7 +2212,8 @@ export class LeadCaptureAssignmentService {
   ): SubmissionEntryContext {
     return {
       ...entryContext,
-      trafficLayer: 'DIRECT',
+      entryMode: 'organic_asesor' as const,
+      trafficLayer: 'DIRECT' as const,
       forcedSponsorId: null,
       adWheelId: null,
     };

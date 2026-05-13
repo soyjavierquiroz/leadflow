@@ -115,6 +115,18 @@ Regla incorrecta:
 Por eso Leadflow ahora normaliza todos los montos KREDIT antes de invocar el
 engine y evita enviar enteros de minor units como payload externo.
 
+### Reintentos de escritura idempotente
+
+Las llamadas POST hacia `wallet-engine` se reintentan hasta 3 veces cuando el
+fallo parece transitorio:
+
+- error de red sin `status`
+- HTTP `429`
+- HTTP `5xx`
+
+Los reintentos solo aplican sobre operaciones con idempotency key controlada por
+Leadflow. Si el error persiste, se propaga como excepcion upstream normalizada.
+
 ## Configuracion por entorno
 Definida en `src/config/runtime.ts`.
 

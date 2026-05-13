@@ -40,7 +40,7 @@ export type LeadSourceChannel =
 export type AvailabilityStatus = 'available' | 'paused' | 'offline';
 
 export type RotationStrategy = 'round-robin' | 'weighted' | 'manual';
-export type TrafficLayer = 'DIRECT' | 'PAID_WHEEL' | 'ORGANIC';
+export type TrafficLayer = 'DIRECT' | 'PAID_WHEEL' | 'PAID_ADS' | 'ORGANIC';
 
 export type EventActorType = 'system' | 'user' | 'visitor' | 'integration';
 

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import type { AutoAssignPublicLeadDto } from './dto/auto-assign-public-lead.dto';
 import type { CapturePublicLeadDto } from './dto/capture-public-lead.dto';
 import type { HydratePublicContextDto } from './dto/hydrate-public-context.dto';
@@ -59,8 +67,11 @@ export class PublicFunnelRuntimeController {
   }
 
   @Post('submissions')
-  submitLeadCapture(@Body() dto: SubmitPublicLeadCaptureDto) {
-    return this.leadCaptureAssignmentService.submitLeadCapture(dto);
+  submitLeadCapture(
+    @Body() dto: SubmitPublicLeadCaptureDto,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.leadCaptureAssignmentService.submitLeadCapture(dto, headers);
   }
 
   @Post('events')

@@ -109,6 +109,7 @@ export type SystemTenantSummary = {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  emailNotificationsEnabled: boolean;
   managerUserId: string | null;
   managerEmail: string | null;
   name: string;
@@ -138,6 +139,7 @@ export type SystemTenantDetail = SystemTenantSummary & {
     defaultCurrency: string;
     primaryLocale: string;
     primaryDomain: string | null;
+    emailNotificationsEnabled: boolean;
   };
 };
 
@@ -427,6 +429,7 @@ export class TeamsService {
             id: true,
             name: true,
             slug: true,
+            emailNotificationsEnabled: true,
           },
         },
         users: {
@@ -464,6 +467,7 @@ export class TeamsService {
         workspaceId: record.workspaceId,
         workspaceName: record.workspace.name,
         workspaceSlug: record.workspace.slug,
+        emailNotificationsEnabled: record.workspace.emailNotificationsEnabled,
         managerUserId: record.managerUserId,
         managerEmail: managerUser?.email ?? null,
         name: record.name,
@@ -500,6 +504,7 @@ export class TeamsService {
             defaultCurrency: true,
             primaryLocale: true,
             primaryDomain: true,
+            emailNotificationsEnabled: true,
           },
         },
         users: {
@@ -556,6 +561,7 @@ export class TeamsService {
       workspaceId: record.workspaceId,
       workspaceName: record.workspace.name,
       workspaceSlug: record.workspace.slug,
+      emailNotificationsEnabled: record.workspace.emailNotificationsEnabled,
       managerEmail: managerUser?.email ?? null,
       name: record.name,
       code: record.code,
@@ -581,6 +587,7 @@ export class TeamsService {
         defaultCurrency: record.workspace.defaultCurrency,
         primaryLocale: record.workspace.primaryLocale,
         primaryDomain: record.workspace.primaryDomain,
+        emailNotificationsEnabled: record.workspace.emailNotificationsEnabled,
       },
       createdAt: toIso(record.createdAt),
       updatedAt: toIso(record.updatedAt),
@@ -1225,6 +1232,13 @@ export class TeamsService {
         ? null
         : sanitizeRequiredText(dto.tenantName, 'tenantName');
     const statusFlags = this.resolveProvisioningStatusFlags(provisioningStatus);
+    const emailNotificationsEnabled =
+      dto.emailNotificationsEnabled === undefined
+        ? undefined
+        : this.normalizeBoolean(
+            dto.emailNotificationsEnabled,
+            'emailNotificationsEnabled',
+          );
 
     const existing = await this.prisma.team.findUnique({
       where: {
@@ -1285,6 +1299,9 @@ export class TeamsService {
                 : existing.workspace.status === 'archived'
                   ? 'archived'
                   : 'active',
+            ...(emailNotificationsEnabled === undefined
+              ? {}
+              : { emailNotificationsEnabled }),
           },
         });
 
@@ -1678,6 +1695,7 @@ export class TeamsService {
           }`,
         );
       }
+      void this.provisionTenantKreditAccount(provisionedTenant.team.id);
       void this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
 
       return provisionedTenant;
@@ -1697,6 +1715,18 @@ export class TeamsService {
       }
 
       throw error;
+    }
+  }
+
+  private async provisionTenantKreditAccount(tenantId: string) {
+    try {
+      await this.walletEngineService.upsertAccount(tenantId);
+    } catch (error) {
+      this.logger.error(
+        `Tenant ${tenantId} wallet provisioning failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
     }
   }
 
@@ -2059,6 +2089,21 @@ export class TeamsService {
     }
 
     return normalized;
+  }
+
+  private normalizeBoolean(
+    value: boolean | null | undefined,
+    field: string,
+  ): boolean {
+    if (typeof value !== 'boolean') {
+      throw new BadRequestException({
+        code: 'INVALID_BOOLEAN',
+        message: `${field} must be a boolean value.`,
+        field,
+      });
+    }
+
+    return value;
   }
 
   private resolveProvisioningStatusFlags(status: SystemTenantProvisioningStatus) {

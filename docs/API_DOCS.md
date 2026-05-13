@@ -2,6 +2,8 @@
 
 Auditoria tecnica realizada el 29 de marzo de 2026 sobre el flujo publico de leads y la rueda de asignacion.
 
+Actualizacion: 2026-05-13 (UTC). Se incorporan atribucion pagada, CAPI server-side, contexto de navegador y toggle de emails por tenant.
+
 ## 1. Entry Point publico de leads
 
 ### Controlador exacto
@@ -20,9 +22,11 @@ Auditoria tecnica realizada el 29 de marzo de 2026 sobre el flujo publico de lea
 2. Valida que `currentStepId` pertenezca a esa publicacion.
 3. Registra o actualiza el visitor.
 4. Captura o actualiza el lead.
-5. Resuelve el siguiente sponsor por rotacion.
-6. Crea el assignment.
-7. Calcula `nextStep`, `handoff` y el objeto `advisor`.
+5. Resuelve entry context y atribucion (`DIRECT`, `ORGANIC`, `PAID_ADS`, `PAID_WHEEL`).
+6. Resuelve el siguiente sponsor por rueda pagada o fallback operativo.
+7. Crea el assignment.
+8. Calcula `nextStep`, `handoff` y el objeto `advisor`.
+9. Dispara side effects CAPI si la captura pagada cumple los guardrails.
 
 ## 2. Payload de entrada
 
@@ -36,6 +40,17 @@ type SubmitPublicLeadCaptureDto = {
   publicationId: string;
   currentStepId: string;
   anonymousId: string;
+  entryContext?: {
+    entryMode: "organic_asesor" | "paid_ads";
+    trafficLayer: "DIRECT" | "PAID_WHEEL" | "PAID_ADS" | "ORGANIC";
+    forcedSponsorId: string | null;
+    adWheelId: string | null;
+    browserPixelsEnabled: boolean;
+    attributionType: "organic" | "referral" | "promo";
+    attributionSlug: string | null;
+    runtimePathPrefix: string | null;
+    referralQueryParam: string | null;
+  } | null;
   sourceChannel?: "manual" | "form" | "landing_page" | "api" | "import" | "automation";
   sourceUrl?: string | null;
   utmSource?: string | null;
@@ -46,6 +61,8 @@ type SubmitPublicLeadCaptureDto = {
   fbclid?: string | null;
   gclid?: string | null;
   ttclid?: string | null;
+  clientIpAddress?: string | null;
+  clientUserAgent?: string | null;
   fullName?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -82,6 +99,9 @@ Nota importante: hoy el backend no impone validacion dura de `fullName`, `phone`
   "sourceUrl": "https://retodetransformacion.com/inmuno",
   "utmSource": "meta",
   "utmCampaign": "inmuno_v13",
+  "fbclid": "fbclid_123",
+  "ttclid": null,
+  "clientUserAgent": "Mozilla/5.0 ...",
   "fullName": "Maria Perez",
   "phone": "+59170000000",
   "email": null,
@@ -94,6 +114,13 @@ Nota importante: hoy el backend no impone validacion dura de `fullName`, `phone`
   "tags": ["runtime-v1", "lead-capture-modal"]
 }
 ```
+
+Notas de atribucion:
+
+- `clientIpAddress` y `clientUserAgent` son opcionales; si faltan, la API intenta resolverlos desde headers.
+- `entryContext` puede venir del runtime, pero la API revalida path y evidencia pagada antes de persistir `trafficLayer`.
+- Rutas `/promo/*` y `/p/*` con rueda activa pueden terminar en `PAID_WHEEL`.
+- `fbclid`, `ttclid`, `gclid` o `utm_source=ads` sin rueda activa pueden terminar en `PAID_ADS`.
 
 ## 3. CORS y diagnostico de `Failed to fetch`
 
@@ -243,6 +270,8 @@ type SubmitLeadCaptureResponse = {
 };
 ```
 
+La respuesta interna tambien calcula una `AttributionDecision` para side effects, pero no se expone como contrato publico estable.
+
 ### Keys que el frontend puede esperar hoy
 
 Compatibilidad moderna:
@@ -273,6 +302,22 @@ Tambien util para la pantalla de confirmacion:
 - Por eso `advisor.photoUrl` hoy sale `null`.
 - `advisor.bio` hoy es texto hardcodeado: `Especialista en Protocolos de Recuperacion`.
 - El telefono visible sale de `Sponsor.phone`.
+
+## 4.1 CAPI server-side
+
+Despues del submit exitoso, la API intenta enviar conversiones a proveedores externos sin bloquear la respuesta publica:
+
+- Meta CAPI: evento `Lead`.
+- TikTok Events API: evento `SubmitForm`.
+
+Condiciones de envio:
+
+- `trafficLayer` debe ser `PAID_WHEEL` o `PAID_ADS`;
+- la ruta debe coincidir con campana o evidencia pagada aceptada;
+- Meta requiere `fbclid`, pixel id, token y user data suficiente;
+- TikTok requiere `ttclid`, pixel id, token, IP, user agent e identidad hashable.
+
+Los datos sensibles se normalizan y se envian con SHA-256 cuando aplica (`email`, `phone`, `external_id`). Los fallos se registran como `CAPI_ERROR` y no cambian el resultado del submit.
 
 ## 5. Base de conocimiento RAG
 

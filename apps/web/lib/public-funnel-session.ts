@@ -134,6 +134,8 @@ const buildEntryContextKey = (publicationId: string) =>
 
 const submissionContextChangedEvent = "leadflow:submission-context-changed";
 const hydrationStatusChangedEvent = "leadflow:submission-hydration-changed";
+const publicationStorageKeyPattern =
+  /^leadflow:publication:(.+):(anonymous-id|submission-context|entry-context)$/;
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -159,6 +161,103 @@ const asNullableString = (value: unknown) =>
 
 const asString = (value: unknown, fallback = "") =>
   typeof value === "string" ? value : fallback;
+
+const normalizeCampaignPathname = (value: string) => {
+  const trimmed = value.trim() || "/";
+  const withoutQuery = trimmed.split("?")[0] ?? "/";
+  const withoutHash = withoutQuery.split("#")[0] ?? "/";
+  const normalized = withoutHash.replace(/\/+/g, "/").replace(/\/$/, "");
+
+  if (!normalized || normalized === ".") {
+    return "/";
+  }
+
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+};
+
+const hasCampaignEvidenceInUrl = (pathname: string, search: string) => {
+  const normalizedPathname = normalizeCampaignPathname(pathname);
+  const searchParams = new URLSearchParams(search);
+  const utmSource = searchParams.get("utm_source")?.trim().toLowerCase() ?? null;
+
+  return Boolean(
+    normalizedPathname.startsWith("/promo/") ||
+      normalizedPathname.startsWith("/p/") ||
+      searchParams.get("fbclid")?.trim() ||
+      searchParams.get("ttclid")?.trim() ||
+      searchParams.get("gclid")?.trim() ||
+      utmSource === "ads",
+  );
+};
+
+const browserHasCampaignEvidence = () => {
+  if (!isBrowser()) {
+    return false;
+  }
+
+  return hasCampaignEvidenceInUrl(
+    window.location.pathname,
+    window.location.search,
+  );
+};
+
+const clearHydrationCache = (publicationId: string) => {
+  hydrationStateByPublication.delete(publicationId);
+  hydrationPromiseByPublication.delete(publicationId);
+  emitHydrationStateChanged(publicationId);
+};
+
+const clearPublicationStorageByKey = (storageKey: string) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  const matchedStorageKey = publicationStorageKeyPattern.exec(storageKey);
+  if (!matchedStorageKey) {
+    return;
+  }
+
+  const [, publicationId, keyType] = matchedStorageKey;
+  if (keyType === "anonymous-id") {
+    window.localStorage.removeItem(storageKey);
+    return;
+  }
+
+  window.sessionStorage.removeItem(storageKey);
+  if (keyType === "submission-context") {
+    emitSubmissionContextChanged(publicationId);
+  }
+};
+
+const clearPublicationSessionState = (
+  publicationId: string,
+  options?: {
+    clearAnonymousId?: boolean;
+  },
+) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  clearPublicationStorageByKey(buildSubmissionContextKey(publicationId));
+  clearPublicationStorageByKey(buildEntryContextKey(publicationId));
+
+  if (options?.clearAnonymousId) {
+    clearPublicationStorageByKey(buildAnonymousIdKey(publicationId));
+  }
+
+  clearHydrationCache(publicationId);
+};
+
+const reloadCurrentUrlWithoutCtx = () => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("ctx");
+  window.location.replace(url.toString());
+};
 
 const readRuntimeSubmissionContext = (
   publicationId: string,
@@ -279,6 +378,18 @@ const readRuntimeSubmissionContext = (
   };
 };
 
+const resolveSubmissionContextSnapshot = (
+  publicationId: string,
+  runtime?: unknown,
+) => {
+  const storedContext = readSubmissionContext(publicationId);
+  if (storedContext?.assignment?.sponsor) {
+    return storedContext;
+  }
+
+  return readRuntimeSubmissionContext(publicationId, runtime) ?? storedContext;
+};
+
 const emitSubmissionContextChanged = (publicationId: string) => {
   if (!isBrowser()) {
     return;
@@ -331,6 +442,7 @@ export const persistSubmissionContext = (
     return;
   }
 
+  const assignedSponsor = payload.assignment?.sponsor ?? null;
   const context: StoredSubmissionContext = {
     publicationId,
     visitorId: payload.visitor.id,
@@ -347,7 +459,10 @@ export const persistSubmissionContext = (
     assignment: payload.assignment,
     lastAssignment: payload.assignment,
     nextStep: payload.nextStep,
-    handoff: payload.handoff,
+    handoff: {
+      ...payload.handoff,
+      sponsor: assignedSponsor ?? payload.handoff.sponsor,
+    },
     advisor:
       payload.advisor ??
       (payload.assigned_advisor
@@ -368,6 +483,19 @@ export const persistSubmissionContext = (
     JSON.stringify(context),
   );
   emitSubmissionContextChanged(publicationId);
+};
+
+export const clearSubmissionContext = (publicationId: string) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  const storageKey = buildSubmissionContextKey(publicationId);
+  if (!window.sessionStorage.getItem(storageKey)) {
+    return;
+  }
+
+  clearPublicationStorageByKey(storageKey);
 };
 
 export const persistEntryContext = (
@@ -397,6 +525,19 @@ export const persistEntryContext = (
   );
 };
 
+export const clearEntryContext = (publicationId: string) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  const storageKey = buildEntryContextKey(publicationId);
+  if (!window.sessionStorage.getItem(storageKey)) {
+    return;
+  }
+
+  clearPublicationStorageByKey(storageKey);
+};
+
 export const readSubmissionContext = (publicationId: string) => {
   if (!isBrowser()) {
     return null;
@@ -411,9 +552,26 @@ export const readSubmissionContext = (publicationId: string) => {
 
   try {
     const parsed = JSON.parse(rawValue) as StoredSubmissionContext;
+    if (
+      parsed.publicationId?.trim() &&
+      parsed.publicationId.trim() !== publicationId
+    ) {
+      clearPublicationSessionState(publicationId);
+      return null;
+    }
+
+    const assignment = parsed.assignment ?? null;
+    const lastAssignment = parsed.lastAssignment ?? assignment ?? null;
+    const assignedSponsor =
+      assignment?.sponsor ?? lastAssignment?.sponsor ?? null;
+
     return {
       ...parsed,
-      lastAssignment: parsed.lastAssignment ?? parsed.assignment ?? null,
+      lastAssignment,
+      handoff: {
+        ...parsed.handoff,
+        sponsor: assignedSponsor ?? parsed.handoff.sponsor,
+      },
     };
   } catch {
     window.sessionStorage.removeItem(buildSubmissionContextKey(publicationId));
@@ -463,18 +621,23 @@ const resolveEffectiveEntryContext = (
   publicationId: string,
   currentEntryContext?: PublicRuntimeEntryContext | null,
 ) => {
-  const storedEntryContext = readEntryContext(publicationId);
+  const hasCampaignEvidence = browserHasCampaignEvidence();
+  const storedEntryContext = hasCampaignEvidence
+    ? readEntryContext(publicationId)
+    : null;
 
   if (
     storedEntryContext?.forcedSponsorId ||
-    storedEntryContext?.trafficLayer === "PAID_WHEEL"
+    storedEntryContext?.trafficLayer === "PAID_WHEEL" ||
+    storedEntryContext?.trafficLayer === "PAID_ADS"
   ) {
     return toPublicEntryContext(storedEntryContext);
   }
 
   if (
     currentEntryContext?.forcedSponsorId ||
-    currentEntryContext?.trafficLayer === "PAID_WHEEL"
+    currentEntryContext?.trafficLayer === "PAID_WHEEL" ||
+    currentEntryContext?.trafficLayer === "PAID_ADS"
   ) {
     return toPublicEntryContext(currentEntryContext);
   }
@@ -573,7 +736,7 @@ export const ensureHydratedSubmissionContext = async (publicationId: string) => 
   )
     .then(async (response) => {
       if (!response.ok) {
-        throw new Error(await parseErrorMessage(response));
+        throw await createApiError(response);
       }
 
       const payload = (await response.json()) as {
@@ -582,6 +745,14 @@ export const ensureHydratedSubmissionContext = async (publicationId: string) => 
         submissionContext: StoredSubmissionContext;
       };
       const resolvedPublicationId = payload.publicationId || publicationId;
+      if (resolvedPublicationId !== publicationId) {
+        clearPublicationSessionState(publicationId, {
+          clearAnonymousId: true,
+        });
+        reloadCurrentUrlWithoutCtx();
+        return null;
+      }
+
       const submissionContext = {
         ...payload.submissionContext,
         lastAssignment:
@@ -613,6 +784,14 @@ export const ensureHydratedSubmissionContext = async (publicationId: string) => 
       return submissionContext;
     })
     .catch((error: unknown) => {
+      if (shouldResetPublicationSessionAfterHydrationError(error)) {
+        clearPublicationSessionState(publicationId, {
+          clearAnonymousId: true,
+        });
+        reloadCurrentUrlWithoutCtx();
+        return null;
+      }
+
       setHydrationState(publicationId, {
         status: "error",
         ctxToken,
@@ -636,17 +815,11 @@ export const useSubmissionContext = (
   runtime?: unknown,
 ) => {
   const [context, setContext] = useState<StoredSubmissionContext | null>(() => {
-    return (
-      readSubmissionContext(publicationId) ??
-      readRuntimeSubmissionContext(publicationId, runtime)
-    );
+    return resolveSubmissionContextSnapshot(publicationId, runtime);
   });
 
   useEffect(() => {
-    setContext(
-      readSubmissionContext(publicationId) ??
-        readRuntimeSubmissionContext(publicationId, runtime),
-    );
+    setContext(resolveSubmissionContextSnapshot(publicationId, runtime));
 
     if (!isBrowser()) {
       return;
@@ -658,10 +831,7 @@ export const useSubmissionContext = (
         return;
       }
 
-      setContext(
-        readSubmissionContext(publicationId) ??
-          readRuntimeSubmissionContext(publicationId, runtime),
-      );
+      setContext(resolveSubmissionContextSnapshot(publicationId, runtime));
     };
 
     window.addEventListener(submissionContextChangedEvent, handleChange);
@@ -703,14 +873,22 @@ export const useSubmissionHydration = (publicationId: string) => {
 };
 
 const parseErrorMessage = async (response: Response) => {
+  return (await parseApiError(response)).message;
+};
+
+const parseApiError = async (response: Response) => {
   try {
     const payload = (await response.json()) as {
+      code?: string;
       message?: string | { message?: string } | { error?: string };
       error?: string;
     };
 
     if (typeof payload.message === "string") {
-      return payload.message;
+      return {
+        code: payload.code ?? null,
+        message: payload.message,
+      };
     }
 
     if (
@@ -719,17 +897,68 @@ const parseErrorMessage = async (response: Response) => {
       "message" in payload.message &&
       typeof payload.message.message === "string"
     ) {
-      return payload.message.message;
+      return {
+        code: payload.code ?? null,
+        message: payload.message.message,
+      };
     }
 
     if (typeof payload.error === "string") {
-      return payload.error;
+      return {
+        code: payload.code ?? null,
+        message: payload.error,
+      };
     }
   } catch {
-    return `La solicitud fallo con estado ${response.status}.`;
+    return {
+      code: null,
+      message: `La solicitud fallo con estado ${response.status}.`,
+    };
   }
 
-  return `La solicitud fallo con estado ${response.status}.`;
+  return {
+    code: null,
+    message: `La solicitud fallo con estado ${response.status}.`,
+  };
+};
+
+const createApiError = async (response: Response) => {
+  const parsedError = await parseApiError(response);
+  const error = new Error(parsedError.message) as Error & {
+    code?: string | null;
+    status?: number;
+  };
+
+  error.code = parsedError.code;
+  error.status = response.status;
+  return error;
+};
+
+const shouldResetPublicationSessionAfterHydrationError = (error: unknown) => {
+  const code =
+    typeof error === "object" &&
+    error &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code
+      : null;
+
+  if (
+    code === "IDENTITY_CONTEXT_LEAD_NOT_FOUND" ||
+    code === "IDENTITY_CONTEXT_PUBLICATION_MISMATCH" ||
+    code === "PUBLICATION_NOT_FOUND"
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  return (
+    message.includes("could not be rehydrated") ||
+    message.includes("does not match the current publication") ||
+    message.includes("publication") && message.includes("not active")
+  );
 };
 
 export const submitPublicLeadCapture = async (

@@ -106,6 +106,8 @@ const KREDIT_UNIT_CODE = 'KREDIT';
 const KREDIT_UNIT_SCALE = 6;
 const INITIAL_WELCOME_CREDITS_AMOUNT = '5000000';
 const DECIMAL_AMOUNT_PATTERN = /^-?\d+(?:\.\d+)?$/;
+const WALLET_POST_MAX_ATTEMPTS = 3;
+const WALLET_POST_RETRY_DELAY_MS = 250;
 
 const sanitizeNullableText = (value: string | null | undefined) => {
   if (value === undefined || value === null) {
@@ -458,17 +460,30 @@ export class WalletEngineService {
   ): Promise<T> {
     this.ensureConfigured();
 
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post<T>(this.buildUrl(path), payload, {
-          headers: this.buildHeaders(idempotencyKey),
-        }),
-      );
+    for (let attempt = 1; attempt <= WALLET_POST_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const response = await firstValueFrom(
+          this.httpService.post<T>(this.buildUrl(path), payload, {
+            headers: this.buildHeaders(idempotencyKey),
+          }),
+        );
 
-      return response.data;
-    } catch (error) {
-      throw this.toRequestException(error);
+        return response.data;
+      } catch (error) {
+        if (
+          attempt >= WALLET_POST_MAX_ATTEMPTS ||
+          !this.shouldRetryPost(error)
+        ) {
+          throw this.toRequestException(error);
+        }
+
+        await this.sleep(WALLET_POST_RETRY_DELAY_MS * attempt);
+      }
     }
+
+    throw new ServiceUnavailableException(
+      'Wallet engine request failed after retries.',
+    );
   }
 
   private buildUrl(path: string) {
@@ -509,6 +524,17 @@ export class WalletEngineService {
     );
 
     return normalized.slice(0, maxLength);
+  }
+
+  private shouldRetryPost(error: unknown) {
+    const axiosError = error as AxiosError;
+    const status = axiosError.response?.status;
+
+    return status === undefined || status === 429 || status >= 500;
+  }
+
+  private async sleep(milliseconds: number) {
+    await new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
   private normalizeDecimalAmountForScale(

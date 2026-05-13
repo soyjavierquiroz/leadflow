@@ -2,8 +2,12 @@
 
 Fecha: 2026-03-21 (UTC)
 
+Actualizacion: 2026-05-13 (UTC)
+
 ## Objetivo
-Implementar una capa interna de tracking para el runtime publico de Leadflow que registre eventos de funnel, step e hitos operativos en una estructura persistente y reutilizable, sin hacer todavia dispatch real a Meta o TikTok.
+Implementar una capa interna de tracking para el runtime publico de Leadflow que registre eventos de funnel, step e hitos operativos en una estructura persistente y reutilizable.
+
+Desde la actualizacion 2026-05-13, el tracking interno convive con un dispatch server-side limitado para conversiones Lead en Meta CAPI y TikTok Events API cuando la captura viene de trafico pagado elegible.
 
 ## Eventos implementados
 
@@ -20,6 +24,12 @@ Implementar una capa interna de tracking para el runtime publico de Leadflow que
 - `assignment_created`
 - `assignment_failed`
 - `handoff_started`
+
+### Eventos enviados a proveedores externos
+- Meta CAPI: `Lead`
+- TikTok Events API: `SubmitForm`
+
+Estos eventos no se persisten como `DomainEvent` adicional por ahora. Se disparan como side effect desde `CapiManagerService` despues de la transaccion de captura.
 
 ### Eventos de dominio previos que se mantienen
 - `visitor_registered`
@@ -84,6 +94,9 @@ Campos frecuentes:
 - `cta`
 - `metadata`
 - `triggerEventId` para correlacion entre submit browser y evento server posterior
+- `trafficLayer`
+- `originAdWheelId`
+- click ids (`fbclid`, `gclid`, `ttclid`) cuando corresponden
 
 ## Uso de `eventId`
 `eventId` ya forma parte del modelo persistido.
@@ -106,20 +119,48 @@ Decision importante:
 - `GET /v1/events?funnelPublicationId=...`
 
 ## Relacion con TrackingProfile y ConversionEventMapping
-En esta fase:
-- no hay dispatch real
-- no se llama a Meta ni TikTok
-- si existe `TrackingProfile`, el contexto queda disponible en el payload
-- `ConversionEventMapping` sigue listo para fases posteriores
+En esta fase mixta:
+
+- el dispatch CAPI actual no depende todavia de `ConversionEventMapping`;
+- el submit usa credenciales de pixel disponibles en la publicacion efectiva;
+- si existe `TrackingProfile`, el contexto sigue disponible en el payload de eventos internos;
+- `ConversionEventMapping` queda como base para mapear mas eventos o proveedores en una fase posterior.
+
+## Guardrails de CAPI
+
+`CapiManagerService` evita enviar conversiones cuando:
+
+- `trafficLayer` es `ORGANIC` o `DIRECT`;
+- la ruta no coincide con una campana (`/promo/*`, `/p/*`) ni con evidencia pagada aceptada;
+- Meta no tiene `fbclid`, pixel id, token o user data suficiente;
+- TikTok no tiene `ttclid`, pixel id, token, IP, user agent o identidad hashable.
+
+Datos de usuario enviados:
+
+- email y telefono normalizados con SHA-256 cuando existen;
+- IP y user agent desde payload o headers;
+- `event_source_url` desde `sourceUrl` o desde `domainHost + requestedPath`;
+- `event_id` derivado de `submissionEventId` cuando esta disponible.
+
+Los errores de proveedor se registran como `CAPI_ERROR` y no bloquean el submit.
+
+## Integridad de `assignmentId`
+
+Antes de crear un `DomainEvent`, `TrackingEventsService` valida que `assignmentId` exista.
+
+- Si no existe, registra warning y crea el evento sin relacion de assignment.
+- Si Prisma devuelve `P2003` por una relacion invalida, reintenta una vez sin `assignmentId`.
+
+Esto evita que un evento browser/server pierda toda la escritura por cargar un assignment obsoleto.
 
 ## Limitaciones intencionales de v1
-- no hay envio real a Meta Pixel
-- no hay envio real a TikTok Events
+- no hay envio browser-side real a Meta Pixel
+- no hay mapeo declarativo por `ConversionEventMapping` para todos los eventos
 - no hay dashboards analiticos
 - no hay deduplicacion hard entre browser/server
-- no hay retries ni colas de dispatch
+- no hay retries ni colas persistentes de dispatch CAPI
 - no hay agregaciones ni reporting
-- no hay handoff real a WhatsApp
+- no hay confirmacion real de handoff por WhatsApp
 
 ## Que queda listo para Meta/TikTok despues
 - taxonomia de eventos consistente
@@ -127,6 +168,7 @@ En esta fase:
 - correlacion entre eventos browser y server
 - contexto de funnel/publicacion/step en cada evento
 - acceso a `TrackingProfile` y `ConversionEventMapping` desde el modelo
+- base CAPI validada para extender eventos, retries y mapeos
 
 ## Validacion manual recomendada
 1. Resolver un funnel publicado seed.

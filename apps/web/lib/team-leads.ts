@@ -6,7 +6,7 @@ export type TeamLeadSupervisionStatus =
   | "stagnant"
   | "active"
   | "closed";
-export type TeamLeadTrafficLayer = "DIRECT" | "PAID_WHEEL" | "ORGANIC";
+export type TeamLeadTrafficLayer = "DIRECT" | "PAID_WHEEL" | "PAID_ADS" | "ORGANIC";
 
 export type TeamLeadInboxItem = {
   id: string;

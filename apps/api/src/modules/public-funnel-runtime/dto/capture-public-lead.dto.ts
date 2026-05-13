@@ -6,6 +6,8 @@ export class CapturePublicLeadDto {
   readonly visitorId?: string | null;
   readonly anonymousId?: string | null;
   readonly sourceChannel?: LeadSourceChannel;
+  readonly clientIpAddress?: string | null;
+  readonly clientUserAgent?: string | null;
   readonly fullName?: string | null;
   readonly email?: string | null;
   readonly phone?: string | null;

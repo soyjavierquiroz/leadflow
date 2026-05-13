@@ -5,4 +5,5 @@ export class UpdateSystemTenantDto {
   readonly adminEmail!: string;
   readonly subdomain!: string;
   readonly provisioningStatus!: SystemTenantProvisioningStatus;
+  readonly emailNotificationsEnabled?: boolean;
 }

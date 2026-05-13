@@ -7,12 +7,19 @@ import {
   RichHeadline,
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
-import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
-import { useSubmissionContext } from "@/lib/public-funnel-session";
+import type {
+  ResolvedPublicFunnelAdvisor,
+  ResolvedPublicFunnelHandoffState,
+} from "@/lib/public-funnel-assigned-sponsor";
 
 type HandoffCtaProps = {
   isBoxed?: boolean;
-  runtime: PublicFunnelRuntimePayload;
+  advisor: ResolvedPublicFunnelAdvisor | null;
+  leadName?: string | null;
+  handoff: Pick<
+    ResolvedPublicFunnelHandoffState,
+    "whatsappPhone" | "whatsappMessage" | "whatsappUrl"
+  >;
   headline?: string;
   buttonPrefix?: string;
   redirectText?: string;
@@ -34,7 +41,9 @@ const normalizeWhatsappPhone = (value: string | null | undefined) => {
 
 export function HandoffCta({
   isBoxed = false,
-  runtime,
+  advisor,
+  leadName,
+  handoff,
   headline,
   buttonPrefix,
   redirectText,
@@ -42,13 +51,7 @@ export function HandoffCta({
   autoRedirectSeconds = 5,
   buttonColor,
 }: HandoffCtaProps) {
-  const context = useSubmissionContext(runtime.publication.id, runtime);
   const redirectStartedRef = useRef(false);
-  const runtimeData = runtime as any;
-  const advisor = useMemo(
-    () => runtimeData?.advisor ?? context?.advisor ?? null,
-    [context, runtimeData],
-  );
   const [countdown, setCountdown] = useState(
     Math.max(1, Math.floor(autoRedirectSeconds)),
   );
@@ -56,49 +59,37 @@ export function HandoffCta({
   const renderText = useCallback(
     (rawText: string | undefined, seconds = countdown) => {
       if (!rawText) return "";
-      const leadName =
-        context?.leadSnapshot?.fullName?.trim() || "un nuevo lead";
       return rawText
         .replace(/\{\{\s*advisorName\s*\}\}/g, advisor?.name || "")
-        .replace(/\{\{\s*leadName\s*\}\}/g, leadName)
+        .replace(/\{\{\s*leadName\s*\}\}/g, leadName?.trim() || "un nuevo lead")
         .replace(/\{\{\s*seconds\s*\}\}/g, String(seconds));
     },
-    [advisor?.name, context?.leadSnapshot?.fullName, countdown],
+    [advisor?.name, leadName, countdown],
   );
 
   const dynamicWhatsappUrl = useMemo(() => {
-    const messageTemplate =
-      whatsappText ||
-      runtimeData?.handoff?.whatsappMessage ||
-      DEFAULT_WHATSAPP_TEXT;
-    const phone = normalizeWhatsappPhone(
-      advisor?.phone ?? runtimeData?.handoff?.whatsappPhone,
-    );
-    const leadName = context?.leadSnapshot?.fullName?.trim() || "un nuevo lead";
+    const messageTemplate = whatsappText || handoff.whatsappMessage || DEFAULT_WHATSAPP_TEXT;
+    const phone = normalizeWhatsappPhone(handoff.whatsappPhone ?? advisor?.phone);
+    const resolvedLeadName = leadName?.trim() || "un nuevo lead";
     const message = messageTemplate
       .replace(/\{\{\s*advisorName\s*\}\}/g, advisor?.name || "")
-      .replace(/\{\{\s*leadName\s*\}\}/g, leadName)
+      .replace(/\{\{\s*leadName\s*\}\}/g, resolvedLeadName)
       .trim();
 
     if (!phone) {
-      return (
-        context?.handoff?.whatsappUrl ??
-        runtimeData?.handoff?.whatsappUrl ??
-        null
-      );
+      return handoff.whatsappUrl ?? null;
     }
 
     return message
       ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
       : `https://wa.me/${phone}`;
   }, [
-    advisor?.phone,
-    context?.handoff?.whatsappUrl,
-    context?.leadSnapshot?.fullName,
     advisor?.name,
-    runtimeData?.handoff?.whatsappMessage,
-    runtimeData?.handoff?.whatsappPhone,
-    runtimeData?.handoff?.whatsappUrl,
+    advisor?.phone,
+    handoff.whatsappMessage,
+    handoff.whatsappPhone,
+    handoff.whatsappUrl,
+    leadName,
     whatsappText,
   ]);
 
