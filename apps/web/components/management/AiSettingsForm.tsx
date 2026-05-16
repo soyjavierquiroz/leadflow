@@ -237,10 +237,10 @@ const kloserCadenceOptions = [
 ] as const;
 
 const kloserCtaTypeOptions = [
-  { value: "watch_video", label: "watch_video" },
-  { value: "book_call", label: "book_call" },
-  { value: "visit_page", label: "visit_page" },
-  { value: "custom", label: "custom" },
+  { value: "watch_video", label: "Ver video" },
+  { value: "book_call", label: "Agendar llamada" },
+  { value: "visit_page", label: "Visitar página / Carta de ventas" },
+  { value: "custom", label: "Otro (Personalizado)" },
 ] as const;
 
 const defaultKloserSettings: KloserSettings = {
