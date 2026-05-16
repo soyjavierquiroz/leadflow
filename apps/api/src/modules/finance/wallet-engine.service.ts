@@ -96,7 +96,7 @@ type WalletEngineExceptionResponse = {
 };
 
 const PLATFORM_KEY = 'leadflow';
-const KREDIT_PLATFORM_KEY = 'kurukin';
+const KREDIT_PLATFORM_KEY = PLATFORM_KEY;
 const KREDIT_PRODUCT_KEY = 'leadflow';
 const TEAM_PRODUCT_KEY = 'ads_wheel';
 const UNIT_CODE = 'USD';
@@ -286,7 +286,7 @@ export class WalletEngineService {
     const normalizedAccountId = this.requireText(accountId, 'accountId');
 
     return await this.get<WalletEngineBalance>(
-      `/wallets/${encodeURIComponent(normalizedAccountId)}/balance`,
+      this.buildBalancePath(normalizedAccountId, TEAM_PRODUCT_KEY),
     );
   }
 
@@ -314,7 +314,7 @@ export class WalletEngineService {
   async getSponsorKredits(accountId: string): Promise<string> {
     const normalizedAccountId = this.requireText(accountId, 'accountId');
     const response = await this.get<WalletEngineBalanceResponse>(
-      `/wallets/${encodeURIComponent(normalizedAccountId)}/balance`,
+      this.buildBalancePath(normalizedAccountId, KREDIT_PRODUCT_KEY),
     );
     const balances = this.toBalanceList(response);
     const kredietBalance = balances.find(
@@ -488,6 +488,15 @@ export class WalletEngineService {
 
   private buildUrl(path: string) {
     return `${this.internalUrl}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
+  private buildBalancePath(accountId: string, productKey: string) {
+    const query = new URLSearchParams({
+      platform_key: PLATFORM_KEY,
+      product_key: productKey,
+    });
+
+    return `/wallets/${encodeURIComponent(accountId)}/balance?${query.toString()}`;
   }
 
   private readAccountId(response: WalletEngineAccountUpsertResponse) {

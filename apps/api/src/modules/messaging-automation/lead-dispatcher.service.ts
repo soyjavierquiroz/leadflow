@@ -1,7 +1,13 @@
 import { randomUUID } from 'crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  resolveKloserRuntimeAttributes,
+  resolveKloserTenantConfig,
+} from '../ai-config/kloser-tenant-config';
+import type { KloserTenantConfig } from '../ai-config/ai-config.types';
+import { KloserApiClient } from '../kloser/kloser-api.client';
 import { normalizeMessagingPhone } from '../shared/messaging-channel.utils';
 import type { LeadContextUpsertPayload } from './lead-dispatcher.types';
 import {
@@ -18,8 +24,35 @@ const DISPATCH_TIMEOUT_MS = 2_500;
 const LEAD_DISPATCHER_SOURCE_VERSION = '1.0.0' as const;
 const DEFAULT_N8N_DISPATCHER_INTERNAL_BASE =
   'http://n8n_v2_webhook:5678/webhook';
+const DEFAULT_KLOSER_TIMEZONE = 'America/La_Paz';
 
 const assignmentLeadContextInclude = {
+  workspace: {
+    select: {
+      timezone: true,
+    },
+  },
+  team: {
+    select: {
+      id: true,
+      code: true,
+      aiAgentConfigs: {
+        where: {
+          memberId: null,
+          isActive: true,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 1,
+        select: {
+          aiPolicy: true,
+          ctaPolicy: true,
+          routeContexts: true,
+        },
+      },
+    },
+  },
   lead: true,
   sponsor: {
     include: {
@@ -79,6 +112,40 @@ type DispatchResponse = {
   data: unknown;
 };
 
+type KloserMissionPayload = {
+  event_id: string;
+  event_type: 'mission.created';
+  tenant_id: string;
+  lead_id: string;
+  remote_jid: string;
+  channel: 'whatsapp';
+  idempotency_key: string;
+  due_at: string;
+  timezone: string;
+  strategy: KloserTenantConfig['strategy'];
+  compliance_policy: KloserTenantConfig['compliance_policy'] & {
+    is_opted_out: false;
+    stage_allows_automation: true;
+    human_takeover: false;
+  };
+  cta_policy: KloserTenantConfig['cta_policy'];
+  message_policy: KloserTenantConfig['message_policy'];
+  context_snapshot: {
+    lead_stage: string;
+    source: 'leadflow_core';
+    custom_attributes: {
+      vertical: string;
+      app_key: 'leadflow';
+      wallet_account_id: string | null;
+      push_name: string;
+    };
+  };
+  observability: {
+    source_system: 'leadflow';
+    service_owner_key: 'lead-handler';
+  };
+};
+
 @Injectable()
 export class LeadDispatcherService {
   private readonly logger = new Logger(LeadDispatcherService.name);
@@ -95,6 +162,7 @@ export class LeadDispatcherService {
 
   constructor(
     private readonly prisma: PrismaService,
+    @Optional() private readonly kloserApiClient?: KloserApiClient,
   ) {
     this.logger.log(
       `Dispatcher URL resolved to internal route: configured=${this.configuredDispatcherWebhookUrl} effective=${this.dispatcherWebhookUrl}`,
@@ -130,7 +198,11 @@ export class LeadDispatcherService {
     const eventId = randomUUID();
     const payload = this.buildPayload(assignment, eventId);
 
-    return await this.postWithRetry(payload);
+    const response = await this.postWithRetry(payload);
+
+    await this.createKloserMission(assignment, payload);
+
+    return response;
   }
 
   private buildPayload(
@@ -247,6 +319,90 @@ export class LeadDispatcherService {
     throw (
       lastError ?? new Error('Lead dispatcher failed without a reported error.')
     );
+  }
+
+  private async createKloserMission(
+    assignment: AssignmentLeadContextRecord,
+    payload: LeadContextUpsertPayload,
+  ) {
+    if (!this.kloserApiClient) {
+      return;
+    }
+
+    const missionPayload = this.buildKloserMissionPayload(assignment, payload);
+
+    try {
+      await this.kloserApiClient.createMission(missionPayload);
+    } catch (error) {
+      this.logger.error(
+        `Kloser mission creation failed after dispatcher success. leadId=${assignment.lead.id} assignmentId=${assignment.id} message=${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+  }
+
+  private buildKloserMissionPayload(
+    assignment: AssignmentLeadContextRecord,
+    payload: LeadContextUpsertPayload,
+  ): KloserMissionPayload {
+    const tenantConfigRecord = assignment.team.aiAgentConfigs[0] ?? null;
+    const tenantConfig = {
+      kloser: resolveKloserTenantConfig({
+        aiPolicy: tenantConfigRecord?.aiPolicy,
+        ctaPolicy: tenantConfigRecord?.ctaPolicy,
+      }),
+      ...resolveKloserRuntimeAttributes({
+        aiPolicy: tenantConfigRecord?.aiPolicy,
+        routeContexts: tenantConfigRecord?.routeContexts,
+        verticalFallback: toVerticalHint(assignment),
+      }),
+    };
+    const firstDelayMinutes =
+      tenantConfig.kloser.strategy.cadence_minutes[0] || 1440;
+    const idempotencyKey = `lf_strat_${tenantConfig.kloser.strategy.id}_lead_${assignment.lead.id}`;
+    const eventId = `lf_evt_${randomUUID()}`;
+    const dueAt = new Date(
+      Date.now() + firstDelayMinutes * 60_000,
+    ).toISOString();
+
+    return {
+      event_id: eventId,
+      event_type: 'mission.created',
+      tenant_id: assignment.teamId,
+      lead_id: assignment.lead.id,
+      remote_jid: payload.routing.remote_jid,
+      channel: 'whatsapp',
+      idempotency_key: idempotencyKey,
+      due_at: dueAt,
+      timezone:
+        sanitizeNullableText(assignment.workspace.timezone) ??
+        DEFAULT_KLOSER_TIMEZONE,
+      strategy: tenantConfig.kloser.strategy,
+      compliance_policy: {
+        ...tenantConfig.kloser.compliance_policy,
+        is_opted_out: false,
+        stage_allows_automation: true,
+        human_takeover: false,
+      },
+      cta_policy: tenantConfig.kloser.cta_policy,
+      message_policy: tenantConfig.kloser.message_policy,
+      context_snapshot: {
+        lead_stage: assignment.lead.status || 'prospect',
+        source: 'leadflow_core',
+        custom_attributes: {
+          vertical: tenantConfig.vertical || 'multinivel',
+          app_key: 'leadflow',
+          wallet_account_id: tenantConfig.wallet_account_id,
+          push_name:
+            sanitizeNullableText(assignment.lead.fullName) ?? 'Prospecto',
+        },
+      },
+      observability: {
+        source_system: 'leadflow',
+        service_owner_key: 'lead-handler',
+      },
+    };
   }
 
   private async dispatchOnce(payload: LeadContextUpsertPayload) {

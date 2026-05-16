@@ -167,7 +167,9 @@ Contrato aplicado por `EvolutionModule`:
 - `channel = whatsapp`
 - `service_owner_key = lead-handler`
 - `source_system = leadflow`
-- `vertical_key = user.team.vertical || "unknown"`
+- `vertical_key = user.team.vertical || "multinivel"`
+- `brand_key = user.team.code || "leadflow"`
+- `business_model_type = "multinivel"`
 
 Autenticación interna usada por la API:
 

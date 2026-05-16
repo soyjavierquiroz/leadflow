@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
+import { KloserModule } from '../kloser/kloser.module';
 import { LeadDispatcherService } from './lead-dispatcher.service';
 import { MessagingAutomationController } from './messaging-automation.controller';
 import { N8nAutomationClient } from './n8n-automation.client';
 import { MessagingAutomationService } from './messaging-automation.service';
 
 @Module({
+  imports: [KloserModule],
   controllers: [MessagingAutomationController],
   providers: [
     MessagingAutomationService,

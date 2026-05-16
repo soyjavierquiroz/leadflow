@@ -1,10 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import {
-  normalizeBaseUrl,
-  sanitizeNullableText,
-} from '../shared/url.utils';
+import { normalizeBaseUrl, sanitizeNullableText } from '../shared/url.utils';
+import { resolveAiRuntimeRoutingMetadata } from '../ai-config/ai-config.defaults';
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const RUNTIME_CONTEXT_CONFIG_SYNC_PATH = '/v1/config/sync';
@@ -45,7 +43,9 @@ const cloneJsonValue = (value: Prisma.JsonValue): Prisma.JsonValue => {
   return value;
 };
 
-const toJsonRecord = (value: Prisma.JsonValue | null | undefined): JsonRecord =>
+const toJsonRecord = (
+  value: Prisma.JsonValue | null | undefined,
+): JsonRecord =>
   isJsonRecord(value) ? (cloneJsonValue(value) as JsonRecord) : {};
 
 @Injectable()
@@ -84,6 +84,11 @@ export class RuntimeContextConfigSyncService {
             teamId: input.tenantId,
           },
           include: {
+            team: {
+              select: {
+                code: true,
+              },
+            },
             publications: {
               where: {
                 teamId: input.tenantId,
@@ -139,6 +144,12 @@ export class RuntimeContextConfigSyncService {
       const routeContexts = toJsonRecord(
         tenantConfig.routeContexts as Prisma.JsonValue,
       );
+      const aiPolicy = toJsonRecord(tenantConfig.aiPolicy as Prisma.JsonValue);
+      const routingMetadata = resolveAiRuntimeRoutingMetadata({
+        tenantCode: funnelInstance.team.code,
+        routeContexts,
+        aiPolicy,
+      });
       const funnelContext = {
         funnel_instance_id: funnelInstance.id,
         funnel_name: funnelInstance.name,
@@ -163,10 +174,13 @@ export class RuntimeContextConfigSyncService {
         tenant_id: input.tenantId,
         member_id: memberId,
         base_prompt: tenantConfig.basePrompt,
+        vertical_key: routingMetadata.vertical_key,
+        brand_key: routingMetadata.brand_key,
+        business_model_type: routingMetadata.business_model_type,
         route_contexts: routeContexts,
         funnel_context: funnelContext,
         cta_policy: toJsonRecord(tenantConfig.ctaPolicy as Prisma.JsonValue),
-        ai_policy: toJsonRecord(tenantConfig.aiPolicy as Prisma.JsonValue),
+        ai_policy: aiPolicy,
         status: tenantConfig.isActive ? 'active' : 'inactive',
       });
 
@@ -190,6 +204,9 @@ export class RuntimeContextConfigSyncService {
     tenant_id: string;
     member_id: string | null;
     base_prompt: string;
+    vertical_key: string;
+    brand_key: string;
+    business_model_type: string;
     route_contexts: JsonRecord;
     funnel_context: JsonRecord;
     cta_policy: JsonRecord;

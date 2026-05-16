@@ -11,6 +11,8 @@ describe('AiConfigService', () => {
       },
       aiAgentConfig: {
         findFirst: jest.fn(),
+        update: jest.fn(),
+        create: jest.fn(),
       },
       sponsor: {
         findFirst: jest.fn(),
@@ -34,6 +36,82 @@ describe('AiConfigService', () => {
       ),
     };
   };
+
+  it('creates tenant default AI config with multinivel runtime metadata', async () => {
+    const { prisma, service } = buildService();
+
+    prisma.aiAgentConfig.findFirst.mockResolvedValue(null);
+    prisma.aiAgentConfig.create.mockResolvedValue({
+      id: 'tenant-config-1',
+    });
+
+    await service.ensureTenantDefaultConfig({
+      tenantId: 'team-1',
+      brandKey: 'immunotec',
+    });
+
+    expect(prisma.aiAgentConfig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: 'team-1',
+        memberId: null,
+        isActive: true,
+        aiPolicy: expect.objectContaining({
+          vertical_key: 'multinivel',
+          brand_key: 'immunotec',
+          business_model_type: 'multinivel',
+          kloser: expect.objectContaining({
+            strategy: expect.objectContaining({
+              version: '2.2',
+              enabled: true,
+            }),
+          }),
+        }),
+      }),
+    });
+  });
+
+  it('repairs unknown tenant runtime metadata without clobbering the config', async () => {
+    const { prisma, service } = buildService();
+
+    prisma.aiAgentConfig.findFirst.mockResolvedValue({
+      id: 'tenant-config-1',
+      aiPolicy: {
+        vertical_key: 'unknown',
+        brand_key: 'unknown',
+        business_model_type: 'unknown',
+        model: 'gpt-4o-mini',
+      },
+    });
+    prisma.aiAgentConfig.update.mockResolvedValue({
+      id: 'tenant-config-1',
+    });
+
+    await service.ensureTenantDefaultConfig({
+      tenantId: 'team-1',
+      brandKey: 'immunotec',
+    });
+
+    expect(prisma.aiAgentConfig.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tenant-config-1',
+      },
+      data: {
+        aiPolicy: expect.objectContaining({
+          vertical_key: 'multinivel',
+          brand_key: 'immunotec',
+          business_model_type: 'multinivel',
+          model: 'gpt-4o-mini',
+          kloser: expect.objectContaining({
+            strategy: expect.objectContaining({
+              version: '2.2',
+              enabled: true,
+            }),
+          }),
+        }),
+        isActive: true,
+      },
+    });
+  });
 
   it('prefers member overrides, merges JSON policies, replaces placeholders and enriches the wallet context', async () => {
     const { prisma, walletEngineService, service } = buildService();
@@ -454,7 +532,9 @@ describe('AiConfigService', () => {
       status: 200,
       text: jest
         .fn()
-        .mockResolvedValue(JSON.stringify({ ok: true, execution_id: 'exec-1' })),
+        .mockResolvedValue(
+          JSON.stringify({ ok: true, execution_id: 'exec-1' }),
+        ),
     });
 
     try {
@@ -547,7 +627,9 @@ describe('AiConfigService', () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      text: jest.fn().mockResolvedValue(JSON.stringify({ ok: true, closed: true })),
+      text: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ ok: true, closed: true })),
     });
 
     try {

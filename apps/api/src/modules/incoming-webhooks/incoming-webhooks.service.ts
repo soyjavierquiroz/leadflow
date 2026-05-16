@@ -3,11 +3,13 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  Optional,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { MessagingConnectionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { KloserApiClient } from '../kloser/kloser-api.client';
 import {
   normalizeMessagingPhone,
   resolveMessagingConnectionStatus,
@@ -47,6 +49,12 @@ const toDateOrNull = (value: string | null | undefined) => {
 
   const parsed = new Date(value);
   return Number.isNaN(parsed.valueOf()) ? null : parsed;
+};
+
+const toWhatsappRemoteJid = (phone: string | null | undefined) => {
+  const normalizedPhone = normalizeMessagingPhone(phone ?? null);
+
+  return normalizedPhone ? `${normalizedPhone}@s.whatsapp.net` : null;
 };
 
 const extractConnectionWebhookPayload = (input: {
@@ -103,7 +111,10 @@ export class IncomingWebhooksService {
   private readonly incomingWebhookSecret =
     process.env.INCOMING_MESSAGING_WEBHOOK_SECRET?.trim() || null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly kloserApiClient?: KloserApiClient,
+  ) {}
 
   async ingestMessagingConnection(
     headers: Record<string, string | string[] | undefined>,
@@ -350,7 +361,9 @@ export class IncomingWebhooksService {
       null;
     const messageText = extractInboundMessageText(payload);
     const keyword = detectOptOutKeyword(messageText);
-    const senderPhone = normalizeMessagingPhone(extractInboundMessagePhone(payload));
+    const senderPhone = normalizeMessagingPhone(
+      extractInboundMessagePhone(payload),
+    );
 
     const leadContext = await this.resolveLeadContext({
       leadId,
@@ -371,6 +384,15 @@ export class IncomingWebhooksService {
         reason: 'lead_context_not_found',
         keyword,
       };
+    }
+
+    if (messageText) {
+      this.fireKloserHardKill({
+        leadContext,
+        senderPhone,
+        keyword,
+        externalEventId,
+      });
     }
 
     if (!keyword) {
@@ -448,6 +470,39 @@ export class IncomingWebhooksService {
     } as Prisma.InputJsonValue;
   }
 
+  private fireKloserHardKill(input: {
+    leadContext: {
+      teamId: string;
+      strategyId: string;
+      leadPhone: string | null;
+    };
+    senderPhone: string | null;
+    keyword: string | null;
+    externalEventId: string | null;
+  }) {
+    if (!this.kloserApiClient) {
+      return;
+    }
+
+    const remoteJid =
+      toWhatsappRemoteJid(input.senderPhone) ??
+      toWhatsappRemoteJid(input.leadContext.leadPhone);
+
+    if (!remoteJid) {
+      this.logger.warn(
+        `Skipping Kloser hard kill because remote_jid could not be resolved. externalEventId=${input.externalEventId ?? 'n/a'}`,
+      );
+      return;
+    }
+
+    void this.kloserApiClient.cancelMission(
+      input.leadContext.teamId,
+      remoteJid,
+      input.leadContext.strategyId,
+      input.keyword ? `lead_inbound_${input.keyword}` : 'lead_inbound_message',
+    );
+  }
+
   private async resolveLeadContext(input: {
     leadId: string | null;
     assignmentId: string | null;
@@ -461,17 +516,33 @@ export class IncomingWebhooksService {
           id: input.leadId,
         },
         include: {
-          currentAssignment: true,
+          currentAssignment: {
+            include: {
+              funnelInstance: {
+                select: {
+                  handoffStrategyId: true,
+                },
+              },
+              funnelPublication: {
+                select: {
+                  handoffStrategyId: true,
+                },
+              },
+            },
+          },
         },
       });
 
       if (lead?.currentAssignment) {
+        const assignment = lead.currentAssignment;
+
         return {
           workspaceId: lead.workspaceId,
-          teamId: lead.currentAssignment.teamId,
-          sponsorId: lead.currentAssignment.sponsorId,
+          teamId: assignment.teamId,
+          sponsorId: assignment.sponsorId,
           leadId: lead.id,
           leadPhone: lead.phone,
+          strategyId: this.resolveKloserStrategyId(assignment),
         };
       }
     }
@@ -483,6 +554,16 @@ export class IncomingWebhooksService {
         },
         include: {
           lead: true,
+          funnelInstance: {
+            select: {
+              handoffStrategyId: true,
+            },
+          },
+          funnelPublication: {
+            select: {
+              handoffStrategyId: true,
+            },
+          },
         },
       });
 
@@ -493,6 +574,7 @@ export class IncomingWebhooksService {
           sponsorId: assignment.sponsorId,
           leadId: assignment.leadId,
           leadPhone: assignment.lead.phone,
+          strategyId: this.resolveKloserStrategyId(assignment),
         };
       }
     }
@@ -544,7 +626,20 @@ export class IncomingWebhooksService {
           : {}),
       },
       include: {
-        currentAssignment: true,
+        currentAssignment: {
+          include: {
+            funnelInstance: {
+              select: {
+                handoffStrategyId: true,
+              },
+            },
+            funnelPublication: {
+              select: {
+                handoffStrategyId: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         updatedAt: 'desc',
@@ -561,6 +656,23 @@ export class IncomingWebhooksService {
       sponsorId: lead.currentAssignment.sponsorId,
       leadId: lead.id,
       leadPhone: lead.phone,
+      strategyId: this.resolveKloserStrategyId(lead.currentAssignment),
     };
+  }
+
+  private resolveKloserStrategyId(assignment: {
+    funnelPublication?: { handoffStrategyId: string | null } | null;
+    funnelInstance?: { handoffStrategyId: string | null } | null;
+    funnelPublicationId?: string | null;
+    funnelInstanceId?: string | null;
+    funnelId: string;
+  }) {
+    return (
+      assignment.funnelPublication?.handoffStrategyId ??
+      assignment.funnelInstance?.handoffStrategyId ??
+      assignment.funnelPublicationId ??
+      assignment.funnelInstanceId ??
+      assignment.funnelId
+    );
   }
 }

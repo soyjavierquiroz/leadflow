@@ -31,6 +31,9 @@ describe('AiConfigController', () => {
         id: 'team-1',
         name: 'Freddy Team',
         code: 'immunotec',
+        vertical_key: 'multinivel',
+        brand_key: 'immunotec',
+        business_model_type: 'multinivel',
       },
       member: {
         id: 'sponsor-1',
@@ -81,9 +84,11 @@ describe('AiConfigController', () => {
     ).resolves.toEqual({
       tenant_id: 'team-1',
       app_key: 'leadflow_api',
-      platform_key: 'kurukin',
+      platform_key: 'leadflow',
       product_key: 'leadflow',
-      vertical_key: 'immunotec',
+      vertical_key: 'multinivel',
+      brand_key: 'immunotec',
+      business_model_type: 'multinivel',
       service_owner_key: 'lead-handler',
       wallet_subject: {
         type: 'sponsor',
@@ -98,6 +103,9 @@ describe('AiConfigController', () => {
           id: 'team-1',
           name: 'Freddy Team',
           code: 'immunotec',
+          vertical_key: 'multinivel',
+          brand_key: 'immunotec',
+          business_model_type: 'multinivel',
         },
         ai_agent: {
           base_prompt: 'Prompt final',
@@ -181,20 +189,19 @@ describe('AiConfigController', () => {
       },
     });
 
-    expect(aiConfigService.initOrchestrationSessionForUser).toHaveBeenCalledWith(
-      user,
-      {
-        instanceName: 'drenvexman',
-        teamId: 'team-1',
-        funnelId: 'funnel-1',
-        funnelContext: {
-          blocks: [],
-        },
-        metadata: {
-          source: 'unit-test',
-        },
+    expect(
+      aiConfigService.initOrchestrationSessionForUser,
+    ).toHaveBeenCalledWith(user, {
+      instanceName: 'drenvexman',
+      teamId: 'team-1',
+      funnelId: 'funnel-1',
+      funnelContext: {
+        blocks: [],
       },
-    );
+      metadata: {
+        source: 'unit-test',
+      },
+    });
   });
 
   it('forwards execute requests with sessionId and prompt only', async () => {
@@ -292,13 +299,12 @@ describe('AiConfigController', () => {
       },
     });
 
-    expect(aiConfigService.closeOrchestrationSessionForUser).toHaveBeenCalledWith(
-      user,
-      {
-        instanceName: 'drenvexman',
-        teamId: 'team-1',
-        sessionId: 'drenvexman-funnel-1',
-      },
-    );
+    expect(
+      aiConfigService.closeOrchestrationSessionForUser,
+    ).toHaveBeenCalledWith(user, {
+      instanceName: 'drenvexman',
+      teamId: 'team-1',
+      sessionId: 'drenvexman-funnel-1',
+    });
   });
 });

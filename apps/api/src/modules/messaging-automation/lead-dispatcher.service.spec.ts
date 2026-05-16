@@ -4,8 +4,59 @@ describe('LeadDispatcherService', () => {
   const fixedNow = '2026-03-30T12:00:00.000Z';
   const mockAssignment = {
     id: 'assign_test_ana_001',
+    teamId: 'team_test_001',
+    workspace: {
+      timezone: 'America/La_Paz',
+    },
+    team: {
+      id: 'team_test_001',
+      code: 'inmuno-team',
+      aiAgentConfigs: [
+        {
+          routeContexts: {
+            vertical: 'salud',
+          },
+          ctaPolicy: null,
+          aiPolicy: {
+            wallet_account_id: 'wallet_tenant_001',
+            kloser: {
+              strategy: {
+                id: 'inmuno_follow_up',
+                version: '2.2',
+                enabled: true,
+                max_attempts: 4,
+                cadence_minutes: [30, 1440],
+              },
+              compliance_policy: {
+                has_whatsapp_opt_in: true,
+                quiet_hours: {
+                  start: '22:00',
+                  end: '07:00',
+                },
+              },
+              cta_policy: {
+                type: 'checkout_link',
+                required: true,
+                shortener: 'kuruk',
+                allowed_domains: ['retodetransformacion.com'],
+              },
+              message_policy: {
+                template_id: 'inmuno_follow_up_v2',
+                language: 'es-MX',
+                variables: {
+                  advisor: 'Ana',
+                },
+                max_length: 800,
+                requires_personalization: true,
+              },
+            },
+          },
+        },
+      ],
+    },
     lead: {
       id: 'lead_test_001',
+      status: 'captured',
       fullName: 'Carlos Mendoza',
       phone: '+52 55 1234 5678',
       email: 'carlos.mendoza@example.com',
@@ -117,6 +168,80 @@ describe('LeadDispatcherService', () => {
           is_owned_lead: false,
         },
         notes: '',
+      },
+    });
+  });
+
+  it('builds the Kloser mission payload v2.2 from tenant config and lead identity', () => {
+    const service = new LeadDispatcherService({} as never);
+    const dispatcherPayload = buildPayload(
+      service,
+      'evt_test_lead_context_seed',
+    );
+    const missionPayload = (
+      service as unknown as {
+        buildKloserMissionPayload: (
+          assignment: typeof mockAssignment,
+          payload: typeof dispatcherPayload,
+        ) => unknown;
+      }
+    ).buildKloserMissionPayload(mockAssignment, dispatcherPayload);
+
+    expect(missionPayload).toEqual({
+      event_id: expect.stringMatching(/^lf_evt_/),
+      event_type: 'mission.created',
+      tenant_id: 'team_test_001',
+      lead_id: 'lead_test_001',
+      remote_jid: '525512345678@s.whatsapp.net',
+      channel: 'whatsapp',
+      idempotency_key: 'lf_strat_inmuno_follow_up_lead_lead_test_001',
+      due_at: '2026-03-30T12:30:00.000Z',
+      timezone: 'America/La_Paz',
+      strategy: {
+        id: 'inmuno_follow_up',
+        version: '2.2',
+        enabled: true,
+        max_attempts: 4,
+        cadence_minutes: [30, 1440],
+      },
+      compliance_policy: {
+        has_whatsapp_opt_in: true,
+        quiet_hours: {
+          start: '22:00',
+          end: '07:00',
+        },
+        is_opted_out: false,
+        stage_allows_automation: true,
+        human_takeover: false,
+      },
+      cta_policy: {
+        type: 'checkout_link',
+        required: true,
+        shortener: 'kuruk',
+        allowed_domains: ['retodetransformacion.com'],
+      },
+      message_policy: {
+        template_id: 'inmuno_follow_up_v2',
+        language: 'es-MX',
+        variables: {
+          advisor: 'Ana',
+        },
+        max_length: 800,
+        requires_personalization: true,
+      },
+      context_snapshot: {
+        lead_stage: 'captured',
+        source: 'leadflow_core',
+        custom_attributes: {
+          vertical: 'salud',
+          app_key: 'leadflow',
+          wallet_account_id: 'wallet_tenant_001',
+          push_name: 'Carlos Mendoza',
+        },
+      },
+      observability: {
+        source_system: 'leadflow',
+        service_owner_key: 'lead-handler',
       },
     });
   });

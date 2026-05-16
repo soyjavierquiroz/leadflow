@@ -16,6 +16,7 @@ import { HandoffStrategiesModule } from '../handoff-strategies/handoff-strategie
 import { HybridFunnelPublicationsModule } from '../hybrid-funnel-publications/hybrid-funnel-publications.module';
 import { IncomingWebhooksModule } from '../incoming-webhooks/incoming-webhooks.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { KloserModule } from '../kloser/kloser.module';
 import { LeadsModule } from '../leads/leads.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
@@ -51,6 +52,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     HybridFunnelPublicationsModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
+    KloserModule,
     KnowledgeModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
@@ -83,6 +85,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     HybridFunnelPublicationsModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
+    KloserModule,
     KnowledgeModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,

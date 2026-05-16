@@ -16,14 +16,19 @@ describe('TeamMembersService', () => {
       upsertSponsorAccount: jest.fn(),
     } as unknown as WalletEngineService;
     const mailerService = {} as MailerService;
+    const aiConfigService = {
+      ensureTenantDefaultConfig: jest.fn(),
+    };
 
     return {
       prisma,
       walletEngineService,
+      aiConfigService,
       service: new TeamMembersService(
         prisma,
         walletEngineService,
         mailerService,
+        aiConfigService as never,
       ),
     };
   };
@@ -36,6 +41,9 @@ describe('TeamMembersService', () => {
     };
     const memberRecord = {
       id: 'admin-1',
+      workspaceId: scope.workspaceId,
+      teamId: scope.teamId,
+      sponsorId: 'sponsor-1',
       email: 'freddy@example.com',
       fullName: 'Freddy',
       role: UserRole.TEAM_ADMIN,

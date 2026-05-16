@@ -220,7 +220,7 @@ Secuencia operativa actual:
 
 1. Leadflow crea o reutiliza la instancia en Evolution y configura el webhook inbound.
 2. La conexión se marca en base como `PROVISIONED`.
-3. Leadflow registra o actualiza automáticamente el binding en Runtime Context Central vía `POST /v1/admin/channel-bindings/upsert`, usando `provider=evolution`, `channel=whatsapp`, `instance_name`, `tenant_id`, `service_owner_key=lead-handler`, `source_system=leadflow` y `vertical_key`.
+3. Leadflow registra o actualiza automáticamente el binding en Runtime Context Central vía `POST /v1/admin/channel-bindings/upsert`, usando `provider=evolution`, `channel=whatsapp`, `instance_name`, `tenant_id`, `service_owner_key=lead-handler`, `source_system=leadflow`, `vertical_key`, `brand_key` y `business_model_type`.
 4. La conexión pasa a `REGISTERED`.
 5. Leadflow hace polling de verificación contra `resolve-full` hasta que Runtime Context Central devuelve `200`.
 6. La conexión pasa a `READY`.

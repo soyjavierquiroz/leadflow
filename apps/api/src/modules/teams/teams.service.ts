@@ -18,6 +18,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { mapFunnelRecord } from '../../prisma/prisma.mappers';
 import { AdWheelSequenceGeneratorService } from '../ad-wheels/ad-wheel-sequence-generator.service';
+import { AiConfigService } from '../ai-config/ai-config.service';
 import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { BlueprintService } from '../funnels/blueprint.service';
@@ -207,6 +208,7 @@ export class TeamsService {
     private readonly mailService: MailService,
     private readonly adWheelSequenceGeneratorService: AdWheelSequenceGeneratorService,
     private readonly runtimeContextConfigSyncService: RuntimeContextConfigSyncService,
+    private readonly aiConfigService: AiConfigService,
     @Optional()
     @Inject(TEAM_REPOSITORY)
     private readonly repository?: TeamRepository,
@@ -634,8 +636,9 @@ export class TeamsService {
         (funnelInstance?.settingsJson as JsonValue) ?? {},
       ),
       steps:
-        funnelInstance?.steps.map((step) => this.mapSystemTenantFunnelStep(step)) ??
-        [],
+        funnelInstance?.steps.map((step) =>
+          this.mapSystemTenantFunnelStep(step),
+        ) ?? [],
     };
   }
 
@@ -671,7 +674,9 @@ export class TeamsService {
           description: existing.description,
           code,
           thumbnailUrl: existing.thumbnailUrl,
-          config: toInputJson(this.cloneJsonValue(existing.config as JsonValue)),
+          config: toInputJson(
+            this.cloneJsonValue(existing.config as JsonValue),
+          ),
           status: existing.status,
           isTemplate: false,
           stages: [...existing.stages],
@@ -694,7 +699,9 @@ export class TeamsService {
             status: sourceInstance.status,
             structuralType: sourceInstance.structuralType,
             conversionContract: toInputJson(
-              this.cloneJsonValue(sourceInstance.conversionContract as JsonValue),
+              this.cloneJsonValue(
+                sourceInstance.conversionContract as JsonValue,
+              ),
             ),
             rotationPoolId: sourceInstance.rotationPoolId,
             trackingProfileId: sourceInstance.trackingProfileId,
@@ -719,8 +726,12 @@ export class TeamsService {
               position: step.position,
               isEntryStep: step.isEntryStep,
               isConversionStep: step.isConversionStep,
-              blocksJson: toInputJson(this.cloneJsonValue(step.blocksJson as JsonValue)),
-              mediaMap: toInputJson(this.cloneJsonValue(step.mediaMap as JsonValue)),
+              blocksJson: toInputJson(
+                this.cloneJsonValue(step.blocksJson as JsonValue),
+              ),
+              mediaMap: toInputJson(
+                this.cloneJsonValue(step.mediaMap as JsonValue),
+              ),
               settingsJson: toInputJson(
                 this.cloneJsonValue(step.settingsJson as JsonValue),
               ),
@@ -756,8 +767,7 @@ export class TeamsService {
     if (!existing) {
       throw new NotFoundException({
         code: 'TENANT_FUNNEL_NOT_FOUND',
-        message:
-          'The requested funnel was not found for the selected tenant.',
+        message: 'The requested funnel was not found for the selected tenant.',
       });
     }
 
@@ -858,8 +868,7 @@ export class TeamsService {
     if (!existing) {
       throw new NotFoundException({
         code: 'TENANT_FUNNEL_NOT_FOUND',
-        message:
-          'The requested funnel was not found for the selected tenant.',
+        message: 'The requested funnel was not found for the selected tenant.',
       });
     }
 
@@ -1197,7 +1206,9 @@ export class TeamsService {
       });
     }
 
-    return step.history.map((entry) => this.mapSystemTenantFunnelStepHistory(entry));
+    return step.history.map((entry) =>
+      this.mapSystemTenantFunnelStepHistory(entry),
+    );
   }
 
   async createSystemTenant(dto: CreateSystemTenantDto) {
@@ -1391,7 +1402,10 @@ export class TeamsService {
     const normalizedTeamCode =
       slugify(
         sanitizeRequiredText(
-          dto.teamCode ?? dto.workspaceSlug ?? dto.teamName ?? dto.workspaceName,
+          dto.teamCode ??
+            dto.workspaceSlug ??
+            dto.teamName ??
+            dto.workspaceName,
           'teamCode',
         ),
       ) || null;
@@ -1661,6 +1675,14 @@ export class TeamsService {
           },
         });
 
+        await this.aiConfigService.ensureTenantDefaultConfig(
+          {
+            tenantId: linkedTeam.id,
+            brandKey: linkedTeam.code,
+          },
+          tx,
+        );
+
         return {
           workspace,
           team: linkedTeam,
@@ -1695,8 +1717,8 @@ export class TeamsService {
           }`,
         );
       }
-      void this.provisionTenantKreditAccount(provisionedTenant.team.id);
-      void this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
+      await this.provisionTenantKreditAccount(provisionedTenant.team.id);
+      await this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
 
       return provisionedTenant;
     } catch (error) {
@@ -1727,14 +1749,14 @@ export class TeamsService {
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );
+      throw error;
     }
   }
 
   private async provisionSponsorWelcomeKredits(sponsorId: string) {
     try {
-      const account = await this.walletEngineService.upsertSponsorAccount(
-        sponsorId,
-      );
+      const account =
+        await this.walletEngineService.upsertSponsorAccount(sponsorId);
 
       await this.walletEngineService.creditInitialKredits(
         account.accountId,
@@ -1746,6 +1768,7 @@ export class TeamsService {
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );
+      throw error;
     }
   }
 
@@ -1753,7 +1776,10 @@ export class TeamsService {
     const alphabet =
       'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
-    return Array.from(randomBytes(10), (byte) => alphabet[byte % alphabet.length])
+    return Array.from(
+      randomBytes(10),
+      (byte) => alphabet[byte % alphabet.length],
+    )
       .join('')
       .slice(0, 10);
   }
@@ -1769,8 +1795,7 @@ export class TeamsService {
       .split(/[^a-zA-Z0-9]+/)
       .filter(Boolean)
       .map(
-        (chunk: string) =>
-          `${chunk[0]?.toUpperCase() ?? ''}${chunk.slice(1)}`,
+        (chunk: string) => `${chunk[0]?.toUpperCase() ?? ''}${chunk.slice(1)}`,
       );
 
     if (words.length === 0) {
@@ -2106,7 +2131,9 @@ export class TeamsService {
     return value;
   }
 
-  private resolveProvisioningStatusFlags(status: SystemTenantProvisioningStatus) {
+  private resolveProvisioningStatusFlags(
+    status: SystemTenantProvisioningStatus,
+  ) {
     switch (status) {
       case 'active':
         return {
@@ -2310,7 +2337,10 @@ export class TeamsService {
     });
   }
 
-  private async requireSystemTenantFunnelRecord(tenantId: string, funnelId: string) {
+  private async requireSystemTenantFunnelRecord(
+    tenantId: string,
+    funnelId: string,
+  ) {
     const existing = await this.prisma.funnel.findFirst({
       where: {
         id: funnelId,
@@ -2322,8 +2352,7 @@ export class TeamsService {
     if (!existing) {
       throw new NotFoundException({
         code: 'TENANT_FUNNEL_NOT_FOUND',
-        message:
-          'The requested funnel was not found for the selected tenant.',
+        message: 'The requested funnel was not found for the selected tenant.',
       });
     }
 
@@ -2347,13 +2376,15 @@ export class TeamsService {
       orderBy: [{ updatedAt: 'desc' }],
     });
 
-    return [...instances].sort((left, right) => {
-      if ((left.status === 'active') !== (right.status === 'active')) {
-        return left.status === 'active' ? -1 : 1;
-      }
+    return (
+      [...instances].sort((left, right) => {
+        if ((left.status === 'active') !== (right.status === 'active')) {
+          return left.status === 'active' ? -1 : 1;
+        }
 
-      return right.updatedAt.getTime() - left.updatedAt.getTime();
-    })[0] ?? null;
+        return right.updatedAt.getTime() - left.updatedAt.getTime();
+      })[0] ?? null
+    );
   }
 
   private async findSystemTenantFunnelInstanceById(
@@ -2440,5 +2471,4 @@ export class TeamsService {
       });
     }
   }
-
 }

@@ -21,7 +21,7 @@ import type {
 } from './ai-config.types';
 
 const APP_KEY = 'leadflow_api' as const;
-const PLATFORM_KEY = 'kurukin' as const;
+const PLATFORM_KEY = 'leadflow' as const;
 const PRODUCT_KEY = 'leadflow' as const;
 const RUNTIME_STATUS = 'active' as const;
 
@@ -55,7 +55,9 @@ export class AiConfigController {
       app_key: APP_KEY,
       platform_key: PLATFORM_KEY,
       product_key: PRODUCT_KEY,
-      vertical_key: runtimeContext.tenant.code,
+      vertical_key: runtimeContext.tenant.vertical_key,
+      brand_key: runtimeContext.tenant.brand_key,
+      business_model_type: runtimeContext.tenant.business_model_type,
       service_owner_key: runtimeContext.routing.service_owner_key,
       wallet_subject: {
         type: 'sponsor',

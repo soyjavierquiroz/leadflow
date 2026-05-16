@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import { createHash } from 'node:crypto';
 
-const KREDIT_PLATFORM_KEY = 'kurukin';
+const KREDIT_PLATFORM_KEY = 'leadflow';
 const KREDIT_PRODUCT_KEY = 'leadflow';
 const KREDIT_UNIT_CODE = 'KREDIT';
 const KREDIT_UNIT_SCALE = 6;

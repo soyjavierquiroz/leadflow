@@ -447,7 +447,7 @@ export class KnowledgeService {
     );
     formData.append('tenant_id', input.tenantId);
     formData.append('file_name', fileName);
-    formData.append('platform_key', 'kurukin');
+    formData.append('platform_key', 'leadflow');
     formData.append('product_key', 'leadflow');
     formData.append('cost_kredits', input.costKredits);
     formData.append('training_cost_kredits', input.costKredits);

@@ -11,10 +11,13 @@ import {
 import { Prisma, UserRole } from '@prisma/client';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { normalizeMessagingPhone } from '../shared/messaging-channel.utils';
+import { normalizeBaseUrl, sanitizeNullableText } from '../shared/url.utils';
 import {
-  normalizeBaseUrl,
-  sanitizeNullableText,
-} from '../shared/url.utils';
+  DEFAULT_TENANT_AI_BASE_PROMPT,
+  resolveAiRuntimeRoutingMetadata,
+  withDefaultAiRuntimeRoutingMetadata,
+} from './ai-config.defaults';
+import { resolveKloserTenantConfig } from './kloser-tenant-config';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
@@ -30,6 +33,9 @@ import type {
 } from './ai-config.types';
 
 type JsonRecord = Record<string, unknown>;
+type AiAgentConfigStore =
+  | Pick<PrismaService, 'aiAgentConfig'>
+  | Prisma.TransactionClient;
 
 const AI_RUNTIME_CONTEXT_VERSION = 'leadflow.ai-runtime-context.v1' as const;
 const AI_SERVICE_OWNER_KEY = 'lead-handler' as const;
@@ -83,7 +89,10 @@ const cloneJsonValue = (value: unknown): unknown => {
   return value;
 };
 
-const mergeJsonValues = (baseValue: unknown, overrideValue: unknown): unknown => {
+const mergeJsonValues = (
+  baseValue: unknown,
+  overrideValue: unknown,
+): unknown => {
   if (overrideValue === null || overrideValue === undefined) {
     return cloneJsonValue(baseValue);
   }
@@ -147,7 +156,10 @@ const readRouteContextFields = (
   const record = toJsonRecord(value);
 
   return Object.fromEntries(
-    AI_CONFIG_ROUTE_CONTEXT_KEYS.map((key) => [key, readStringValue(record[key])]),
+    AI_CONFIG_ROUTE_CONTEXT_KEYS.map((key) => [
+      key,
+      readStringValue(record[key]),
+    ]),
   ) as Record<AiConfigRouteContextKey, string>;
 };
 
@@ -290,7 +302,8 @@ const normalizeOrchestrationFunnelContext = (
     }),
   );
   const currentEdges = extractSmartWiringEdges(context.edges);
-  const needsRecovery = normalizedBlocks.length > 1 && currentEdges.length === 0;
+  const needsRecovery =
+    normalizedBlocks.length > 1 && currentEdges.length === 0;
   const recoveryEdges = needsRecovery
     ? buildSequentialRecoveryEdges(normalizedBlocks)
     : currentEdges;
@@ -344,10 +357,7 @@ const replacePromptPlaceholders = (
   return prompt
     .replace(/\{\{\s*name\s*\}\}/gi, placeholders.name)
     .replace(/\{\{\s*team_name\s*\}\}/gi, placeholders.team_name)
-    .replace(
-      /\{\{\s*whatsapp_link\s*\}\}/gi,
-      placeholders.whatsapp_link ?? '',
-    );
+    .replace(/\{\{\s*whatsapp_link\s*\}\}/gi, placeholders.whatsapp_link ?? '');
 };
 
 @Injectable()
@@ -368,6 +378,75 @@ export class AiConfigService {
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
   ) {}
+
+  async ensureTenantDefaultConfig(
+    input: {
+      tenantId: string;
+      brandKey?: string | null;
+    },
+    tx: AiAgentConfigStore = this.prisma,
+  ) {
+    const tenantId = sanitizeNullableText(input.tenantId);
+
+    if (!tenantId) {
+      throw new BadRequestException({
+        code: 'AI_CONFIG_TENANT_REQUIRED',
+        message: 'tenantId is required to provision the default AI config.',
+      });
+    }
+
+    const existingConfig = await tx.aiAgentConfig.findFirst({
+      where: {
+        tenantId,
+        memberId: null,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+    const aiPolicyBase = withDefaultAiRuntimeRoutingMetadata(
+      existingConfig?.aiPolicy,
+      {
+        tenantCode: input.brandKey,
+        brandKey: input.brandKey,
+      },
+    );
+    const aiPolicy = {
+      ...aiPolicyBase,
+      // Preserve any Kloser-adjacent tenant metadata while enforcing the v2.2 base contract.
+      kloser: {
+        ...toJsonRecord(aiPolicyBase.kloser),
+        ...resolveKloserTenantConfig({
+          aiPolicy: aiPolicyBase,
+          ctaPolicy: existingConfig?.ctaPolicy,
+        }),
+      },
+    } as Prisma.InputJsonValue;
+
+    if (existingConfig) {
+      return tx.aiAgentConfig.update({
+        where: {
+          id: existingConfig.id,
+        },
+        data: {
+          aiPolicy,
+          isActive: true,
+        },
+      });
+    }
+
+    return tx.aiAgentConfig.create({
+      data: {
+        tenantId,
+        memberId: null,
+        basePrompt: DEFAULT_TENANT_AI_BASE_PROMPT,
+        routeContexts: Prisma.JsonNull,
+        ctaPolicy: Prisma.JsonNull,
+        aiPolicy,
+        isActive: true,
+      },
+    });
+  }
 
   async getMemberEditorSnapshot(scope: {
     workspaceId: string;
@@ -590,6 +669,20 @@ export class AiConfigService {
     }
 
     const wallet = await this.resolveWalletContext(channelInstance.memberId);
+    const routeContexts = toJsonRecord(
+      mergeJsonValues(tenantConfig?.routeContexts, memberConfig?.routeContexts),
+    );
+    const aiPolicy = toJsonRecord(
+      mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
+    );
+    const ctaPolicy = toJsonRecord(
+      mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
+    );
+    const runtimeRoutingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: channelInstance.tenant.code,
+      aiPolicy,
+      routeContexts,
+    });
 
     return {
       version: AI_RUNTIME_CONTEXT_VERSION,
@@ -603,6 +696,7 @@ export class AiConfigService {
         id: channelInstance.tenant.id,
         name: channelInstance.tenant.name,
         code: channelInstance.tenant.code,
+        ...runtimeRoutingMetadata,
       },
       member: {
         id: channelInstance.member.id,
@@ -616,19 +710,14 @@ export class AiConfigService {
       wallet,
       ai_agent: {
         base_prompt: replacePromptPlaceholders(basePrompt, placeholders),
-        route_contexts: toJsonRecord(
-          mergeJsonValues(
-            tenantConfig?.routeContexts,
-            memberConfig?.routeContexts,
-          ),
-        ),
-        cta_policy: toJsonRecord(
-          mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
-        ),
-        ai_policy: toJsonRecord(
-          mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
-        ),
+        route_contexts: routeContexts,
+        cta_policy: ctaPolicy,
+        ai_policy: aiPolicy,
       },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy,
+        ctaPolicy,
+      }),
       resolution: {
         strategy: memberConfig ? 'member_override' : 'tenant_default',
         tenant_config_id: tenantConfig?.id ?? null,
@@ -648,19 +737,24 @@ export class AiConfigService {
     if (!instanceName) {
       throw new BadRequestException({
         code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
-        message: 'instanceName is required to initialize the orchestration session.',
+        message:
+          'instanceName is required to initialize the orchestration session.',
       });
     }
 
     if (!funnelId) {
       throw new BadRequestException({
         code: 'AI_ORCHESTRATION_FUNNEL_REQUIRED',
-        message: 'funnelId is required to initialize the orchestration session.',
+        message:
+          'funnelId is required to initialize the orchestration session.',
       });
     }
 
     const runtimeContext = await this.resolveRuntimeContext(instanceName);
-    return this.initOrchestrationSessionWithRuntimeContext(runtimeContext, input);
+    return this.initOrchestrationSessionWithRuntimeContext(
+      runtimeContext,
+      input,
+    );
   }
 
   async executeOrchestration(
@@ -712,7 +806,10 @@ export class AiConfigService {
     }
 
     const runtimeContext = await this.resolveRuntimeContext(instanceName);
-    return this.closeOrchestrationSessionWithRuntimeContext(runtimeContext, input);
+    return this.closeOrchestrationSessionWithRuntimeContext(
+      runtimeContext,
+      input,
+    );
   }
 
   private async initOrchestrationSessionWithRuntimeContext(
@@ -724,7 +821,8 @@ export class AiConfigService {
     if (!funnelId) {
       throw new BadRequestException({
         code: 'AI_ORCHESTRATION_FUNNEL_REQUIRED',
-        message: 'funnelId is required to initialize the orchestration session.',
+        message:
+          'funnelId is required to initialize the orchestration session.',
       });
     }
 
@@ -831,7 +929,9 @@ export class AiConfigService {
           message: 'IA Gateway session initialization request failed.',
           details: {
             message:
-              error instanceof Error ? error.message : 'Unknown upstream error.',
+              error instanceof Error
+                ? error.message
+                : 'Unknown upstream error.',
             networkErrorCode,
             attemptedBaseUrl: this.gatewayBaseUrl,
           },
@@ -841,7 +941,8 @@ export class AiConfigService {
       throw new BadGatewayException({
         code: 'AI_GATEWAY_UNREACHABLE',
         message: 'IA Gateway session initialization request failed.',
-        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+        details:
+          error instanceof Error ? error.message : 'Unknown upstream error.',
       });
     }
   }
@@ -910,7 +1011,8 @@ export class AiConfigService {
       throw new BadGatewayException({
         code: 'AI_GATEWAY_UNREACHABLE',
         message: 'IA Gateway orchestration request failed.',
-        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+        details:
+          error instanceof Error ? error.message : 'Unknown upstream error.',
       });
     }
   }
@@ -965,7 +1067,8 @@ export class AiConfigService {
       throw new BadGatewayException({
         code: 'AI_GATEWAY_UNREACHABLE',
         message: 'IA Gateway session close request failed.',
-        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+        details:
+          error instanceof Error ? error.message : 'Unknown upstream error.',
       });
     }
   }
@@ -1026,7 +1129,13 @@ export class AiConfigService {
     try {
       return await this.resolveRuntimeContext(explicitInstanceName);
     } catch (error) {
-      if (!this.shouldUseDevelopmentRuntimeFallback(user, explicitInstanceName, error)) {
+      if (
+        !this.shouldUseDevelopmentRuntimeFallback(
+          user,
+          explicitInstanceName,
+          error,
+        )
+      ) {
         throw error;
       }
 
@@ -1057,7 +1166,8 @@ export class AiConfigService {
     if (!sponsor) {
       throw new NotFoundException({
         code: 'AI_CONFIG_MEMBER_NOT_FOUND',
-        message: 'The requested sponsor was not found for this AI config scope.',
+        message:
+          'The requested sponsor was not found for this AI config scope.',
       });
     }
 
@@ -1135,8 +1245,7 @@ export class AiConfigService {
     }
 
     const sponsor =
-      sanitizeNullableText(input.user.sponsorId) &&
-      input.user.teamId === teamId
+      sanitizeNullableText(input.user.sponsorId) && input.user.teamId === teamId
         ? await this.prisma.sponsor.findFirst({
             where: {
               id: input.user.sponsorId ?? undefined,
@@ -1207,6 +1316,20 @@ export class AiConfigService {
         tenantPrompt: tenantConfig?.basePrompt ?? null,
         memberPrompt: memberConfig?.basePrompt ?? null,
       }) ?? DEFAULT_DEVELOPMENT_ORCHESTRATION_PROMPT;
+    const routeContexts = toJsonRecord(
+      mergeJsonValues(tenantConfig?.routeContexts, memberConfig?.routeContexts),
+    );
+    const aiPolicy = toJsonRecord(
+      mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
+    );
+    const ctaPolicy = toJsonRecord(
+      mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
+    );
+    const runtimeRoutingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: team.code,
+      aiPolicy,
+      routeContexts,
+    });
 
     return {
       version: AI_RUNTIME_CONTEXT_VERSION,
@@ -1220,6 +1343,7 @@ export class AiConfigService {
         id: team.id,
         name: team.name,
         code: team.code,
+        ...runtimeRoutingMetadata,
       },
       member: {
         id: sponsor?.id ?? input.user.id,
@@ -1247,19 +1371,14 @@ export class AiConfigService {
           },
       ai_agent: {
         base_prompt: replacePromptPlaceholders(basePrompt, placeholders),
-        route_contexts: toJsonRecord(
-          mergeJsonValues(
-            tenantConfig?.routeContexts,
-            memberConfig?.routeContexts,
-          ),
-        ),
-        cta_policy: toJsonRecord(
-          mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
-        ),
-        ai_policy: toJsonRecord(
-          mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
-        ),
+        route_contexts: routeContexts,
+        cta_policy: ctaPolicy,
+        ai_policy: aiPolicy,
       },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy,
+        ctaPolicy,
+      }),
       resolution: {
         strategy: memberConfig
           ? 'member_override'
@@ -1288,7 +1407,9 @@ export class AiConfigService {
     };
   }
 
-  private async resolveWalletContext(memberId: string): Promise<AiRuntimeContext['wallet']> {
+  private async resolveWalletContext(
+    memberId: string,
+  ): Promise<AiRuntimeContext['wallet']> {
     if (!this.walletEngineService.isConfigured()) {
       return {
         account_id: null,
@@ -1299,9 +1420,8 @@ export class AiConfigService {
     }
 
     try {
-      const account = await this.walletEngineService.upsertSponsorAccount(
-        memberId,
-      );
+      const account =
+        await this.walletEngineService.upsertSponsorAccount(memberId);
       const balance = await this.walletEngineService.getSponsorKredits(
         account.accountId,
       );
@@ -1410,7 +1530,10 @@ export class AiConfigService {
     baseUrlOverride?: string;
   }) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.gatewayTimeoutMs);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      this.gatewayTimeoutMs,
+    );
     const baseUrl = input.baseUrlOverride ?? this.gatewayBaseUrl;
     const requestUrl = `${baseUrl!.replace(/\/+$/, '')}${input.path}`;
 
