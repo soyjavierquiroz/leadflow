@@ -8,6 +8,26 @@ export type AiSettingsRouteContexts = {
   business: string;
 };
 
+export type KloserSettings = {
+  strategy: {
+    cadence_minutes: number[];
+  };
+  compliance_policy: {
+    quiet_hours: {
+      start: string;
+      end: string;
+    };
+  };
+  cta_policy: {
+    type: string;
+    base_url: string | null;
+    requires_shortener: boolean;
+  };
+  message_policy: {
+    forbidden_claims: string[];
+  };
+};
+
 export type AiSettingsSnapshot = {
   configId: string | null;
   tenantId: string;
@@ -19,6 +39,7 @@ export type AiSettingsSnapshot = {
   ctaPolicy: {
     defaultCta: string | null;
   };
+  kloser: KloserSettings;
   resolution: {
     strategy: "member_override" | "tenant_default" | "empty";
     tenantConfigId: string | null;

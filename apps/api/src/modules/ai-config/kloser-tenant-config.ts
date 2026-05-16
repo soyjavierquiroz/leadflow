@@ -26,6 +26,8 @@ const DEFAULT_KLOSER_CONFIG: KloserTenantConfig = {
     required: true,
     shortener: 'none',
     allowed_domains: [],
+    base_url: null,
+    requires_shortener: false,
   },
   message_policy: {
     template_id: 'leadflow_follow_up_v1',
@@ -33,6 +35,7 @@ const DEFAULT_KLOSER_CONFIG: KloserTenantConfig = {
     variables: {},
     max_length: 1024,
     requires_personalization: true,
+    forbidden_claims: [],
   },
 };
 
@@ -210,6 +213,11 @@ export const resolveKloserTenantConfig = (input: {
     'message_policy',
     'messagePolicy',
   ]);
+  const requiresShortener = readBoolean(
+    ctaPolicyOverride,
+    ['requires_shortener', 'requiresShortener'],
+    DEFAULT_KLOSER_CONFIG.cta_policy.requires_shortener,
+  );
 
   return {
     strategy: {
@@ -265,16 +273,16 @@ export const resolveKloserTenantConfig = (input: {
         ['required'],
         DEFAULT_KLOSER_CONFIG.cta_policy.required,
       ),
-      shortener: readString(
-        ctaPolicyOverride,
-        ['shortener'],
-        DEFAULT_KLOSER_CONFIG.cta_policy.shortener,
-      ),
+      shortener: requiresShortener
+        ? readString(ctaPolicyOverride, ['shortener'], 'enabled')
+        : DEFAULT_KLOSER_CONFIG.cta_policy.shortener,
       allowed_domains: readStringArray(
         ctaPolicyOverride,
         ['allowed_domains', 'allowedDomains'],
         DEFAULT_KLOSER_CONFIG.cta_policy.allowed_domains,
       ),
+      base_url: readNullableString(ctaPolicyOverride, ['base_url', 'baseUrl']),
+      requires_shortener: requiresShortener,
     },
     message_policy: {
       template_id: readString(
@@ -297,6 +305,11 @@ export const resolveKloserTenantConfig = (input: {
         messagePolicy,
         ['requires_personalization', 'requiresPersonalization'],
         DEFAULT_KLOSER_CONFIG.message_policy.requires_personalization,
+      ),
+      forbidden_claims: readStringArray(
+        messagePolicy,
+        ['forbidden_claims', 'forbiddenClaims'],
+        DEFAULT_KLOSER_CONFIG.message_policy.forbidden_claims,
       ),
     },
   };

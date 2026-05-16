@@ -64,6 +64,8 @@ export interface KloserTenantConfig {
     required: boolean;
     shortener: string;
     allowed_domains: string[];
+    base_url: string | null;
+    requires_shortener: boolean;
   };
   message_policy: {
     template_id: string;
@@ -71,6 +73,7 @@ export interface KloserTenantConfig {
     variables: Record<string, any>;
     max_length: number;
     requires_personalization: boolean;
+    forbidden_claims: string[];
   };
 }
 
@@ -114,6 +117,7 @@ export type AiConfigEditorSnapshot = {
   ctaPolicy: {
     defaultCta: string | null;
   };
+  kloser: KloserTenantConfig;
   resolution: {
     strategy: 'member_override' | 'tenant_default' | 'empty';
     tenantConfigId: string | null;

@@ -34,7 +34,7 @@ import { ModalShell } from "@/components/team-operations/modal-shell";
 import { formatDateTime } from "@/lib/app-shell/utils";
 import { memberOperationRequest } from "@/lib/member-operations";
 import { webPublicConfig } from "@/lib/public-env";
-import type { AiSettingsSnapshot } from "@/lib/ai-settings";
+import type { AiSettingsSnapshot, KloserSettings } from "@/lib/ai-settings";
 
 type AiSettingsFormProps = {
   initialSettings: AiSettingsSnapshot;
@@ -49,6 +49,18 @@ type FormState = {
   basePrompt: string;
   routeContexts: AiSettingsSnapshot["routeContexts"];
   defaultCta: string;
+  kloser: KloserFormState;
+};
+
+type KloserFormState = {
+  cadenceOption: string;
+  cadenceMinutes: number[];
+  ctaType: string;
+  ctaBaseUrl: string;
+  requiresShortener: boolean;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  forbiddenClaimsText: string;
 };
 
 type KnowledgeDocument = {
@@ -206,6 +218,51 @@ const ctaOptions = [
   },
 ] as const;
 
+const kloserCadenceOptions = [
+  {
+    value: "relaxed_multilevel",
+    label: "Relajado / Multinivel (24h, 48h, 72h)",
+    cadenceMinutes: [1440, 2880, 4320],
+  },
+  {
+    value: "aggressive_launch",
+    label: "Agresivo / Lanzamiento (1h, 4h, 12h)",
+    cadenceMinutes: [60, 240, 720],
+  },
+  {
+    value: "consultative",
+    label: "Consultivo (48h, 5d, 7d)",
+    cadenceMinutes: [2880, 7200, 10080],
+  },
+] as const;
+
+const kloserCtaTypeOptions = [
+  { value: "watch_video", label: "watch_video" },
+  { value: "book_call", label: "book_call" },
+  { value: "visit_page", label: "visit_page" },
+  { value: "custom", label: "custom" },
+] as const;
+
+const defaultKloserSettings: KloserSettings = {
+  strategy: {
+    cadence_minutes: [1440, 2880, 4320],
+  },
+  compliance_policy: {
+    quiet_hours: {
+      start: "21:00",
+      end: "08:00",
+    },
+  },
+  cta_policy: {
+    type: "watch_video",
+    base_url: "",
+    requires_shortener: true,
+  },
+  message_policy: {
+    forbidden_claims: [],
+  },
+};
+
 const resolutionLabel: Record<
   AiSettingsSnapshot["resolution"]["strategy"],
   string
@@ -226,10 +283,73 @@ const knowledgeAuditOperationLabel: Record<KnowledgeAuditOperation, string> = {
   delete: "Eliminación",
 };
 
+const arraysEqual = (left: readonly number[], right: readonly number[]) =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
+
+const resolveKloserCadenceOption = (cadenceMinutes: readonly number[]) =>
+  kloserCadenceOptions.find((option) =>
+    arraysEqual(option.cadenceMinutes, cadenceMinutes),
+  )?.value ?? kloserCadenceOptions[0].value;
+
+const createKloserFormState = (settings: AiSettingsSnapshot): KloserFormState => {
+  const kloser = settings.kloser ?? defaultKloserSettings;
+  const cadenceMinutes =
+    kloser.strategy.cadence_minutes.length > 0
+      ? kloser.strategy.cadence_minutes
+      : defaultKloserSettings.strategy.cadence_minutes;
+  const quietHours =
+    kloser.compliance_policy.quiet_hours ??
+    defaultKloserSettings.compliance_policy.quiet_hours;
+
+  return {
+    cadenceOption: resolveKloserCadenceOption(cadenceMinutes),
+    cadenceMinutes: [...cadenceMinutes],
+    ctaType: kloser.cta_policy.type || defaultKloserSettings.cta_policy.type,
+    ctaBaseUrl: kloser.cta_policy.base_url ?? "",
+    requiresShortener: kloser.cta_policy.requires_shortener,
+    quietHoursStart:
+      quietHours.start ||
+      defaultKloserSettings.compliance_policy.quiet_hours.start,
+    quietHoursEnd:
+      quietHours.end || defaultKloserSettings.compliance_policy.quiet_hours.end,
+    forbiddenClaimsText: kloser.message_policy.forbidden_claims.join(", "),
+  };
+};
+
 const createFormState = (settings: AiSettingsSnapshot): FormState => ({
   basePrompt: settings.basePrompt,
   routeContexts: { ...settings.routeContexts },
   defaultCta: settings.ctaPolicy.defaultCta ?? "",
+  kloser: createKloserFormState(settings),
+});
+
+const parseForbiddenClaims = (value: string) =>
+  value
+    .split(",")
+    .map((claim) => claim.trim())
+    .filter(Boolean);
+
+const buildKloserAiPolicy = (kloser: KloserFormState) => ({
+  kloser: {
+    strategy: {
+      cadence_minutes: kloser.cadenceMinutes,
+    },
+    compliance_policy: {
+      quiet_hours: {
+        start: kloser.quietHoursStart,
+        end: kloser.quietHoursEnd,
+      },
+    },
+    cta_policy: {
+      type: kloser.ctaType,
+      base_url: kloser.ctaBaseUrl.trim() || null,
+      requires_shortener: kloser.requiresShortener,
+    },
+    message_policy: {
+      forbidden_claims: parseForbiddenClaims(kloser.forbiddenClaimsText),
+    },
+  },
 });
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
@@ -1851,6 +1971,16 @@ export function AiSettingsForm({ initialSettings }: AiSettingsFormProps) {
       }));
     };
 
+  const updateKloserForm = (updates: Partial<KloserFormState>) => {
+    setForm((current) => ({
+      ...current,
+      kloser: {
+        ...current.kloser,
+        ...updates,
+      },
+    }));
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
@@ -1873,6 +2003,7 @@ export function AiSettingsForm({ initialSettings }: AiSettingsFormProps) {
               basePrompt: form.basePrompt,
               routeContexts: form.routeContexts,
               defaultCta: form.defaultCta || null,
+              aiPolicy: buildKloserAiPolicy(form.kloser),
             }),
           },
         );
@@ -2139,6 +2270,163 @@ export function AiSettingsForm({ initialSettings }: AiSettingsFormProps) {
                     </option>
                   ))}
                 </select>
+              </div>
+            </section>
+
+            <section className="space-y-5 rounded-[1.5rem] border border-app-border bg-app-surface p-4">
+              <div>
+                <p className={labelClassName}>
+                  ESTRATEGIA DE SEGUIMIENTO ASÍNCRONO
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="kloser-cadence" className={labelClassName}>
+                  Frecuencia de Seguimiento (Cadencia)
+                </label>
+                <select
+                  id="kloser-cadence"
+                  value={form.kloser.cadenceOption}
+                  onChange={(event) => {
+                    const selectedOption =
+                      kloserCadenceOptions.find(
+                        (option) => option.value === event.target.value,
+                      ) ?? kloserCadenceOptions[0];
+
+                    updateKloserForm({
+                      cadenceOption: selectedOption.value,
+                      cadenceMinutes: [...selectedOption.cadenceMinutes],
+                    });
+                  }}
+                  className={inputClassName}
+                >
+                  {kloserCadenceOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label htmlFor="kloser-cta-type" className={labelClassName}>
+                    Tipo de Acción
+                  </label>
+                  <select
+                    id="kloser-cta-type"
+                    value={form.kloser.ctaType}
+                    onChange={(event) =>
+                      updateKloserForm({ ctaType: event.target.value })
+                    }
+                    className={inputClassName}
+                  >
+                    {kloserCtaTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="kloser-cta-url" className={labelClassName}>
+                    Enlace de Destino
+                  </label>
+                  <input
+                    id="kloser-cta-url"
+                    type="url"
+                    value={form.kloser.ctaBaseUrl}
+                    onChange={(event) =>
+                      updateKloserForm({ ctaBaseUrl: event.target.value })
+                    }
+                    className={inputClassName}
+                    placeholder="https://midominio.com"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center justify-between gap-4 rounded-[1.2rem] border border-app-border bg-app-card px-4 py-3 text-sm text-app-text">
+                <span className="font-semibold">
+                  Acortar enlace y trackear clics
+                </span>
+                <input
+                  type="checkbox"
+                  checked={form.kloser.requiresShortener}
+                  onChange={(event) =>
+                    updateKloserForm({
+                      requiresShortener: event.target.checked,
+                    })
+                  }
+                  className="h-5 w-5 rounded border-app-border bg-app-surface text-app-accent focus:ring-app-accent-soft"
+                />
+              </label>
+
+              <div className="space-y-3">
+                <p className={labelClassName}>
+                  Rango de Horario de Silencio (No enviar mensajes)
+                </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="kloser-quiet-start"
+                      className={labelClassName}
+                    >
+                      Desde
+                    </label>
+                    <input
+                      id="kloser-quiet-start"
+                      type="time"
+                      value={form.kloser.quietHoursStart}
+                      onChange={(event) =>
+                        updateKloserForm({
+                          quietHoursStart: event.target.value,
+                        })
+                      }
+                      className={inputClassName}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="kloser-quiet-end"
+                      className={labelClassName}
+                    >
+                      Hasta
+                    </label>
+                    <input
+                      id="kloser-quiet-end"
+                      type="time"
+                      value={form.kloser.quietHoursEnd}
+                      onChange={(event) =>
+                        updateKloserForm({
+                          quietHoursEnd: event.target.value,
+                        })
+                      }
+                      className={inputClassName}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="kloser-forbidden-claims"
+                  className={labelClassName}
+                >
+                  Palabras o promesas prohibidas en seguimiento
+                </label>
+                <input
+                  id="kloser-forbidden-claims"
+                  value={form.kloser.forbiddenClaimsText}
+                  onChange={(event) =>
+                    updateKloserForm({
+                      forbiddenClaimsText: event.target.value,
+                    })
+                  }
+                  className={inputClassName}
+                  placeholder="garantizado, cura"
+                />
               </div>
             </section>
 

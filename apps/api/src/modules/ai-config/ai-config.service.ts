@@ -202,6 +202,15 @@ const mergeDefaultCta = (input: {
   return Object.keys(current).length > 0 ? current : null;
 };
 
+const mergeAiPolicyFields = (input: {
+  existing: unknown;
+  updates: unknown;
+}) => {
+  const current = toJsonRecord(mergeJsonValues(input.existing, input.updates));
+
+  return Object.keys(current).length > 0 ? current : null;
+};
+
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
 
@@ -478,6 +487,14 @@ export class AiConfigService {
     ]);
 
     const effectiveConfig = memberConfig ?? tenantConfig;
+    const effectiveAiPolicy = mergeJsonValues(
+      tenantConfig?.aiPolicy,
+      memberConfig?.aiPolicy,
+    );
+    const effectiveCtaPolicy = mergeJsonValues(
+      tenantConfig?.ctaPolicy,
+      memberConfig?.ctaPolicy,
+    );
 
     return {
       configId: memberConfig?.id ?? null,
@@ -499,6 +516,10 @@ export class AiConfigService {
               | undefined,
           ) ?? null,
       },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy: effectiveAiPolicy,
+        ctaPolicy: effectiveCtaPolicy,
+      }),
       resolution: {
         strategy: memberConfig
           ? 'member_override'
@@ -523,6 +544,7 @@ export class AiConfigService {
       basePrompt: string;
       routeContexts?: Partial<Record<AiConfigRouteContextKey, string | null>>;
       defaultCta?: string | null;
+      aiPolicy?: unknown;
     },
   ): Promise<AiConfigEditorSnapshot> {
     const sponsor = await this.requireScopedSponsor(scope);
@@ -543,6 +565,10 @@ export class AiConfigService {
         },
       },
     });
+    const aiPolicy = mergeAiPolicyFields({
+      existing: existingConfig?.aiPolicy,
+      updates: input.aiPolicy,
+    });
 
     await this.prisma.aiAgentConfig.upsert({
       where: {
@@ -561,7 +587,7 @@ export class AiConfigService {
           existing: existingConfig?.ctaPolicy,
           defaultCta: input.defaultCta,
         }) ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-        aiPolicy: existingConfig?.aiPolicy ?? undefined,
+        aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         isActive: true,
       },
       create: {
@@ -576,7 +602,7 @@ export class AiConfigService {
           existing: null,
           defaultCta: input.defaultCta,
         }) ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-        aiPolicy: Prisma.JsonNull,
+        aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         isActive: true,
       },
     });

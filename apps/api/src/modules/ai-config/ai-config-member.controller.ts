@@ -36,6 +36,7 @@ export class AiConfigMemberController {
         basePrompt: dto.basePrompt,
         routeContexts: dto.routeContexts,
         defaultCta: dto.defaultCta,
+        aiPolicy: dto.aiPolicy,
       },
     );
   }

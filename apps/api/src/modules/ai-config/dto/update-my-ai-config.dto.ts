@@ -8,4 +8,5 @@ export class UpdateMyAiConfigDto {
     readonly business?: string | null;
   };
   readonly defaultCta?: string | null;
+  readonly aiPolicy?: Record<string, unknown> | null;
 }
