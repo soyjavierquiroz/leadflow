@@ -48,6 +48,50 @@ const toJsonRecord = (
 ): JsonRecord =>
   isJsonRecord(value) ? (cloneJsonValue(value) as JsonRecord) : {};
 
+type RuntimeContextConfigSyncPayloadInput = {
+  tenantId: string;
+  memberId: string | null;
+  basePrompt: string;
+  verticalKey: string;
+  brandKey: string;
+  businessModelType: string;
+  routeContexts: JsonRecord;
+  funnelContext: JsonRecord;
+  ctaPolicy: JsonRecord;
+  aiPolicy: JsonRecord;
+  status: 'active' | 'inactive';
+};
+
+type RuntimeContextConfigSyncPayload = {
+  tenant_id: string;
+  member_id: string | null;
+  base_prompt: string;
+  vertical_key: string;
+  brand_key: string;
+  business_model_type: string;
+  route_contexts: JsonRecord;
+  funnel_context: JsonRecord;
+  cta_policy: JsonRecord;
+  ai_policy: JsonRecord;
+  status: 'active' | 'inactive';
+};
+
+export const buildRuntimeContextConfigSyncPayload = (
+  input: RuntimeContextConfigSyncPayloadInput,
+): RuntimeContextConfigSyncPayload => ({
+  tenant_id: input.tenantId,
+  member_id: input.memberId,
+  base_prompt: input.basePrompt,
+  vertical_key: input.verticalKey,
+  brand_key: input.brandKey,
+  business_model_type: input.businessModelType,
+  route_contexts: input.routeContexts,
+  funnel_context: input.funnelContext,
+  cta_policy: input.ctaPolicy,
+  ai_policy: input.aiPolicy,
+  status: input.status,
+});
+
 @Injectable()
 export class RuntimeContextConfigSyncService {
   private readonly logger = new Logger(RuntimeContextConfigSyncService.name);
@@ -170,19 +214,21 @@ export class RuntimeContextConfigSyncService {
         synced_by: RUNTIME_CONTEXT_SERVICE_KEY,
       };
 
-      await this.request({
-        tenant_id: input.tenantId,
-        member_id: memberId,
-        base_prompt: tenantConfig.basePrompt,
-        vertical_key: routingMetadata.vertical_key,
-        brand_key: routingMetadata.brand_key,
-        business_model_type: routingMetadata.business_model_type,
-        route_contexts: routeContexts,
-        funnel_context: funnelContext,
-        cta_policy: toJsonRecord(tenantConfig.ctaPolicy as Prisma.JsonValue),
-        ai_policy: aiPolicy,
-        status: tenantConfig.isActive ? 'active' : 'inactive',
-      });
+      await this.request(
+        buildRuntimeContextConfigSyncPayload({
+          tenantId: input.tenantId,
+          memberId,
+          basePrompt: tenantConfig.basePrompt,
+          verticalKey: routingMetadata.vertical_key,
+          brandKey: routingMetadata.brand_key,
+          businessModelType: routingMetadata.business_model_type,
+          routeContexts,
+          funnelContext,
+          ctaPolicy: toJsonRecord(tenantConfig.ctaPolicy as Prisma.JsonValue),
+          aiPolicy,
+          status: tenantConfig.isActive ? 'active' : 'inactive',
+        }),
+      );
 
       this.logger.log(
         `Runtime context synced for tenant ${input.tenantId}, funnel ${input.funnelInstanceId}, member ${memberId}.`,
@@ -200,19 +246,7 @@ export class RuntimeContextConfigSyncService {
     return Boolean(this.baseUrl && this.apiKey);
   }
 
-  private async request(body: {
-    tenant_id: string;
-    member_id: string | null;
-    base_prompt: string;
-    vertical_key: string;
-    brand_key: string;
-    business_model_type: string;
-    route_contexts: JsonRecord;
-    funnel_context: JsonRecord;
-    cta_policy: JsonRecord;
-    ai_policy: JsonRecord;
-    status: 'active' | 'inactive';
-  }) {
+  private async request(body: RuntimeContextConfigSyncPayload) {
     const baseUrl = this.baseUrl!;
     const apiKey = this.apiKey!;
     const controller = new AbortController();
