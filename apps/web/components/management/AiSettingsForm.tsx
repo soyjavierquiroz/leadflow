@@ -1995,24 +1995,40 @@ export function AiSettingsForm({ initialSettings }: AiSettingsFormProps) {
 
     startSaving(async () => {
       try {
-        const nextSettings = await memberOperationRequest<AiSettingsSnapshot>(
-          "/ai-config/me",
-          {
+        const personalSettings =
+          await memberOperationRequest<AiSettingsSnapshot>("/ai-config/me", {
             method: "PATCH",
             body: JSON.stringify({
               basePrompt: form.basePrompt,
               routeContexts: form.routeContexts,
               defaultCta: form.defaultCta || null,
+            }),
+          });
+        const teamSettings = await memberOperationRequest<AiSettingsSnapshot>(
+          "/ai-config/team",
+          {
+            method: "PATCH",
+            body: JSON.stringify({
               aiPolicy: buildKloserAiPolicy(form.kloser),
             }),
           },
         );
+        const nextSettings = {
+          ...personalSettings,
+          kloser: teamSettings.kloser,
+          resolution: {
+            ...personalSettings.resolution,
+            tenantConfigId:
+              teamSettings.configId ?? teamSettings.resolution.tenantConfigId,
+          },
+        };
 
         setSettings(nextSettings);
         setForm(createFormState(nextSettings));
         setFeedback({
           tone: "success",
-          message: "La configuración de IA quedó guardada para tu sponsor.",
+          message:
+            "La configuración personal quedó guardada y Kloser quedó actualizado para todo el equipo.",
         });
         router.refresh();
       } catch (error) {

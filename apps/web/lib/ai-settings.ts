@@ -57,8 +57,10 @@ const getErrorMessage = (payload: unknown) =>
     ? payload.message
     : null) ?? "No pudimos cargar la configuración de IA.";
 
-export const getMyAiSettingsSnapshot = async (): Promise<AiSettingsSnapshot> => {
-  const response = await apiFetchWithSession("/ai-config/me");
+const getAiSettingsSnapshot = async (
+  path: string,
+): Promise<AiSettingsSnapshot> => {
+  const response = await apiFetchWithSession(path);
   const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
@@ -67,3 +69,27 @@ export const getMyAiSettingsSnapshot = async (): Promise<AiSettingsSnapshot> => 
 
   return payload as AiSettingsSnapshot;
 };
+
+export const getMyAiSettingsSnapshot = async (): Promise<AiSettingsSnapshot> =>
+  getAiSettingsSnapshot("/ai-config/me");
+
+export const getTeamAiSettingsSnapshot = async (): Promise<AiSettingsSnapshot> =>
+  getAiSettingsSnapshot("/ai-config/team");
+
+export const getManagementAiSettingsSnapshot =
+  async (): Promise<AiSettingsSnapshot> => {
+    const [personalSettings, teamSettings] = await Promise.all([
+      getMyAiSettingsSnapshot(),
+      getTeamAiSettingsSnapshot(),
+    ]);
+
+    return {
+      ...personalSettings,
+      kloser: teamSettings.kloser,
+      resolution: {
+        ...personalSettings.resolution,
+        tenantConfigId:
+          teamSettings.configId ?? teamSettings.resolution.tenantConfigId,
+      },
+    };
+  };
