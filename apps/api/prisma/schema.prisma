@@ -990,6 +990,14 @@ model AutomationDispatch {
   status                AutomationDispatchStatus
   targetWebhookUrl      String?
   payloadSnapshot       Json
+  /// Payload maestro estructurado enviado al motor de IA (n8n/OpenAI)
+  masterPayload         Json?
+  /// Captura inmutable del contexto del lead en el momento de la creación
+  contextSnapshot       Json?
+  /// Reglas de cumplimiento (compliance) heredadas del Tenant en este instante
+  compliancePolicy      Json?
+  /// Reglas de Call to Action (CTA) heredadas del Tenant en este instante
+  ctaPolicy             Json?
   responseSnapshot      Json?
   responseStatusCode    Int?
   errorCode             String?
