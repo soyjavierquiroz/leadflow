@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AutomationDispatchStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   resolveKloserRuntimeAttributes,
@@ -112,6 +112,8 @@ type DispatchResponse = {
   data: unknown;
 };
 
+type JsonRecord = Record<string, unknown>;
+
 type KloserMissionPayload = {
   event_id: string;
   event_type: 'mission.created';
@@ -144,6 +146,48 @@ type KloserMissionPayload = {
     source_system: 'leadflow';
     service_owner_key: 'lead-handler';
   };
+};
+
+type KloserMasterPayloadArtifacts = {
+  masterPayload: Prisma.InputJsonValue;
+  contextSnapshot: Prisma.InputJsonValue;
+  compliancePolicy: Prisma.InputJsonValue;
+  ctaPolicy: Prisma.InputJsonValue;
+};
+
+const isJsonRecord = (value: unknown): value is JsonRecord =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const cloneJsonValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneJsonValue(item));
+  }
+
+  if (isJsonRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        cloneJsonValue(nestedValue),
+      ]),
+    );
+  }
+
+  return value;
+};
+
+const toJsonRecord = (value: unknown): JsonRecord =>
+  isJsonRecord(value) ? (cloneJsonValue(value) as JsonRecord) : {};
+
+const readTenantKloserPolicy = (
+  tenantConfigRecord:
+    | AssignmentLeadContextRecord['team']['aiAgentConfigs'][number]
+    | null,
+  key: 'compliance_policy' | 'cta_policy',
+): Prisma.InputJsonValue => {
+  const aiPolicy = toJsonRecord(tenantConfigRecord?.aiPolicy);
+  const kloser = toJsonRecord(aiPolicy.kloser ?? aiPolicy.kloser_config);
+
+  return toJsonRecord(kloser[key]) as Prisma.InputJsonValue;
 };
 
 @Injectable()
@@ -197,12 +241,75 @@ export class LeadDispatcherService {
 
     const eventId = randomUUID();
     const payload = this.buildPayload(assignment, eventId);
+    const missionPayload = this.buildKloserMissionPayload(assignment, payload);
+    const masterPayloadArtifacts = this.buildKloserMasterPayloadArtifacts(
+      assignment,
+      payload,
+      missionPayload,
+    );
+    const dispatch = await this.prisma.automationDispatch.create({
+      data: {
+        workspaceId: assignment.workspaceId,
+        teamId: assignment.teamId,
+        sponsorId: assignment.sponsorId,
+        leadId: assignment.leadId,
+        assignmentId: assignment.id,
+        funnelInstanceId: assignment.funnelInstanceId ?? null,
+        funnelPublicationId: assignment.funnelPublicationId ?? null,
+        messagingConnectionId: connection.id ?? null,
+        triggerType: 'LEAD_CONTEXT_UPSERT',
+        status: AutomationDispatchStatus.pending,
+        targetWebhookUrl: this.dispatcherWebhookUrl,
+        payloadSnapshot: payload as Prisma.InputJsonValue,
+        masterPayload: masterPayloadArtifacts.masterPayload,
+        contextSnapshot: masterPayloadArtifacts.contextSnapshot,
+        compliancePolicy: masterPayloadArtifacts.compliancePolicy,
+        ctaPolicy: masterPayloadArtifacts.ctaPolicy,
+        responseStatusCode: null,
+        errorCode: null,
+        errorMessage: null,
+        queuedAt: new Date(payload.occurred_at),
+      },
+    });
 
-    const response = await this.postWithRetry(payload);
+    try {
+      const response = await this.postWithRetry(payload);
 
-    await this.createKloserMission(assignment, payload);
+      await this.prisma.automationDispatch.update({
+        where: {
+          id: dispatch.id,
+        },
+        data: {
+          status: AutomationDispatchStatus.dispatched,
+          responseSnapshot: this.toNullableJsonValue(response.data),
+          responseStatusCode: response.status,
+          dispatchedAt: new Date(),
+          completedAt: new Date(),
+        },
+      });
 
-    return response;
+      await this.createKloserMission(assignment, missionPayload);
+
+      return response;
+    } catch (error) {
+      await this.prisma.automationDispatch.update({
+        where: {
+          id: dispatch.id,
+        },
+        data: {
+          status: AutomationDispatchStatus.failed,
+          errorCode:
+            error instanceof Error ? 'LEAD_CONTEXT_UPSERT_FAILED' : 'UNKNOWN',
+          errorMessage:
+            error instanceof Error
+              ? error.message
+              : 'Lead context dispatcher failed unexpectedly.',
+          completedAt: new Date(),
+        },
+      });
+
+      throw error;
+    }
   }
 
   private buildPayload(
@@ -323,13 +430,11 @@ export class LeadDispatcherService {
 
   private async createKloserMission(
     assignment: AssignmentLeadContextRecord,
-    payload: LeadContextUpsertPayload,
+    missionPayload: KloserMissionPayload,
   ) {
     if (!this.kloserApiClient) {
       return;
     }
-
-    const missionPayload = this.buildKloserMissionPayload(assignment, payload);
 
     try {
       await this.kloserApiClient.createMission(missionPayload);
@@ -405,6 +510,49 @@ export class LeadDispatcherService {
     };
   }
 
+  private buildKloserMasterPayloadArtifacts(
+    assignment: AssignmentLeadContextRecord,
+    payload: LeadContextUpsertPayload,
+    missionPayload: KloserMissionPayload,
+  ): KloserMasterPayloadArtifacts {
+    const tenantConfigRecord = assignment.team.aiAgentConfigs[0] ?? null;
+    const compliancePolicy = readTenantKloserPolicy(
+      tenantConfigRecord,
+      'compliance_policy',
+    );
+    const ctaPolicy = readTenantKloserPolicy(tenantConfigRecord, 'cta_policy');
+    const contextSnapshot = {
+      leadStage: assignment.lead.status || payload.context.lead_stage,
+      routeMode: payload.context.lead_source,
+      verticalFlow:
+        missionPayload.context_snapshot.custom_attributes.vertical ||
+        payload.context.vertical_hint ||
+        'multinivel',
+      leadId: assignment.lead.id,
+      assignmentId: assignment.id,
+      trafficLayer: payload.context.traffic_layer,
+      capturedAt: payload.occurred_at,
+    } satisfies Prisma.JsonObject;
+
+    return {
+      contextSnapshot,
+      compliancePolicy,
+      ctaPolicy,
+      masterPayload: {
+        version: 'leadflow.kloser-master-payload.v1',
+        createdAt: contextSnapshot.capturedAt,
+        tenantId: assignment.teamId,
+        leadId: assignment.lead.id,
+        assignmentId: assignment.id,
+        dispatcherPayload: payload,
+        kloserMission: missionPayload,
+        contextSnapshot,
+        compliancePolicy,
+        ctaPolicy,
+      } as Prisma.InputJsonValue,
+    };
+  }
+
   private async dispatchOnce(payload: LeadContextUpsertPayload) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
@@ -444,5 +592,15 @@ export class LeadDispatcherService {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  private toNullableJsonValue(
+    value: unknown,
+  ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+    if (value === null || value === undefined) {
+      return Prisma.JsonNull;
+    }
+
+    return value as Prisma.InputJsonValue;
   }
 }

@@ -246,6 +246,140 @@ describe('LeadDispatcherService', () => {
     });
   });
 
+  it('persists the Kloser master payload snapshots on lead context dispatch', async () => {
+    process.env.N8N_DISPATCHER_WEBHOOK_URL =
+      'https://n8n.example.com/webhook/channels/dispatcher/lead-context-upsert';
+
+    const dispatchAssignment = {
+      ...mockAssignment,
+      workspaceId: 'workspace_test_001',
+      sponsorId: 'sponsor_ana_001',
+      leadId: 'lead_test_001',
+      funnelInstanceId: 'funnel_instance_001',
+      funnelPublicationId: 'funnel_publication_001',
+      sponsor: {
+        ...mockAssignment.sponsor,
+        messagingConnection: {
+          id: 'messaging_connection_001',
+          externalInstanceId: 'drenvexman',
+        },
+      },
+    };
+    const prisma = {
+      assignment: {
+        findUnique: jest.fn().mockResolvedValue(dispatchAssignment),
+      },
+      automationDispatch: {
+        create: jest.fn().mockResolvedValue({
+          id: 'automation_dispatch_001',
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const kloserApiClient = {
+      createMission: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new LeadDispatcherService(
+      prisma as never,
+      kloserApiClient as never,
+    );
+    jest
+      .spyOn(
+        service as unknown as {
+          postWithRetry: (
+            input: unknown,
+          ) => Promise<{ status: number; data: unknown }>;
+        },
+        'postWithRetry',
+      )
+      .mockResolvedValue({ status: 202, data: { accepted: true } });
+
+    await expect(
+      service.dispatchLeadContextUpsert({
+        assignmentId: 'assign_test_ana_001',
+      }),
+    ).resolves.toEqual({
+      status: 202,
+      data: { accepted: true },
+    });
+
+    expect(prisma.automationDispatch.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        workspaceId: 'workspace_test_001',
+        teamId: 'team_test_001',
+        sponsorId: 'sponsor_ana_001',
+        leadId: 'lead_test_001',
+        assignmentId: 'assign_test_ana_001',
+        funnelInstanceId: 'funnel_instance_001',
+        funnelPublicationId: 'funnel_publication_001',
+        messagingConnectionId: 'messaging_connection_001',
+        triggerType: 'LEAD_CONTEXT_UPSERT',
+        status: 'pending',
+        compliancePolicy: {
+          has_whatsapp_opt_in: true,
+          quiet_hours: {
+            start: '22:00',
+            end: '07:00',
+          },
+        },
+        ctaPolicy: {
+          type: 'checkout_link',
+          required: true,
+          shortener: 'kuruk',
+          allowed_domains: ['retodetransformacion.com'],
+        },
+        contextSnapshot: {
+          leadStage: 'captured',
+          routeMode: 'leadflow_wheel',
+          verticalFlow: 'salud',
+          leadId: 'lead_test_001',
+          assignmentId: 'assign_test_ana_001',
+          trafficLayer: 'PAID_WHEEL',
+          capturedAt: fixedNow,
+        },
+        masterPayload: expect.objectContaining({
+          version: 'leadflow.kloser-master-payload.v1',
+          tenantId: 'team_test_001',
+          leadId: 'lead_test_001',
+          assignmentId: 'assign_test_ana_001',
+          compliancePolicy: {
+            has_whatsapp_opt_in: true,
+            quiet_hours: {
+              start: '22:00',
+              end: '07:00',
+            },
+          },
+          ctaPolicy: {
+            type: 'checkout_link',
+            required: true,
+            shortener: 'kuruk',
+            allowed_domains: ['retodetransformacion.com'],
+          },
+        }),
+      }),
+    });
+    expect(prisma.automationDispatch.update).toHaveBeenCalledWith({
+      where: {
+        id: 'automation_dispatch_001',
+      },
+      data: expect.objectContaining({
+        status: 'dispatched',
+        responseSnapshot: {
+          accepted: true,
+        },
+        responseStatusCode: 202,
+        dispatchedAt: expect.any(Date),
+        completedAt: expect.any(Date),
+      }),
+    });
+    expect(kloserApiClient.createMission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenant_id: 'team_test_001',
+        lead_id: 'lead_test_001',
+      }),
+    );
+  });
+
   it('sends the dispatcher request with the expected url, headers and body', async () => {
     process.env.N8N_DISPATCHER_WEBHOOK_URL =
       'https://n8n.example.com/webhook/channels/dispatcher/lead-context-upsert';

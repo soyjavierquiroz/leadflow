@@ -46,7 +46,24 @@ const sponsorSnapshotInclude = {
 
 const assignmentDispatchInclude = {
   workspace: true,
-  team: true,
+  team: {
+    include: {
+      aiAgentConfigs: {
+        where: {
+          memberId: null,
+          isActive: true,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 1,
+        select: {
+          aiPolicy: true,
+          routeContexts: true,
+        },
+      },
+    },
+  },
   funnel: true,
   lead: {
     include: {
@@ -79,7 +96,54 @@ type AssignmentDispatchRecord = Prisma.AssignmentGetPayload<{
   include: typeof assignmentDispatchInclude;
 }>;
 
+type JsonRecord = Record<string, unknown>;
+
 const toIso = (value: Date | null) => (value ? value.toISOString() : null);
+
+const sanitizeText = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed ? trimmed : null;
+};
+
+const isJsonRecord = (value: unknown): value is JsonRecord =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const cloneJsonValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneJsonValue(item));
+  }
+
+  if (isJsonRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        cloneJsonValue(nestedValue),
+      ]),
+    );
+  }
+
+  return value;
+};
+
+const toJsonRecord = (value: unknown): JsonRecord =>
+  isJsonRecord(value) ? (cloneJsonValue(value) as JsonRecord) : {};
+
+const readTenantKloserPolicy = (
+  tenantConfigRecord:
+    | AssignmentDispatchRecord['team']['aiAgentConfigs'][number]
+    | null,
+  key: 'compliance_policy' | 'cta_policy',
+): Prisma.InputJsonValue => {
+  const aiPolicy = toJsonRecord(tenantConfigRecord?.aiPolicy);
+  const kloser = toJsonRecord(aiPolicy.kloser ?? aiPolicy.kloser_config);
+
+  return toJsonRecord(kloser[key]) as Prisma.InputJsonValue;
+};
 
 @Injectable()
 export class MessagingAutomationService {
@@ -176,6 +240,12 @@ export class MessagingAutomationService {
       input,
       targetWebhookUrl,
     });
+    const masterPayloadArtifacts = this.buildKloserMasterPayloadArtifacts({
+      assignment,
+      payload,
+      queuedAt,
+      triggerType: input.triggerType,
+    });
 
     await this.prisma.automationDispatch.create({
       data: {
@@ -192,6 +262,10 @@ export class MessagingAutomationService {
         status: AutomationDispatchStatus.pending,
         targetWebhookUrl,
         payloadSnapshot: payload,
+        masterPayload: masterPayloadArtifacts.masterPayload,
+        contextSnapshot: masterPayloadArtifacts.contextSnapshot,
+        compliancePolicy: masterPayloadArtifacts.compliancePolicy,
+        ctaPolicy: masterPayloadArtifacts.ctaPolicy,
         responseStatusCode: null,
         errorCode: null,
         errorMessage: null,
@@ -502,6 +576,76 @@ export class MessagingAutomationService {
         utmCampaign: assignment.lead.visitor?.utmCampaign ?? null,
       },
     } satisfies Prisma.JsonObject;
+  }
+
+  private buildKloserMasterPayloadArtifacts(input: {
+    assignment: AssignmentDispatchRecord;
+    payload: Prisma.InputJsonValue;
+    queuedAt: Date;
+    triggerType: string;
+  }) {
+    const tenantConfigRecord =
+      input.assignment.team.aiAgentConfigs[0] ?? null;
+    const compliancePolicy = readTenantKloserPolicy(
+      tenantConfigRecord,
+      'compliance_policy',
+    );
+    const ctaPolicy = readTenantKloserPolicy(tenantConfigRecord, 'cta_policy');
+    const contextSnapshot = {
+      leadStage: input.assignment.lead.status,
+      routeMode: input.triggerType,
+      verticalFlow: this.resolveVerticalFlow(input.assignment),
+      leadId: input.assignment.lead.id,
+      assignmentId: input.assignment.id,
+      trafficLayer:
+        input.assignment.trafficLayer ??
+        input.assignment.lead.trafficLayer ??
+        'ORGANIC',
+      capturedAt: input.queuedAt.toISOString(),
+    } satisfies Prisma.JsonObject;
+
+    return {
+      contextSnapshot,
+      compliancePolicy,
+      ctaPolicy,
+      masterPayload: {
+        version: 'leadflow.kloser-master-payload.v1',
+        createdAt: input.queuedAt.toISOString(),
+        tenantId: input.assignment.teamId,
+        leadId: input.assignment.lead.id,
+        assignmentId: input.assignment.id,
+        automationPayload: input.payload,
+        contextSnapshot,
+        compliancePolicy,
+        ctaPolicy,
+      } as Prisma.InputJsonValue,
+    };
+  }
+
+  private resolveVerticalFlow(assignment: AssignmentDispatchRecord) {
+    const tenantConfigRecord = assignment.team.aiAgentConfigs[0] ?? null;
+    const aiPolicy = toJsonRecord(tenantConfigRecord?.aiPolicy);
+    const routeContexts = toJsonRecord(tenantConfigRecord?.routeContexts);
+    const kloser = toJsonRecord(aiPolicy.kloser ?? aiPolicy.kloser_config);
+    const candidates = [
+      kloser.vertical,
+      kloser.vertical_key,
+      aiPolicy.vertical_key,
+      aiPolicy.vertical,
+      routeContexts.vertical,
+      assignment.funnelPublication?.pathPrefix?.replace(/^\/+/, ''),
+      assignment.funnelInstance?.code,
+    ];
+
+    for (const candidate of candidates) {
+      const normalized = sanitizeText(candidate);
+
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    return 'multinivel';
   }
 
   private async recordDomainEvent(input: {
