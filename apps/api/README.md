@@ -68,6 +68,65 @@ La ingesta RAG acepta `multipart/form-data` y reenvia el PDF al webhook interno 
 
 `KnowledgeService` conserva los metadatos no reservados y los pasa a n8n para que el workflow resuelva el stack correcto. Para borrado fisico, `deleteDocumentById()` llama Runtime Context Central con `DELETE /v1/knowledge/:document_id?tenant_id=<uuid>` y sin body JSON.
 
+## Configuracion IA y runtime gateway
+
+La configuracion IA esta separada por alcance para evitar que ajustes
+personales sobrescriban politicas del tenant:
+
+- `GET /v1/ai-config/me`: snapshot editable de la configuracion personal del
+  sponsor autenticado.
+- `PATCH /v1/ai-config/me`: actualiza prompt, route contexts, CTA y AI policy
+  personal. No acepta claves `kloser` ni `kloser_config`.
+- `GET /v1/ai-config/team`: snapshot editable de la configuracion del equipo.
+  Requiere rol `TEAM_ADMIN`.
+- `PATCH /v1/ai-config/team`: actualiza `basePrompt` y `aiPolicy` team-level.
+  Las estrategias Kloser viven en este alcance.
+
+Resolucion interna para gateway/n8n:
+
+- `POST /v1/ai-config/resolve-full`
+- Body soportado:
+
+```json
+{
+  "instance_name": "drenvexman",
+  "tenant_id": "team_uuid_opcional"
+}
+```
+
+`instance_id` tambien se acepta como alias de `instance_name`. Cuando se envia
+`tenant_id`, la resolucion prioriza `MessagingConnection` del tenant antes que
+`ChannelInstance`, lo que evita usar bindings obsoletos de otra cuenta. Si hay
+una configuracion IA directa para el tenant con prompt valido, el servicio puede
+construir un runtime tenant-level sin depender del binding legacy.
+
+El runtime devuelto incluye:
+
+- `basePrompt` y `base_prompt` en la raiz y dentro de `ai_agent`.
+- `config_version` con ids y timestamps de las configuraciones tenant/member.
+- `routing` WhatsApp para `lead-handler`.
+- metadata tenant (`vertical_key`, `brand_key`, `business_model_type`).
+- identity del member/sponsor, wallet context, route contexts, CTA policy, AI
+  policy y configuracion Kloser resuelta.
+
+Seleccion de configuracion tenant:
+
+1. Prompt custom distinto del default del sistema.
+2. Cualquier prompt valido no vacio.
+3. Fallback disponible.
+
+### Cache Redis de configuracion tenant
+
+Cuando se crea o actualiza una configuracion IA tenant/member, la API intenta
+purgar la cache Redis asociada al tenant. La purga no bloquea la escritura si
+Redis no esta disponible.
+
+Variables:
+
+- `REDIS_URL`
+- `TENANT_CONFIG_CACHE_KEY_PREFIX` (default `tenant:config`)
+- `REDIS_CACHE_TIMEOUT_MS` (default `2000`)
+
 ## Kredits Admin
 
 Leadflow ya incluye una superficie administrativa de Kredits consumida por la

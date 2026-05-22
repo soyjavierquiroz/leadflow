@@ -2009,6 +2009,7 @@ export function AiSettingsForm({ initialSettings }: AiSettingsFormProps) {
           {
             method: "PATCH",
             body: JSON.stringify({
+              basePrompt: form.basePrompt,
               aiPolicy: buildKloserAiPolicy(form.kloser),
             }),
           },

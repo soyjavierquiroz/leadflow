@@ -3,6 +3,11 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { AutomationDispatchStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  DEFAULT_TENANT_AI_BASE_PROMPT,
+  resolveAiRuntimeRoutingMetadata,
+  withDefaultAiRuntimeRoutingMetadata,
+} from '../ai-config/ai-config.defaults';
+import {
   resolveKloserRuntimeAttributes,
   resolveKloserTenantConfig,
 } from '../ai-config/kloser-tenant-config';
@@ -35,6 +40,7 @@ const assignmentLeadContextInclude = {
   team: {
     select: {
       id: true,
+      name: true,
       code: true,
       aiAgentConfigs: {
         where: {
@@ -42,13 +48,15 @@ const assignmentLeadContextInclude = {
           isActive: true,
         },
         orderBy: {
-          updatedAt: 'desc',
+          id: 'asc',
         },
-        take: 1,
         select: {
+          id: true,
+          basePrompt: true,
           aiPolicy: true,
           ctaPolicy: true,
           routeContexts: true,
+          updatedAt: true,
         },
       },
     },
@@ -190,6 +198,46 @@ const readTenantKloserPolicy = (
   return toJsonRecord(kloser[key]) as Prisma.InputJsonValue;
 };
 
+const isValidBasePrompt = (value: string | null | undefined) =>
+  Boolean(sanitizeNullableText(value));
+
+const isCustomTenantBasePrompt = (value: string | null | undefined) => {
+  const prompt = sanitizeNullableText(value);
+
+  return Boolean(prompt && prompt !== DEFAULT_TENANT_AI_BASE_PROMPT);
+};
+
+const selectTenantConfigByPromptPriority = (
+  configs: AssignmentLeadContextRecord['team']['aiAgentConfigs'],
+) => {
+  return (
+    configs.find((config) => isCustomTenantBasePrompt(config.basePrompt)) ??
+    configs.find((config) => isValidBasePrompt(config.basePrompt)) ??
+    configs[0] ??
+    null
+  );
+};
+
+const readTenantBasePrompt = (
+  tenantConfigRecord:
+    | AssignmentLeadContextRecord['team']['aiAgentConfigs'][number]
+    | null,
+) =>
+  sanitizeNullableText(tenantConfigRecord?.basePrompt) ??
+  DEFAULT_TENANT_AI_BASE_PROMPT;
+
+const buildTenantConfigVersion = (
+  tenantConfigRecord:
+    | AssignmentLeadContextRecord['team']['aiAgentConfigs'][number]
+    | null,
+) => {
+  if (!tenantConfigRecord) {
+    return 'ai-agent-config:fallback';
+  }
+
+  return `ai-agent-config:${tenantConfigRecord.id}:${tenantConfigRecord.updatedAt.toISOString()}`;
+};
+
 @Injectable()
 export class LeadDispatcherService {
   private readonly logger = new Logger(LeadDispatcherService.name);
@@ -323,6 +371,13 @@ export class LeadDispatcherService {
     const adWheelId =
       assignment.originAdWheelId ?? assignment.lead.originAdWheelId ?? null;
     const isOwnedLead = trafficLayer === 'DIRECT';
+    const tenantConfigRecord = selectTenantConfigByPromptPriority(
+      assignment.team.aiAgentConfigs,
+    );
+    const runtimeConfig = this.buildRuntimeConfig({
+      assignment,
+      tenantConfigRecord,
+    });
 
     return {
       event: 'LEAD_CONTEXT_UPSERT',
@@ -333,6 +388,8 @@ export class LeadDispatcherService {
         type: 'external_app',
         version: LEAD_DISPATCHER_SOURCE_VERSION,
       },
+      config_version: buildTenantConfigVersion(tenantConfigRecord),
+      runtime_config: runtimeConfig,
       routing: {
         provider: 'evolution',
         channel: 'whatsapp',
@@ -451,7 +508,9 @@ export class LeadDispatcherService {
     assignment: AssignmentLeadContextRecord,
     payload: LeadContextUpsertPayload,
   ): KloserMissionPayload {
-    const tenantConfigRecord = assignment.team.aiAgentConfigs[0] ?? null;
+    const tenantConfigRecord = selectTenantConfigByPromptPriority(
+      assignment.team.aiAgentConfigs,
+    );
     const tenantConfig = {
       kloser: resolveKloserTenantConfig({
         aiPolicy: tenantConfigRecord?.aiPolicy,
@@ -515,7 +574,9 @@ export class LeadDispatcherService {
     payload: LeadContextUpsertPayload,
     missionPayload: KloserMissionPayload,
   ): KloserMasterPayloadArtifacts {
-    const tenantConfigRecord = assignment.team.aiAgentConfigs[0] ?? null;
+    const tenantConfigRecord = selectTenantConfigByPromptPriority(
+      assignment.team.aiAgentConfigs,
+    );
     const compliancePolicy = readTenantKloserPolicy(
       tenantConfigRecord,
       'compliance_policy',
@@ -540,10 +601,12 @@ export class LeadDispatcherService {
       ctaPolicy,
       masterPayload: {
         version: 'leadflow.kloser-master-payload.v1',
+        config_version: buildTenantConfigVersion(tenantConfigRecord),
         createdAt: contextSnapshot.capturedAt,
         tenantId: assignment.teamId,
         leadId: assignment.lead.id,
         assignmentId: assignment.id,
+        runtime_config: payload.runtime_config,
         dispatcherPayload: payload,
         kloserMission: missionPayload,
         contextSnapshot,
@@ -551,6 +614,67 @@ export class LeadDispatcherService {
         ctaPolicy,
       } as Prisma.InputJsonValue,
     };
+  }
+
+  private buildRuntimeConfig(input: {
+    assignment: AssignmentLeadContextRecord;
+    tenantConfigRecord:
+      | AssignmentLeadContextRecord['team']['aiAgentConfigs'][number]
+      | null;
+  }) {
+    const routeContexts = toJsonRecord(input.tenantConfigRecord?.routeContexts);
+    const aiPolicy = withDefaultAiRuntimeRoutingMetadata(
+      input.tenantConfigRecord?.aiPolicy,
+      {
+        tenantCode: input.assignment.team.code,
+        brandKey: input.assignment.team.code,
+      },
+    );
+    const ctaPolicy = toJsonRecord(input.tenantConfigRecord?.ctaPolicy);
+    const routingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: input.assignment.team.code,
+      aiPolicy,
+      routeContexts,
+    });
+    const basePrompt = readTenantBasePrompt(input.tenantConfigRecord);
+    const instanceName =
+      input.assignment.sponsor.messagingConnection?.externalInstanceId ?? '';
+
+    return {
+      version: 'leadflow.ai-runtime-context.v1',
+      base_prompt: basePrompt,
+      routing: {
+        provider: 'evolution',
+        channel: 'whatsapp',
+        instance_name: instanceName,
+        service_owner_key: 'lead-handler',
+      },
+      tenant: {
+        id: input.assignment.teamId,
+        name: input.assignment.team.name,
+        code: input.assignment.team.code,
+        ...routingMetadata,
+      },
+      member: {
+        id: input.assignment.sponsor.id,
+        name: input.assignment.sponsor.displayName,
+        email: sanitizeNullableText(input.assignment.sponsor.email),
+        phone: sanitizeNullableText(input.assignment.sponsor.phone),
+        whatsapp_link: normalizeMessagingPhone(input.assignment.sponsor.phone)
+          ? `https://wa.me/${normalizeMessagingPhone(input.assignment.sponsor.phone)}`
+          : null,
+      },
+      ai_agent: {
+        base_prompt: basePrompt,
+        route_contexts: routeContexts,
+        cta_policy: ctaPolicy,
+        ai_policy: aiPolicy,
+      },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy,
+        ctaPolicy,
+      }),
+    } as Record<string, unknown>;
   }
 
   private async dispatchOnce(payload: LeadContextUpsertPayload) {

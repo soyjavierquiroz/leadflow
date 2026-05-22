@@ -1,5 +1,8 @@
 export type AiRuntimeContext = {
   version: 'leadflow.ai-runtime-context.v1';
+  config_version: string;
+  basePrompt: string;
+  base_prompt: string;
   routing: {
     provider: string;
     channel: 'whatsapp';
@@ -34,6 +37,7 @@ export type AiRuntimeContext = {
     reason: string | null;
   };
   ai_agent: {
+    basePrompt: string;
     base_prompt: string;
     route_contexts: Record<string, unknown>;
     cta_policy: Record<string, unknown>;
@@ -94,8 +98,10 @@ export type ResolveFullRuntimeResponse = {
     status: 'resolved' | 'unavailable';
     reason: string | null;
   };
+  basePrompt: string;
+  base_prompt: string;
   runtime_config: AiRuntimeContext;
-  config_version: AiRuntimeContext['version'];
+  config_version: string;
   status: 'active';
 };
 

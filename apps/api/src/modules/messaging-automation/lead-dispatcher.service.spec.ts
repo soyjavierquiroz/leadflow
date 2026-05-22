@@ -10,9 +10,13 @@ describe('LeadDispatcherService', () => {
     },
     team: {
       id: 'team_test_001',
+      name: 'Inmuno Team',
       code: 'inmuno-team',
       aiAgentConfigs: [
         {
+          id: 'tenant_config_custom_001',
+          basePrompt: 'Prompt custom de Inmuno para seguimiento.',
+          updatedAt: new Date('2026-03-29T10:00:00.000Z'),
           routeContexts: {
             vertical: 'salud',
           },
@@ -68,6 +72,8 @@ describe('LeadDispatcherService', () => {
     sponsor: {
       id: 'sponsor_ana_001',
       displayName: 'Ana',
+      email: 'ana@example.com',
+      phone: '+52 55 7777 8888',
       messagingConnection: {
         externalInstanceId: 'drenvexman',
       },
@@ -125,6 +131,32 @@ describe('LeadDispatcherService', () => {
         type: 'external_app',
         version: '1.0.0',
       },
+      config_version:
+        'ai-agent-config:tenant_config_custom_001:2026-03-29T10:00:00.000Z',
+      runtime_config: expect.objectContaining({
+        version: 'leadflow.ai-runtime-context.v1',
+        base_prompt: 'Prompt custom de Inmuno para seguimiento.',
+        routing: {
+          provider: 'evolution',
+          channel: 'whatsapp',
+          instance_name: 'drenvexman',
+          service_owner_key: 'lead-handler',
+        },
+        tenant: expect.objectContaining({
+          id: 'team_test_001',
+          name: 'Inmuno Team',
+          code: 'inmuno-team',
+          vertical_key: 'multinivel',
+          brand_key: 'inmuno-team',
+          business_model_type: 'multinivel',
+        }),
+        ai_agent: expect.objectContaining({
+          base_prompt: 'Prompt custom de Inmuno para seguimiento.',
+          route_contexts: {
+            vertical: 'salud',
+          },
+        }),
+      }),
       routing: {
         provider: 'evolution',
         channel: 'whatsapp',
@@ -172,6 +204,59 @@ describe('LeadDispatcherService', () => {
     });
   });
 
+  it('keeps the custom tenant basePrompt even when a default config is newer', () => {
+    const service = new LeadDispatcherService({} as never);
+    const assignment = {
+      ...mockAssignment,
+      team: {
+        ...mockAssignment.team,
+        aiAgentConfigs: [
+          {
+            id: 'tenant_config_default_new',
+            basePrompt:
+              'Actua como asesor de {{team_name}} para conversaciones de negocio multinivel. Personaliza la ayuda para {{name}}, prioriza claridad, seguimiento util y una invitacion natural a continuar por WhatsApp cuando aplique.',
+            updatedAt: new Date('2026-05-20T00:00:00.000Z'),
+            routeContexts: null,
+            ctaPolicy: null,
+            aiPolicy: null,
+          },
+          {
+            ...mockAssignment.team.aiAgentConfigs[0],
+            id: 'tenant_config_custom_old',
+            basePrompt: 'Prompt custom antiguo que debe ganar.',
+            updatedAt: new Date('2026-05-01T00:00:00.000Z'),
+          },
+        ],
+      },
+    };
+    const payload = (
+      service as unknown as {
+        buildPayload: (
+          assignment: any,
+          nextEventId: string,
+        ) => {
+          config_version: string;
+          runtime_config: {
+            base_prompt: string;
+            ai_agent: {
+              base_prompt: string;
+            };
+          };
+        };
+      }
+    ).buildPayload(assignment, 'evt_test_prompt_priority');
+
+    expect(payload.config_version).toBe(
+      'ai-agent-config:tenant_config_custom_old:2026-05-01T00:00:00.000Z',
+    );
+    expect(payload.runtime_config.base_prompt).toBe(
+      'Prompt custom antiguo que debe ganar.',
+    );
+    expect(payload.runtime_config.ai_agent.base_prompt).toBe(
+      'Prompt custom antiguo que debe ganar.',
+    );
+  });
+
   it('builds the Kloser mission payload v2.2 from tenant config and lead identity', () => {
     const service = new LeadDispatcherService({} as never);
     const dispatcherPayload = buildPayload(
@@ -217,8 +302,10 @@ describe('LeadDispatcherService', () => {
       cta_policy: {
         type: 'checkout_link',
         required: true,
-        shortener: 'kuruk',
+        shortener: 'none',
         allowed_domains: ['retodetransformacion.com'],
+        base_url: null,
+        requires_shortener: false,
       },
       message_policy: {
         template_id: 'inmuno_follow_up_v2',
@@ -228,6 +315,7 @@ describe('LeadDispatcherService', () => {
         },
         max_length: 800,
         requires_personalization: true,
+        forbidden_claims: [],
       },
       context_snapshot: {
         lead_stage: 'captured',
@@ -339,9 +427,17 @@ describe('LeadDispatcherService', () => {
         },
         masterPayload: expect.objectContaining({
           version: 'leadflow.kloser-master-payload.v1',
+          config_version:
+            'ai-agent-config:tenant_config_custom_001:2026-03-29T10:00:00.000Z',
           tenantId: 'team_test_001',
           leadId: 'lead_test_001',
           assignmentId: 'assign_test_ana_001',
+          runtime_config: expect.objectContaining({
+            base_prompt: 'Prompt custom de Inmuno para seguimiento.',
+            ai_agent: expect.objectContaining({
+              base_prompt: 'Prompt custom de Inmuno para seguimiento.',
+            }),
+          }),
           compliancePolicy: {
             has_whatsapp_opt_in: true,
             quiet_hours: {

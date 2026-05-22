@@ -85,6 +85,7 @@ export const getManagementAiSettingsSnapshot =
 
     return {
       ...personalSettings,
+      basePrompt: teamSettings.basePrompt || personalSettings.basePrompt,
       kloser: teamSettings.kloser,
       resolution: {
         ...personalSettings.resolution,

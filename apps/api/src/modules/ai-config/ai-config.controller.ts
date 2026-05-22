@@ -36,9 +36,14 @@ export class AiConfigController {
     @Body()
     body?: {
       instance_name?: string | null;
+      instance_id?: string | null;
+      tenant_id?: string | null;
     },
   ): Promise<ResolveFullRuntimeResponse> {
-    const instanceName = sanitizeNullableText(body?.instance_name);
+    const instanceName =
+      sanitizeNullableText(body?.instance_name) ??
+      sanitizeNullableText(body?.instance_id);
+    const tenantId = sanitizeNullableText(body?.tenant_id);
 
     if (!instanceName) {
       throw new BadRequestException({
@@ -47,8 +52,10 @@ export class AiConfigController {
       });
     }
 
-    const runtimeContext =
-      await this.aiConfigService.resolveRuntimeContext(instanceName);
+    const runtimeContext = await this.aiConfigService.resolveRuntimeContext({
+      instanceName,
+      tenantId,
+    });
 
     return {
       tenant_id: runtimeContext.tenant.id,
@@ -67,8 +74,10 @@ export class AiConfigController {
         status: runtimeContext.wallet.status,
         reason: runtimeContext.wallet.reason,
       },
+      basePrompt: runtimeContext.basePrompt,
+      base_prompt: runtimeContext.base_prompt,
       runtime_config: runtimeContext,
-      config_version: runtimeContext.version,
+      config_version: runtimeContext.config_version,
       status: RUNTIME_STATUS,
     };
   }

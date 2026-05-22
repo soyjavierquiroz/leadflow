@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeBaseUrl, sanitizeNullableText } from '../shared/url.utils';
-import { resolveAiRuntimeRoutingMetadata } from '../ai-config/ai-config.defaults';
+import {
+  DEFAULT_TENANT_AI_BASE_PROMPT,
+  resolveAiRuntimeRoutingMetadata,
+} from '../ai-config/ai-config.defaults';
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const RUNTIME_CONTEXT_CONFIG_SYNC_PATH = '/v1/config/sync';
@@ -10,6 +13,9 @@ const RUNTIME_CONTEXT_SERVICE_KEY = 'leadflow_api' as const;
 const FUNNEL_HANDLER_MEMBER_PREFIX = 'lead-handler' as const;
 
 type JsonRecord = Record<string, Prisma.JsonValue>;
+type TenantAiAgentConfig = Prisma.AiAgentConfigGetPayload<
+  Record<string, never>
+>;
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -47,6 +53,24 @@ const toJsonRecord = (
   value: Prisma.JsonValue | null | undefined,
 ): JsonRecord =>
   isJsonRecord(value) ? (cloneJsonValue(value) as JsonRecord) : {};
+
+const isValidBasePrompt = (value: string | null | undefined) =>
+  Boolean(sanitizeNullableText(value));
+
+const isCustomTenantBasePrompt = (value: string | null | undefined) => {
+  const prompt = sanitizeNullableText(value);
+
+  return Boolean(prompt && prompt !== DEFAULT_TENANT_AI_BASE_PROMPT);
+};
+
+const selectTenantConfigByPromptPriority = (configs: TenantAiAgentConfig[]) => {
+  return (
+    configs.find((config) => isCustomTenantBasePrompt(config.basePrompt)) ??
+    configs.find((config) => isValidBasePrompt(config.basePrompt)) ??
+    configs[0] ??
+    null
+  );
+};
 
 type RuntimeContextConfigSyncPayloadInput = {
   tenantId: string;
@@ -109,6 +133,21 @@ export class RuntimeContextConfigSyncService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  private async findActiveTenantConfig(tenantId: string) {
+    const configs = await this.prisma.aiAgentConfig.findMany({
+      where: {
+        tenantId,
+        memberId: null,
+        isActive: true,
+      },
+      orderBy: {
+        id: 'asc',
+      },
+    });
+
+    return selectTenantConfigByPromptPriority(configs);
+  }
+
   async syncFunnelContextForInstance(input: {
     tenantId: string;
     funnelInstanceId: string;
@@ -151,16 +190,7 @@ export class RuntimeContextConfigSyncService {
             },
           },
         }),
-        this.prisma.aiAgentConfig.findFirst({
-          where: {
-            tenantId: input.tenantId,
-            memberId: null,
-            isActive: true,
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-        }),
+        this.findActiveTenantConfig(input.tenantId),
       ]);
 
       if (!funnelInstance) {

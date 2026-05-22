@@ -9,8 +9,14 @@ describe('AiConfigService', () => {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
       },
+      messagingConnection: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       aiAgentConfig: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
       },
@@ -26,13 +32,18 @@ describe('AiConfigService', () => {
       upsertSponsorAccount: jest.fn(),
       getSponsorKredits: jest.fn(),
     };
+    const tenantConfigCacheService = {
+      purgeTenantConfig: jest.fn(),
+    };
 
     return {
       prisma,
       walletEngineService,
+      tenantConfigCacheService,
       service: new AiConfigService(
         prisma as never,
         walletEngineService as never,
+        tenantConfigCacheService as never,
       ),
     };
   };
@@ -40,7 +51,7 @@ describe('AiConfigService', () => {
   it('creates tenant default AI config with multinivel runtime metadata', async () => {
     const { prisma, service } = buildService();
 
-    prisma.aiAgentConfig.findFirst.mockResolvedValue(null);
+    prisma.aiAgentConfig.findMany.mockResolvedValue([]);
     prisma.aiAgentConfig.create.mockResolvedValue({
       id: 'tenant-config-1',
     });
@@ -73,15 +84,18 @@ describe('AiConfigService', () => {
   it('repairs unknown tenant runtime metadata without clobbering the config', async () => {
     const { prisma, service } = buildService();
 
-    prisma.aiAgentConfig.findFirst.mockResolvedValue({
-      id: 'tenant-config-1',
-      aiPolicy: {
-        vertical_key: 'unknown',
-        brand_key: 'unknown',
-        business_model_type: 'unknown',
-        model: 'gpt-4o-mini',
+    prisma.aiAgentConfig.findMany.mockResolvedValue([
+      {
+        id: 'tenant-config-1',
+        basePrompt: 'Prompt equipo',
+        aiPolicy: {
+          vertical_key: 'unknown',
+          brand_key: 'unknown',
+          business_model_type: 'unknown',
+          model: 'gpt-4o-mini',
+        },
       },
-    });
+    ]);
     prisma.aiAgentConfig.update.mockResolvedValue({
       id: 'tenant-config-1',
     });
@@ -113,6 +127,159 @@ describe('AiConfigService', () => {
     });
   });
 
+  it('rejects Kloser writes on personal AI config updates', async () => {
+    const { prisma, service } = buildService();
+
+    prisma.sponsor.findFirst.mockResolvedValue({
+      id: 'sponsor-1',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      displayName: 'Ana Sponsor',
+      team: {
+        id: 'team-1',
+        name: 'Freddy Team',
+        code: 'freddy',
+      },
+    });
+
+    await expect(
+      service.updateMemberSettings(
+        {
+          workspaceId: 'workspace-1',
+          teamId: 'team-1',
+          sponsorId: 'sponsor-1',
+        },
+        {
+          basePrompt: 'Prompt personal',
+          aiPolicy: {
+            kloser: {
+              strategy: {
+                cadence_minutes: [60],
+              },
+            },
+          },
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'AI_CONFIG_KLOSER_PERSONAL_FORBIDDEN',
+      }),
+    });
+    expect(prisma.aiAgentConfig.upsert).not.toHaveBeenCalled();
+  });
+
+  it('merges Kloser updates into the tenant AI config with memberId null', async () => {
+    const { prisma, service, tenantConfigCacheService } = buildService();
+    const updatedAt = new Date('2026-05-17T00:00:00.000Z');
+
+    prisma.sponsor.findFirst.mockResolvedValue({
+      id: 'sponsor-1',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      displayName: 'Ana Sponsor',
+      team: {
+        id: 'team-1',
+        name: 'Freddy Team',
+        code: 'freddy',
+      },
+    });
+    prisma.aiAgentConfig.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'tenant-config-1',
+          tenantId: 'team-1',
+          memberId: null,
+          basePrompt: 'Prompt equipo',
+          routeContexts: null,
+          ctaPolicy: null,
+          aiPolicy: {
+            model: 'gpt-4o-mini',
+            kloser: {
+              strategy: {
+                cadence_minutes: [1440],
+              },
+            },
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'tenant-config-1',
+          tenantId: 'team-1',
+          memberId: null,
+          basePrompt: 'Prompt equipo',
+          routeContexts: null,
+          ctaPolicy: null,
+          aiPolicy: {
+            model: 'gpt-4o-mini',
+            kloser: {
+              strategy: {
+                cadence_minutes: [60, 240],
+              },
+            },
+          },
+          updatedAt,
+        },
+      ]);
+    prisma.aiAgentConfig.update.mockResolvedValue({
+      id: 'tenant-config-1',
+    });
+
+    const result = await service.updateTeamSettings(
+      {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        sponsorId: 'sponsor-1',
+      },
+      {
+        basePrompt: 'Prompt equipo actualizado',
+        aiPolicy: {
+          kloser: {
+            strategy: {
+              cadence_minutes: [60, 240],
+            },
+          },
+        },
+      },
+    );
+
+    expect(prisma.aiAgentConfig.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tenant-config-1',
+      },
+      data: expect.objectContaining({
+        isActive: true,
+        basePrompt: 'Prompt equipo actualizado',
+        aiPolicy: expect.objectContaining({
+          model: 'gpt-4o-mini',
+          kloser: expect.objectContaining({
+            strategy: expect.objectContaining({
+              cadence_minutes: [60, 240],
+            }),
+          }),
+        }),
+      }),
+    });
+    expect(tenantConfigCacheService.purgeTenantConfig).toHaveBeenCalledWith(
+      'team-1',
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        configId: 'tenant-config-1',
+        resolution: expect.objectContaining({
+          strategy: 'tenant_default',
+          tenantConfigId: 'tenant-config-1',
+          memberConfigId: null,
+        }),
+        kloser: expect.objectContaining({
+          strategy: expect.objectContaining({
+            cadence_minutes: [60, 240],
+          }),
+        }),
+      }),
+    );
+  });
+
   it('prefers member overrides, merges JSON policies, replaces placeholders and enriches the wallet context', async () => {
     const { prisma, walletEngineService, service } = buildService();
 
@@ -136,27 +303,27 @@ describe('AiConfigService', () => {
         publicSlug: 'ana-sponsor',
       },
     });
-    prisma.aiAgentConfig.findFirst
-      .mockResolvedValueOnce({
-        id: 'member-config-1',
-        basePrompt:
-          'Habla como {{name}} desde {{team_name}} y dirige a {{whatsapp_link}} cuando sea correcto.',
-        routeContexts: {
-          offer: {
-            mode: 'member-offer',
-          },
+    prisma.aiAgentConfig.findFirst.mockResolvedValueOnce({
+      id: 'member-config-1',
+      basePrompt:
+        'Habla como {{name}} desde {{team_name}} y dirige a {{whatsapp_link}} cuando sea correcto.',
+      routeContexts: {
+        offer: {
+          mode: 'member-offer',
         },
-        ctaPolicy: {
-          close: {
-            mode: 'soft',
-          },
+      },
+      ctaPolicy: {
+        close: {
+          mode: 'soft',
         },
-        aiPolicy: {
-          model: 'gpt-4o-mini',
-          temperature: 0.4,
-        },
-      })
-      .mockResolvedValueOnce({
+      },
+      aiPolicy: {
+        model: 'gpt-4o-mini',
+        temperature: 0.4,
+      },
+    });
+    prisma.aiAgentConfig.findMany.mockResolvedValueOnce([
+      {
         id: 'tenant-config-1',
         basePrompt: 'Base team prompt.',
         routeContexts: {
@@ -178,7 +345,8 @@ describe('AiConfigService', () => {
           model: 'gpt-5-mini',
           top_p: 0.9,
         },
-      });
+      },
+    ]);
     walletEngineService.isConfigured.mockReturnValue(true);
     walletEngineService.upsertSponsorAccount.mockResolvedValue({
       accountId: 'wallet-1',
@@ -204,7 +372,9 @@ describe('AiConfigService', () => {
           status: 'resolved',
           reason: null,
         },
-        ai_agent: {
+        ai_agent: expect.objectContaining({
+          basePrompt:
+            'Base team prompt.\n\nHabla como Ana Sponsor desde Freddy Team y dirige a https://wa.me/525512345678 cuando sea correcto.',
           base_prompt:
             'Base team prompt.\n\nHabla como Ana Sponsor desde Freddy Team y dirige a https://wa.me/525512345678 cuando sea correcto.',
           route_contexts: {
@@ -227,7 +397,7 @@ describe('AiConfigService', () => {
             top_p: 0.9,
             temperature: 0.4,
           },
-        },
+        }),
         resolution: {
           strategy: 'member_override',
           tenant_config_id: 'tenant-config-1',
@@ -260,9 +430,9 @@ describe('AiConfigService', () => {
         publicSlug: null,
       },
     });
-    prisma.aiAgentConfig.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
+    prisma.aiAgentConfig.findFirst.mockResolvedValueOnce(null);
+    prisma.aiAgentConfig.findMany.mockResolvedValueOnce([
+      {
         id: 'tenant-config-1',
         basePrompt: 'Hola {{name}}',
         routeContexts: {
@@ -278,12 +448,14 @@ describe('AiConfigService', () => {
         aiPolicy: {
           model: 'gpt-4o-mini',
         },
-      });
+      },
+    ]);
     walletEngineService.isConfigured.mockReturnValue(false);
 
     await expect(service.resolveRuntimeContext('drenvexman')).resolves.toEqual(
       expect.objectContaining({
-        ai_agent: {
+        ai_agent: expect.objectContaining({
+          basePrompt: 'Hola Ana Sponsor',
           base_prompt: 'Hola Ana Sponsor',
           route_contexts: {
             business: {
@@ -298,7 +470,7 @@ describe('AiConfigService', () => {
           ai_policy: {
             model: 'gpt-4o-mini',
           },
-        },
+        }),
         wallet: {
           account_id: null,
           balance: null,
@@ -312,6 +484,144 @@ describe('AiConfigService', () => {
         },
       }),
     );
+  });
+
+  it('prioritizes a custom tenant basePrompt over the default tenant template', async () => {
+    const { prisma, walletEngineService, service } = buildService();
+
+    prisma.channelInstance.findUnique.mockResolvedValue({
+      id: 'channel-1',
+      instanceName: 'drenvexman',
+      tenantId: 'team-1',
+      memberId: 'sponsor-1',
+      provider: 'evolution',
+      tenant: {
+        id: 'team-1',
+        name: 'Freddy Team',
+        code: 'freddy',
+      },
+      member: {
+        id: 'sponsor-1',
+        teamId: 'team-1',
+        displayName: 'Ana Sponsor',
+        email: null,
+        phone: null,
+        publicSlug: null,
+      },
+    });
+    prisma.aiAgentConfig.findFirst.mockResolvedValueOnce(null);
+    prisma.aiAgentConfig.findMany.mockResolvedValueOnce([
+      {
+        id: 'tenant-config-default',
+        basePrompt:
+          'Actua como asesor de {{team_name}} para conversaciones de negocio multinivel. Personaliza la ayuda para {{name}}, prioriza claridad, seguimiento util y una invitacion natural a continuar por WhatsApp cuando aplique.',
+        routeContexts: null,
+        ctaPolicy: null,
+        aiPolicy: null,
+        updatedAt: new Date('2026-05-20T00:00:00.000Z'),
+      },
+      {
+        id: 'tenant-config-custom',
+        basePrompt: 'Prompt real del tenant para {{team_name}}',
+        routeContexts: null,
+        ctaPolicy: null,
+        aiPolicy: null,
+        updatedAt: new Date('2026-05-01T00:00:00.000Z'),
+      },
+    ]);
+    walletEngineService.isConfigured.mockReturnValue(false);
+
+    await expect(service.resolveRuntimeContext('drenvexman')).resolves.toEqual(
+      expect.objectContaining({
+        ai_agent: expect.objectContaining({
+          base_prompt: 'Prompt real del tenant para Freddy Team',
+        }),
+        resolution: expect.objectContaining({
+          tenant_config_id: 'tenant-config-custom',
+        }),
+      }),
+    );
+  });
+
+  it('resolves n8n runtime context by tenant_id and WhatsApp instance instead of a stale ChannelInstance', async () => {
+    const { prisma, walletEngineService, service } = buildService();
+
+    prisma.messagingConnection.findFirst.mockResolvedValue({
+      id: 'connection-1',
+      externalInstanceId: 'drenvexman',
+      provider: 'EVOLUTION',
+      teamId: 'team-custom',
+      sponsorId: 'sponsor-custom',
+      team: {
+        id: 'team-custom',
+        name: 'Tenant Custom',
+        code: 'tenant-custom',
+      },
+      sponsor: {
+        id: 'sponsor-custom',
+        teamId: 'team-custom',
+        displayName: 'Laura Sponsor',
+        email: 'laura@example.com',
+        phone: '+52 55 3333 4444',
+        publicSlug: 'laura-sponsor',
+      },
+    });
+    prisma.aiAgentConfig.findFirst.mockResolvedValueOnce({
+      id: 'tenant-config-custom-latest',
+      basePrompt: 'Prompt custom HTTP para {{team_name}} y {{name}}',
+      routeContexts: null,
+      ctaPolicy: null,
+      aiPolicy: null,
+      updatedAt: new Date('2026-05-21T00:00:00.000Z'),
+    });
+    walletEngineService.isConfigured.mockReturnValue(false);
+
+    await expect(
+      service.resolveRuntimeContext({
+        instanceName: 'drenvexman',
+        tenantId: 'team-custom',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        config_version:
+          'ai-agent-config:tenant-config-custom-latest:2026-05-21T00:00:00.000Z',
+        basePrompt: 'Prompt custom HTTP para Tenant Custom y Laura Sponsor',
+        base_prompt: 'Prompt custom HTTP para Tenant Custom y Laura Sponsor',
+        routing: expect.objectContaining({
+          provider: 'evolution',
+          instance_name: 'drenvexman',
+        }),
+        tenant: expect.objectContaining({
+          id: 'team-custom',
+        }),
+        ai_agent: expect.objectContaining({
+          base_prompt: 'Prompt custom HTTP para Tenant Custom y Laura Sponsor',
+        }),
+        resolution: expect.objectContaining({
+          tenant_config_id: 'tenant-config-custom-latest',
+        }),
+      }),
+    );
+    expect(prisma.aiAgentConfig.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'team-custom',
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+    expect(prisma.aiAgentConfig.findMany).not.toHaveBeenCalled();
+    expect(prisma.messagingConnection.findFirst).toHaveBeenCalledWith({
+      where: {
+        externalInstanceId: 'drenvexman',
+        teamId: 'team-custom',
+      },
+      include: {
+        team: true,
+        sponsor: true,
+      },
+    });
+    expect(prisma.channelInstance.findFirst).not.toHaveBeenCalled();
   });
 
   it('builds a development runtime context for default-constructor when the user has no channel instance yet', async () => {
@@ -340,17 +650,20 @@ describe('AiConfigService', () => {
         name: 'Freddy Team',
         code: 'freddy',
       });
-      prisma.aiAgentConfig.findFirst.mockResolvedValue({
-        id: 'tenant-config-1',
-        basePrompt: 'Usa el contexto de {{team_name}} para cablear el funnel.',
-        routeContexts: {
-          offer: {
-            mode: 'team-default',
+      prisma.aiAgentConfig.findMany.mockResolvedValue([
+        {
+          id: 'tenant-config-1',
+          basePrompt:
+            'Usa el contexto de {{team_name}} para cablear el funnel.',
+          routeContexts: {
+            offer: {
+              mode: 'team-default',
+            },
           },
+          ctaPolicy: null,
+          aiPolicy: null,
         },
-        ctaPolicy: null,
-        aiPolicy: null,
-      });
+      ]);
       walletEngineService.isConfigured.mockReturnValue(false);
 
       await expect(
@@ -452,9 +765,9 @@ describe('AiConfigService', () => {
           publicSlug: 'ana-sponsor',
         },
       });
-      prisma.aiAgentConfig.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
+      prisma.aiAgentConfig.findFirst.mockResolvedValueOnce(null);
+      prisma.aiAgentConfig.findMany.mockResolvedValueOnce([
+        {
           id: 'tenant-config-1',
           basePrompt: 'Hola {{name}}',
           routeContexts: {
@@ -470,7 +783,8 @@ describe('AiConfigService', () => {
           aiPolicy: {
             model: 'gpt-4o-mini',
           },
-        });
+        },
+      ]);
       walletEngineService.isConfigured.mockReturnValue(false);
 
       await expect(
@@ -560,9 +874,9 @@ describe('AiConfigService', () => {
           publicSlug: 'ana-sponsor',
         },
       });
-      prisma.aiAgentConfig.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
+      prisma.aiAgentConfig.findFirst.mockResolvedValueOnce(null);
+      prisma.aiAgentConfig.findMany.mockResolvedValueOnce([
+        {
           id: 'tenant-config-1',
           basePrompt: 'Hola {{name}}',
           routeContexts: {
@@ -578,7 +892,8 @@ describe('AiConfigService', () => {
           aiPolicy: {
             model: 'gpt-4o-mini',
           },
-        });
+        },
+      ]);
       walletEngineService.isConfigured.mockReturnValue(false);
 
       await expect(
@@ -655,15 +970,16 @@ describe('AiConfigService', () => {
           publicSlug: 'ana-sponsor',
         },
       });
-      prisma.aiAgentConfig.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
+      prisma.aiAgentConfig.findFirst.mockResolvedValueOnce(null);
+      prisma.aiAgentConfig.findMany.mockResolvedValueOnce([
+        {
           id: 'tenant-config-1',
           basePrompt: 'Hola {{name}}',
           routeContexts: null,
           ctaPolicy: null,
           aiPolicy: null,
-        });
+        },
+      ]);
       walletEngineService.isConfigured.mockReturnValue(false);
 
       await expect(
@@ -745,15 +1061,16 @@ describe('AiConfigService', () => {
           publicSlug: 'ana-sponsor',
         },
       });
-      prisma.aiAgentConfig.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
+      prisma.aiAgentConfig.findFirst.mockResolvedValueOnce(null);
+      prisma.aiAgentConfig.findMany.mockResolvedValueOnce([
+        {
           id: 'tenant-config-1',
           basePrompt: 'Hola {{name}}',
           routeContexts: null,
           ctaPolicy: null,
           aiPolicy: null,
-        });
+        },
+      ]);
       walletEngineService.isConfigured.mockReturnValue(false);
 
       await expect(

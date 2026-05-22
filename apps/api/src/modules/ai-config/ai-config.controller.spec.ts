@@ -21,6 +21,10 @@ describe('AiConfigController', () => {
 
     aiConfigService.resolveRuntimeContext.mockResolvedValue({
       version: 'leadflow.ai-runtime-context.v1',
+      config_version:
+        'leadflow.ai-runtime-context.v1|tenant:tenant-config-1:2026-05-20T00:00:00.000Z|member:member-config-1:2026-05-20T00:00:00.000Z',
+      basePrompt: 'Prompt final',
+      base_prompt: 'Prompt final',
       routing: {
         provider: 'evolution',
         channel: 'whatsapp',
@@ -55,6 +59,7 @@ describe('AiConfigController', () => {
         reason: null,
       },
       ai_agent: {
+        basePrompt: 'Prompt final',
         base_prompt: 'Prompt final',
         route_contexts: {
           risk: {
@@ -80,6 +85,7 @@ describe('AiConfigController', () => {
     await expect(
       controller.resolveFull({
         instance_name: 'drenvexman',
+        tenant_id: 'team-1',
       }),
     ).resolves.toEqual({
       tenant_id: 'team-1',
@@ -98,7 +104,11 @@ describe('AiConfigController', () => {
         status: 'resolved',
         reason: null,
       },
+      basePrompt: 'Prompt final',
+      base_prompt: 'Prompt final',
       runtime_config: expect.objectContaining({
+        basePrompt: 'Prompt final',
+        base_prompt: 'Prompt final',
         tenant: {
           id: 'team-1',
           name: 'Freddy Team',
@@ -108,6 +118,7 @@ describe('AiConfigController', () => {
           business_model_type: 'multinivel',
         },
         ai_agent: {
+          basePrompt: 'Prompt final',
           base_prompt: 'Prompt final',
           route_contexts: {
             risk: {
@@ -124,12 +135,14 @@ describe('AiConfigController', () => {
           },
         },
       }),
-      config_version: 'leadflow.ai-runtime-context.v1',
+      config_version:
+        'leadflow.ai-runtime-context.v1|tenant:tenant-config-1:2026-05-20T00:00:00.000Z|member:member-config-1:2026-05-20T00:00:00.000Z',
       status: 'active',
     });
-    expect(aiConfigService.resolveRuntimeContext).toHaveBeenCalledWith(
-      'drenvexman',
-    );
+    expect(aiConfigService.resolveRuntimeContext).toHaveBeenCalledWith({
+      instanceName: 'drenvexman',
+      tenantId: 'team-1',
+    });
   });
 
   it('rejects requests without instance_name', async () => {

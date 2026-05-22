@@ -19,6 +19,7 @@ import {
 } from './ai-config.defaults';
 import { resolveKloserTenantConfig } from './kloser-tenant-config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TenantConfigCacheService } from './tenant-config-cache.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
   AiConfigEditorSnapshot,
@@ -36,6 +37,46 @@ type JsonRecord = Record<string, unknown>;
 type AiAgentConfigStore =
   | Pick<PrismaService, 'aiAgentConfig'>
   | Prisma.TransactionClient;
+type TenantAiAgentConfig = Prisma.AiAgentConfigGetPayload<
+  Record<string, never>
+>;
+type RuntimeChannelInstanceRecord = Prisma.ChannelInstanceGetPayload<{
+  include: {
+    tenant: true;
+    member: true;
+  };
+}>;
+type RuntimeMessagingConnectionRecord = Prisma.MessagingConnectionGetPayload<{
+  include: {
+    team: true;
+    sponsor: true;
+  };
+}>;
+type RuntimeContextResolveInput =
+  | string
+  | {
+      instanceName?: string | null;
+      tenantId?: string | null;
+    };
+type RuntimeContextSource = {
+  instanceName: string;
+  provider: string;
+  tenantId: string;
+  memberId: string;
+  tenant: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  member: {
+    id: string;
+    teamId: string;
+    displayName: string;
+    email: string | null;
+    phone: string | null;
+    publicSlug: string | null;
+  };
+};
 
 const AI_RUNTIME_CONTEXT_VERSION = 'leadflow.ai-runtime-context.v1' as const;
 const AI_SERVICE_OWNER_KEY = 'lead-handler' as const;
@@ -211,6 +252,24 @@ const mergeAiPolicyFields = (input: {
   return Object.keys(current).length > 0 ? current : null;
 };
 
+const hasKloserPolicyKey = (value: unknown) => {
+  const record = toJsonRecord(value);
+
+  return (
+    Object.prototype.hasOwnProperty.call(record, 'kloser') ||
+    Object.prototype.hasOwnProperty.call(record, 'kloser_config')
+  );
+};
+
+const omitKloserPolicyKeys = (value: unknown) => {
+  const record = toJsonRecord(value);
+
+  delete record.kloser;
+  delete record.kloser_config;
+
+  return Object.keys(record).length > 0 ? record : null;
+};
+
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
 
@@ -355,6 +414,59 @@ const buildMergedPrompt = (input: {
   return memberPrompt ?? tenantPrompt ?? null;
 };
 
+const isValidBasePrompt = (value: string | null | undefined) =>
+  Boolean(sanitizeNullableText(value));
+
+const isCustomTenantBasePrompt = (value: string | null | undefined) => {
+  const prompt = sanitizeNullableText(value);
+
+  return Boolean(prompt && prompt !== DEFAULT_TENANT_AI_BASE_PROMPT);
+};
+
+const selectTenantConfigByPromptPriority = (configs: TenantAiAgentConfig[]) => {
+  return (
+    configs.find((config) => isCustomTenantBasePrompt(config.basePrompt)) ??
+    configs.find((config) => isValidBasePrompt(config.basePrompt)) ??
+    configs[0] ??
+    null
+  );
+};
+
+const buildConfigVersionPart = (
+  scope: 'tenant' | 'member',
+  config: TenantAiAgentConfig | null,
+) => {
+  if (!config) {
+    return `${scope}:none`;
+  }
+
+  const updatedAt =
+    config.updatedAt instanceof Date
+      ? config.updatedAt.toISOString()
+      : String(config.updatedAt ?? 'unknown');
+
+  return `${scope}:${config.id}:${updatedAt}`;
+};
+
+const buildRuntimeConfigVersion = (input: {
+  tenantConfig: TenantAiAgentConfig | null;
+  memberConfig: TenantAiAgentConfig | null;
+}) =>
+  [
+    AI_RUNTIME_CONTEXT_VERSION,
+    buildConfigVersionPart('tenant', input.tenantConfig),
+    buildConfigVersionPart('member', input.memberConfig),
+  ].join('|');
+
+const buildTenantBypassConfigVersion = (config: TenantAiAgentConfig) => {
+  const updatedAt =
+    config.updatedAt instanceof Date
+      ? config.updatedAt.toISOString()
+      : String(config.updatedAt ?? 'unknown');
+
+  return `ai-agent-config:${config.id}:${updatedAt}`;
+};
+
 const replacePromptPlaceholders = (
   prompt: string,
   placeholders: {
@@ -386,7 +498,325 @@ export class AiConfigService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
+    private readonly tenantConfigCacheService?: TenantConfigCacheService,
   ) {}
+
+  private async findTenantConfig(input: {
+    tenantId: string;
+    activeOnly?: boolean;
+    tx?: AiAgentConfigStore;
+  }) {
+    const tx = input.tx ?? this.prisma;
+    const configs = await tx.aiAgentConfig.findMany({
+      where: {
+        tenantId: input.tenantId,
+        memberId: null,
+        ...(input.activeOnly ? { isActive: true } : {}),
+      },
+      orderBy: {
+        id: 'asc',
+      },
+    });
+
+    return selectTenantConfigByPromptPriority(configs);
+  }
+
+  private async purgeTenantConfigCache(tenantId: string) {
+    await this.tenantConfigCacheService?.purgeTenantConfig(tenantId);
+  }
+
+  private toRuntimeContextSourceFromChannelInstance(
+    channelInstance: RuntimeChannelInstanceRecord,
+  ): RuntimeContextSource {
+    if (channelInstance.member.teamId !== channelInstance.tenantId) {
+      throw new InternalServerErrorException({
+        code: 'AI_CHANNEL_INSTANCE_OWNERSHIP_MISMATCH',
+        message:
+          'The resolved ChannelInstance points to a member that does not belong to the same tenant.',
+      });
+    }
+
+    return {
+      instanceName: channelInstance.instanceName,
+      provider: channelInstance.provider,
+      tenantId: channelInstance.tenantId,
+      memberId: channelInstance.memberId,
+      tenant: {
+        id: channelInstance.tenant.id,
+        name: channelInstance.tenant.name,
+        code: channelInstance.tenant.code,
+      },
+      member: {
+        id: channelInstance.member.id,
+        teamId: channelInstance.member.teamId,
+        displayName: channelInstance.member.displayName,
+        email: channelInstance.member.email,
+        phone: channelInstance.member.phone,
+        publicSlug: channelInstance.member.publicSlug,
+      },
+    };
+  }
+
+  private toRuntimeContextSourceFromMessagingConnection(
+    connection: RuntimeMessagingConnectionRecord,
+  ): RuntimeContextSource {
+    return {
+      instanceName: connection.externalInstanceId ?? '',
+      provider: connection.provider.toLowerCase(),
+      tenantId: connection.teamId,
+      memberId: connection.sponsorId,
+      tenant: {
+        id: connection.team.id,
+        name: connection.team.name,
+        code: connection.team.code,
+      },
+      member: {
+        id: connection.sponsor.id,
+        teamId: connection.sponsor.teamId,
+        displayName: connection.sponsor.displayName,
+        email: connection.sponsor.email,
+        phone: connection.sponsor.phone,
+        publicSlug: connection.sponsor.publicSlug,
+      },
+    };
+  }
+
+  private async findChannelInstanceRuntimeSource(input: {
+    instanceName: string;
+    tenantId?: string | null;
+  }): Promise<RuntimeContextSource | null> {
+    const channelInstance = input.tenantId
+      ? await this.prisma.channelInstance.findFirst({
+          where: {
+            instanceName: input.instanceName,
+            tenantId: input.tenantId,
+          },
+          include: {
+            tenant: true,
+            member: true,
+          },
+        })
+      : await this.prisma.channelInstance.findUnique({
+          where: {
+            instanceName: input.instanceName,
+          },
+          include: {
+            tenant: true,
+            member: true,
+          },
+        });
+
+    return channelInstance
+      ? this.toRuntimeContextSourceFromChannelInstance(channelInstance)
+      : null;
+  }
+
+  private async findMessagingConnectionRuntimeSource(input: {
+    instanceName: string;
+    tenantId?: string | null;
+  }): Promise<RuntimeContextSource | null> {
+    const connection = await this.prisma.messagingConnection.findFirst({
+      where: {
+        externalInstanceId: input.instanceName,
+        ...(input.tenantId ? { teamId: input.tenantId } : {}),
+      },
+      include: {
+        team: true,
+        sponsor: true,
+      },
+    });
+
+    return connection
+      ? this.toRuntimeContextSourceFromMessagingConnection(connection)
+      : null;
+  }
+
+  private async resolveRuntimeContextSource(input: {
+    instanceName: string;
+    tenantId?: string | null;
+  }) {
+    if (input.tenantId) {
+      const scopedMessagingConnection =
+        await this.findMessagingConnectionRuntimeSource(input);
+
+      if (scopedMessagingConnection) {
+        return scopedMessagingConnection;
+      }
+
+      const scopedChannelInstance =
+        await this.findChannelInstanceRuntimeSource(input);
+
+      if (scopedChannelInstance) {
+        return scopedChannelInstance;
+      }
+    } else {
+      const channelInstance = await this.findChannelInstanceRuntimeSource(input);
+
+      if (channelInstance) {
+        return channelInstance;
+      }
+
+      const messagingConnection =
+        await this.findMessagingConnectionRuntimeSource(input);
+
+      if (messagingConnection) {
+        return messagingConnection;
+      }
+    }
+
+    throw new NotFoundException({
+      code: 'AI_CHANNEL_INSTANCE_NOT_FOUND',
+      message: input.tenantId
+        ? `No runtime context source was found for instance ${input.instanceName} in tenant ${input.tenantId}.`
+        : `No runtime context source was found for instance ${input.instanceName}.`,
+    });
+  }
+
+  private async resolveTenantBypassRuntimeSource(input: {
+    instanceName: string;
+    tenantId: string;
+  }): Promise<RuntimeContextSource> {
+    const messagingConnection =
+      await this.findMessagingConnectionRuntimeSource(input);
+
+    if (messagingConnection) {
+      return messagingConnection;
+    }
+
+    const channelInstance = await this.findChannelInstanceRuntimeSource(input);
+
+    if (channelInstance) {
+      return channelInstance;
+    }
+
+    const [team, sponsor] = await Promise.all([
+      this.prisma.team.findUnique({
+        where: {
+          id: input.tenantId,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      }),
+      this.prisma.sponsor.findFirst({
+        where: {
+          teamId: input.tenantId,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        select: {
+          id: true,
+          teamId: true,
+          displayName: true,
+          email: true,
+          phone: true,
+          publicSlug: true,
+        },
+      }),
+    ]);
+
+    if (!team) {
+      throw new NotFoundException({
+        code: 'AI_RUNTIME_TENANT_NOT_FOUND',
+        message: `No tenant was found for runtime context bypass ${input.tenantId}.`,
+      });
+    }
+
+    return {
+      instanceName: input.instanceName,
+      provider: 'evolution',
+      tenantId: team.id,
+      memberId: sponsor?.id ?? `tenant:${team.id}`,
+      tenant: team,
+      member: {
+        id: sponsor?.id ?? `tenant:${team.id}`,
+        teamId: team.id,
+        displayName: sponsor?.displayName ?? team.name,
+        email: sponsor?.email ?? null,
+        phone: sponsor?.phone ?? null,
+        publicSlug: sponsor?.publicSlug ?? null,
+      },
+    };
+  }
+
+  private async buildTenantBypassRuntimeContext(input: {
+    instanceName: string;
+    tenantId: string;
+    customConfig: TenantAiAgentConfig;
+  }): Promise<AiRuntimeContext> {
+    const runtimeSource = await this.resolveTenantBypassRuntimeSource({
+      instanceName: input.instanceName,
+      tenantId: input.tenantId,
+    });
+    const placeholders = this.buildPlaceholders({
+      name: runtimeSource.member.displayName,
+      teamName: runtimeSource.tenant.name,
+      phone: runtimeSource.member.phone,
+    });
+    const basePrompt = sanitizeNullableText(input.customConfig.basePrompt)!;
+    const resolvedBasePrompt = replacePromptPlaceholders(
+      basePrompt,
+      placeholders,
+    );
+    const routeContexts = toJsonRecord(input.customConfig.routeContexts);
+    const aiPolicy = toJsonRecord(input.customConfig.aiPolicy);
+    const ctaPolicy = toJsonRecord(input.customConfig.ctaPolicy);
+    const runtimeRoutingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: runtimeSource.tenant.code,
+      aiPolicy,
+      routeContexts,
+    });
+    const configVersion = buildTenantBypassConfigVersion(input.customConfig);
+    const wallet = await this.resolveWalletContext(runtimeSource.memberId);
+
+    return {
+      version: AI_RUNTIME_CONTEXT_VERSION,
+      config_version: configVersion,
+      basePrompt: resolvedBasePrompt,
+      base_prompt: resolvedBasePrompt,
+      routing: {
+        provider: runtimeSource.provider,
+        channel: AI_RUNTIME_CHANNEL,
+        instance_name: runtimeSource.instanceName,
+        service_owner_key: AI_SERVICE_OWNER_KEY,
+      },
+      tenant: {
+        id: runtimeSource.tenant.id,
+        name: runtimeSource.tenant.name,
+        code: runtimeSource.tenant.code,
+        ...runtimeRoutingMetadata,
+      },
+      member: {
+        id: runtimeSource.member.id,
+        name: runtimeSource.member.displayName,
+        email: sanitizeNullableText(runtimeSource.member.email),
+        phone: sanitizeNullableText(runtimeSource.member.phone),
+        public_slug: sanitizeNullableText(runtimeSource.member.publicSlug),
+        whatsapp_link: placeholders.whatsapp_link,
+      },
+      placeholders,
+      wallet,
+      ai_agent: {
+        basePrompt: resolvedBasePrompt,
+        base_prompt: resolvedBasePrompt,
+        route_contexts: routeContexts,
+        cta_policy: ctaPolicy,
+        ai_policy: aiPolicy,
+      },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy,
+        ctaPolicy,
+      }),
+      resolution: {
+        strategy: 'tenant_default',
+        tenant_config_id: input.customConfig.id,
+        member_config_id: null,
+      },
+    };
+  }
 
   async ensureTenantDefaultConfig(
     input: {
@@ -404,16 +834,11 @@ export class AiConfigService {
       });
     }
 
-    const existingConfig = await tx.aiAgentConfig.findFirst({
-      where: {
-        tenantId,
-        memberId: null,
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
+    const existingConfig = await this.findTenantConfig({
+      tenantId,
+      tx,
     });
-    const aiPolicyBase = withDefaultAiRuntimeRoutingMetadata(
+    const baseAiPolicy = withDefaultAiRuntimeRoutingMetadata(
       existingConfig?.aiPolicy,
       {
         tenantCode: input.brandKey,
@@ -421,40 +846,48 @@ export class AiConfigService {
       },
     );
     const aiPolicy = {
-      ...aiPolicyBase,
+      ...baseAiPolicy,
       // Preserve any Kloser-adjacent tenant metadata while enforcing the v2.2 base contract.
       kloser: {
-        ...toJsonRecord(aiPolicyBase.kloser),
+        ...toJsonRecord(baseAiPolicy.kloser),
         ...resolveKloserTenantConfig({
-          aiPolicy: aiPolicyBase,
+          aiPolicy: baseAiPolicy,
           ctaPolicy: existingConfig?.ctaPolicy,
         }),
       },
     } as Prisma.InputJsonValue;
 
-    if (existingConfig) {
-      return tx.aiAgentConfig.update({
-        where: {
-          id: existingConfig.id,
-        },
+    if (!existingConfig) {
+      const createdConfig = await tx.aiAgentConfig.create({
         data: {
+          tenantId,
+          memberId: null,
+          basePrompt: DEFAULT_TENANT_AI_BASE_PROMPT,
+          routeContexts: Prisma.JsonNull,
+          ctaPolicy: Prisma.JsonNull,
           aiPolicy,
           isActive: true,
         },
       });
+
+      await this.purgeTenantConfigCache(tenantId);
+
+      return createdConfig;
     }
 
-    return tx.aiAgentConfig.create({
+    const updatedConfig = await tx.aiAgentConfig.update({
+      where: {
+        id: existingConfig.id,
+      },
       data: {
-        tenantId,
-        memberId: null,
-        basePrompt: DEFAULT_TENANT_AI_BASE_PROMPT,
-        routeContexts: Prisma.JsonNull,
-        ctaPolicy: Prisma.JsonNull,
         aiPolicy,
         isActive: true,
       },
     });
+
+    await this.purgeTenantConfigCache(tenantId);
+
+    return updatedConfig;
   }
 
   async getMemberEditorSnapshot(scope: {
@@ -474,27 +907,13 @@ export class AiConfigService {
           updatedAt: 'desc',
         },
       }),
-      this.prisma.aiAgentConfig.findFirst({
-        where: {
-          tenantId: sponsor.teamId,
-          memberId: null,
-          isActive: true,
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
+      this.findTenantConfig({
+        tenantId: sponsor.teamId,
+        activeOnly: true,
       }),
     ]);
 
     const effectiveConfig = memberConfig ?? tenantConfig;
-    const effectiveAiPolicy = mergeJsonValues(
-      tenantConfig?.aiPolicy,
-      memberConfig?.aiPolicy,
-    );
-    const effectiveCtaPolicy = mergeJsonValues(
-      tenantConfig?.ctaPolicy,
-      memberConfig?.ctaPolicy,
-    );
 
     return {
       configId: memberConfig?.id ?? null,
@@ -517,8 +936,8 @@ export class AiConfigService {
           ) ?? null,
       },
       kloser: resolveKloserTenantConfig({
-        aiPolicy: effectiveAiPolicy,
-        ctaPolicy: effectiveCtaPolicy,
+        aiPolicy: tenantConfig?.aiPolicy,
+        ctaPolicy: tenantConfig?.ctaPolicy,
       }),
       resolution: {
         strategy: memberConfig
@@ -531,6 +950,48 @@ export class AiConfigService {
       },
       availablePlaceholders: [...AI_CONFIG_PLACEHOLDERS],
       updatedAt: memberConfig?.updatedAt?.toISOString() ?? null,
+    };
+  }
+
+  async getTeamEditorSnapshot(scope: {
+    workspaceId: string;
+    teamId: string;
+    sponsorId: string;
+  }): Promise<AiConfigEditorSnapshot> {
+    const sponsor = await this.requireScopedSponsor(scope);
+    const tenantConfig = await this.findTenantConfig({
+      tenantId: sponsor.teamId,
+      activeOnly: true,
+    });
+
+    return {
+      configId: tenantConfig?.id ?? null,
+      tenantId: sponsor.team.id,
+      memberId: sponsor.id,
+      tenantName: sponsor.team.name,
+      memberName: sponsor.displayName,
+      basePrompt: sanitizeNullableText(tenantConfig?.basePrompt) ?? '',
+      routeContexts: readRouteContextFields(tenantConfig?.routeContexts),
+      ctaPolicy: {
+        defaultCta:
+          sanitizeNullableText(
+            toJsonRecord(tenantConfig?.ctaPolicy).default_cta as
+              | string
+              | null
+              | undefined,
+          ) ?? null,
+      },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy: tenantConfig?.aiPolicy,
+        ctaPolicy: tenantConfig?.ctaPolicy,
+      }),
+      resolution: {
+        strategy: tenantConfig ? 'tenant_default' : 'empty',
+        tenantConfigId: tenantConfig?.id ?? null,
+        memberConfigId: null,
+      },
+      availablePlaceholders: [...AI_CONFIG_PLACEHOLDERS],
+      updatedAt: tenantConfig?.updatedAt?.toISOString() ?? null,
     };
   }
 
@@ -557,6 +1018,14 @@ export class AiConfigService {
       });
     }
 
+    if (hasKloserPolicyKey(input.aiPolicy)) {
+      throw new BadRequestException({
+        code: 'AI_CONFIG_KLOSER_PERSONAL_FORBIDDEN',
+        message:
+          'Kloser follow-up strategy is a team-level setting and cannot be saved on a personal AI config.',
+      });
+    }
+
     const existingConfig = await this.prisma.aiAgentConfig.findUnique({
       where: {
         tenantId_memberId: {
@@ -566,7 +1035,7 @@ export class AiConfigService {
       },
     });
     const aiPolicy = mergeAiPolicyFields({
-      existing: existingConfig?.aiPolicy,
+      existing: omitKloserPolicyKeys(existingConfig?.aiPolicy),
       updates: input.aiPolicy,
     });
 
@@ -607,11 +1076,96 @@ export class AiConfigService {
       },
     });
 
+    await this.purgeTenantConfigCache(sponsor.teamId);
+
     return await this.getMemberEditorSnapshot(scope);
   }
 
-  async resolveRuntimeContext(instanceName: string): Promise<AiRuntimeContext> {
-    const normalizedInstanceName = sanitizeNullableText(instanceName);
+  async updateTeamSettings(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+      sponsorId: string;
+    },
+    input: {
+      basePrompt?: string | null;
+      aiPolicy?: unknown;
+    },
+  ): Promise<AiConfigEditorSnapshot> {
+    const sponsor = await this.requireScopedSponsor(scope);
+    const normalizedBasePrompt =
+      input.basePrompt === undefined
+        ? undefined
+        : sanitizeNullableText(input.basePrompt);
+
+    if (input.aiPolicy === undefined && input.basePrompt === undefined) {
+      throw new BadRequestException({
+        code: 'AI_CONFIG_TEAM_UPDATE_EMPTY',
+        message: 'At least one team AI config field is required.',
+      });
+    }
+
+    if (input.basePrompt !== undefined && !normalizedBasePrompt) {
+      throw new BadRequestException({
+        code: 'AI_CONFIG_BASE_PROMPT_REQUIRED',
+        message: 'basePrompt is required to persist the AI configuration.',
+      });
+    }
+
+    const existingConfig = await this.findTenantConfig({
+      tenantId: sponsor.teamId,
+    });
+    const existingAiPolicy = withDefaultAiRuntimeRoutingMetadata(
+      existingConfig?.aiPolicy,
+      {
+        tenantCode: sponsor.team.code,
+        brandKey: sponsor.team.code,
+      },
+    );
+    const aiPolicy = mergeAiPolicyFields({
+      existing: existingAiPolicy,
+      updates: input.aiPolicy,
+    });
+
+    if (existingConfig) {
+      await this.prisma.aiAgentConfig.update({
+        where: {
+          id: existingConfig.id,
+        },
+        data: {
+          ...(normalizedBasePrompt ? { basePrompt: normalizedBasePrompt } : {}),
+          aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+          isActive: true,
+        },
+      });
+    } else {
+      await this.prisma.aiAgentConfig.create({
+        data: {
+          tenantId: sponsor.teamId,
+          memberId: null,
+          basePrompt: normalizedBasePrompt ?? DEFAULT_TENANT_AI_BASE_PROMPT,
+          routeContexts: Prisma.JsonNull,
+          ctaPolicy: Prisma.JsonNull,
+          aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+          isActive: true,
+        },
+      });
+    }
+
+    await this.purgeTenantConfigCache(sponsor.teamId);
+
+    return await this.getTeamEditorSnapshot(scope);
+  }
+
+  async resolveRuntimeContext(
+    input: RuntimeContextResolveInput,
+  ): Promise<AiRuntimeContext> {
+    const normalizedInstanceName =
+      typeof input === 'string'
+        ? sanitizeNullableText(input)
+        : sanitizeNullableText(input.instanceName);
+    const normalizedTenantId =
+      typeof input === 'string' ? null : sanitizeNullableText(input.tenantId);
 
     if (!normalizedInstanceName) {
       throw new NotFoundException({
@@ -620,51 +1174,44 @@ export class AiConfigService {
       });
     }
 
-    const channelInstance = await this.prisma.channelInstance.findUnique({
-      where: {
-        instanceName: normalizedInstanceName,
-      },
-      include: {
-        tenant: true,
-        member: true,
-      },
+    if (normalizedTenantId) {
+      const customConfig = await this.prisma.aiAgentConfig.findFirst({
+        where: {
+          tenantId: normalizedTenantId,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+      });
+
+      if (customConfig && isValidBasePrompt(customConfig.basePrompt)) {
+        return this.buildTenantBypassRuntimeContext({
+          instanceName: normalizedInstanceName,
+          tenantId: normalizedTenantId,
+          customConfig,
+        });
+      }
+    }
+
+    const runtimeSource = await this.resolveRuntimeContextSource({
+      instanceName: normalizedInstanceName,
+      tenantId: normalizedTenantId,
     });
-
-    if (!channelInstance) {
-      throw new NotFoundException({
-        code: 'AI_CHANNEL_INSTANCE_NOT_FOUND',
-        message: `No ChannelInstance was found for instance ${normalizedInstanceName}.`,
-      });
-    }
-
-    if (channelInstance.member.teamId !== channelInstance.tenantId) {
-      throw new InternalServerErrorException({
-        code: 'AI_CHANNEL_INSTANCE_OWNERSHIP_MISMATCH',
-        message:
-          'The resolved ChannelInstance points to a member that does not belong to the same tenant.',
-      });
-    }
 
     const [memberConfig, tenantConfig] = await Promise.all([
       this.prisma.aiAgentConfig.findFirst({
         where: {
-          tenantId: channelInstance.tenantId,
-          memberId: channelInstance.memberId,
+          tenantId: runtimeSource.tenantId,
+          memberId: runtimeSource.memberId,
           isActive: true,
         },
         orderBy: {
           updatedAt: 'desc',
         },
       }),
-      this.prisma.aiAgentConfig.findFirst({
-        where: {
-          tenantId: channelInstance.tenantId,
-          memberId: null,
-          isActive: true,
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
+      this.findTenantConfig({
+        tenantId: runtimeSource.tenantId,
+        activeOnly: true,
       }),
     ]);
 
@@ -677,9 +1224,9 @@ export class AiConfigService {
     }
 
     const placeholders = this.buildPlaceholders({
-      name: channelInstance.member.displayName,
-      teamName: channelInstance.tenant.name,
-      phone: channelInstance.member.phone,
+      name: runtimeSource.member.displayName,
+      teamName: runtimeSource.tenant.name,
+      phone: runtimeSource.member.phone,
     });
     const basePrompt = buildMergedPrompt({
       tenantPrompt: tenantConfig?.basePrompt ?? null,
@@ -694,48 +1241,59 @@ export class AiConfigService {
       });
     }
 
-    const wallet = await this.resolveWalletContext(channelInstance.memberId);
+    const wallet = await this.resolveWalletContext(runtimeSource.memberId);
     const routeContexts = toJsonRecord(
       mergeJsonValues(tenantConfig?.routeContexts, memberConfig?.routeContexts),
     );
     const aiPolicy = toJsonRecord(
-      mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
+      mergeJsonValues(
+        tenantConfig?.aiPolicy,
+        omitKloserPolicyKeys(memberConfig?.aiPolicy),
+      ),
     );
     const ctaPolicy = toJsonRecord(
       mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
     );
     const runtimeRoutingMetadata = resolveAiRuntimeRoutingMetadata({
-      tenantCode: channelInstance.tenant.code,
+      tenantCode: runtimeSource.tenant.code,
       aiPolicy,
       routeContexts,
     });
+    const resolvedBasePrompt = replacePromptPlaceholders(basePrompt, placeholders);
 
     return {
       version: AI_RUNTIME_CONTEXT_VERSION,
+      config_version: buildRuntimeConfigVersion({
+        tenantConfig,
+        memberConfig,
+      }),
+      basePrompt: resolvedBasePrompt,
+      base_prompt: resolvedBasePrompt,
       routing: {
-        provider: channelInstance.provider,
+        provider: runtimeSource.provider,
         channel: AI_RUNTIME_CHANNEL,
-        instance_name: channelInstance.instanceName,
+        instance_name: runtimeSource.instanceName,
         service_owner_key: AI_SERVICE_OWNER_KEY,
       },
       tenant: {
-        id: channelInstance.tenant.id,
-        name: channelInstance.tenant.name,
-        code: channelInstance.tenant.code,
+        id: runtimeSource.tenant.id,
+        name: runtimeSource.tenant.name,
+        code: runtimeSource.tenant.code,
         ...runtimeRoutingMetadata,
       },
       member: {
-        id: channelInstance.member.id,
-        name: channelInstance.member.displayName,
-        email: sanitizeNullableText(channelInstance.member.email),
-        phone: sanitizeNullableText(channelInstance.member.phone),
-        public_slug: sanitizeNullableText(channelInstance.member.publicSlug),
+        id: runtimeSource.member.id,
+        name: runtimeSource.member.displayName,
+        email: sanitizeNullableText(runtimeSource.member.email),
+        phone: sanitizeNullableText(runtimeSource.member.phone),
+        public_slug: sanitizeNullableText(runtimeSource.member.publicSlug),
         whatsapp_link: placeholders.whatsapp_link,
       },
       placeholders,
       wallet,
       ai_agent: {
-        base_prompt: replacePromptPlaceholders(basePrompt, placeholders),
+        basePrompt: resolvedBasePrompt,
+        base_prompt: resolvedBasePrompt,
         route_contexts: routeContexts,
         cta_policy: ctaPolicy,
         ai_policy: aiPolicy,
@@ -1317,15 +1875,9 @@ export class AiConfigService {
             },
           })
         : Promise.resolve(null),
-      this.prisma.aiAgentConfig.findFirst({
-        where: {
-          tenantId: team.id,
-          memberId: null,
-          isActive: true,
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
+      this.findTenantConfig({
+        tenantId: team.id,
+        activeOnly: true,
       }),
     ]);
 
@@ -1346,7 +1898,10 @@ export class AiConfigService {
       mergeJsonValues(tenantConfig?.routeContexts, memberConfig?.routeContexts),
     );
     const aiPolicy = toJsonRecord(
-      mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
+      mergeJsonValues(
+        tenantConfig?.aiPolicy,
+        omitKloserPolicyKeys(memberConfig?.aiPolicy),
+      ),
     );
     const ctaPolicy = toJsonRecord(
       mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
@@ -1356,9 +1911,16 @@ export class AiConfigService {
       aiPolicy,
       routeContexts,
     });
+    const resolvedBasePrompt = replacePromptPlaceholders(basePrompt, placeholders);
 
     return {
       version: AI_RUNTIME_CONTEXT_VERSION,
+      config_version: buildRuntimeConfigVersion({
+        tenantConfig,
+        memberConfig,
+      }),
+      basePrompt: resolvedBasePrompt,
+      base_prompt: resolvedBasePrompt,
       routing: {
         provider: 'leadflow_builder',
         channel: AI_RUNTIME_CHANNEL,
@@ -1388,15 +1950,16 @@ export class AiConfigService {
       placeholders,
       wallet: sponsor
         ? await this.resolveWalletContext(sponsor.id)
-        : {
-            account_id: null,
-            balance: null,
-            status: 'unavailable',
-            reason:
-              'Development orchestration fallback does not bind a sponsor wallet.',
-          },
+          : {
+              account_id: null,
+              balance: null,
+              status: 'unavailable',
+              reason:
+                'Development orchestration fallback does not bind a sponsor wallet.',
+            },
       ai_agent: {
-        base_prompt: replacePromptPlaceholders(basePrompt, placeholders),
+        basePrompt: resolvedBasePrompt,
+        base_prompt: resolvedBasePrompt,
         route_contexts: routeContexts,
         cta_policy: ctaPolicy,
         ai_policy: aiPolicy,
