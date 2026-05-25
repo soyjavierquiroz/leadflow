@@ -12,6 +12,7 @@ import { Prisma, UserRole } from '@prisma/client';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { normalizeMessagingPhone } from '../shared/messaging-channel.utils';
 import { normalizeBaseUrl, sanitizeNullableText } from '../shared/url.utils';
+import { RuntimeContextConfigSyncService } from '../runtime-context/runtime-context-config-sync.service';
 import {
   DEFAULT_TENANT_AI_BASE_PROMPT,
   resolveAiRuntimeRoutingMetadata,
@@ -499,6 +500,7 @@ export class AiConfigService {
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
     private readonly tenantConfigCacheService?: TenantConfigCacheService,
+    private readonly runtimeContextConfigSyncService?: RuntimeContextConfigSyncService,
   ) {}
 
   private async findTenantConfig(input: {
@@ -523,6 +525,24 @@ export class AiConfigService {
 
   private async purgeTenantConfigCache(tenantId: string) {
     await this.tenantConfigCacheService?.purgeTenantConfig(tenantId);
+  }
+
+  private async safeSyncAiConfigToRuntimeContext(input: {
+    config: TenantAiAgentConfig;
+    tenantCode?: string | null;
+  }) {
+    try {
+      await this.runtimeContextConfigSyncService?.syncAiAgentConfig({
+        config: input.config,
+        tenantCode: input.tenantCode,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Runtime context AI config sync failed for tenant ${input.config.tenantId}, config ${input.config.id}, member ${input.config.memberId ?? 'global'}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      );
+    }
   }
 
   private toRuntimeContextSourceFromChannelInstance(
@@ -650,7 +670,8 @@ export class AiConfigService {
         return scopedChannelInstance;
       }
     } else {
-      const channelInstance = await this.findChannelInstanceRuntimeSource(input);
+      const channelInstance =
+        await this.findChannelInstanceRuntimeSource(input);
 
       if (channelInstance) {
         return channelInstance;
@@ -1039,7 +1060,7 @@ export class AiConfigService {
       updates: input.aiPolicy,
     });
 
-    await this.prisma.aiAgentConfig.upsert({
+    const savedConfig = await this.prisma.aiAgentConfig.upsert({
       where: {
         tenantId_memberId: {
           tenantId: sponsor.teamId,
@@ -1077,6 +1098,11 @@ export class AiConfigService {
     });
 
     await this.purgeTenantConfigCache(sponsor.teamId);
+    // Member saves sync only the sponsor scope; the team endpoint owns the tenant-level global prompt.
+    await this.safeSyncAiConfigToRuntimeContext({
+      config: savedConfig,
+      tenantCode: sponsor.team.code,
+    });
 
     return await this.getMemberEditorSnapshot(scope);
   }
@@ -1127,32 +1153,36 @@ export class AiConfigService {
       updates: input.aiPolicy,
     });
 
-    if (existingConfig) {
-      await this.prisma.aiAgentConfig.update({
-        where: {
-          id: existingConfig.id,
-        },
-        data: {
-          ...(normalizedBasePrompt ? { basePrompt: normalizedBasePrompt } : {}),
-          aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-          isActive: true,
-        },
-      });
-    } else {
-      await this.prisma.aiAgentConfig.create({
-        data: {
-          tenantId: sponsor.teamId,
-          memberId: null,
-          basePrompt: normalizedBasePrompt ?? DEFAULT_TENANT_AI_BASE_PROMPT,
-          routeContexts: Prisma.JsonNull,
-          ctaPolicy: Prisma.JsonNull,
-          aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-          isActive: true,
-        },
-      });
-    }
+    const savedConfig = existingConfig
+      ? await this.prisma.aiAgentConfig.update({
+          where: {
+            id: existingConfig.id,
+          },
+          data: {
+            ...(normalizedBasePrompt
+              ? { basePrompt: normalizedBasePrompt }
+              : {}),
+            aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+            isActive: true,
+          },
+        })
+      : await this.prisma.aiAgentConfig.create({
+          data: {
+            tenantId: sponsor.teamId,
+            memberId: null,
+            basePrompt: normalizedBasePrompt ?? DEFAULT_TENANT_AI_BASE_PROMPT,
+            routeContexts: Prisma.JsonNull,
+            ctaPolicy: Prisma.JsonNull,
+            aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+            isActive: true,
+          },
+        });
 
     await this.purgeTenantConfigCache(sponsor.teamId);
+    await this.safeSyncAiConfigToRuntimeContext({
+      config: savedConfig,
+      tenantCode: sponsor.team.code,
+    });
 
     return await this.getTeamEditorSnapshot(scope);
   }
@@ -1259,7 +1289,10 @@ export class AiConfigService {
       aiPolicy,
       routeContexts,
     });
-    const resolvedBasePrompt = replacePromptPlaceholders(basePrompt, placeholders);
+    const resolvedBasePrompt = replacePromptPlaceholders(
+      basePrompt,
+      placeholders,
+    );
 
     return {
       version: AI_RUNTIME_CONTEXT_VERSION,
@@ -1911,7 +1944,10 @@ export class AiConfigService {
       aiPolicy,
       routeContexts,
     });
-    const resolvedBasePrompt = replacePromptPlaceholders(basePrompt, placeholders);
+    const resolvedBasePrompt = replacePromptPlaceholders(
+      basePrompt,
+      placeholders,
+    );
 
     return {
       version: AI_RUNTIME_CONTEXT_VERSION,
@@ -1950,13 +1986,13 @@ export class AiConfigService {
       placeholders,
       wallet: sponsor
         ? await this.resolveWalletContext(sponsor.id)
-          : {
-              account_id: null,
-              balance: null,
-              status: 'unavailable',
-              reason:
-                'Development orchestration fallback does not bind a sponsor wallet.',
-            },
+        : {
+            account_id: null,
+            balance: null,
+            status: 'unavailable',
+            reason:
+              'Development orchestration fallback does not bind a sponsor wallet.',
+          },
       ai_agent: {
         basePrompt: resolvedBasePrompt,
         base_prompt: resolvedBasePrompt,

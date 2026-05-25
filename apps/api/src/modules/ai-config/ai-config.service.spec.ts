@@ -35,15 +35,20 @@ describe('AiConfigService', () => {
     const tenantConfigCacheService = {
       purgeTenantConfig: jest.fn(),
     };
+    const runtimeContextConfigSyncService = {
+      syncAiAgentConfig: jest.fn().mockResolvedValue(undefined),
+    };
 
     return {
       prisma,
       walletEngineService,
       tenantConfigCacheService,
+      runtimeContextConfigSyncService,
       service: new AiConfigService(
         prisma as never,
         walletEngineService as never,
         tenantConfigCacheService as never,
+        runtimeContextConfigSyncService as never,
       ),
     };
   };
@@ -169,7 +174,12 @@ describe('AiConfigService', () => {
   });
 
   it('merges Kloser updates into the tenant AI config with memberId null', async () => {
-    const { prisma, service, tenantConfigCacheService } = buildService();
+    const {
+      prisma,
+      service,
+      tenantConfigCacheService,
+      runtimeContextConfigSyncService,
+    } = buildService();
     const updatedAt = new Date('2026-05-17T00:00:00.000Z');
 
     prisma.sponsor.findFirst.mockResolvedValue({
@@ -223,6 +233,20 @@ describe('AiConfigService', () => {
       ]);
     prisma.aiAgentConfig.update.mockResolvedValue({
       id: 'tenant-config-1',
+      tenantId: 'team-1',
+      memberId: null,
+      basePrompt: 'Prompt equipo actualizado',
+      routeContexts: null,
+      ctaPolicy: null,
+      aiPolicy: {
+        model: 'gpt-4o-mini',
+        kloser: {
+          strategy: {
+            cadence_minutes: [60, 240],
+          },
+        },
+      },
+      isActive: true,
     });
 
     const result = await service.updateTeamSettings(
@@ -263,6 +287,17 @@ describe('AiConfigService', () => {
     expect(tenantConfigCacheService.purgeTenantConfig).toHaveBeenCalledWith(
       'team-1',
     );
+    expect(
+      runtimeContextConfigSyncService.syncAiAgentConfig,
+    ).toHaveBeenCalledWith({
+      config: expect.objectContaining({
+        id: 'tenant-config-1',
+        tenantId: 'team-1',
+        memberId: null,
+        basePrompt: 'Prompt equipo actualizado',
+      }),
+      tenantCode: 'freddy',
+    });
     expect(result).toEqual(
       expect.objectContaining({
         configId: 'tenant-config-1',
@@ -278,6 +313,173 @@ describe('AiConfigService', () => {
         }),
       }),
     );
+  });
+
+  it('syncs personal AI config updates with the sponsor member id', async () => {
+    const {
+      prisma,
+      service,
+      tenantConfigCacheService,
+      runtimeContextConfigSyncService,
+    } = buildService();
+    const updatedAt = new Date('2026-05-18T00:00:00.000Z');
+    const savedConfig = {
+      id: 'member-config-1',
+      tenantId: 'team-1',
+      memberId: 'sponsor-1',
+      basePrompt: 'Prompt personal actualizado',
+      routeContexts: {
+        offer: 'Contexto oferta',
+      },
+      ctaPolicy: {
+        default_cta: 'book_call',
+      },
+      aiPolicy: null,
+      isActive: true,
+      updatedAt,
+    };
+
+    prisma.sponsor.findFirst.mockResolvedValue({
+      id: 'sponsor-1',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      displayName: 'Ana Sponsor',
+      team: {
+        id: 'team-1',
+        name: 'Freddy Team',
+        code: 'freddy',
+      },
+    });
+    prisma.aiAgentConfig.findUnique.mockResolvedValue(null);
+    prisma.aiAgentConfig.upsert.mockResolvedValue(savedConfig);
+    prisma.aiAgentConfig.findFirst.mockResolvedValue(savedConfig);
+    prisma.aiAgentConfig.findMany.mockResolvedValue([]);
+
+    const result = await service.updateMemberSettings(
+      {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        sponsorId: 'sponsor-1',
+      },
+      {
+        basePrompt: 'Prompt personal actualizado',
+        routeContexts: {
+          offer: 'Contexto oferta',
+        },
+        defaultCta: 'book_call',
+      },
+    );
+
+    expect(prisma.aiAgentConfig.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          tenantId: 'team-1',
+          memberId: 'sponsor-1',
+          basePrompt: 'Prompt personal actualizado',
+        }),
+      }),
+    );
+    expect(tenantConfigCacheService.purgeTenantConfig).toHaveBeenCalledWith(
+      'team-1',
+    );
+    expect(
+      runtimeContextConfigSyncService.syncAiAgentConfig,
+    ).toHaveBeenCalledWith({
+      config: expect.objectContaining({
+        id: 'member-config-1',
+        tenantId: 'team-1',
+        memberId: 'sponsor-1',
+        basePrompt: 'Prompt personal actualizado',
+      }),
+      tenantCode: 'freddy',
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        configId: 'member-config-1',
+        resolution: expect.objectContaining({
+          strategy: 'member_override',
+          memberConfigId: 'member-config-1',
+        }),
+      }),
+    );
+  });
+
+  it('does not fail team updates when runtime context sync fails', async () => {
+    const { prisma, service, runtimeContextConfigSyncService } = buildService();
+    const updatedAt = new Date('2026-05-19T00:00:00.000Z');
+
+    runtimeContextConfigSyncService.syncAiAgentConfig.mockRejectedValue(
+      new Error('runtime unavailable'),
+    );
+    prisma.sponsor.findFirst.mockResolvedValue({
+      id: 'sponsor-1',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      displayName: 'Ana Sponsor',
+      team: {
+        id: 'team-1',
+        name: 'Freddy Team',
+        code: 'freddy',
+      },
+    });
+    prisma.aiAgentConfig.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'tenant-config-1',
+          tenantId: 'team-1',
+          memberId: null,
+          basePrompt: 'Prompt anterior',
+          routeContexts: null,
+          ctaPolicy: null,
+          aiPolicy: null,
+          isActive: true,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'tenant-config-1',
+          tenantId: 'team-1',
+          memberId: null,
+          basePrompt: 'Prompt nuevo',
+          routeContexts: null,
+          ctaPolicy: null,
+          aiPolicy: null,
+          isActive: true,
+          updatedAt,
+        },
+      ]);
+    prisma.aiAgentConfig.update.mockResolvedValue({
+      id: 'tenant-config-1',
+      tenantId: 'team-1',
+      memberId: null,
+      basePrompt: 'Prompt nuevo',
+      routeContexts: null,
+      ctaPolicy: null,
+      aiPolicy: null,
+      isActive: true,
+      updatedAt,
+    });
+
+    await expect(
+      service.updateTeamSettings(
+        {
+          workspaceId: 'workspace-1',
+          teamId: 'team-1',
+          sponsorId: 'sponsor-1',
+        },
+        {
+          basePrompt: 'Prompt nuevo',
+        },
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        configId: 'tenant-config-1',
+        basePrompt: 'Prompt nuevo',
+      }),
+    );
+    expect(
+      runtimeContextConfigSyncService.syncAiAgentConfig,
+    ).toHaveBeenCalled();
   });
 
   it('prefers member overrides, merges JSON policies, replaces placeholders and enriches the wallet context', async () => {

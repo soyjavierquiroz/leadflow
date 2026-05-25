@@ -16,6 +16,9 @@ type JsonRecord = Record<string, Prisma.JsonValue>;
 type TenantAiAgentConfig = Prisma.AiAgentConfigGetPayload<
   Record<string, never>
 >;
+type AiAgentConfigRecord = Prisma.AiAgentConfigGetPayload<
+  Record<string, never>
+>;
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -270,6 +273,51 @@ export class RuntimeContextConfigSyncService {
         }`,
       );
     }
+  }
+
+  async syncAiAgentConfig(input: {
+    config: AiAgentConfigRecord;
+    tenantCode?: string | null;
+  }): Promise<void> {
+    if (!this.isConfigured()) {
+      this.logger.warn(
+        `Skipping runtime context AI config sync for tenant ${input.config.tenantId}, config ${input.config.id}: runtime context is not configured.`,
+      );
+      return;
+    }
+
+    const routeContexts = toJsonRecord(input.config.routeContexts);
+    const aiPolicy = toJsonRecord(input.config.aiPolicy);
+    const ctaPolicy = toJsonRecord(input.config.ctaPolicy);
+    const routingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: input.tenantCode,
+      routeContexts,
+      aiPolicy,
+    });
+    const aiPolicyWithRoutingMetadata = {
+      ...aiPolicy,
+      ...routingMetadata,
+    } satisfies JsonRecord;
+
+    await this.request(
+      buildRuntimeContextConfigSyncPayload({
+        tenantId: input.config.tenantId,
+        memberId: input.config.memberId,
+        basePrompt: input.config.basePrompt,
+        verticalKey: routingMetadata.vertical_key,
+        brandKey: routingMetadata.brand_key,
+        businessModelType: routingMetadata.business_model_type,
+        routeContexts,
+        funnelContext: {},
+        ctaPolicy,
+        aiPolicy: aiPolicyWithRoutingMetadata,
+        status: input.config.isActive ? 'active' : 'inactive',
+      }),
+    );
+
+    this.logger.log(
+      `Runtime context AI config synced for tenant ${input.config.tenantId}, config ${input.config.id}, member ${input.config.memberId ?? 'global'}.`,
+    );
   }
 
   private isConfigured() {
