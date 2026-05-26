@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CrmIdentityMatcher } from './crm-identity-matcher';
 import { KurukinCrmReadClient } from './kurukin-crm-read.client';
 import { LeadflowCrmReadRepository } from './leadflow-crm-read.repository';
 import { TeamCrmController } from './team-crm.controller';
@@ -9,6 +10,7 @@ import { UnifiedCrmMapper } from './unified-crm.mapper';
   controllers: [TeamCrmController],
   providers: [
     LeadflowCrmReadRepository,
+    CrmIdentityMatcher,
     KurukinCrmReadClient,
     UnifiedCrmInboxService,
     UnifiedCrmMapper,

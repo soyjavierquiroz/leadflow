@@ -3,6 +3,7 @@ import {
   KurukinCrmReadClient,
   KurukinCrmReadError,
 } from './kurukin-crm-read.client';
+import { CrmIdentityMatcher } from './crm-identity-matcher';
 import { LeadflowCrmReadRepository } from './leadflow-crm-read.repository';
 import { UnifiedCrmMapper } from './unified-crm.mapper';
 import type {
@@ -57,6 +58,7 @@ export class UnifiedCrmInboxService {
     private readonly leadflowRepository: LeadflowCrmReadRepository,
     private readonly mapper: UnifiedCrmMapper,
     private readonly kurukinClient: KurukinCrmReadClient,
+    private readonly identityMatcher: CrmIdentityMatcher,
   ) {}
 
   async getInbox(
@@ -71,23 +73,24 @@ export class UnifiedCrmInboxService {
       status: query.status ?? null,
     };
     const supabaseEnabled = this.kurukinClient.isEnabled();
-
-    if (tab === 'duplicates') {
-      return this.emptyResponse({
-        limit,
-        cursor: query.cursor ?? null,
-        supabaseEnabled,
-        supabaseError: null,
-      });
-    }
+    const supabaseCanProvideContext =
+      supabaseEnabled && this.kurukinClient.isConfigured();
 
     const includeLeadflow =
       source !== 'supabase' &&
-      (tab === 'registered' || tab === 'all' || tab === 'unassigned');
+      (tab === 'registered' ||
+        tab === 'all' ||
+        tab === 'duplicates' ||
+        tab === 'unassigned' ||
+        (tab === 'conversational' && supabaseCanProvideContext));
     const includeSupabase =
       source === 'supabase' ||
       (source !== 'leadflow' &&
-        (tab === 'conversational' || tab === 'all' || tab === 'unassigned'));
+        (tab === 'conversational' ||
+          tab === 'all' ||
+          tab === 'duplicates' ||
+          tab === 'unassigned' ||
+          (tab === 'registered' && supabaseCanProvideContext)));
     const ownerFilter = tab === 'unassigned' ? 'unassigned' : query.owner;
     const filters = {
       ...baseFilters,
@@ -101,7 +104,13 @@ export class UnifiedCrmInboxService {
           unassignedCount: 0,
         };
     const supabaseResult = includeSupabase
-      ? await this.resolveSupabase(scope, filters, limit, query, supabaseEnabled)
+      ? await this.resolveSupabase(
+          scope,
+          filters,
+          limit,
+          query,
+          supabaseEnabled,
+        )
       : {
           rows: [] as UnifiedCrmLead[],
           conversationalCount: 0,
@@ -109,9 +118,20 @@ export class UnifiedCrmInboxService {
           available: false,
           error: null,
         };
-    const data = [...leadflowResult.rows, ...supabaseResult.rows]
+    const matchedRows = this.identityMatcher.markPossibleDuplicates([
+      ...leadflowResult.rows,
+      ...supabaseResult.rows,
+    ]);
+    const duplicateCount = matchedRows.filter(
+      (row) => row.flags?.possible_duplicate,
+    ).length;
+    const data = matchedRows
+      .filter((row) => matchesRequestedView(row, tab, source))
       .sort((left, right) =>
-        byLastActivityDesc(left.activity.last_activity_at, right.activity.last_activity_at),
+        byLastActivityDesc(
+          left.activity.last_activity_at,
+          right.activity.last_activity_at,
+        ),
       )
       .slice(0, limit);
 
@@ -127,7 +147,7 @@ export class UnifiedCrmInboxService {
         conversacionales: supabaseResult.conversationalCount,
         todos:
           leadflowResult.registeredCount + supabaseResult.conversationalCount,
-        posibles_duplicados: 0,
+        posibles_duplicados: duplicateCount,
         sin_owner:
           leadflowResult.unassignedCount + supabaseResult.unassignedCount,
       },
@@ -226,18 +246,20 @@ export class UnifiedCrmInboxService {
     };
 
     try {
-      const [records, conversationalCount, unassignedCount] = await Promise.all([
-        this.kurukinClient.listConversationalLeads(supabaseFilters),
-        this.kurukinClient.countConversationalLeads(supabaseCountFilters),
-        this.kurukinClient.countConversationalLeads({
-          tenantId: scope.teamId,
-          q: filters.q,
-          status: filters.status,
-          owner: 'unassigned',
-          instanceId: query.instanceId ?? null,
-          verticalKey: query.verticalKey ?? null,
-        }),
-      ]);
+      const [records, conversationalCount, unassignedCount] = await Promise.all(
+        [
+          this.kurukinClient.listConversationalLeads(supabaseFilters),
+          this.kurukinClient.countConversationalLeads(supabaseCountFilters),
+          this.kurukinClient.countConversationalLeads({
+            tenantId: scope.teamId,
+            q: filters.q,
+            status: filters.status,
+            owner: 'unassigned',
+            instanceId: query.instanceId ?? null,
+            verticalKey: query.verticalKey ?? null,
+          }),
+        ],
+      );
 
       return {
         rows: records.map((record) => this.mapper.fromSupabase(record)),
@@ -262,35 +284,6 @@ export class UnifiedCrmInboxService {
     }
   }
 
-  private emptyResponse(input: {
-    limit: number;
-    cursor: string | null;
-    supabaseEnabled: boolean;
-    supabaseError: string | null;
-  }): UnifiedCrmInboxResponse {
-    return {
-      data: [],
-      page: {
-        limit: input.limit,
-        cursor: input.cursor,
-        next_cursor: null,
-      },
-      counts: {
-        registrados: 0,
-        conversacionales: 0,
-        todos: 0,
-        posibles_duplicados: 0,
-        sin_owner: 0,
-      },
-      diagnostics: {
-        leadflow_available: true,
-        supabase_available: false,
-        supabase_enabled: input.supabaseEnabled,
-        supabase_error: input.supabaseError,
-      },
-    };
-  }
-
   private toSupabaseDiagnosticsCode(error: unknown) {
     if (error instanceof KurukinCrmReadError) {
       return error.code;
@@ -308,4 +301,32 @@ const byLastActivityDesc = (
   const rightTime = right ? new Date(right).getTime() : 0;
 
   return rightTime - leftTime;
+};
+
+const matchesRequestedView = (
+  row: UnifiedCrmLead,
+  tab: UnifiedCrmInboxTab,
+  source: UnifiedCrmInboxSource,
+) => {
+  if (source !== 'all' && row.source !== source) {
+    return false;
+  }
+
+  if (tab === 'registered') {
+    return row.source === 'leadflow';
+  }
+
+  if (tab === 'conversational') {
+    return row.source === 'supabase';
+  }
+
+  if (tab === 'duplicates') {
+    return Boolean(row.flags?.possible_duplicate);
+  }
+
+  if (tab === 'unassigned') {
+    return Boolean(row.flags?.is_orphaned);
+  }
+
+  return true;
 };

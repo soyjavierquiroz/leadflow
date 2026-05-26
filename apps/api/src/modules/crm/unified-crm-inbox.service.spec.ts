@@ -1,10 +1,15 @@
 import { LeadflowCrmReadRepository } from './leadflow-crm-read.repository';
+import { CrmIdentityMatcher } from './crm-identity-matcher';
 import {
   KurukinCrmReadClient,
   KurukinCrmReadError,
 } from './kurukin-crm-read.client';
-import { UnifiedCrmInboxService, normalizeCrmLimit } from './unified-crm-inbox.service';
+import {
+  UnifiedCrmInboxService,
+  normalizeCrmLimit,
+} from './unified-crm-inbox.service';
 import { UnifiedCrmMapper } from './unified-crm.mapper';
+import type { UnifiedCrmLead } from './unified-crm.types';
 
 describe('UnifiedCrmInboxService', () => {
   const scope = {
@@ -17,6 +22,9 @@ describe('UnifiedCrmInboxService', () => {
     listConversationalLeads: jest.fn(),
     countConversationalLeads: jest.fn(),
   };
+  const identityMatcher = {
+    markPossibleDuplicates: jest.fn((rows) => rows),
+  };
 
   it('returns an empty PR1 response for conversational tab', async () => {
     const repository = {
@@ -27,6 +35,7 @@ describe('UnifiedCrmInboxService', () => {
       repository as unknown as LeadflowCrmReadRepository,
       {} as UnifiedCrmMapper,
       disabledKurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
     );
 
     const result = await service.getInbox(scope, { tab: 'conversational' });
@@ -46,6 +55,7 @@ describe('UnifiedCrmInboxService', () => {
       repository as unknown as LeadflowCrmReadRepository,
       {} as UnifiedCrmMapper,
       disabledKurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
     );
 
     const result = await service.getInbox(scope, { source: 'supabase' });
@@ -72,6 +82,7 @@ describe('UnifiedCrmInboxService', () => {
       repository as unknown as LeadflowCrmReadRepository,
       mapper as unknown as UnifiedCrmMapper,
       disabledKurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
     );
 
     await service.getInbox(scope, { tab: 'unassigned', limit: '10' });
@@ -109,6 +120,7 @@ describe('UnifiedCrmInboxService', () => {
       repository as unknown as LeadflowCrmReadRepository,
       {} as UnifiedCrmMapper,
       kurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
     );
 
     const result = await service.getInbox(scope, { tab: 'conversational' });
@@ -124,8 +136,8 @@ describe('UnifiedCrmInboxService', () => {
 
   it('returns mocked Supabase rows for conversational tab', async () => {
     const repository = {
-      findMany: jest.fn(),
-      count: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     };
     const kurukinClient = {
       isEnabled: jest.fn().mockReturnValue(true),
@@ -148,6 +160,7 @@ describe('UnifiedCrmInboxService', () => {
       repository as unknown as LeadflowCrmReadRepository,
       mapper as unknown as UnifiedCrmMapper,
       kurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
     );
 
     const result = await service.getInbox(scope, { tab: 'conversational' });
@@ -163,7 +176,7 @@ describe('UnifiedCrmInboxService', () => {
     ]);
     expect(result.counts.conversacionales).toBe(1);
     expect(result.diagnostics.supabase_available).toBe(true);
-    expect(repository.findMany).not.toHaveBeenCalled();
+    expect(repository.findMany).toHaveBeenCalled();
   });
 
   it('combines and sorts LeadFlow and Supabase rows for all tab', async () => {
@@ -199,6 +212,7 @@ describe('UnifiedCrmInboxService', () => {
       repository as unknown as LeadflowCrmReadRepository,
       mapper as unknown as UnifiedCrmMapper,
       kurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
     );
 
     const result = await service.getInbox(scope, { tab: 'all' });
@@ -213,6 +227,116 @@ describe('UnifiedCrmInboxService', () => {
       todos: 2,
       sin_owner: 2,
     });
+  });
+
+  it('applies the identity matcher for all tab and counts possible duplicates', async () => {
+    const repository = {
+      findMany: jest.fn().mockResolvedValue([{ id: 'lead-1' }]),
+      count: jest.fn().mockResolvedValue(1),
+    };
+    const kurukinClient = {
+      isEnabled: jest.fn().mockReturnValue(true),
+      isConfigured: jest.fn().mockReturnValue(true),
+      listConversationalLeads: jest
+        .fn()
+        .mockResolvedValue([{ id: 'saas-lead-1' }]),
+      countConversationalLeads: jest.fn().mockResolvedValue(1),
+    };
+    const mapper = {
+      fromLeadflow: jest.fn().mockReturnValue({
+        id: 'leadflow:lead-1',
+        source: 'leadflow',
+        flags: { possible_duplicate: false },
+        activity: {
+          last_activity_at: '2026-05-22T10:00:00.000Z',
+        },
+      }),
+      fromSupabase: jest.fn().mockReturnValue({
+        id: 'supabase:saas-lead-1',
+        source: 'supabase',
+        flags: { possible_duplicate: false },
+        activity: {
+          last_activity_at: '2026-05-24T10:00:00.000Z',
+        },
+      }),
+    };
+    const matcher = {
+      markPossibleDuplicates: jest.fn((rows: UnifiedCrmLead[]) =>
+        rows.map((row) =>
+          row.id === 'supabase:saas-lead-1'
+            ? { ...row, flags: { possible_duplicate: true } }
+            : row,
+        ),
+      ),
+    };
+    const service = new UnifiedCrmInboxService(
+      repository as unknown as LeadflowCrmReadRepository,
+      mapper as unknown as UnifiedCrmMapper,
+      kurukinClient as unknown as KurukinCrmReadClient,
+      matcher as unknown as CrmIdentityMatcher,
+    );
+
+    const result = await service.getInbox(scope, { tab: 'all' });
+
+    expect(matcher.markPossibleDuplicates).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'leadflow:lead-1' }),
+      expect.objectContaining({ id: 'supabase:saas-lead-1' }),
+    ]);
+    expect(result.counts.posibles_duplicados).toBe(1);
+  });
+
+  it('returns only possible duplicates for duplicates tab', async () => {
+    const repository = {
+      findMany: jest.fn().mockResolvedValue([{ id: 'lead-1' }]),
+      count: jest.fn().mockResolvedValue(1),
+    };
+    const kurukinClient = {
+      isEnabled: jest.fn().mockReturnValue(true),
+      isConfigured: jest.fn().mockReturnValue(true),
+      listConversationalLeads: jest
+        .fn()
+        .mockResolvedValue([{ id: 'saas-lead-1' }]),
+      countConversationalLeads: jest.fn().mockResolvedValue(1),
+    };
+    const mapper = {
+      fromLeadflow: jest.fn().mockReturnValue({
+        id: 'leadflow:lead-1',
+        source: 'leadflow',
+        flags: { possible_duplicate: false },
+        activity: {
+          last_activity_at: '2026-05-22T10:00:00.000Z',
+        },
+      }),
+      fromSupabase: jest.fn().mockReturnValue({
+        id: 'supabase:saas-lead-1',
+        source: 'supabase',
+        flags: { possible_duplicate: false },
+        activity: {
+          last_activity_at: '2026-05-24T10:00:00.000Z',
+        },
+      }),
+    };
+    const matcher = {
+      markPossibleDuplicates: jest.fn((rows: UnifiedCrmLead[]) =>
+        rows.map((row) => ({
+          ...row,
+          flags: {
+            possible_duplicate: row.id === 'leadflow:lead-1',
+          },
+        })),
+      ),
+    };
+    const service = new UnifiedCrmInboxService(
+      repository as unknown as LeadflowCrmReadRepository,
+      mapper as unknown as UnifiedCrmMapper,
+      kurukinClient as unknown as KurukinCrmReadClient,
+      matcher as unknown as CrmIdentityMatcher,
+    );
+
+    const result = await service.getInbox(scope, { tab: 'duplicates' });
+
+    expect(result.data.map((item) => item.id)).toEqual(['leadflow:lead-1']);
+    expect(result.counts.posibles_duplicados).toBe(1);
   });
 
   it('keeps LeadFlow rows when Supabase fails', async () => {
@@ -234,16 +358,23 @@ describe('UnifiedCrmInboxService', () => {
       fromLeadflow: jest.fn().mockReturnValue({
         id: 'leadflow:lead-1',
         source: 'leadflow',
+        flags: {
+          possible_duplicate: false,
+        },
         activity: {
           last_activity_at: '2026-05-22T10:00:00.000Z',
         },
       }),
       fromSupabase: jest.fn(),
     };
+    const matcher = {
+      markPossibleDuplicates: jest.fn((rows) => rows),
+    };
     const service = new UnifiedCrmInboxService(
       repository as unknown as LeadflowCrmReadRepository,
       mapper as unknown as UnifiedCrmMapper,
       kurukinClient as unknown as KurukinCrmReadClient,
+      matcher as unknown as CrmIdentityMatcher,
     );
 
     const result = await service.getInbox(scope, { tab: 'all' });
@@ -252,6 +383,9 @@ describe('UnifiedCrmInboxService', () => {
       {
         id: 'leadflow:lead-1',
         source: 'leadflow',
+        flags: {
+          possible_duplicate: false,
+        },
         activity: {
           last_activity_at: '2026-05-22T10:00:00.000Z',
         },
@@ -262,12 +396,15 @@ describe('UnifiedCrmInboxService', () => {
       supabase_available: false,
       supabase_error: 'query_failed',
     });
+    expect(matcher.markPossibleDuplicates).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'leadflow:lead-1' }),
+    ]);
   });
 
   it('maps owner=unassigned into Supabase filters', async () => {
     const repository = {
-      findMany: jest.fn(),
-      count: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     };
     const kurukinClient = {
       isEnabled: jest.fn().mockReturnValue(true),
@@ -279,6 +416,7 @@ describe('UnifiedCrmInboxService', () => {
       repository as unknown as LeadflowCrmReadRepository,
       { fromSupabase: jest.fn() } as unknown as UnifiedCrmMapper,
       kurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
     );
 
     await service.getInbox(scope, {
