@@ -150,5 +150,71 @@ describe('UnifiedCrmMapper', () => {
     expect(result.flags.is_orphaned).toBe(true);
     expect(result.flags.is_stagnant).toBe(false);
   });
-});
 
+  it('maps a Supabase conversational lead into the unified CRM DTO', () => {
+    const mapper = new UnifiedCrmMapper();
+
+    const result = mapper.fromSupabase({
+      id: 'saas-lead-1',
+      tenant_id: 'team-1',
+      whatsapp_id: '59177771234@s.whatsapp.net',
+      phone_e164: '+591 7777-1234',
+      name: 'Conversational Jane',
+      status: 'active',
+      last_message: 'Hola, quiero informacion',
+      last_message_at: new Date('2026-05-24T12:00:00.000Z'),
+      attributes: {},
+      source_app: 'kurukin-core',
+      instance_id: 'instance-1',
+      vertical_key: 'dxn',
+      owner_external_id: 'sponsor-1',
+      owner_name: 'Advisor One',
+      created_at: new Date('2026-05-23T12:00:00.000Z'),
+      updated_at: new Date('2026-05-24T12:30:00.000Z'),
+    });
+
+    expect(result).toMatchObject({
+      id: 'supabase:saas-lead-1',
+      source: 'supabase',
+      tenant_id: 'team-1',
+      team_id: 'team-1',
+      workspace_id: null,
+      contact: {
+        display_name: 'Conversational Jane',
+        phone_e164: '59177771234',
+        whatsapp_id: '59177771234@s.whatsapp.net',
+        email: null,
+      },
+      supabase: {
+        saas_lead_id: 'saas-lead-1',
+        status: 'active',
+        source_app: 'kurukin-core',
+        instance_id: 'instance-1',
+        vertical_key: 'dxn',
+        last_message: 'Hola, quiero informacion',
+        last_message_at: '2026-05-24T12:00:00.000Z',
+      },
+      owner: {
+        sponsor_id: 'sponsor-1',
+        display_name: 'Advisor One',
+        assignment_status: 'external_owner',
+      },
+      origin: {
+        origin_type: 'whatsapp',
+        instance_id: 'instance-1',
+        vertical_key: 'dxn',
+      },
+      activity: {
+        last_activity_at: '2026-05-24T12:00:00.000Z',
+        last_message: 'Hola, quiero informacion',
+      },
+      flags: {
+        is_registered: false,
+        is_conversational: true,
+        has_assignment: true,
+        is_orphaned: false,
+        possible_duplicate: false,
+      },
+    });
+  });
+});

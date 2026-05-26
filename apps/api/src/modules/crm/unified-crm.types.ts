@@ -128,6 +128,8 @@ export type UnifiedCrmInboxQuery = {
   owner?: string;
   status?: string;
   source?: UnifiedCrmInboxSource;
+  instanceId?: string;
+  verticalKey?: string;
   limit?: string;
   cursor?: string;
 };
@@ -136,4 +138,3 @@ export type UnifiedCrmScope = {
   workspaceId: string;
   teamId: string;
 };
-
