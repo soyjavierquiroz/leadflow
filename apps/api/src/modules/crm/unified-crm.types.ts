@@ -119,6 +119,7 @@ export type UnifiedCrmInboxResponse = {
     supabase_available: boolean;
     supabase_enabled: boolean;
     supabase_error?: string | null;
+    crm_candidate_limit_reached?: boolean;
   };
 };
 

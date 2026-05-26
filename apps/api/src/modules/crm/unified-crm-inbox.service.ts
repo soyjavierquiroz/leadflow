@@ -18,6 +18,7 @@ import type {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const INTERNAL_CANDIDATE_LIMIT = 1_000;
 const validTabs = new Set<UnifiedCrmInboxTab>([
   'registered',
   'conversational',
@@ -70,7 +71,6 @@ export class UnifiedCrmInboxService {
     const source = normalizeSource(query.source);
     const limit = normalizeCrmLimit(query.limit);
     const cursor = decodeCrmCursor(query.cursor);
-    const fetchLimit = limit + 1;
     const baseFilters = {
       q: query.q ?? null,
       status: query.status ?? null,
@@ -94,48 +94,39 @@ export class UnifiedCrmInboxService {
           tab === 'duplicates' ||
           tab === 'unassigned' ||
           (tab === 'registered' && supabaseCanProvideContext)));
-    const ownerFilter = tab === 'unassigned' ? 'unassigned' : query.owner;
     const filters = {
       ...baseFilters,
-      owner: ownerFilter ?? null,
+      owner: query.owner ?? null,
     };
     const leadflowResult = includeLeadflow
       ? await this.resolveLeadflow(
           scope,
           filters,
-          baseFilters,
-          fetchLimit,
-          query,
-          cursor,
+          INTERNAL_CANDIDATE_LIMIT,
         )
       : {
           rows: [] as UnifiedCrmLead[],
-          registeredCount: 0,
-          unassignedCount: 0,
+          candidateLimitReached: false,
         };
     const supabaseResult = includeSupabase
       ? await this.resolveSupabase(
           scope,
           filters,
-          fetchLimit,
+          INTERNAL_CANDIDATE_LIMIT,
           query,
           supabaseEnabled,
-          cursor,
         )
       : {
           rows: [] as UnifiedCrmLead[],
-          conversationalCount: 0,
-          unassignedCount: 0,
           available: false,
           error: null,
+          candidateLimitReached: false,
         };
     const matchedRows = this.identityMatcher.markPossibleDuplicates([
       ...leadflowResult.rows,
       ...supabaseResult.rows,
     ]);
-    const duplicateCount = matchedRows.filter(
-      (row) => row.flags?.possible_duplicate,
-    ).length;
+    const counts = buildCounts(matchedRows);
     const requestedRows = matchedRows
       .filter((row) => matchesRequestedView(row, tab, source))
       .filter((row) => !cursor || isAfterCursor(row, cursor))
@@ -154,19 +145,21 @@ export class UnifiedCrmInboxService {
         next_cursor: nextCursor,
       },
       counts: {
-        registrados: leadflowResult.registeredCount,
-        conversacionales: supabaseResult.conversationalCount,
-        todos:
-          leadflowResult.registeredCount + supabaseResult.conversationalCount,
-        posibles_duplicados: duplicateCount,
-        sin_owner:
-          leadflowResult.unassignedCount + supabaseResult.unassignedCount,
+        registrados: counts.registered,
+        conversacionales: counts.conversational,
+        todos: counts.all,
+        posibles_duplicados: counts.duplicates,
+        sin_owner: counts.unassigned,
       },
       diagnostics: {
         leadflow_available: true,
         supabase_available: supabaseResult.available,
         supabase_enabled: supabaseEnabled,
         supabase_error: supabaseResult.error,
+        crm_candidate_limit_reached:
+          leadflowResult.candidateLimitReached ||
+          supabaseResult.candidateLimitReached ||
+          undefined,
       },
     };
   }
@@ -174,38 +167,17 @@ export class UnifiedCrmInboxService {
   private async resolveLeadflow(
     scope: UnifiedCrmScope,
     filters: { q: string | null; status: string | null; owner: string | null },
-    baseFilters: { q: string | null; status: string | null },
     limit: number,
-    query: UnifiedCrmInboxQuery,
-    cursor: UnifiedCrmPaginationCursor | null,
   ) {
-    const [records, registeredCount, unassignedCount] = await Promise.all([
-      this.leadflowRepository.findMany({
-        scope,
-        filters,
-        limit,
-        cursor,
-      }),
-      this.leadflowRepository.count({
-        scope,
-        filters: {
-          ...baseFilters,
-          owner: query.owner ?? null,
-        },
-      }),
-      this.leadflowRepository.count({
-        scope,
-        filters: {
-          ...baseFilters,
-          owner: 'unassigned',
-        },
-      }),
-    ]);
-
+    const records = await this.leadflowRepository.findMany({
+      scope,
+      filters,
+      limit,
+      cursor: null,
+    });
     return {
       rows: records.map((record) => this.mapper.fromLeadflow(record, scope)),
-      registeredCount,
-      unassignedCount,
+      candidateLimitReached: records.length >= limit,
     };
   }
 
@@ -215,15 +187,13 @@ export class UnifiedCrmInboxService {
     limit: number,
     query: UnifiedCrmInboxQuery,
     supabaseEnabled: boolean,
-    cursor: UnifiedCrmPaginationCursor | null,
   ) {
     if (!supabaseEnabled) {
       return {
         rows: [] as UnifiedCrmLead[],
-        conversationalCount: 0,
-        unassignedCount: 0,
         available: false,
         error: null,
+        candidateLimitReached: false,
       };
     }
 
@@ -234,10 +204,9 @@ export class UnifiedCrmInboxService {
 
       return {
         rows: [] as UnifiedCrmLead[],
-        conversationalCount: 0,
-        unassignedCount: 0,
         available: false,
         error: 'missing_database_url',
+        candidateLimitReached: false,
       };
     }
 
@@ -249,39 +218,19 @@ export class UnifiedCrmInboxService {
       owner: filters.owner,
       instanceId: query.instanceId ?? null,
       verticalKey: query.verticalKey ?? null,
-      cursor,
-    };
-    const supabaseCountFilters = {
-      tenantId: scope.teamId,
-      q: filters.q,
-      status: filters.status,
-      owner: filters.owner,
-      instanceId: query.instanceId ?? null,
-      verticalKey: query.verticalKey ?? null,
+      cursor: null,
     };
 
     try {
-      const [records, conversationalCount, unassignedCount] = await Promise.all(
-        [
-          this.kurukinClient.listConversationalLeads(supabaseFilters),
-          this.kurukinClient.countConversationalLeads(supabaseCountFilters),
-          this.kurukinClient.countConversationalLeads({
-            tenantId: scope.teamId,
-            q: filters.q,
-            status: filters.status,
-            owner: 'unassigned',
-            instanceId: query.instanceId ?? null,
-            verticalKey: query.verticalKey ?? null,
-          }),
-        ],
+      const records = await this.kurukinClient.listConversationalLeads(
+        supabaseFilters,
       );
 
       return {
         rows: records.map((record) => this.mapper.fromSupabase(record)),
-        conversationalCount,
-        unassignedCount,
         available: true,
         error: null,
+        candidateLimitReached: records.length >= limit,
       };
     } catch (error) {
       const errorCode = this.toSupabaseDiagnosticsCode(error);
@@ -291,10 +240,9 @@ export class UnifiedCrmInboxService {
 
       return {
         rows: [] as UnifiedCrmLead[],
-        conversationalCount: 0,
-        unassignedCount: 0,
         available: false,
         error: errorCode,
+        candidateLimitReached: false,
       };
     }
   }
@@ -307,6 +255,38 @@ export class UnifiedCrmInboxService {
     return 'query_failed';
   }
 }
+
+const buildCounts = (rows: UnifiedCrmLead[]) => {
+  return rows.reduce(
+    (counts, row) => {
+      if (row.source === 'leadflow') {
+        counts.registered += 1;
+      }
+
+      if (row.source === 'supabase') {
+        counts.conversational += 1;
+      }
+
+      if (row.flags?.possible_duplicate) {
+        counts.duplicates += 1;
+      }
+
+      if (row.flags?.is_orphaned) {
+        counts.unassigned += 1;
+      }
+
+      counts.all += 1;
+      return counts;
+    },
+    {
+      all: 0,
+      conversational: 0,
+      duplicates: 0,
+      registered: 0,
+      unassigned: 0,
+    },
+  );
+};
 
 const toTimestamp = (value: string | null | undefined) => {
   if (!value) {
