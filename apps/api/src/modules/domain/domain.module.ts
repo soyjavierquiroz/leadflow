@@ -4,6 +4,7 @@ import { AiConfigModule } from '../ai-config/ai-config.module';
 import { BlockDefinitionsModule } from '../block-definitions/block-definitions.module';
 import { AssignmentsModule } from '../assignments/assignments.module';
 import { ConversionEventMappingsModule } from '../conversion-event-mappings/conversion-event-mappings.module';
+import { CrmModule } from '../crm/crm.module';
 import { DomainsModule } from '../domains/domains.module';
 import { EventsModule } from '../events/events.module';
 import { WalletEngineModule } from '../finance/wallet-engine.module';
@@ -36,6 +37,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     AiConfigModule,
     AdWheelsModule,
     BlockDefinitionsModule,
+    CrmModule,
     WorkspacesModule,
     TeamsModule,
     SponsorsModule,
@@ -69,6 +71,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     AiConfigModule,
     AdWheelsModule,
     BlockDefinitionsModule,
+    CrmModule,
     WorkspacesModule,
     TeamsModule,
     SponsorsModule,
