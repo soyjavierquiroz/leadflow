@@ -12,6 +12,7 @@ import type {
   UnifiedCrmInboxResponse,
   UnifiedCrmInboxSource,
   UnifiedCrmInboxTab,
+  UnifiedCrmPaginationCursor,
   UnifiedCrmScope,
 } from './unified-crm.types';
 
@@ -68,6 +69,8 @@ export class UnifiedCrmInboxService {
     const tab = normalizeTab(query.tab);
     const source = normalizeSource(query.source);
     const limit = normalizeCrmLimit(query.limit);
+    const cursor = decodeCrmCursor(query.cursor);
+    const fetchLimit = limit + 1;
     const baseFilters = {
       q: query.q ?? null,
       status: query.status ?? null,
@@ -97,7 +100,14 @@ export class UnifiedCrmInboxService {
       owner: ownerFilter ?? null,
     };
     const leadflowResult = includeLeadflow
-      ? await this.resolveLeadflow(scope, filters, baseFilters, limit, query)
+      ? await this.resolveLeadflow(
+          scope,
+          filters,
+          baseFilters,
+          fetchLimit,
+          query,
+          cursor,
+        )
       : {
           rows: [] as UnifiedCrmLead[],
           registeredCount: 0,
@@ -107,9 +117,10 @@ export class UnifiedCrmInboxService {
       ? await this.resolveSupabase(
           scope,
           filters,
-          limit,
+          fetchLimit,
           query,
           supabaseEnabled,
+          cursor,
         )
       : {
           rows: [] as UnifiedCrmLead[],
@@ -125,22 +136,22 @@ export class UnifiedCrmInboxService {
     const duplicateCount = matchedRows.filter(
       (row) => row.flags?.possible_duplicate,
     ).length;
-    const data = matchedRows
+    const requestedRows = matchedRows
       .filter((row) => matchesRequestedView(row, tab, source))
-      .sort((left, right) =>
-        byLastActivityDesc(
-          left.activity.last_activity_at,
-          right.activity.last_activity_at,
-        ),
-      )
-      .slice(0, limit);
+      .filter((row) => !cursor || isAfterCursor(row, cursor))
+      .sort(compareCrmRows);
+    const data = requestedRows.slice(0, limit);
+    const nextCursor =
+      requestedRows.length > limit
+        ? encodeCrmCursor(data[data.length - 1])
+        : null;
 
     return {
       data,
       page: {
         limit,
         cursor: query.cursor ?? null,
-        next_cursor: null,
+        next_cursor: nextCursor,
       },
       counts: {
         registrados: leadflowResult.registeredCount,
@@ -166,12 +177,14 @@ export class UnifiedCrmInboxService {
     baseFilters: { q: string | null; status: string | null },
     limit: number,
     query: UnifiedCrmInboxQuery,
+    cursor: UnifiedCrmPaginationCursor | null,
   ) {
     const [records, registeredCount, unassignedCount] = await Promise.all([
       this.leadflowRepository.findMany({
         scope,
         filters,
         limit,
+        cursor,
       }),
       this.leadflowRepository.count({
         scope,
@@ -202,6 +215,7 @@ export class UnifiedCrmInboxService {
     limit: number,
     query: UnifiedCrmInboxQuery,
     supabaseEnabled: boolean,
+    cursor: UnifiedCrmPaginationCursor | null,
   ) {
     if (!supabaseEnabled) {
       return {
@@ -235,6 +249,7 @@ export class UnifiedCrmInboxService {
       owner: filters.owner,
       instanceId: query.instanceId ?? null,
       verticalKey: query.verticalKey ?? null,
+      cursor,
     };
     const supabaseCountFilters = {
       tenantId: scope.teamId,
@@ -293,14 +308,97 @@ export class UnifiedCrmInboxService {
   }
 }
 
-const byLastActivityDesc = (
-  left: string | null | undefined,
-  right: string | null | undefined,
-) => {
-  const leftTime = left ? new Date(left).getTime() : 0;
-  const rightTime = right ? new Date(right).getTime() : 0;
+const toTimestamp = (value: string | null | undefined) => {
+  if (!value) {
+    return 0;
+  }
 
-  return rightTime - leftTime;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const getActivityTimestamp = (row: UnifiedCrmLead) =>
+  toTimestamp(row.activity?.last_activity_at) ||
+  toTimestamp(row.updated_at) ||
+  toTimestamp(row.created_at);
+
+const getActivityIso = (row: UnifiedCrmLead) => {
+  const timestamp = getActivityTimestamp(row);
+  return timestamp > 0 ? new Date(timestamp).toISOString() : null;
+};
+
+const compareCrmRows = (left: UnifiedCrmLead, right: UnifiedCrmLead) => {
+  const activityDiff = getActivityTimestamp(right) - getActivityTimestamp(left);
+
+  if (activityDiff !== 0) {
+    return activityDiff;
+  }
+
+  return left.id.localeCompare(right.id);
+};
+
+const isAfterCursor = (
+  row: UnifiedCrmLead,
+  cursor: UnifiedCrmPaginationCursor,
+) => {
+  const cursorTimestamp = toTimestamp(cursor.last_activity_at);
+  const rowTimestamp = getActivityTimestamp(row);
+
+  if (rowTimestamp !== cursorTimestamp) {
+    return rowTimestamp < cursorTimestamp;
+  }
+
+  return row.id > cursor.id;
+};
+
+const encodeCrmCursor = (row: UnifiedCrmLead | undefined) => {
+  if (!row) {
+    return null;
+  }
+
+  return Buffer.from(
+    JSON.stringify({
+      last_activity_at: getActivityIso(row),
+      id: row.id,
+    } satisfies UnifiedCrmPaginationCursor),
+    'utf8',
+  ).toString('base64url');
+};
+
+const decodeCrmCursor = (
+  value: string | null | undefined,
+): UnifiedCrmPaginationCursor | null => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(value, 'base64url').toString('utf8'),
+    ) as unknown;
+
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      !('id' in payload) ||
+      typeof payload.id !== 'string'
+    ) {
+      return null;
+    }
+
+    const lastActivityAt =
+      'last_activity_at' in payload &&
+      typeof payload.last_activity_at === 'string'
+        ? payload.last_activity_at
+        : null;
+
+    return {
+      id: payload.id,
+      last_activity_at: lastActivityAt,
+    };
+  } catch {
+    return null;
+  }
 };
 
 const matchesRequestedView = (

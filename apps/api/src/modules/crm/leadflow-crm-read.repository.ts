@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { AssignmentStatus, LeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { UnifiedCrmScope } from './unified-crm.types';
+import type {
+  UnifiedCrmPaginationCursor,
+  UnifiedCrmScope,
+} from './unified-crm.types';
 
 const activeAssignmentStatuses: AssignmentStatus[] = [
   'pending',
@@ -77,9 +80,18 @@ export class LeadflowCrmReadRepository {
     scope: UnifiedCrmScope;
     filters: LeadflowCrmLeadFilters;
     limit: number;
+    cursor?: UnifiedCrmPaginationCursor | null;
   }): Promise<LeadflowCrmLeadRecord[]> {
+    const where = this.buildWhere(input.scope, input.filters);
+    const cursorWhere = this.buildCursorWhere(input.cursor);
+
     return this.prisma.lead.findMany({
-      where: this.buildWhere(input.scope, input.filters),
+      where: cursorWhere
+        ? {
+            ...where,
+            AND: [...toAndArray(where.AND), cursorWhere],
+          }
+        : where,
       include: leadflowCrmLeadInclude,
       orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
       take: input.limit,
@@ -205,4 +217,62 @@ export class LeadflowCrmReadRepository {
       AND: andFilters,
     };
   }
+
+  private buildCursorWhere(
+    cursor: UnifiedCrmPaginationCursor | null | undefined,
+  ): Prisma.LeadWhereInput | null {
+    if (!cursor?.last_activity_at) {
+      return null;
+    }
+
+    const cursorDate = new Date(cursor.last_activity_at);
+
+    if (Number.isNaN(cursorDate.getTime())) {
+      return null;
+    }
+
+    const leadflowId = cursor.id.startsWith('leadflow:')
+      ? cursor.id.slice('leadflow:'.length)
+      : null;
+
+    if (!leadflowId) {
+      return {
+        updatedAt: {
+          lt: cursorDate,
+        },
+      };
+    }
+
+    return {
+      OR: [
+        {
+          updatedAt: {
+            lt: cursorDate,
+          },
+        },
+        {
+          AND: [
+            {
+              updatedAt: cursorDate,
+            },
+            {
+              id: {
+                gt: leadflowId,
+              },
+            },
+          ],
+        },
+      ],
+    };
+  }
 }
+
+const toAndArray = (
+  value: Prisma.LeadWhereInput['AND'],
+): Prisma.LeadWhereInput[] => {
+  if (!value) {
+    return [];
+  }
+
+  return Array.isArray(value) ? value : [value];
+};

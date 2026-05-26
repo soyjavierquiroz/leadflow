@@ -134,6 +134,11 @@ export type UnifiedCrmInboxQuery = {
   cursor?: string;
 };
 
+export type UnifiedCrmPaginationCursor = {
+  last_activity_at?: string | null;
+  id: string;
+};
+
 export type UnifiedCrmScope = {
   workspaceId: string;
   teamId: string;

@@ -131,6 +131,7 @@ export type TeamCrmInboxSnapshotParams = {
   owner?: string;
   status?: string;
   source?: UnifiedCrmInboxSource;
+  cursor?: string;
 };
 
 const getErrorMessage = (payload: unknown, fallback: string) =>
@@ -173,6 +174,10 @@ const buildInboxQuery = (params: TeamCrmInboxSnapshotParams) => {
 
   if (params.source && params.source !== "all") {
     searchParams.set("source", params.source);
+  }
+
+  if (params.cursor?.trim()) {
+    searchParams.set("cursor", params.cursor.trim());
   }
 
   const queryString = searchParams.toString();

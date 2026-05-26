@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useDeferredValue,
   useEffect,
@@ -27,6 +28,9 @@ import {
 
 type TeamCrmClientProps = {
   initialSnapshot: UnifiedCrmInboxResponse;
+  initialSearch: string;
+  initialSource: UnifiedCrmInboxSource;
+  initialTab: UnifiedCrmTab;
 };
 
 const tabs = [
@@ -134,6 +138,7 @@ const getDuplicateReasonLabel = (reason: string) =>
 const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
 
 const buildInboxPath = (input: {
+  cursor?: string | null;
   tab: UnifiedCrmTab;
   q: string;
   source: UnifiedCrmInboxSource;
@@ -151,7 +156,32 @@ const buildInboxPath = (input: {
     params.set("source", input.source);
   }
 
+  if (input.cursor) {
+    params.set("cursor", input.cursor);
+  }
+
   return `/team/crm/inbox?${params.toString()}`;
+};
+
+const getVisibleTotal = (
+  counts: UnifiedCrmInboxResponse["counts"],
+  tab: UnifiedCrmTab,
+) => {
+  const tabConfig = tabs.find((item) => item.value === tab);
+  return tabConfig ? counts[tabConfig.countKey] : counts.todos;
+};
+
+const mergeUniqueRows = (
+  currentRows: UnifiedCrmLead[],
+  nextRows: UnifiedCrmLead[],
+) => {
+  const byId = new Map(currentRows.map((row) => [row.id, row]));
+
+  nextRows.forEach((row) => {
+    byId.set(row.id, row);
+  });
+
+  return Array.from(byId.values());
 };
 
 function InlineBadge({
@@ -175,8 +205,8 @@ function LeadCard({ lead }: { lead: UnifiedCrmLead }) {
   const matchedRecords = lead.dedupe.matched_records ?? [];
 
   return (
-    <article className="rounded-[1.5rem] border border-app-border bg-app-card p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <article className="rounded-[1.25rem] border border-app-border bg-app-card p-4 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <InlineBadge className={sourceBadgeClassName[lead.source]}>
@@ -199,11 +229,11 @@ function LeadCard({ lead }: { lead: UnifiedCrmLead }) {
             ) : null}
           </div>
 
-          <h2 className="mt-4 break-words text-xl font-semibold tracking-tight text-app-text">
+          <h2 className="mt-3 break-words text-lg font-semibold tracking-tight text-app-text">
             {getLeadTitle(lead)}
           </h2>
 
-          <div className="mt-3 grid gap-2 text-sm text-app-text-muted sm:grid-cols-2">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-app-text-muted">
             <p>
               <span className="font-semibold text-app-text-soft">Telefono:</span>{" "}
               {lead.contact.phone_e164 ?? "Sin telefono"}
@@ -223,15 +253,15 @@ function LeadCard({ lead }: { lead: UnifiedCrmLead }) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl bg-app-surface-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl bg-app-surface-muted p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-soft">
             Origen
           </p>
-          <p className="mt-2 font-medium text-app-text">
+          <p className="mt-1 text-sm font-medium text-app-text">
             {toSentenceCase(lead.origin.origin_type)}
           </p>
-          <p className="mt-1 text-sm text-app-text-muted">
+          <p className="mt-1 truncate text-xs text-app-text-muted">
             {lead.origin.funnel_name ??
               lead.origin.source_channel ??
               "Origen pendiente"}
@@ -243,66 +273,66 @@ function LeadCard({ lead }: { lead: UnifiedCrmLead }) {
           ) : null}
         </div>
 
-        <div className="rounded-2xl bg-app-surface-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
+        <div className="rounded-2xl bg-app-surface-muted p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-soft">
             Owner
           </p>
-          <p className="mt-2 font-medium text-app-text">
+          <p className="mt-1 truncate text-sm font-medium text-app-text">
             {lead.owner.display_name ?? "Sin owner"}
           </p>
-          <p className="mt-1 text-sm text-app-text-muted">
+          <p className="mt-1 text-xs text-app-text-muted">
             {lead.owner.assigned_at
               ? `Asignado ${formatRelativeTime(lead.owner.assigned_at)}`
               : "Sin asignacion activa"}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-app-surface-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
+        <div className="rounded-2xl bg-app-surface-muted p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-soft">
             Actividad
           </p>
-          <p className="mt-2 font-medium text-app-text">
+          <p className="mt-1 text-sm font-medium text-app-text">
             {formatRelativeTime(lead.activity.last_activity_at)}
           </p>
-          <p className="mt-1 text-sm text-app-text-muted">
+          <p className="mt-1 text-xs text-app-text-muted">
             {formatDateTime(lead.activity.last_activity_at)}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-app-surface-muted p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
+        <div className="rounded-2xl bg-app-surface-muted p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-soft">
             Registro
           </p>
-          <p className="mt-2 font-medium text-app-text">
+          <p className="mt-1 text-sm font-medium text-app-text">
             {summarizeId(getRecordId(lead))}
           </p>
-          <p className="mt-1 text-sm text-app-text-muted">
+          <p className="mt-1 text-xs text-app-text-muted">
             Actualizado {formatRelativeTime(lead.updated_at)}
           </p>
         </div>
       </div>
 
       {lead.activity.last_message ? (
-        <div className="mt-4 rounded-2xl border border-app-border bg-app-surface px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
+        <div className="mt-3 rounded-2xl border border-app-border bg-app-surface px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-soft">
             Ultimo mensaje
           </p>
-          <p className="mt-2 line-clamp-3 text-sm leading-6 text-app-text-muted">
+          <p className="mt-1 line-clamp-2 text-sm leading-5 text-app-text-muted">
             {lead.activity.last_message}
           </p>
         </div>
       ) : null}
 
       {lead.flags.possible_duplicate && matchedRecords.length > 0 ? (
-        <details className="mt-4 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-app-warning-text">
+        <details className="mt-3 rounded-2xl border border-app-warning-border bg-app-warning-bg px-3 py-2.5 text-app-warning-text">
           <summary className="cursor-pointer text-sm font-semibold">
-            Coincidencias posibles
+            Coincidencias posibles · {matchedRecords.length}
           </summary>
-          <div className="mt-3 space-y-2">
+          <div className="mt-2 space-y-2">
             {matchedRecords.map((record) => (
               <div
                 key={`${record.source}:${record.id}:${record.reason}`}
-                className="rounded-xl border border-app-warning-border bg-app-card px-3 py-2 text-sm"
+                className="rounded-xl border border-app-warning-border bg-app-card px-3 py-2 text-xs"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold">
@@ -322,15 +352,30 @@ function LeadCard({ lead }: { lead: UnifiedCrmLead }) {
   );
 }
 
-export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
+export function TeamCrmClient({
+  initialSearch,
+  initialSnapshot,
+  initialSource,
+  initialTab,
+}: TeamCrmClientProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
-  const [activeTab, setActiveTab] = useState<UnifiedCrmTab>("all");
-  const [search, setSearch] = useState("");
-  const [source, setSource] = useState<UnifiedCrmInboxSource>("all");
+  const [rows, setRows] = useState(initialSnapshot.data);
+  const [nextCursor, setNextCursor] = useState(
+    initialSnapshot.page.next_cursor ?? null,
+  );
+  const [activeTab, setActiveTab] = useState<UnifiedCrmTab>(initialTab);
+  const [search, setSearch] = useState(initialSearch);
+  const [source, setSource] = useState<UnifiedCrmInboxSource>(initialSource);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const deferredSearch = useDeferredValue(search);
   const didHydrate = useRef(false);
+  const requestSequence = useRef(0);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentQueryString = searchParams.toString();
 
   useEffect(() => {
     if (!didHydrate.current) {
@@ -339,10 +384,13 @@ export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
     }
 
     const controller = new AbortController();
+    const requestId = requestSequence.current + 1;
+    requestSequence.current = requestId;
+    const trimmedSearch = deferredSearch.trim();
 
     queueMicrotask(() => {
       if (!controller.signal.aborted) {
-        setIsLoading(true);
+        setIsRefreshing(true);
         setErrorMessage(null);
       }
     });
@@ -350,7 +398,7 @@ export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
     teamOperationRequest<UnifiedCrmInboxResponse>(
       buildInboxPath({
         tab: activeTab,
-        q: deferredSearch,
+        q: trimmedSearch,
         source,
       }),
       {
@@ -359,7 +407,13 @@ export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
       },
     )
       .then((nextSnapshot) => {
+        if (requestSequence.current !== requestId) {
+          return;
+        }
+
         setSnapshot(nextSnapshot);
+        setRows(nextSnapshot.data);
+        setNextCursor(nextSnapshot.page.next_cursor ?? null);
       })
       .catch((error) => {
         if (error instanceof Error && error.name === "AbortError") {
@@ -373,8 +427,8 @@ export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
         );
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
+        if (!controller.signal.aborted && requestSequence.current === requestId) {
+          setIsRefreshing(false);
         }
       });
 
@@ -383,10 +437,50 @@ export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
     };
   }, [activeTab, deferredSearch, source]);
 
+  useEffect(() => {
+    const trimmedSearch = deferredSearch.trim();
+    const nextParams = new URLSearchParams(currentQueryString);
+
+    if (activeTab === "all") {
+      nextParams.delete("tab");
+    } else {
+      nextParams.set("tab", activeTab);
+    }
+
+    if (trimmedSearch) {
+      nextParams.set("q", trimmedSearch);
+    } else {
+      nextParams.delete("q");
+    }
+
+    if (source === "all") {
+      nextParams.delete("source");
+    } else {
+      nextParams.set("source", source);
+    }
+
+    const queryString = nextParams.toString();
+
+    if (queryString === currentQueryString) {
+      return;
+    }
+
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+      scroll: false,
+    });
+  }, [
+    activeTab,
+    currentQueryString,
+    deferredSearch,
+    pathname,
+    router,
+    source,
+  ]);
+
   const hasSupabaseWarning =
     snapshot.diagnostics.supabase_enabled &&
     !snapshot.diagnostics.supabase_available;
-  const rows = snapshot.data;
+  const visibleTotal = getVisibleTotal(snapshot.counts, activeTab);
   const registeredCount = snapshot.counts.registrados;
   const conversationalCount = snapshot.counts.conversacionales;
   const visibleSourceLabel = useMemo(
@@ -395,6 +489,46 @@ export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
       "Todas las fuentes",
     [source],
   );
+  const handleLoadMore = () => {
+    if (!nextCursor || isLoadingMore) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+    setErrorMessage(null);
+
+    teamOperationRequest<UnifiedCrmInboxResponse>(
+      buildInboxPath({
+        cursor: nextCursor,
+        tab: activeTab,
+        q: deferredSearch,
+        source,
+      }),
+      {
+        method: "GET",
+      },
+    )
+      .then((nextSnapshot) => {
+        setSnapshot((currentSnapshot) => ({
+          ...nextSnapshot,
+          counts: currentSnapshot.counts,
+        }));
+        setRows((currentRows) =>
+          mergeUniqueRows(currentRows, nextSnapshot.data),
+        );
+        setNextCursor(nextSnapshot.page.next_cursor ?? null);
+      })
+      .catch((error) => {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "No pudimos cargar mas registros del CRM unificado.",
+        );
+      })
+      .finally(() => {
+        setIsLoadingMore(false);
+      });
+  };
 
   return (
     <div className="w-full min-w-0 space-y-8">
@@ -502,18 +636,18 @@ export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
             </p>
             <p className="text-sm text-app-text-muted">
               Fuente: {visibleSourceLabel}
-              {isLoading ? " · Actualizando..." : ""}
+              {isRefreshing ? " · Actualizando..." : ""}
             </p>
           </div>
         </div>
 
-        {isLoading && rows.length === 0 ? (
+        {isRefreshing && rows.length === 0 ? (
           <div className="rounded-[1.5rem] border border-dashed border-app-border bg-app-card px-5 py-10 text-center text-sm text-app-text-muted">
             Cargando CRM unificado...
           </div>
         ) : null}
 
-        {!isLoading && rows.length === 0 ? (
+        {!isRefreshing && rows.length === 0 ? (
           <div className="rounded-[1.5rem] border border-dashed border-app-border bg-app-card px-5 py-10 text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-app-text-soft">
               Sin resultados
@@ -531,6 +665,25 @@ export function TeamCrmClient({ initialSnapshot }: TeamCrmClientProps) {
           {rows.map((lead) => (
             <LeadCard key={lead.id} lead={lead} />
           ))}
+        </div>
+
+        <div className="flex flex-col items-center justify-between gap-3 rounded-[1.25rem] border border-app-border bg-app-surface px-4 py-3 text-sm text-app-text-muted sm:flex-row">
+          <p>
+            Mostrando {formatCompactNumber(rows.length)} de{" "}
+            {formatCompactNumber(visibleTotal)}
+          </p>
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            disabled={!nextCursor || isLoadingMore || isRefreshing}
+            className="rounded-full border border-app-border bg-app-card px-4 py-2 text-sm font-semibold text-app-text transition hover:border-app-border-strong disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoadingMore
+              ? "Cargando..."
+              : nextCursor
+                ? "Cargar mas"
+                : "No hay mas registros"}
+          </button>
         </div>
       </section>
     </div>

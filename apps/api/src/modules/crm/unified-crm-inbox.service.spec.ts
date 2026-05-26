@@ -25,6 +25,30 @@ describe('UnifiedCrmInboxService', () => {
   const identityMatcher = {
     markPossibleDuplicates: jest.fn((rows) => rows),
   };
+  const makeLead = (
+    id: string,
+    activityAt: string,
+    overrides: Partial<UnifiedCrmLead> = {},
+  ): UnifiedCrmLead =>
+    ({
+      id,
+      source: id.startsWith('supabase:') ? 'supabase' : 'leadflow',
+      activity: {
+        last_activity_at: activityAt,
+      },
+      flags: {
+        is_registered: id.startsWith('leadflow:'),
+        is_conversational: id.startsWith('supabase:'),
+        has_assignment: false,
+        is_orphaned: true,
+        is_stagnant: false,
+        is_closed: false,
+        possible_duplicate: false,
+      },
+      created_at: activityAt,
+      updated_at: activityAt,
+      ...overrides,
+    }) as UnifiedCrmLead;
 
   it('returns an empty PR1 response for conversational tab', async () => {
     const repository = {
@@ -94,7 +118,8 @@ describe('UnifiedCrmInboxService', () => {
         status: null,
         owner: 'unassigned',
       },
-      limit: 10,
+      limit: 11,
+      cursor: null,
     });
   });
 
@@ -103,6 +128,135 @@ describe('UnifiedCrmInboxService', () => {
     expect(normalizeCrmLimit('25')).toBe(25);
     expect(normalizeCrmLimit('500')).toBe(100);
     expect(normalizeCrmLimit('0')).toBe(50);
+  });
+
+  it('fetches a 101-row lookahead when limit is capped at 100', async () => {
+    const records = Array.from({ length: 101 }, (_, index) => ({
+      id: `lead-${index + 1}`,
+    }));
+    const repository = {
+      findMany: jest.fn().mockResolvedValue(records),
+      count: jest.fn().mockResolvedValue(101),
+    };
+    const mapper = {
+      fromLeadflow: jest.fn((record: { id: string }) =>
+        makeLead(
+          `leadflow:${record.id}`,
+          new Date(
+            Date.UTC(2026, 4, 26, 12, 0, 0) -
+              (Number(record.id.split('-')[1]) - 1) * 60_000,
+          ).toISOString(),
+        ),
+      ),
+    };
+    const service = new UnifiedCrmInboxService(
+      repository as unknown as LeadflowCrmReadRepository,
+      mapper as unknown as UnifiedCrmMapper,
+      disabledKurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
+    );
+
+    const result = await service.getInbox(scope, {
+      tab: 'registered',
+      limit: '500',
+    });
+
+    expect(result.page.limit).toBe(100);
+    expect(result.data).toHaveLength(100);
+    expect(result.page.next_cursor).toEqual(expect.any(String));
+    expect(repository.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limit: 101,
+      }),
+    );
+  });
+
+  it('returns next_cursor=null when there are no more rows', async () => {
+    const repository = {
+      findMany: jest.fn().mockResolvedValue([{ id: 'lead-1' }, { id: 'lead-2' }]),
+      count: jest.fn().mockResolvedValue(2),
+    };
+    const mapper = {
+      fromLeadflow: jest.fn((record: { id: string }) =>
+        makeLead(
+          `leadflow:${record.id}`,
+          new Date(
+            Date.UTC(2026, 4, 26, 12, 0, 0) -
+              (Number(record.id.split('-')[1]) - 1) * 60_000,
+          ).toISOString(),
+        ),
+      ),
+    };
+    const service = new UnifiedCrmInboxService(
+      repository as unknown as LeadflowCrmReadRepository,
+      mapper as unknown as UnifiedCrmMapper,
+      disabledKurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
+    );
+
+    const result = await service.getInbox(scope, {
+      tab: 'registered',
+      limit: '2',
+    });
+
+    expect(result.data.map((item) => item.id)).toEqual([
+      'leadflow:lead-1',
+      'leadflow:lead-2',
+    ]);
+    expect(result.page.next_cursor).toBeNull();
+  });
+
+  it('uses cursor to return the next page without duplicate rows', async () => {
+    const records = [{ id: 'lead-1' }, { id: 'lead-2' }, { id: 'lead-3' }];
+    const repository = {
+      findMany: jest.fn().mockResolvedValue(records),
+      count: jest.fn().mockResolvedValue(3),
+    };
+    const mapper = {
+      fromLeadflow: jest.fn((record: { id: string }) =>
+        makeLead(
+          `leadflow:${record.id}`,
+          new Date(
+            Date.UTC(2026, 4, 26, 12, 0, 0) -
+              (Number(record.id.split('-')[1]) - 1) * 60_000,
+          ).toISOString(),
+        ),
+      ),
+    };
+    const service = new UnifiedCrmInboxService(
+      repository as unknown as LeadflowCrmReadRepository,
+      mapper as unknown as UnifiedCrmMapper,
+      disabledKurukinClient as unknown as KurukinCrmReadClient,
+      identityMatcher as unknown as CrmIdentityMatcher,
+    );
+
+    const firstPage = await service.getInbox(scope, {
+      tab: 'registered',
+      limit: '2',
+    });
+    const secondPage = await service.getInbox(scope, {
+      tab: 'registered',
+      limit: '2',
+      cursor: firstPage.page.next_cursor ?? undefined,
+    });
+
+    expect(firstPage.data.map((item) => item.id)).toEqual([
+      'leadflow:lead-1',
+      'leadflow:lead-2',
+    ]);
+    expect(secondPage.data.map((item) => item.id)).toEqual(['leadflow:lead-3']);
+    expect(
+      firstPage.data.some((item) =>
+        secondPage.data.map((row) => row.id).includes(item.id),
+      ),
+    ).toBe(false);
+    expect(repository.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        cursor: expect.objectContaining({
+          id: 'leadflow:lead-2',
+        }),
+      }),
+    );
   });
 
   it('returns missing DB URL diagnostics without throwing when enabled but unconfigured', async () => {
@@ -428,12 +582,13 @@ describe('UnifiedCrmInboxService', () => {
 
     expect(kurukinClient.listConversationalLeads).toHaveBeenCalledWith({
       tenantId: 'team-1',
-      limit: 50,
+      limit: 51,
       q: null,
       status: null,
       owner: 'unassigned',
       instanceId: 'instance-1',
       verticalKey: 'dxn',
+      cursor: null,
     });
   });
 });

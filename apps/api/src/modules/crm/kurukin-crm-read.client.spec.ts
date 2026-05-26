@@ -45,5 +45,28 @@ describe('KurukinCrmReadClient query builder', () => {
     expect(query.text).toContain('owner_external_id = $2');
     expect(query.values).toEqual(['tenant-1', 'sponsor-1']);
   });
-});
 
+  it('builds cursor pagination for conversational leads', () => {
+    const query = buildKurukinConversationalLeadsQuery({
+      tenantId: 'tenant-1',
+      limit: 10,
+      cursor: {
+        id: 'supabase:saas-lead-7',
+        last_activity_at: '2026-05-26T12:00:00.000Z',
+      },
+    });
+
+    expect(query.text).toContain(
+      "COALESCE(last_message_at, updated_at, created_at) < $2",
+    );
+    expect(query.text).toContain("('supabase:' || id) > $3");
+    expect(query.text).toContain("('supabase:' || id) ASC");
+    expect(query.text).toContain('LIMIT $4');
+    expect(query.values).toEqual([
+      'tenant-1',
+      new Date('2026-05-26T12:00:00.000Z'),
+      'supabase:saas-lead-7',
+      10,
+    ]);
+  });
+});

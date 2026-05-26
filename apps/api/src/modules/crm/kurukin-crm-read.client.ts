@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { UnifiedCrmPaginationCursor } from './unified-crm.types';
 
 export type KurukinCrmErrorCode =
   | 'connection_failed'
@@ -35,6 +36,7 @@ export type KurukinConversationalLeadFilters = {
   owner?: string | null;
   instanceId?: string | null;
   verticalKey?: string | null;
+  cursor?: UnifiedCrmPaginationCursor | null;
 };
 
 export type KurukinCrmQuery = {
@@ -143,11 +145,49 @@ const appendConversationalFilters = (
   return where;
 };
 
+const appendConversationalCursor = (
+  cursor: UnifiedCrmPaginationCursor | null | undefined,
+  values: unknown[],
+) => {
+  if (!cursor?.last_activity_at) {
+    return null;
+  }
+
+  const cursorDate = new Date(cursor.last_activity_at);
+
+  if (Number.isNaN(cursorDate.getTime())) {
+    return null;
+  }
+
+  const activityExpression = 'COALESCE(last_message_at, updated_at, created_at)';
+  values.push(cursorDate);
+  const timestampIndex = values.length;
+
+  if (cursor.id.startsWith('supabase:')) {
+    values.push(cursor.id);
+    const idIndex = values.length;
+
+    return `(${activityExpression} < $${timestampIndex} OR (${activityExpression} = $${timestampIndex} AND ('supabase:' || id) > $${idIndex}))`;
+  }
+
+  if (cursor.id.startsWith('leadflow:')) {
+    return `${activityExpression} <= $${timestampIndex}`;
+  }
+
+  return `${activityExpression} < $${timestampIndex}`;
+};
+
 export const buildKurukinConversationalLeadsQuery = (
   params: KurukinConversationalLeadFilters,
 ): KurukinCrmQuery => {
   const values: unknown[] = [params.tenantId];
   const where = appendConversationalFilters(params, values);
+  const cursorWhere = appendConversationalCursor(params.cursor, values);
+
+  if (cursorWhere) {
+    where.push(cursorWhere);
+  }
+
   values.push(normalizeLimit(params.limit));
 
   return {
@@ -171,7 +211,7 @@ SELECT
   updated_at
 FROM public.saas_leads
 WHERE ${where.join(' AND ')}
-ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC NULLS LAST
+ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC NULLS LAST, ('supabase:' || id) ASC
 LIMIT $${values.length}
 `.trim(),
     values,
@@ -320,4 +360,3 @@ export class KurukinCrmReadClient {
     );
   }
 }
-
