@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { UnifiedCrmLead } from './unified-crm.types';
 
 type MatchReason = 'same_phone' | 'same_whatsapp' | 'phone_matches_whatsapp';
+type MatchedRecord = NonNullable<
+  UnifiedCrmLead['dedupe']['matched_records']
+>[number];
 
 type IdentityMatch = {
   key: string;
@@ -12,6 +15,11 @@ type IdentityMatch = {
 
 const phoneCharactersToStrip = /[\s+\-()]/g;
 const whatsappSuffix = '@s.whatsapp.net';
+const reasonPriority: Record<MatchReason, number> = {
+  same_whatsapp: 3,
+  same_phone: 2,
+  phone_matches_whatsapp: 1,
+};
 
 export const normalizePhone = (value?: string | null): string | null => {
   const normalized = value?.trim().replace(phoneCharactersToStrip, '') ?? '';
@@ -39,6 +47,38 @@ export const normalizeWhatsappId = (value?: string | null): string | null => {
 
 export const extractWhatsappNumber = (value?: string | null): string | null =>
   normalizeWhatsappId(value);
+
+export const getReasonPriority = (reason: string | null | undefined) =>
+  reasonPriority[reason as MatchReason] ?? 0;
+
+export const dedupeMatchedRecords = (
+  records: MatchedRecord[],
+): MatchedRecord[] => {
+  const deduped = new Map<string, MatchedRecord>();
+
+  for (const record of records) {
+    const key = `${record.source}:${record.id}`;
+    const current = deduped.get(key);
+
+    if (!current) {
+      deduped.set(key, record);
+      continue;
+    }
+
+    const currentPriority = getReasonPriority(current.reason);
+    const candidatePriority = getReasonPriority(record.reason);
+    const nextReason =
+      candidatePriority > currentPriority ? record.reason : current.reason;
+
+    deduped.set(key, {
+      ...current,
+      reason: nextReason,
+      confidence: Math.max(current.confidence, record.confidence),
+    });
+  }
+
+  return [...deduped.values()];
+};
 
 @Injectable()
 export class CrmIdentityMatcher {
@@ -208,10 +248,7 @@ export class CrmIdentityMatcher {
   }
 
   private buildMatchedRecords(lead: UnifiedCrmLead, matches: IdentityMatch[]) {
-    const records = new Map<
-      string,
-      NonNullable<UnifiedCrmLead['dedupe']['matched_records']>[number]
-    >();
+    const records: MatchedRecord[] = [];
 
     for (const match of matches) {
       for (const matchedLead of match.leads) {
@@ -219,7 +256,7 @@ export class CrmIdentityMatcher {
           continue;
         }
 
-        records.set(`${matchedLead.source}:${matchedLead.id}:${match.reason}`, {
+        records.push({
           source: matchedLead.source as 'leadflow' | 'supabase',
           id: matchedLead.id,
           reason: match.reason,
@@ -228,7 +265,7 @@ export class CrmIdentityMatcher {
       }
     }
 
-    return [...records.values()].sort((left, right) => {
+    return dedupeMatchedRecords(records).sort((left, right) => {
       const sourceOrder = left.source.localeCompare(right.source);
       return sourceOrder === 0 ? left.id.localeCompare(right.id) : sourceOrder;
     });
