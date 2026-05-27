@@ -6,7 +6,9 @@ Leadflow es un SaaS de captación, asignación y automatización de leads constr
 
 Flujo operativo real:
 
-`Traefik -> Docker Swarm -> web -> api -> Prisma/Postgres -> Runtime Context Central -> n8n dispatcher`
+`Traefik -> Docker Swarm -> web -> api -> Prisma/Postgres -> CRM ownership engine -> outreach queue -> Kloser Missions -> n8n / WhatsApp / AI`
+
+`Prisma/Postgres` sigue siendo el ledger principal de Leadflow para leads, ownership MLM, assignments, deduplicación, auditoría y estado observacional de outreach. Kloser tiene su propio ledger operacional para misiones, scheduling, retries, workers y FSM de dispatch. Redis/BullMQ, cuando participan en la ejecución de misiones, viven del lado Kloser; Leadflow no crea workers infinitos ni duplica la cola operacional de Kloser.
 
 Leadflow ahora opera en un clúster Swarm unificado, conectado a las redes externas `traefik_public` y `general_network`.
 
@@ -19,6 +21,9 @@ Piezas principales del monorepo:
 - `packages/shared/mail` (`@leadflow/mail`): cliente compartido para emails transaccionales sobre AWS SES.
 - `packages/kurukin-video-player-pkg`: reproductor reutilizable para VSL y bloques de video del runtime público.
 - `Prisma/Postgres`: persistencia transaccional del backend.
+- `CRM ownership engine`: capa Leadflow que decide ownership MLM, attribution, locks conversacionales, assignment lifecycle y si un outreach está permitido.
+- `Outreach queue`: intención operacional MLM-safe generada por Leadflow antes de entregar misiones a Kloser.
+- `Kloser Missions`: ledger y orquestador operacional para scheduling, retries, workers, FSM y handoff hacia n8n.
 - `Runtime Context Central`: registro y resolución del contexto operativo antes de habilitar dispatch downstream.
 - `n8n`: recibe eventos del dispatcher y automatizaciones complementarias.
 
@@ -111,6 +116,285 @@ Mantenimiento para equipos heredados:
 ```bash
 docker exec -it $(docker ps --filter name=leadflow_api -q | head -n 1) sh -lc 'cd /app/apps/api && npx ts-node src/scripts/seed-default-pools.ts'
 ```
+
+## CRM Conversacional MLM
+
+Leadflow no opera el CRM como un CRM inmobiliario tradicional donde un administrador reparte manualmente contactos a vendedores. El modelo MLM exige que el ownership del lead respete el origen real de la relación comercial, la continuidad conversacional y las reglas anti-abuso del equipo.
+
+El ownership operativo puede venir de varias fuentes:
+
+- tráfico orgánico del asesor, cuando el visitante llega por un funnel o enlace asociado al sponsor
+- `Ad Wheels`, cuando el lead viene de tráfico pagado repartido por ruleta ponderada
+- `Rotation Pools`, cuando el equipo usa rotación orgánica o fallback operativo
+- ownership conversacional WhatsApp, cuando un inbound confirma que la relación real ya existe con un asesor
+- reassignment protegido, cuando una transición está autorizada sin romper locks activos
+- auto-accept por inbound, cuando el propio comportamiento conversacional acepta el assignment sin acción manual
+
+En el flujo MLM normal, `TEAM_ADMIN` no asigna leads manualmente como operación primaria. Su función es observar, auditar, resolver excepciones y monitorear calidad operativa. El sistema privilegia ownership automático, continuidad conversacional y protección contra robo de leads. Cuando una conversación WhatsApp ya está activa, esa conversación puede convertirse en la fuente de verdad operacional para decidir quién debe atender al lead.
+
+### CRM Unificado
+
+El CRM unificado junta datos internos de Leadflow con señales conversacionales externas para que team admins y members vean una sola superficie operacional sin mezclar responsabilidades.
+
+#### Team CRM
+
+Ruta web:
+
+- `/team/crm`
+
+Propósito:
+
+- observabilidad operacional del equipo
+- deduplicación cross-source entre Leadflow y fuentes conversacionales
+- monitoreo de handoffs, outreach y ownership
+- detección de duplicados probables
+- lectura de external matches cuando existe conversación previa fuera del lead ledger principal
+
+Fuentes actuales:
+
+- Leadflow DB: leads, assignments, sponsors, CRM lifecycle, locks, outreach queue y metadata de handoff
+- Kurukin conversational store / Supabase: señales externas de conversación, teléfonos normalizados, último mensaje y coincidencias por identidad
+
+Características:
+
+- cursor pagination para bandejas grandes
+- dedupe engine por teléfono e identidad normalizada
+- `possible_duplicate` para revisión operacional sin fusionar datos de forma destructiva
+- external matches para mostrar señales conversacionales que todavía no son lead principal
+- modo resiliente: si Supabase o el store conversacional falla, el CRM sigue respondiendo con los datos de Leadflow y registra el fallo como degradación
+
+#### Member CRM
+
+Ruta web:
+
+- `/member/crm`
+
+Propósito:
+
+- bandeja operacional individual del asesor
+- aceptación de handoffs propios
+- visibilidad de leads activos, duplicados y matches externos relacionados con su sponsor
+- continuidad comercial sin exponer herramientas administrativas de team
+
+Tabs actuales:
+
+- `all`: vista unificada del asesor
+- `handoffs`: assignments pendientes de aceptación
+- `active`: leads aceptados o auto aceptados bajo ownership del sponsor
+- `duplicates`: posibles duplicados que requieren cuidado antes de contactar
+- `external_matches`: conversaciones externas que coinciden con identidad conocida
+
+Comportamiento esperado:
+
+- optimistic accept en UI para reducir fricción al aceptar handoffs
+- badges de lifecycle para distinguir `pending`, `accepted`, `auto_accepted`, `reassigned` y estados cerrados
+- ownership protegido cuando hay lock activo
+- outreach preparado solo cuando las políticas MLM-safe lo permiten
+- auto accepted visible cuando el inbound WhatsApp resolvió el ownership sin acción manual
+
+### Assignment Lifecycle
+
+El lifecycle CRM MLM vive separado del modelo legacy de assignment público. Sus estados principales son:
+
+- `pending`: el lead está pendiente de aceptación o resolución operacional
+- `assigned`: el lead fue asignado en una capa previa o legacy y todavía requiere transición CRM
+- `accepted`: el sponsor aceptó manualmente el lead
+- `auto_accepted`: el sistema aceptó por señal conversacional válida
+- `reassigned`: el ownership fue transferido de forma auditada
+- `closed`: el assignment dejó de ser activo
+
+#### Manual accept
+
+El sponsor acepta el lead desde `/member/crm`. Leadflow valida que el assignment pertenece al sponsor correcto, actualiza el lifecycle, audita el evento y prepara outreach solo si la política MLM-safe lo permite. El accept manual no debe saltarse ownership locks ni duplicar assignments activos.
+
+#### Auto accept
+
+El auto accept ocurre cuando llega un inbound WhatsApp desde el mismo teléfono o identidad normalizada y la señal corresponde al sponsor que ya debería operar la conversación. En ese caso Leadflow puede marcar el assignment como `auto_accepted`, fijar ownership conversacional y evitar que otro asesor contacte al mismo lead por error.
+
+#### Ownership lock
+
+El ownership lock evita robo de conversación y protege continuidad MLM. Mientras el lock está vigente, Leadflow no debe reasignar ni preparar outreach para otro sponsor salvo que exista una operación explícita y auditada que lo permita. El lock se usa especialmente cuando WhatsApp confirma una relación conversacional activa.
+
+#### Concurrency rules
+
+Las reglas de concurrencia son parte del contrato operativo:
+
+- antes de modificar ownership o assignment activo, el backend bloquea el lead con `SELECT ... FOR UPDATE`
+- la base refuerza el invariante con índices únicos parciales para impedir múltiples assignments activos por lead
+- un lead no debe tener más de un owner activo en el mismo scope operativo
+- las transiciones deben releer estado dentro de la transacción protegida
+
+### Outreach Queue MLM-safe
+
+Leadflow no envía WhatsApp directamente desde el CRM MLM. Leadflow crea una intención operacional, aplica reglas MLM-safe, programa outreach con jitter, genera un payload estructurado y entrega el handoff a Kloser cuando corresponde.
+
+Responsabilidades de Leadflow:
+
+- decidir ownership MLM
+- decidir attribution MLM
+- detectar duplicados y conflictos conversacionales
+- decidir si outreach está permitido
+- crear la intención en `crm_outreach_queue`
+- entregar una misión operacional a Kloser sin bloquear el CRM
+
+Responsabilidades de Kloser:
+
+- persistir mission ledger
+- agendar ejecución
+- coordinar workers
+- ejecutar retries
+- mantener FSM operacional de dispatch
+- entregar la ejecución downstream hacia n8n
+
+Estados principales de outreach:
+
+- `queued`: intención creada y pendiente de ventana o handoff
+- `blocked`: Leadflow bloqueó el outreach por política MLM-safe
+- `ready`: outreach listo para intento de handoff
+- `processing`: fila reclamada para evaluación/handoff
+- `handed_off`: misión aceptada por Kloser o simulada en modo seguro
+- `dispatched`: Kloser informó finalización operacional observable
+- `failed`: falló el handoff o el callback informó fallo
+
+Reglas anti-spam y anti-bloqueo:
+
+- quiet hours de `22:00` a `08:00` según timezone del workspace
+- rate limit por sponsor: 5 mensajes cada 15 minutos
+- rate limit por sponsor: 20 mensajes por hora
+- jitter aleatorio de 2 a 12 minutos antes del primer contacto
+- templates variables para evitar repetición rígida
+- duplicate protection antes de contactar
+- ownership protection antes de contactar
+- no blasting simultáneo desde Leadflow
+
+La intención de estas reglas es evitar comportamiento detectable como spam o bot. Leadflow debe preferir bloquear o reintentar antes que disparar contacto masivo o ambiguo.
+
+## Integración Kloser Missions
+
+Kloser Missions es la capa operacional de ejecución para outreach. Leadflow sigue siendo el control plane MLM; Kloser es el execution plane de misiones.
+
+Separación real de responsabilidades:
+
+- Leadflow: ownership, CRM, attribution, dedupe, locks conversacionales, políticas anti-spam, outreach orchestration y estado observacional
+- Kloser: mission ledger, scheduling, retries, workers, dispatch FSM y handoff orchestration
+- n8n: automation execution, IA, transporte WhatsApp y gateways downstream
+
+### Contrato actual Leadflow -> Kloser
+
+Endpoint Kloser:
+
+```http
+POST /api/v1/missions
+```
+
+Headers firmados:
+
+- `X-Kurukin-Signature`
+- `X-Kurukin-Timestamp`
+- `X-Kurukin-Source: leadflow`
+
+La firma usa HMAC SHA-256 sobre:
+
+```text
+timestamp + "." + rawBody
+```
+
+Payload operacional:
+
+```json
+{
+  "tenant_id": "...",
+  "lead_id": "...",
+  "remote_jid": "59170000000@s.whatsapp.net",
+  "strategy_id": "initial_contact_v1",
+  "strategy_version": 1,
+  "due_at": "2026-05-26T14:00:00.000Z",
+  "metadata": {
+    "source": "leadflow_crm",
+    "workspace_id": "...",
+    "team_id": "...",
+    "sponsor_id": "...",
+    "assignment_id": "...",
+    "outreach_id": "...",
+    "mlm_safe": true,
+    "conversation_owner_locked": true
+  }
+}
+```
+
+`remote_jid` se construye desde el teléfono del lead con solo dígitos y el sufijo `@s.whatsapp.net`. Si no existe un teléfono válido, Leadflow no crea misión, marca el outreach como bloqueado y registra un warning estructurado sin loggear el teléfono completo.
+
+### Seguridad y resiliencia
+
+- requests firmados con `KLOSER_HMAC_SECRET`
+- timeout agresivo con `KLOSER_API_TIMEOUT_MS`
+- dry-run seguro por defecto
+- noop/disabled mode por defecto
+- callback interno verificado con HMAC
+- logs sin payload completo, teléfonos completos, JIDs completos ni secretos
+- si Kloser cae, la queue de Leadflow sigue viva y el lifecycle actual programa retry
+- Leadflow nunca debe bloquear inbox CRM ni `acceptAssignment` esperando transporte externo
+
+### Modo actual PR10
+
+Estado operativo importante:
+
+- no hay envío real de WhatsApp desde Leadflow
+- Leadflow no conecta Evolution para este outreach
+- Leadflow no crea workers automáticos ni BullMQ propio
+- Kloser puede operar en `dry-run`
+- `dispatch_enabled` sigue protegido por la política actual
+- Leadflow es control plane, no transport layer
+- el estado recibido desde Kloser es observacional y no cambia ownership MLM ni reasigna leads
+
+### Callback Kloser -> Leadflow
+
+Endpoint interno:
+
+```http
+POST /v1/internal/kloser/missions/callback
+```
+
+Payload esperado:
+
+```json
+{
+  "mission_id": "...",
+  "status": "queued",
+  "dispatch_id": "...",
+  "reason": "..."
+}
+```
+
+Mapeo observacional:
+
+- `queued` -> `handed_off`
+- `running` -> `processing`
+- `completed` -> `dispatched`
+- `failed` -> `failed`
+- `cancelled` -> `cancelled`
+
+Este callback no cambia ownership MLM, no reasigna leads y no envía mensajes.
+
+### Endpoints CRM y Kloser
+
+Team Admin:
+
+- `GET /v1/team/crm/outreach-queue`
+- `POST /v1/team/crm/outreach-queue/:id/dry-run`
+- `POST /v1/team/crm/outreach-queue/:id/requeue`
+- `GET /v1/team/crm/outreach-dispatch/metrics`
+- `GET /v1/team/crm/kloser/health`
+- `GET /v1/team/crm/kloser/metrics`
+
+Sponsor / Member:
+
+- `GET /v1/sponsors/me/crm/inbox`
+- `POST /v1/sponsors/me/crm/assignments/:id/accept`
+
+Internal:
+
+- `POST /v1/internal/kloser/missions/callback`
 
 ## Modulo Admin de Kredits
 
@@ -337,6 +621,12 @@ Variables de integración frecuentes:
 
 - `EVOLUTION_API_INTERNAL_BASE_URL`
 - `EVOLUTION_API_KEY`
+- `KLOSER_API_URL`
+- `KLOSER_API_TIMEOUT_MS`
+- `KLOSER_HMAC_SECRET`
+- `KLOSER_MISSION_ENABLED`
+- `KLOSER_MISSION_DRY_RUN`
+- `KLOSER_STRATEGY_INITIAL_CONTACT`
 - `N8N_WEBHOOK_INTERNAL_BASE`
 - `N8N_WEBHOOK_ID`
 - `N8N_DISPATCHER_API_KEY`
@@ -369,6 +659,28 @@ Variables de correo transaccional:
 - `MAIL_FROM_NAME`
 - `MAIL_FROM_ADDRESS`
 - `MAIL_REPLY_TO_ADDRESS`
+
+Variables CRM/Kloser Missions:
+
+- `KLOSER_API_URL`: base URL de Kloser para crear misiones. Default seguro: vacío, sin llamadas reales si la integración está deshabilitada.
+- `KLOSER_API_TIMEOUT_MS`: timeout agresivo para requests a Kloser. Default: `3000`.
+- `KLOSER_HMAC_SECRET`: secreto compartido para firmar requests y validar callbacks. No debe loggearse.
+- `KLOSER_MISSION_ENABLED`: habilita el handoff real hacia Kloser. Default seguro: `false`.
+- `KLOSER_MISSION_DRY_RUN`: simula creación de misión sin tráfico HTTP a Kloser. Default seguro: `true`.
+- `KLOSER_STRATEGY_INITIAL_CONTACT`: strategy usada para outreach inicial. Default: `initial_contact_v1`.
+
+Configuración segura para QA sin tráfico real:
+
+```env
+KLOSER_API_URL=
+KLOSER_API_TIMEOUT_MS=3000
+KLOSER_HMAC_SECRET=
+KLOSER_MISSION_ENABLED=false
+KLOSER_MISSION_DRY_RUN=true
+KLOSER_STRATEGY_INITIAL_CONTACT=initial_contact_v1
+```
+
+Para habilitar tráfico real hacia Kloser, `KLOSER_MISSION_ENABLED=true`, `KLOSER_MISSION_DRY_RUN=false`, `KLOSER_API_URL` y `KLOSER_HMAC_SECRET` deben estar configurados. Incluso en ese modo Leadflow solo entrega misiones; no envía WhatsApp directamente.
 
 ### Web
 
@@ -496,6 +808,51 @@ docker service logs --tail 200 leadflow_api
 docker exec <leadflow_db_container> psql -U leadflow -d leadflow -c "SELECT runtimeContextStatus, runtimeContextLastErrorMessage, runtimeContextReadyAt FROM \"MessagingConnection\";"
 ```
 
+## Troubleshooting CRM MLM y Kloser
+
+### Outreach bloqueado
+
+Cuando un outreach queda en `blocked`, revisar primero:
+
+- quiet hours: el workspace puede estar dentro de la ventana protegida `22:00-08:00`
+- duplicate lock: existe otro outreach activo o posible duplicado para el mismo lead/teléfono
+- ownership conflict: el sponsor del outreach no coincide con el owner conversacional o assignment activo
+- rate limit: el sponsor superó 5 mensajes en 15 minutos o 20 mensajes en una hora
+- teléfono inválido: no se pudo construir `remote_jid` con dígitos suficientes
+- lead inactivo: el lead está cerrado, perdido o fuera del lifecycle permitido
+
+Comprobaciones útiles:
+
+```bash
+docker service logs --tail 200 leadflow_api | grep -E 'outreach_blocked|outreach_retry_scheduled|kloser_mission'
+```
+
+### Kloser handoff
+
+Si el handoff no llega a Kloser o queda en retry:
+
+- confirmar `KLOSER_MISSION_ENABLED`
+- confirmar si `KLOSER_MISSION_DRY_RUN=true`; en ese modo no hay llamada HTTP real
+- revisar que `KLOSER_API_URL` no esté vacío cuando se espera tráfico real
+- revisar que `KLOSER_HMAC_SECRET` coincida en ambos lados
+- verificar `/health` de Kloser desde la red donde corre `leadflow_api`
+- revisar `GET /v1/team/crm/kloser/health`
+- revisar `GET /v1/team/crm/kloser/metrics`
+- validar que el outreach tenga `dispatch_enabled=true`
+
+La respuesta HTTP no debe depender de que Kloser esté disponible. Si Kloser cae, Leadflow debe dejar trazabilidad, programar retry con el lifecycle actual y mantener intacto el CRM.
+
+### Auto accept no ocurrió
+
+Si un inbound WhatsApp no auto aceptó el assignment:
+
+- revisar normalización de teléfono (`+`, espacios y caracteres no numéricos)
+- revisar `whatsapp_id` externo y su equivalencia con el teléfono del lead
+- confirmar que el sponsor conversacional coincide con el sponsor esperado
+- confirmar que no existe un ownership lock protegido de otro sponsor
+- revisar si el lead ya tenía assignment activo cerrado o reasignado
+- revisar logs de ownership conversacional y dedupe antes de forzar cualquier reasignación
+
 ## Estado operativo conocido
 
 Según el código actual:
@@ -503,6 +860,10 @@ Según el código actual:
 - la web enruta tráfico SaaS por `HostRegexp`
 - la API depende explícitamente de `DATABASE_URL`
 - el dispatcher depende explícitamente de `N8N_DISPATCHER_WEBHOOK_URL`
+- el CRM unificado opera sobre Leadflow DB y puede degradar con resiliencia si el store conversacional externo no responde
+- el handoff Kloser PR10 está preparado para disabled/noop y dry-run por defecto
+- Leadflow no envía WhatsApp real desde la outreach queue CRM
+- el callback Kloser actualiza observabilidad, no ownership ni assignment MLM
 - ya se verificó en producción que la API arranca y que la URL del dispatcher se carga
 - aún falta observar un submit real para cerrar la verificación end-to-end hacia n8n
 
@@ -564,6 +925,23 @@ Además del lock transaccional, la base de datos impone el siguiente invariante:
 
 Este invariante se refuerza con un índice único parcial sobre `Assignment(leadId)` filtrado por esos estados.
 
+### Reglas Arquitectónicas CRM MLM
+
+El CRM MLM agrega invariantes adicionales sobre el motor de leads:
+
+- un lead no debe tener múltiples owners activos en el mismo scope operativo
+- WhatsApp inbound puede tomar ownership automáticamente cuando la identidad y el sponsor coinciden
+- ownership conversacional tiene prioridad operacional sobre asignación manual normal
+- `TEAM_ADMIN` observa y resuelve excepciones; no debe convertirse en repartidor manual permanente del flujo MLM
+- outreach nunca debe ejecutarse masivamente sin quiet hours, rate limiting, jitter y duplicate protection
+- Leadflow nunca debe enviar WhatsApp directamente desde la queue CRM
+- la transport layer queda desacoplada de Leadflow y vive en Kloser/n8n/gateways
+- Leadflow nunca debe bloquear una request HTTP principal esperando WhatsApp, workers externos o retries operacionales
+- callbacks de Kloser son observacionales: no pueden reasignar leads ni cambiar ownership MLM
+- cualquier cambio de ownership debe quedar auditado y respetar locks conversacionales
+
+La regla práctica: Leadflow decide si corresponde contactar; Kloser decide cuándo y cómo ejecutar la misión; n8n/gateways ejecutan automatización y transporte. Mezclar esas responsabilidades vuelve frágil el sistema y aumenta el riesgo de spam, duplicados y robo de conversación.
+
 ### Regla de Evolución
 Toda nueva feature que:
 - cree leads,
@@ -571,5 +949,6 @@ Toda nueva feature que:
 - reasigne sponsors,
 - acepte handoffs,
 - o introduzca nuevos webhooks,
+- o introduzca outreach/transport hacia WhatsApp,
 
 debe respetar estas reglas de seguridad y concurrencia antes de considerarse lista para producción.

@@ -1,4 +1,5 @@
 import {
+  buildKurukinConversationalLeadsByPhonesQuery,
   buildKurukinConversationalLeadsCountQuery,
   buildKurukinConversationalLeadsQuery,
 } from './kurukin-crm-read.client';
@@ -57,7 +58,7 @@ describe('KurukinCrmReadClient query builder', () => {
     });
 
     expect(query.text).toContain(
-      "COALESCE(last_message_at, updated_at, created_at) < $2",
+      'COALESCE(last_message_at, updated_at, created_at) < $2',
     );
     expect(query.text).toContain("('supabase:' || id) > $3");
     expect(query.text).toContain("('supabase:' || id) ASC");
@@ -66,6 +67,31 @@ describe('KurukinCrmReadClient query builder', () => {
       'tenant-1',
       new Date('2026-05-26T12:00:00.000Z'),
       'supabase:saas-lead-7',
+      10,
+    ]);
+  });
+
+  it('builds a parameterized phone match query for advisor enrichment', () => {
+    const query = buildKurukinConversationalLeadsByPhonesQuery({
+      tenantId: 'tenant-1',
+      phones: ['59175259952', '59175259952', '59170000000'],
+      status: 'active',
+      limit: 10,
+    });
+
+    expect(query.text).toContain('FROM public.saas_leads');
+    expect(query.text).toContain('tenant_id = $1');
+    expect(query.text).toContain('status = $2');
+    expect(query.text).toContain('ANY($3::text[])');
+    expect(query.text).toContain('regexp_replace(coalesce(phone_e164');
+    expect(query.text).toContain(
+      'regexp_replace(regexp_replace(coalesce(whatsapp_id',
+    );
+    expect(query.text).toContain('LIMIT $4');
+    expect(query.values).toEqual([
+      'tenant-1',
+      'active',
+      ['59175259952', '59170000000'],
       10,
     ]);
   });

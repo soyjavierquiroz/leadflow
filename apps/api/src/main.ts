@@ -98,6 +98,9 @@ async function bootstrap() {
     new FastifyAdapter({
       bodyLimit: 10_485_760,
     }),
+    {
+      rawBody: true,
+    },
   );
   const prisma = app.get(PrismaService);
   const fastify = app.getHttpAdapter().getInstance();

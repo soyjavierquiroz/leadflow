@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { MessagingConnectionStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CrmConversationOwnershipService } from '../crm/crm-conversation-ownership.service';
 import { KloserApiClient } from '../kloser/kloser-api.client';
 import {
   normalizeMessagingPhone,
@@ -105,6 +106,22 @@ const extractConnectionWebhookPayload = (input: {
   };
 };
 
+const extractInboundWhatsappId = (payload: unknown): string | null => {
+  const root = asRecord(payload);
+  const data = asRecord(root?.data);
+  const key = asRecord(root?.key) ?? asRecord(data?.key);
+
+  return (
+    readString(root?.whatsappId) ??
+    readString(root?.whatsapp_id) ??
+    readString(data?.whatsappId) ??
+    readString(data?.whatsapp_id) ??
+    readString(key?.remoteJid) ??
+    readString(key?.participant) ??
+    null
+  );
+};
+
 @Injectable()
 export class IncomingWebhooksService {
   private readonly logger = new Logger(IncomingWebhooksService.name);
@@ -114,6 +131,8 @@ export class IncomingWebhooksService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly kloserApiClient?: KloserApiClient,
+    @Optional()
+    private readonly crmConversationOwnershipService?: CrmConversationOwnershipService,
   ) {}
 
   async ingestMessagingConnection(
@@ -364,6 +383,14 @@ export class IncomingWebhooksService {
     const senderPhone = normalizeMessagingPhone(
       extractInboundMessagePhone(payload),
     );
+    const senderWhatsappId = extractInboundWhatsappId(payload);
+
+    await this.detectCrmConversationOwnership({
+      instanceId,
+      senderPhone,
+      senderWhatsappId,
+      externalEventId,
+    });
 
     const leadContext = await this.resolveLeadContext({
       leadId,
@@ -501,6 +528,35 @@ export class IncomingWebhooksService {
       input.leadContext.strategyId,
       input.keyword ? `lead_inbound_${input.keyword}` : 'lead_inbound_message',
     );
+  }
+
+  private async detectCrmConversationOwnership(input: {
+    instanceId: string | null;
+    senderPhone: string | null;
+    senderWhatsappId: string | null;
+    externalEventId: string | null;
+  }) {
+    if (!this.crmConversationOwnershipService) {
+      return;
+    }
+
+    try {
+      await this.crmConversationOwnershipService.handleWhatsappConversation({
+        phoneE164: input.senderPhone,
+        whatsappId: input.senderWhatsappId,
+        receiverInstanceId: input.instanceId,
+        metadata: {
+          external_event_id: input.externalEventId,
+          detected_by: 'incoming_webhooks_service',
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `CRM conversation ownership detection skipped: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
   }
 
   private async resolveLeadContext(input: {

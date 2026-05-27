@@ -39,6 +39,14 @@ export type KurukinConversationalLeadFilters = {
   cursor?: UnifiedCrmPaginationCursor | null;
 };
 
+export type KurukinConversationalLeadPhoneFilters = {
+  tenantId: string;
+  phones: string[];
+  limit?: number;
+  q?: string | null;
+  status?: string | null;
+};
+
 export type KurukinCrmQuery = {
   text: string;
   values: unknown[];
@@ -46,10 +54,7 @@ export type KurukinCrmQuery = {
 
 type PgClientLike = {
   connect(): Promise<void>;
-  query<T = unknown>(
-    text: string,
-    values?: unknown[],
-  ): Promise<{ rows: T[] }>;
+  query<T = unknown>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
   end(): Promise<void>;
 };
 
@@ -159,7 +164,8 @@ const appendConversationalCursor = (
     return null;
   }
 
-  const activityExpression = 'COALESCE(last_message_at, updated_at, created_at)';
+  const activityExpression =
+    'COALESCE(last_message_at, updated_at, created_at)';
   values.push(cursorDate);
   const timestampIndex = values.length;
 
@@ -234,6 +240,65 @@ WHERE ${where.join(' AND ')}
   };
 };
 
+export const buildKurukinConversationalLeadsByPhonesQuery = (
+  params: KurukinConversationalLeadPhoneFilters,
+): KurukinCrmQuery => {
+  const values: unknown[] = [params.tenantId];
+  const where = appendConversationalFilters(
+    {
+      tenantId: params.tenantId,
+      q: params.q,
+      status: params.status,
+      owner: null,
+      instanceId: null,
+      verticalKey: null,
+    },
+    values,
+  );
+  const phones = [
+    ...new Set(params.phones.map((phone) => phone.trim())),
+  ].filter(Boolean);
+
+  if (phones.length === 0) {
+    where.push('false');
+  } else {
+    values.push(phones);
+    const phonesIndex = values.length;
+    where.push(
+      `(regexp_replace(coalesce(phone_e164, ''), '\\D', '', 'g') = ANY($${phonesIndex}::text[]) OR regexp_replace(regexp_replace(coalesce(whatsapp_id, ''), '@s\\.whatsapp\\.net$', '', 'i'), '\\D', '', 'g') = ANY($${phonesIndex}::text[]))`,
+    );
+  }
+
+  values.push(normalizeLimit(params.limit));
+
+  return {
+    text: `
+SELECT
+  id,
+  tenant_id,
+  whatsapp_id,
+  phone_e164,
+  name,
+  status,
+  last_message,
+  last_message_at,
+  attributes,
+  source_app,
+  instance_id,
+  vertical_key,
+  owner_external_id,
+  owner_name,
+  created_at,
+  updated_at
+FROM public.saas_leads
+WHERE ${where.join(' AND ')}
+ORDER BY COALESCE(last_message_at, updated_at, created_at) DESC NULLS LAST, ('supabase:' || id) ASC
+LIMIT $${values.length}
+`.trim(),
+    values,
+  };
+};
+
 @Injectable()
 export class KurukinCrmReadClient {
   private readonly logger = new Logger(KurukinCrmReadClient.name);
@@ -273,6 +338,20 @@ export class KurukinCrmReadClient {
     const query = buildKurukinConversationalLeadsCountQuery(params);
     const [row] = await this.runQuery<{ total: number }>(query);
     return Number(row?.total ?? 0);
+  }
+
+  async listConversationalLeadsByPhones(
+    params: KurukinConversationalLeadPhoneFilters,
+  ): Promise<KurukinConversationalLeadRow[]> {
+    if (!this.isEnabled()) {
+      throw new KurukinCrmReadError(
+        'not_configured',
+        'Supabase CRM adapter is disabled.',
+      );
+    }
+
+    const query = buildKurukinConversationalLeadsByPhonesQuery(params);
+    return this.runQuery<KurukinConversationalLeadRow>(query);
   }
 
   private async runQuery<T>(query: KurukinCrmQuery): Promise<T[]> {
@@ -334,13 +413,19 @@ export class KurukinCrmReadClient {
     }
 
     if (error instanceof Error && error.name === 'AbortError') {
-      return new KurukinCrmReadError('timeout', 'Supabase CRM query timed out.');
+      return new KurukinCrmReadError(
+        'timeout',
+        'Supabase CRM query timed out.',
+      );
     }
 
     const message = error instanceof Error ? error.message.toLowerCase() : '';
 
     if (message.includes('timeout') || message.includes('timed out')) {
-      return new KurukinCrmReadError('timeout', 'Supabase CRM query timed out.');
+      return new KurukinCrmReadError(
+        'timeout',
+        'Supabase CRM query timed out.',
+      );
     }
 
     if (
