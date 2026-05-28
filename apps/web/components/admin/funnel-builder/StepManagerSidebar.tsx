@@ -295,6 +295,8 @@ export function StepManagerSidebar({
   };
 
   const handleAddNode = (option: (typeof addableRoleOptions)[number]) => {
+    setIsAddMenuOpen(false);
+
     if (!funnelInstanceId) {
       setErrorMessage("No hay funnelInstanceId disponible para crear pasos.");
       return;
@@ -316,13 +318,19 @@ export function StepManagerSidebar({
         });
 
         applyGraphResponse(response);
-        setIsAddMenuOpen(false);
       } catch (error) {
+        console.error("[Flow Director] No pudimos añadir el paso.", {
+          role: option.role,
+          templateKey: option.templateKey,
+          error,
+        });
         setErrorMessage(
           error instanceof Error
             ? error.message
             : "No pudimos añadir el paso al grafo.",
         );
+      } finally {
+        setIsAddMenuOpen(false);
       }
     });
   };
