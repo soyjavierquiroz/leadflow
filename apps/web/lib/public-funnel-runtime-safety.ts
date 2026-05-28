@@ -151,6 +151,7 @@ export function normalizePublicFunnelRuntimePayload(
   const record = isRecord(value) ? value : {};
   const requestRecord = isRecord(record.request) ? record.request : {};
   const domainRecord = isRecord(record.domain) ? record.domain : {};
+  const teamRecord = isRecord(record.team) ? record.team : {};
   const entryContextRecord = isRecord(record.entryContext)
     ? record.entryContext
     : {};
@@ -224,6 +225,11 @@ export function normalizePublicFunnelRuntimePayload(
       canonicalHost:
         typeof domainRecord.canonicalHost === 'string' ? domainRecord.canonicalHost : null,
       redirectToPrimary: asBoolean(domainRecord.redirectToPrimary),
+    },
+    team: {
+      id: asString(teamRecord.id, 'runtime-team'),
+      name: asString(teamRecord.name, 'LeadFlow'),
+      description: asNullableString(teamRecord.description),
     },
     entryContext: {
       entryMode:

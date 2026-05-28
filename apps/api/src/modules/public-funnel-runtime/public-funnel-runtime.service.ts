@@ -32,6 +32,13 @@ import {
 
 const publicRuntimeInclude = {
   domain: true,
+  team: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+    },
+  },
   trackingProfile: {
     include: {
       conversionEventMappings: true,
@@ -682,6 +689,11 @@ export class PublicFunnelRuntimeService {
         isPrimary: publication.domain.isPrimary,
         canonicalHost: publication.domain.canonicalHost,
         redirectToPrimary: publication.domain.redirectToPrimary,
+      },
+      team: {
+        id: publication.team.id,
+        name: publication.team.name,
+        description: publication.team.description,
       },
       entryContext: {
         entryMode: entryContext.entryMode,

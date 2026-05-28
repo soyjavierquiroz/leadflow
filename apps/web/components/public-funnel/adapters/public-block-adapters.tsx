@@ -30,6 +30,7 @@ import {
   RecycledVideoSection,
 } from "@/components/public-funnel/recycled/compatible-commercial-sections";
 import { FaqSocialProof } from "@/components/public-funnel/faq-social-proof";
+import { HeroVslDelayedCtaBlock } from "@/components/public-funnel/hero-vsl-delayed-cta-block";
 import { resolveLeadflowBlockMedia } from "@/components/public-funnel/leadflow-media-resolver";
 import { JakawiHookAndPromiseSection } from "@/components/public-funnel/recycled/jakawi-hook-and-promise-section";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
@@ -135,6 +136,7 @@ function resolveBlockSurfaceProps(
 
   switch (blockType) {
     case "hero":
+    case "hero_vsl_delayed_cta":
     case "hook_and_promise":
       return { isBoxed, surfaceSlot: "hero-hook", tone: "brand" };
     case "who_am_i":
@@ -2198,6 +2200,15 @@ export function PublicBlockAdapter({
             blocks={blocks}
             layoutVariant={layoutVariant}
             surfaceProps={surfaceProps}
+          />
+        );
+      case "hero_vsl_delayed_cta":
+        return (
+          <HeroVslDelayedCtaBlock
+            block={block}
+            runtime={runtime}
+            blocks={blocks}
+            isBoxed={surfaceProps.isBoxed}
           />
         );
       case "hook_and_promise":

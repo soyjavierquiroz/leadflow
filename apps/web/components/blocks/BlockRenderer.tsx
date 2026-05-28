@@ -91,6 +91,11 @@ function buildPreviewRuntime(
       canonicalHost: null,
       redirectToPrimary: false,
     },
+    team: {
+      id: "preview-team",
+      name: "Preview Team",
+      description: null,
+    },
     entryContext: {
       entryMode: "paid_ads",
       trafficLayer: "ORGANIC",

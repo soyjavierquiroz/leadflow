@@ -17,6 +17,8 @@ declare module "kurukin-video-player-pkg" {
     videoId: string;
     vslMode?: boolean;
     vslProgressBarColor?: string;
+    resumePlayback?: boolean;
+    onTimeUpdate?: (currentTime: number) => void;
     lazyLoadYoutube?: boolean;
     hideYoutubeUi?: boolean;
     smartPoster?: SmartPosterConfig;

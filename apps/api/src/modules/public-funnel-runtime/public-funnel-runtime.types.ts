@@ -69,6 +69,11 @@ export type PublicRuntimePayload = {
     canonicalHost: string | null;
     redirectToPrimary: boolean;
   };
+  team: {
+    id: string;
+    name: string;
+    description: string | null;
+  };
   entryContext: PublicRuntimeEntryContext;
   publication: {
     id: string;

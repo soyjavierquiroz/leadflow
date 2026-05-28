@@ -277,6 +277,8 @@ export const normalizeRuntimeBlockType = (value: string) => {
       return "lead_capture_form";
     case "hero_block":
       return "hero";
+    case "vsl_delayed_cta_hero":
+      return "hero_vsl_delayed_cta";
     case "video_block":
       return "video";
     case "faq_accordion":

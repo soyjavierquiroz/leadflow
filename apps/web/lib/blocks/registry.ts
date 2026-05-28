@@ -132,6 +132,7 @@ const defaultRequiredCapabilities = (
   if (
     definition.key === "lead_capture_form" ||
     definition.key === "lead_capture_config" ||
+    definition.key === "hero_vsl_delayed_cta" ||
     definition.key === "hook_and_promise" ||
     definition.key === "sticky_conversion_bar" ||
     definition.key === "cta" ||
@@ -170,6 +171,7 @@ const defaultAutoWiring = (
 
   if (
     definition.key === "hook_and_promise" ||
+    definition.key === "hero_vsl_delayed_cta" ||
     definition.key === "sticky_conversion_bar" ||
     definition.key === "cta" ||
     definition.key === "grand_slam_offer"
@@ -321,6 +323,74 @@ export const builderBlockDefinitionsByKey: Record<
         "Jerarquía visual lista para mobile",
         "CTA conectado al flujo de captura",
       ],
+    },
+  }),
+  hero_vsl_delayed_cta: defineBlock({
+    key: "hero_vsl_delayed_cta",
+    name: "Hero VSL Delayed CTA",
+    description:
+      "Hero VSL con CTA principal y sticky CTA revelados por tiempo de reproduccion del video.",
+    category: "conversion",
+    compatibleStepTypes: ["landing", "vsl", "presentation", "lead_capture"],
+    requiredCapabilities: ["lead_capture"],
+    emitsOutcomes: ["view", "cta_click"],
+    autoWiring: [
+      {
+        when: "inserted",
+        ensureBlockType: "lead_capture_config",
+        bindFields: { action: "open_lead_capture_modal" },
+      },
+    ],
+    schema: {
+      type: "hero_vsl_delayed_cta",
+      key: "string",
+      content: {
+        eyebrow: "string with {{team.name}} variables",
+        headline: "string",
+        highlight: "string",
+        subheadline: "string",
+        video_url: "media:vsl_main | https://...",
+        poster_title: "string with {{sponsor.first_name}} variables",
+        poster_description: "string",
+        poster_button_text: "string",
+        cta_text: "string",
+        sticky_title: "string",
+        sticky_subtitle: "string",
+      },
+      behavior: {
+        reveal_after_seconds: 10,
+        show_sticky_cta: true,
+        cta_mode: "modal | drawer | link",
+        resume_playback: true,
+        vsl_progress_bar_color: "#dc2626",
+      },
+    },
+    example: {
+      type: "hero_vsl_delayed_cta",
+      key: "hero-vsl-delayed-main",
+      is_boxed: false,
+      content: {
+        eyebrow: "ATENCION {{team.name}}",
+        headline:
+          "Si tu equipo no prospecta sin ti... tienes un empleo disfrazado.",
+        highlight: "tienes un empleo disfrazado.",
+        subheadline:
+          "Con LeadFlow genera interesados diarios para cada miembro de tu equipo.",
+        video_url: "media:vsl_main",
+        poster_title: "Mensaje urgente de {{sponsor.first_name}}",
+        poster_description: "Haz clic para ver el sistema.",
+        poster_button_text: "Ver mensaje",
+        cta_text: "Aplicar con {{sponsor.first_name}} ahora",
+        sticky_title: "Tu equipo necesita infraestructura, no mas motivacion.",
+        sticky_subtitle: "Solo aceptamos equipos listos este mes.",
+      },
+      behavior: {
+        reveal_after_seconds: 10,
+        show_sticky_cta: true,
+        cta_mode: "modal",
+        resume_playback: true,
+        vsl_progress_bar_color: "#dc2626",
+      },
     },
   }),
   hook_and_promise: defineBlock({
@@ -1600,6 +1670,7 @@ export const defaultBuilderBlockDefinitions = [
   stickyConversionBarDefinition,
   builderBlockDefinitionsByKey.announcement,
   builderBlockDefinitionsByKey.hero,
+  builderBlockDefinitionsByKey.hero_vsl_delayed_cta,
   builderBlockDefinitionsByKey.hook_and_promise,
   builderBlockDefinitionsByKey.who_am_i,
   builderBlockDefinitionsByKey.qualification_checklist,
@@ -1638,6 +1709,7 @@ export const getBuilderBlockDefinition = (key: string) =>
 export const BlockRegistry: Record<string, FC<any>> = {
   announcement: PublicAnnouncementBlockBridge,
   hero: PublicStickyRuntimeBlockBridge,
+  hero_vsl_delayed_cta: PublicStickyRuntimeBlockBridge,
   hook_and_promise: PublicHookAndPromiseBlockBridge,
   who_am_i: PublicStickyRuntimeBlockBridge,
   qualification_checklist: PublicStickyRuntimeBlockBridge,

@@ -4,6 +4,7 @@ import type { JsonValue } from './domain.types';
 const supportedFunnelBlockTypes = [
   'announcement',
   'hero',
+  'hero_vsl_delayed_cta',
   'hook_and_promise',
   'who_am_i',
   'qualification_checklist',
@@ -40,6 +41,7 @@ const supportedFunnelBlockTypes = [
   'form_placeholder',
   'hero_block',
   'video_block',
+  'vsl_delayed_cta_hero',
   'features',
   'features_and_benefits',
   'how_it_works',
