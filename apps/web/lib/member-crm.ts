@@ -209,14 +209,14 @@ const getErrorMessage = (payload: unknown, fallback: string) =>
   (typeof payload === "object" &&
   payload !== null &&
   "message" in payload &&
-  typeof payload.message === "string"
-    ? payload.message
+  typeof (payload as any).message === "string"
+    ? (payload as any).message
     : null) ??
   (typeof payload === "object" &&
   payload !== null &&
   "error" in payload &&
-  typeof payload.error === "string"
-    ? payload.error
+  typeof (payload as any).error === "string"
+    ? (payload as any).error
     : null) ??
   fallback;
 
@@ -224,21 +224,11 @@ export const appendAdvisorCrmInboxQuery = (
   searchParams: URLSearchParams,
   params: AdvisorCrmInboxSnapshotParams,
 ) => {
-  if (params.tab) {
-    searchParams.set("tab", params.tab);
-  }
-
-  if (params.limit) {
-    searchParams.set("limit", String(params.limit));
-  }
-
-  if (params.q?.trim()) {
-    searchParams.set("q", params.q.trim());
-  }
-
-  if (params.source && params.source !== "all") {
+  if (params.tab) searchParams.set("tab", params.tab);
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  if (params.q?.trim()) searchParams.set("q", params.q.trim());
+  if (params.source && params.source !== "all")
     searchParams.set("source", params.source);
-  }
 
   if (
     params.status === "pending" ||
@@ -252,9 +242,7 @@ export const appendAdvisorCrmInboxQuery = (
     searchParams.set("assignment_status", params.status);
   }
 
-  if (params.cursor?.trim()) {
-    searchParams.set("cursor", params.cursor.trim());
-  }
+  if (params.cursor?.trim()) searchParams.set("cursor", params.cursor.trim());
 };
 
 export const buildAdvisorCrmInboxPath = (
@@ -267,11 +255,22 @@ export const buildAdvisorCrmInboxPath = (
   return `/sponsors/me/crm/inbox${queryString ? `?${queryString}` : ""}`;
 };
 
+/**
+ * ✅ FIX PRINCIPAL:
+ * Eliminado auth.ts completamente
+ * Reemplazado por fetch simple con cookies (credentials)
+ */
 export const getAdvisorCrmInboxSnapshot = async (
   params: AdvisorCrmInboxSnapshotParams = {},
 ): Promise<AdvisorCrmInboxResponse> => {
-  const { apiFetchWithSession } = await import("@/lib/auth");
-  const response = await apiFetchWithSession(buildAdvisorCrmInboxPath(params));
+  const response = await fetch(buildAdvisorCrmInboxPath(params), {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
   const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
@@ -313,6 +312,7 @@ export const acceptAssignment = async (
       },
     },
   );
+
   const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
