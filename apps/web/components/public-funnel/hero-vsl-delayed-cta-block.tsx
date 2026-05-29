@@ -97,9 +97,7 @@ const renderHighlightedHeadline = (headline: string, highlight: string) => {
   return (
     <>
       {before}
-      <span className="rounded-sm bg-vsl-highlight px-1 py-0.5">
-        {trimmedHighlight}
-      </span>
+      <span className="text-amber-400">{trimmedHighlight}</span>
       {after}
     </>
   );
@@ -230,77 +228,73 @@ export function HeroVslDelayedCtaBlock({
   }
 
   return (
-    <section
-      id={asString(block.key) || undefined}
-      className={cx(
-        "relative overflow-hidden bg-slate-950 text-white",
-        isBoxed ? "rounded-theme border [border-color:var(--theme-base-divider)]" : "",
-      )}
-    >
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,1))]" />
-      <div className="relative mx-auto grid min-h-screen w-full max-w-7xl content-center gap-8 px-4 py-10 md:px-8 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:py-14">
-        <div className="max-w-3xl">
-          {eyebrow ? (
-            <p className="text-xs font-bold uppercase text-emerald-300 md:text-sm">
-              {eyebrow}
-            </p>
-          ) : null}
-          <h1 className="mt-4 text-4xl font-black leading-none md:text-6xl lg:text-7xl">
-            {renderHighlightedHeadline(headline, highlight)}
-          </h1>
+    <>
+      <section
+        id={asString(block.key) || undefined}
+        className={cx(
+          "relative left-1/2 min-h-screen w-screen -translate-x-1/2 overflow-hidden bg-black text-white",
+          isBoxed ? "rounded-none border-0" : "",
+        )}
+      >
+        <div className="relative mx-auto grid min-h-screen w-full max-w-7xl content-center items-center gap-6 px-5 py-10 md:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16 lg:py-16">
+          <div className="max-w-3xl text-left">
+            {eyebrow ? (
+              <p className="text-center text-xs font-bold uppercase tracking-[0.24em] text-amber-400 lg:text-left lg:tracking-[0.32em]">
+                {eyebrow}
+              </p>
+            ) : null}
+            <h1 className="mx-auto mt-4 max-w-sm text-center text-[2.25rem] font-bold leading-[0.95] md:max-w-2xl md:text-5xl lg:mx-0 lg:max-w-none lg:text-left lg:text-7xl lg:leading-[1.02]">
+              {renderHighlightedHeadline(headline, highlight)}
+            </h1>
+            {subheadline ? (
+              <p className="mt-6 hidden max-w-2xl text-left text-lg leading-7 text-zinc-300 lg:block">
+                {subheadline}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex w-full justify-center lg:justify-end">
+            <div className="w-full max-w-[360px] overflow-hidden rounded-[2rem] border border-zinc-800 bg-black shadow-[0_24px_90px_rgba(0,0,0,0.55)] md:max-w-[420px]">
+              <div className="aspect-[3/4] h-full w-full">
+                <KurukinPlayer
+                  provider={provider}
+                  videoId={videoUrl}
+                  vslMode={true}
+                  vslProgressBarColor={progressBarColor}
+                  resumePlayback={resumePlayback}
+                  onTimeUpdate={handleTimeUpdate}
+                  hideYoutubeUi={provider === "youtube"}
+                  smartPoster={{
+                    imageUrl: posterImageUrl || undefined,
+                    eyebrow: "VSL",
+                    title: posterTitle,
+                    description: posterDescription,
+                    buttonText: posterButtonText,
+                  }}
+                  className="h-full w-full !aspect-auto !rounded-none [&_video]:h-full [&_video]:w-full [&_video]:object-cover"
+                />
+              </div>
+            </div>
+          </div>
+
           {subheadline ? (
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 md:text-lg">
+            <p className="mx-auto mt-0 max-w-sm text-center text-base leading-7 text-zinc-300 lg:hidden">
               {subheadline}
             </p>
           ) : null}
-
-          {hasCtaRevealed ? (
-            <div className="mt-7">
-              <TrackedCta
-                publicationId={runtime.publication.id}
-                currentStepId={runtime.currentStep.id}
-                currentPath={runtime.request.path}
-                href={ctaHref}
-                label={ctaText}
-                className="inline-flex min-h-14 items-center justify-center rounded-xl bg-emerald-400 px-6 py-4 text-center text-base font-black text-slate-950 shadow-[0_18px_44px_rgba(16,185,129,0.28)] transition hover:-translate-y-0.5 hover:bg-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
-                action={ctaAction}
-              />
-            </div>
-          ) : null}
         </div>
-
-        <div className="w-full">
-          <div className="overflow-hidden rounded-xl border border-white/10 bg-black shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
-            <div className="aspect-video">
-              <KurukinPlayer
-                provider={provider}
-                videoId={videoUrl}
-                vslMode={true}
-                vslProgressBarColor={progressBarColor}
-                resumePlayback={resumePlayback}
-                onTimeUpdate={handleTimeUpdate}
-                hideYoutubeUi={provider === "youtube"}
-                smartPoster={{
-                  imageUrl: posterImageUrl || undefined,
-                  eyebrow: "VSL",
-                  title: posterTitle,
-                  description: posterDescription,
-                  buttonText: posterButtonText,
-                }}
-                className="h-full !aspect-auto !rounded-none"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
 
       {hasCtaRevealed && showStickyCta ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-slate-950/94 px-4 py-3 text-white shadow-[0_-18px_50px_rgba(0,0,0,0.32)] backdrop-blur md:px-6">
-          <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-bold md:text-base">{stickyTitle}</p>
+        <div className="fixed bottom-0 left-0 right-0 z-[60] text-white">
+          <div className="absolute inset-0 border-t border-white/10 bg-black/90 shadow-[0_-18px_50px_rgba(0,0,0,0.32)] backdrop-blur-xl" />
+          <div className="relative mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-4 p-4 md:flex-row md:gap-8 md:px-6 md:py-4">
+            <div className="hidden min-w-0 flex-1 text-left md:block">
+              <p className="text-lg font-bold text-white">
+                {stickyTitle}
+              </p>
               {stickySubtitle ? (
-                <p className="mt-1 text-xs text-slate-300 md:text-sm">
+                <p className="mt-1 text-sm text-slate-400">
                   {stickySubtitle}
                 </p>
               ) : null}
@@ -311,12 +305,12 @@ export function HeroVslDelayedCtaBlock({
               currentPath={runtime.request.path}
               href={ctaHref}
               label={ctaText}
-              className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-xl bg-emerald-400 px-5 py-3 text-center text-sm font-black text-slate-950 shadow-[0_14px_32px_rgba(16,185,129,0.24)] transition hover:bg-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
+              className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 px-5 py-3 text-center text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_14px_34px_rgba(251,191,36,0.25)] transition hover:-translate-y-0.5 hover:from-amber-200 hover:to-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200 md:h-14 md:w-auto md:min-w-[320px] md:px-8 md:py-4"
               action={ctaAction}
             />
           </div>
         </div>
       ) : null}
-    </section>
+    </>
   );
 }
