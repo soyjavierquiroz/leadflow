@@ -71,18 +71,7 @@ const defaultMediaRows = requiredMediaKeys.map((key) => ({
 
 const defaultDevelopmentOrchestrationInstanceName = "default-constructor";
 
-const editorStepDefinitions = [
-  {
-    key: "captura",
-    label: "Paso 1: Landing (Captura)",
-  },
-  {
-    key: "confirmado",
-    label: "Paso 2: Handoff (Confirmación)",
-  },
-] as const;
-
-type EditorStepTabKey = (typeof editorStepDefinitions)[number]["key"];
+type EditorStepTabKey = "captura" | "confirmado";
 
 const trimOuterSlashes = (value: string) => value.replace(/^\/+|\/+$/g, "");
 
@@ -830,6 +819,9 @@ export function TeamVslPublicationEditor({
   );
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [activeStepTab, setActiveStepTab] = useState<EditorStepTabKey>("captura");
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(
+    initialFunnelCaptureStep?.id ?? initialFunnelSteps[0]?.id ?? null,
+  );
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
   const visibleTemplateOptions = useMemo(
@@ -885,6 +877,7 @@ export function TeamVslPublicationEditor({
         setStepSettingsJson(nextCaptureStep?.settingsJson ?? {});
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
+        setSelectedStepId(nextCaptureStep?.id ?? nextStepRecords[0]?.id ?? null);
         setMetaPixelId("");
         setTiktokPixelId("");
         setMetaCapiToken("");
@@ -900,6 +893,7 @@ export function TeamVslPublicationEditor({
       setFlowGraph(null);
       setStepRecords([]);
       setStepDrafts({});
+      setSelectedStepId(null);
       setStepSettingsJson({});
       setMetaPixelId("");
       setTiktokPixelId("");
@@ -936,6 +930,7 @@ export function TeamVslPublicationEditor({
         setStepSettingsJson(payload.step.settingsJson);
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
+        setSelectedStepId(payload.step.id ?? nextStepRecords[0]?.id ?? null);
         setFlowGraph(
           extractFlowGraphFromContract(payload.funnelInstance.conversionContract) ??
             deriveFlowGraphFromSteps(nextStepRecords),
@@ -970,32 +965,58 @@ export function TeamVslPublicationEditor({
     () => pickPrimaryConfirmStep(stepRecords, captureStep?.id ?? null),
     [stepRecords, captureStep?.id],
   );
-  const stepTabs = useMemo(
-    () =>
-      editorStepDefinitions.map((definition) => ({
-        ...definition,
-        step: definition.key === "captura" ? captureStep : confirmStep,
-      })),
-    [captureStep, confirmStep],
+  const orderedStepRecords = useMemo(
+    () => [...stepRecords].sort((left, right) => left.position - right.position),
+    [stepRecords],
   );
-  const activeStep = showStepSwitcher
-    ? stepTabs.find((tab) => tab.key === activeStepTab)?.step ?? null
+  const activeStepRecord = useMemo(() => {
+    if (!showStepSwitcher) {
+      return null;
+    }
+
+    if (selectedStepId) {
+      return (
+        stepRecords.find(
+          (step) => step.id === selectedStepId || step.slug === selectedStepId,
+        ) ?? null
+      );
+    }
+
+    return captureStep ?? orderedStepRecords[0] ?? null;
+  }, [captureStep, orderedStepRecords, selectedStepId, showStepSwitcher, stepRecords]);
+  const activeStep = activeStepRecord;
+  const activeFlowNode = activeStep
+    ? flowGraph?.nodes[activeStep.id] ??
+      Object.values(flowGraph?.nodes ?? {}).find(
+        (node) => node.stepId === activeStep.id || node.slug === activeStep.slug,
+      ) ??
+      null
     : null;
-  const activeStepTabLabel =
-    stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
-    "Paso activo";
+  const activeStepTitle =
+    activeFlowNode?.meta?.title?.trim() ||
+    (activeStep ? `Paso ${activeStep.position}` : "Paso activo");
+  const activeStepType = activeFlowNode?.stepType ?? activeStep?.stepType ?? null;
+  const activeStepTabLabel = activeStep
+    ? `Paso ${activeStep.position}: ${activeStepTitle}`
+    : "Paso activo";
   const activeDraft = showStepSwitcher
     ? activeStep
       ? stepDrafts[activeStep.id] ?? buildStepDraft(activeStep)
-      : fallbackDrafts[activeStepTab] ?? createEmptyStepDraft()
+      : selectedStepId
+        ? createEmptyStepDraft()
+        : fallbackDrafts[activeStepTab] ?? createEmptyStepDraft()
     : null;
   const editorBlocksText = activeDraft?.blocksText ?? blocksText;
   const editorMediaRows = activeDraft?.mediaRows ?? mediaRows;
   const editorSettingsJson = activeDraft?.settingsJson ?? stepSettingsJson;
   const editorLayoutOverride = readStepLayoutOverride(editorSettingsJson);
-  const editorContext = showStepSwitcher
-      ? {
-        stepName: activeStepTabLabel,
+  const activeEditorContext = showStepSwitcher
+    ? {
+        stepName: activeStep
+          ? `Paso ${activeStep.position} / ${String(
+              activeStepType ?? activeStep.stepType,
+            ).toUpperCase()} / ${activeStepTitle}`
+          : activeStepTabLabel,
         stepPath: activeStep
           ? buildPublicationStepPath(
               pathPrefix,
@@ -1005,7 +1026,7 @@ export function TeamVslPublicationEditor({
           : activeStepTab === "captura"
             ? normalizePublicationPath(pathPrefix)
             : buildPublicationStepPath(pathPrefix, "confirmado", false),
-        stepType: activeStep?.stepType ?? activeStepTab,
+        stepType: activeStepType ?? activeStepTab,
       }
     : null;
   const previewDraftKey =
@@ -1020,6 +1041,25 @@ export function TeamVslPublicationEditor({
     : activeStepTabLabel;
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "development") {
+      return;
+    }
+
+    console.debug("[Funnel Builder] active editor step", {
+      selectedStepId,
+      activeStepRecordId: activeStepRecord?.id ?? null,
+      activeStepSlug: activeStepRecord?.slug ?? null,
+      activeStepType,
+    });
+  }, [
+    activeStepRecord?.id,
+    activeStepRecord?.slug,
+    activeStepRecord?.stepType,
+    activeStepType,
+    selectedStepId,
+  ]);
+
+  useEffect(() => {
     const handleStepManagerChange = (event: Event) => {
       if (!showStepSwitcher) {
         return;
@@ -1032,22 +1072,27 @@ export function TeamVslPublicationEditor({
           .map((value) => value.trim()),
       );
 
-      const directMatch = stepTabs.find(
-        (tab) =>
-          tab.step &&
-          (candidateIds.has(tab.step.id) || candidateIds.has(tab.step.slug)),
+      const directMatch = stepRecords.find(
+        (step) => candidateIds.has(step.id) || candidateIds.has(step.slug),
       );
       const orderedFallback =
-        typeof detail.orderIndex === "number" ? stepTabs[detail.orderIndex] : null;
-      const targetTab = directMatch ?? (orderedFallback?.step ? orderedFallback : null);
+        typeof detail.orderIndex === "number"
+          ? orderedStepRecords[detail.orderIndex]
+          : null;
+      const targetStep = directMatch ?? orderedFallback ?? null;
 
-      if (!targetTab || targetTab.key === activeStepTab) {
+      if (!targetStep || targetStep.id === selectedStepId) {
         return;
       }
 
       setErrorMessage(null);
       setSuccessMessage(null);
-      setActiveStepTab(targetTab.key);
+      setSelectedStepId(targetStep.id);
+      if (targetStep.id === captureStep?.id) {
+        setActiveStepTab("captura");
+      } else if (targetStep.id === confirmStep?.id) {
+        setActiveStepTab("confirmado");
+      }
     };
 
     window.addEventListener(
@@ -1061,7 +1106,14 @@ export function TeamVslPublicationEditor({
         handleStepManagerChange,
       );
     };
-  }, [activeStepTab, showStepSwitcher, stepTabs]);
+  }, [
+    captureStep?.id,
+    confirmStep?.id,
+    orderedStepRecords,
+    selectedStepId,
+    showStepSwitcher,
+    stepRecords,
+  ]);
 
   const updateEditorDraft = (patch: Partial<StepDraft>) => {
     if (!showStepSwitcher) {
@@ -1307,7 +1359,7 @@ export function TeamVslPublicationEditor({
       return [];
     }
 
-    return Object.entries(flowGraph.nodes).map(([nodeId, node]) => ({
+    return Object.values(flowGraph.nodes).map((node) => ({
       value: buildPublicationStepPath(
         pathPrefix,
         node.slug,
@@ -1372,10 +1424,10 @@ export function TeamVslPublicationEditor({
       },
       activeStep: {
         id: activeStep?.id ?? null,
-        slug: activeStep?.slug ?? captureStep?.slug ?? "captura",
-        stepType: activeStep?.stepType ?? captureStep?.stepType ?? "landing",
+        slug: activeStep?.slug ?? null,
+        stepType: activeStepType,
         label: activeStepTabLabel,
-        path: editorContext?.stepPath ?? normalizePublicationPath(pathPrefix),
+        path: activeEditorContext?.stepPath ?? normalizePublicationPath(pathPrefix),
       },
       graph: flowGraph,
       edges: [],
@@ -1388,15 +1440,11 @@ export function TeamVslPublicationEditor({
   }, [
     activeStep?.id,
     activeStep?.slug,
-    activeStep?.stepType,
+    activeStepType,
     activeStepTabLabel,
-    captureStep?.slug,
-    captureStep?.stepType,
-    confirmStep?.id,
-    confirmStep?.isEntryStep,
-    confirmStep?.slug,
+    confirmStep,
     currentPublicationId,
-    editorContext?.stepPath,
+    activeEditorContext?.stepPath,
     editorSettingsJson,
     flowGraph,
     funnelInstanceId,
@@ -1639,7 +1687,12 @@ export function TeamVslPublicationEditor({
           seoTitle: seoTitle.trim(),
           metaDescription: metaDescription.trim(),
           stepId: activeStep?.id,
-          stepKey: showStepSwitcher ? activeStepTab : undefined,
+          stepKey:
+            showStepSwitcher && activeStep?.id === captureStep?.id
+              ? "captura"
+              : showStepSwitcher && activeStep?.id === confirmStep?.id
+                ? "confirmado"
+                : undefined,
           blocksJson: parsedBlocks.value,
           mediaMap,
           settingsJson: editorSettingsJson,
@@ -1768,15 +1821,14 @@ export function TeamVslPublicationEditor({
         setStepSettingsJson(response.step.settingsJson);
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
+        setSelectedStepId(response.step.id ?? activeStep?.id ?? null);
         setFlowGraph(
           extractFlowGraphFromContract(response.funnelInstance.conversionContract),
         );
         setSuccessMessage(
           currentPublicationId
             ? showStepSwitcher
-              ? `${
-                  stepTabs.find((tab) => tab.key === activeStepTab)?.label ?? "Paso"
-                } actualizado y publicado.`
+              ? `${activeStepTabLabel} actualizado y publicado.`
               : "Funnel híbrido actualizado y publicado."
             : "Funnel híbrido creado, publicado y listo para edición.",
         );
@@ -1926,7 +1978,7 @@ export function TeamVslPublicationEditor({
             blocks: editorBlocksText,
             recipe,
             catalog,
-            stepType: editorContext?.stepType ?? activeStep?.stepType ?? null,
+            stepType: activeEditorContext?.stepType ?? activeStep?.stepType ?? null,
             successRedirect,
             replace,
           });
@@ -2042,6 +2094,16 @@ export function TeamVslPublicationEditor({
           graph={flowGraph}
           runtimeHealthStatus={runtimeHealthStatus}
           isOrchestrating={isOrchestrating}
+          activeStepId={activeStepRecord?.id ?? selectedStepId}
+          onActiveStepChange={(stepId) => {
+            setSelectedStepId(stepId);
+            const nextStep = stepRecords.find((step) => step.id === stepId);
+            if (nextStep?.id === captureStep?.id) {
+              setActiveStepTab("captura");
+            } else if (nextStep?.id === confirmStep?.id) {
+              setActiveStepTab("confirmado");
+            }
+          }}
           onGraphUpdated={handleGraphUpdated}
           onSmartWiring={handleSmartWiring}
         />
@@ -2102,8 +2164,7 @@ export function TeamVslPublicationEditor({
                 </p>
                 <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {showStepSwitcher
-                    ? stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
-                      "Paso activo"
+                    ? activeStepTabLabel
                     : selectedDomain
                       ? `${selectedDomain.host}${pathPrefix}`
                       : "Selecciona dominio y ruta"}
@@ -2209,10 +2270,11 @@ export function TeamVslPublicationEditor({
         </details>
 
         <HybridJsonMediaEditor
-          key={activeStep?.id ?? activeStepTab}
+          key={activeStepRecord?.id ?? activeStepTab}
           blocksText={editorBlocksText}
           previewDraftKey={previewDraftKey}
-          editorContext={editorContext}
+          activeStepRecord={activeStepRecord}
+          editorContext={activeEditorContext}
           onBlocksTextChange={(value) => updateEditorDraft({ blocksText: value })}
           parsedBlocksError={parsedBlocks.error}
           parsedBlocksCount={parsedBlocks.value?.length ?? 0}

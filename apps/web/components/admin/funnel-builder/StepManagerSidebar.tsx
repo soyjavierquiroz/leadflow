@@ -34,6 +34,7 @@ type StepManagerSidebarProps = {
   graph?: FlowGraphV1 | null;
   runtimeHealthStatus?: FunnelRuntimeHealthStatus;
   isOrchestrating?: boolean;
+  activeStepId?: string | null;
   onSmartWiring?: () => void;
   onActiveStepChange?: (stepId: string, node: FlowNode, orderIndex: number) => void;
   onGraphUpdated?: (graph: FlowGraphV1) => void;
@@ -219,6 +220,7 @@ export function StepManagerSidebar({
   graph,
   runtimeHealthStatus,
   isOrchestrating = false,
+  activeStepId: controlledActiveStepId = null,
   onSmartWiring,
   onActiveStepChange,
   onGraphUpdated,
@@ -251,9 +253,10 @@ export function StepManagerSidebar({
         : createEmptyReport(),
     [localGraph],
   );
-  const [activeStepId, setActiveStepId] = useState(
+  const [internalActiveStepId, setInternalActiveStepId] = useState(
     localGraph?.entryStepId ?? orderedNodes[0]?.stepId ?? "",
   );
+  const activeStepId = controlledActiveStepId ?? internalActiveStepId;
   const status = runtimeHealthStatus ?? stepManagerReport.status;
   const StatusIcon = statusConfig[status].icon;
   const issueCount = stepManagerReport.issues.length;
@@ -289,7 +292,7 @@ export function StepManagerSidebar({
   };
 
   const handleSelectNode = (node: FlowNode, orderIndex: number) => {
-    setActiveStepId(node.stepId);
+    setInternalActiveStepId(node.stepId);
     onActiveStepChange?.(node.stepId, node, orderIndex);
     dispatchActiveStepChange(node.stepId, node, orderIndex);
   };
@@ -548,7 +551,7 @@ export function StepManagerSidebar({
   }, [dirtySlugStepIds, focusedSlugStepId, graph]);
 
   useEffect(() => {
-    setActiveStepId((current) => {
+    setInternalActiveStepId((current) => {
       if (current && orderedNodes.some((node) => node.stepId === current)) {
         return current;
       }

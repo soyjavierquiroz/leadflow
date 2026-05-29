@@ -342,6 +342,27 @@ const getBlockIdentity = (block: ComposerBlock, index: number) =>
 const cloneJson = <T,>(value: T): T =>
   value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
 
+const mergeJsonObjectPatch = (
+  current: Record<string, JsonValue | undefined>,
+  patch: Record<string, JsonValue | undefined>,
+): Record<string, JsonValue | undefined> => {
+  const merged: Record<string, JsonValue | undefined> = { ...current };
+
+  for (const [key, patchValue] of Object.entries(patch)) {
+    const currentValue = current[key];
+
+    merged[key] =
+      isRecord(currentValue) && isRecord(patchValue)
+        ? (mergeJsonObjectPatch(
+            currentValue as Record<string, JsonValue | undefined>,
+            patchValue as Record<string, JsonValue | undefined>,
+          ) as JsonValue)
+        : patchValue;
+  }
+
+  return merged;
+};
+
 export const isAbsoluteHttpUrl = (value: string) =>
   /^https?:\/\//i.test(value.trim());
 
@@ -385,6 +406,12 @@ type HybridJsonMediaEditorProps = {
   previewTheme?: string;
   previewSettingsJson?: unknown;
   previewDraftKey?: string | null;
+  activeStepRecord?: {
+    id: string;
+    slug: string;
+    stepType: string;
+    position: number;
+  } | null;
   editorContext?: {
     stepName: string;
     stepPath: string;
@@ -451,6 +478,7 @@ export function HybridJsonMediaEditor({
   previewTheme = "default",
   previewSettingsJson = null,
   previewDraftKey = null,
+  activeStepRecord = null,
   editorContext = null,
   availableBlocks = defaultBuilderBlockDefinitions,
   routingReference = null,
@@ -472,7 +500,8 @@ export function HybridJsonMediaEditor({
 
     return Array.from(merged.values());
   }, [availableBlocks]);
-  const currentStepType = editorContext?.stepType ?? stepSwitcher?.badge ?? null;
+  const currentStepType =
+    activeStepRecord?.stepType ?? editorContext?.stepType ?? stepSwitcher?.badge ?? null;
   const compatibleCatalogBlocks = useMemo(
     () =>
       catalogBlocks.filter((definition) =>
@@ -663,7 +692,9 @@ export function HybridJsonMediaEditor({
   const patchComposerBlock = (blockId: string, patch: Partial<ComposerBlock>) => {
     writeComposerBlocks(
       composerBlocks.map((block, index) =>
-        getBlockIdentity(block, index) === blockId ? { ...block, ...patch } : block,
+        getBlockIdentity(block, index) === blockId
+          ? (mergeJsonObjectPatch(block, patch) as ComposerBlock)
+          : block,
       ),
     );
   };
@@ -1059,7 +1090,7 @@ export function HybridJsonMediaEditor({
             </div>
 
             {editorContext ? (
-                <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 shadow-sm backdrop-blur">
+              <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 shadow-sm backdrop-blur">
                 <div className="flex w-full items-center justify-start px-4 py-3 text-left">
                   <span className="mr-3 shrink-0 text-base leading-none text-amber-300">
                     ⚠️
@@ -1076,7 +1107,7 @@ export function HybridJsonMediaEditor({
                 <div className="flex flex-col gap-5">
                   <div className="max-w-2xl space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">
-                      Lienzo en blanco
+                      Este paso aún no tiene bloques
                     </p>
                     <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                       Arranca este paso con una estructura segura
