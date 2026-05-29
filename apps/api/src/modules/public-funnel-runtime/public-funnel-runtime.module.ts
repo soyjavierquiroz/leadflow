@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
 import { MailModule } from '../mail/mail.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
+import { RuntimeContextModule } from '../runtime-context/runtime-context.module';
 import { SystemApiGuard } from '../webhooks/system-api.guard';
 import { CapiManagerService } from './capi-manager.service';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
@@ -15,7 +16,12 @@ import { PublicRuntimeService } from './public-runtime.service';
 import { ShortLinkProvider } from './short-link.provider';
 
 @Module({
-  imports: [EventsModule, MessagingAutomationModule, MailModule],
+  imports: [
+    EventsModule,
+    MessagingAutomationModule,
+    MailModule,
+    RuntimeContextModule,
+  ],
   controllers: [
     PublicFunnelRuntimeController,
     PublicRuntimeController,

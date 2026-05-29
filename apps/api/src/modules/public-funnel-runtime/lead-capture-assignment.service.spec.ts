@@ -77,6 +77,12 @@ describe('LeadCaptureAssignmentService', () => {
     const capiManagerService = {
       dispatchLeadConversion: jest.fn().mockResolvedValue(undefined),
     } as any;
+    const ownershipContextUpsertService = {
+      upsertForAssignment: jest.fn().mockResolvedValue({
+        dispatched: false,
+        reason: 'test_noop',
+      }),
+    } as any;
 
     const service = new LeadCaptureAssignmentService(
       prisma,
@@ -86,6 +92,7 @@ describe('LeadCaptureAssignmentService', () => {
       publicFunnelRuntimeService,
       mailerService,
       capiManagerService,
+      ownershipContextUpsertService,
     );
 
     return {
@@ -749,7 +756,9 @@ describe('LeadCaptureAssignmentService', () => {
       },
     });
     expect(tx.team.update).not.toHaveBeenCalled();
-    expect(trackingEventsService.recordTrackingEventInTransaction).toHaveBeenCalledWith(
+    expect(
+      trackingEventsService.recordTrackingEventInTransaction,
+    ).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({
         eventName: 'assignment_created',
@@ -771,20 +780,18 @@ describe('LeadCaptureAssignmentService', () => {
     const { service } = buildService();
     const publication = buildPublication();
 
-    const nextStep = (service as any).resolveNextStepAfterCaptureFromPublication(
-      publication,
-      'step-1',
-      {
-        entryMode: 'organic_asesor',
-        trafficLayer: 'DIRECT',
-        forcedSponsorId: 'sponsor-1',
-        adWheelId: null,
-        browserPixelsEnabled: false,
-        attributionType: 'ref',
-        attributionSlug: 'asesor-uno',
-        runtimePathPrefix: '/ref/asesor-uno',
-      },
-    );
+    const nextStep = (
+      service as any
+    ).resolveNextStepAfterCaptureFromPublication(publication, 'step-1', {
+      entryMode: 'organic_asesor',
+      trafficLayer: 'DIRECT',
+      forcedSponsorId: 'sponsor-1',
+      adWheelId: null,
+      browserPixelsEnabled: false,
+      attributionType: 'ref',
+      attributionSlug: 'asesor-uno',
+      runtimePathPrefix: '/ref/asesor-uno',
+    });
 
     expect(nextStep).toEqual({
       id: 'step-2',
@@ -1008,7 +1015,9 @@ describe('LeadCaptureAssignmentService', () => {
         }),
       }),
     );
-    expect(trackingEventsService.recordTrackingEventInTransaction).toHaveBeenCalledWith(
+    expect(
+      trackingEventsService.recordTrackingEventInTransaction,
+    ).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({
         eventName: 'lead_created',

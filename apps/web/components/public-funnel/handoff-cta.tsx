@@ -39,6 +39,17 @@ const normalizeWhatsappPhone = (value: string | null | undefined) => {
   return digits.startsWith("00") ? digits.slice(2) : digits;
 };
 
+const extractOwnershipRef = (value: string | null | undefined) =>
+  value?.match(/(?:^|\n)Ref:\s*(lf_own_[A-Za-z0-9_-]+)/)?.[1] ?? null;
+
+const appendOwnershipRef = (message: string, ownershipRef: string | null) => {
+  if (!ownershipRef || message.includes(ownershipRef)) {
+    return message;
+  }
+
+  return `${message}\n\nRef: ${ownershipRef}`;
+};
+
 export function HandoffCta({
   isBoxed = false,
   advisor,
@@ -68,13 +79,20 @@ export function HandoffCta({
   );
 
   const dynamicWhatsappUrl = useMemo(() => {
-    const messageTemplate = whatsappText || handoff.whatsappMessage || DEFAULT_WHATSAPP_TEXT;
-    const phone = normalizeWhatsappPhone(handoff.whatsappPhone ?? advisor?.phone);
+    const messageTemplate =
+      whatsappText || handoff.whatsappMessage || DEFAULT_WHATSAPP_TEXT;
+    const phone = normalizeWhatsappPhone(
+      handoff.whatsappPhone ?? advisor?.phone,
+    );
     const resolvedLeadName = leadName?.trim() || "un nuevo lead";
-    const message = messageTemplate
-      .replace(/\{\{\s*advisorName\s*\}\}/g, advisor?.name || "")
-      .replace(/\{\{\s*leadName\s*\}\}/g, resolvedLeadName)
-      .trim();
+    const ownershipRef = extractOwnershipRef(handoff.whatsappMessage);
+    const message = appendOwnershipRef(
+      messageTemplate
+        .replace(/\{\{\s*advisorName\s*\}\}/g, advisor?.name || "")
+        .replace(/\{\{\s*leadName\s*\}\}/g, resolvedLeadName)
+        .trim(),
+      ownershipRef,
+    );
 
     if (!phone) {
       return handoff.whatsappUrl ?? null;

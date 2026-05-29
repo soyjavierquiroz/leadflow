@@ -28,6 +28,7 @@ const baseLead = {
   updatedAt: new Date('2026-05-21T10:00:00.000Z'),
   currentAssignment: {
     id: 'assignment-1',
+    ownershipKey: 'lf_own_test',
     workspaceId: 'workspace-1',
     leadId: 'lead-1',
     sponsorId: 'sponsor-1',

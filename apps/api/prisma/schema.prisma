@@ -1007,6 +1007,7 @@ model Lead {
 
 model Assignment {
   id                   String               @id @default(uuid())
+  ownershipKey         String?              @unique
   workspaceId          String
   leadId               String
   sponsorId            String

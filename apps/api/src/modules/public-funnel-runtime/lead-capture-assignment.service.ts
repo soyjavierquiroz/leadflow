@@ -14,6 +14,11 @@ import {
 import { TrackingEventsService } from '../events/tracking-events.service';
 import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
 import { MessagingAutomationService } from '../messaging-automation/messaging-automation.service';
+import { OwnershipContextUpsertService } from '../runtime-context/ownership-context-upsert.service';
+import {
+  appendOwnershipRefToMessage,
+  generateOwnershipKey,
+} from '../runtime-context/ownership-context-key.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailerService } from '../shared/mailer.service';
 import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
@@ -25,7 +30,10 @@ import type {
   AttributionDecision,
   PublicRuntimeEntryContext,
 } from './public-funnel-runtime.types';
-import { buildPublicationStepPath, normalizePath } from './public-funnel-runtime.utils';
+import {
+  buildPublicationStepPath,
+  normalizePath,
+} from './public-funnel-runtime.utils';
 import { CapiManagerService } from './capi-manager.service';
 import { pickNextRotationMember } from './lead-capture-assignment.utils';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
@@ -89,6 +97,7 @@ type RotationPoolWithMembers = Prisma.RotationPoolGetPayload<{
 
 type AssignmentSummary = {
   id: string;
+  ownershipKey: string | null;
   status: string;
   reason: string;
   assignedAt: string;
@@ -212,6 +221,7 @@ export class LeadCaptureAssignmentService {
     private readonly publicFunnelRuntimeService: PublicFunnelRuntimeService,
     private readonly mailerService: MailerService,
     private readonly capiManagerService: CapiManagerService,
+    private readonly ownershipContextUpsertService: OwnershipContextUpsertService,
   ) {}
 
   async registerVisitor(dto: RegisterPublicVisitorDto) {
@@ -316,6 +326,7 @@ export class LeadCaptureAssignmentService {
         this.dispatchAssignmentCreatedSideEffects({
           assignmentId: result.assignment.id,
           sponsorId: result.assignment.sponsor.id,
+          sourceUrl: null,
           automation: {
             assignmentId: result.assignment.id,
             triggerType: 'public_auto_assignment_created',
@@ -537,6 +548,7 @@ export class LeadCaptureAssignmentService {
           this.dispatchAssignmentCreatedSideEffects({
             assignmentId: result.assignment.id,
             sponsorId: result.assignment.sponsor.id,
+            sourceUrl: enrichedDto.sourceUrl ?? null,
             automation: {
               assignmentId: result.assignment.id,
               triggerType: 'public_submission_assignment_created',
@@ -706,6 +718,7 @@ export class LeadCaptureAssignmentService {
   private dispatchAssignmentCreatedSideEffects(input: {
     assignmentId: string;
     sponsorId: string;
+    sourceUrl?: string | null;
     automation: Parameters<
       MessagingAutomationService['dispatchAssignmentAutomation']
     >[0];
@@ -716,6 +729,11 @@ export class LeadCaptureAssignmentService {
 
     void this.sendLeadContextUpsert({
       assignmentId: input.assignmentId,
+    });
+
+    void this.ownershipContextUpsertService.upsertForAssignment({
+      assignmentId: input.assignmentId,
+      sourceUrl: input.sourceUrl ?? null,
     });
 
     void this.sendAdvisorAssignmentEmail({
@@ -962,7 +980,7 @@ export class LeadCaptureAssignmentService {
     const sourceChannel = this.toDbSource(input.sourceChannel ?? 'form');
     const requestedOriginAdWheelId = input.originAdWheelId ?? null;
     const validatedOriginAdWheelId = requestedOriginAdWheelId
-      ? (
+      ? ((
           await tx.adWheel.findUnique({
             where: {
               id: requestedOriginAdWheelId,
@@ -971,7 +989,7 @@ export class LeadCaptureAssignmentService {
               id: true,
             },
           })
-        )?.id ?? null
+        )?.id ?? null)
       : null;
     const existing = await tx.lead.findUnique({
       where: {
@@ -1152,6 +1170,7 @@ export class LeadCaptureAssignmentService {
       return {
         assignment: {
           id: existingOpenAssignment.id,
+          ownershipKey: existingOpenAssignment.ownershipKey,
           status: existingOpenAssignment.status,
           reason: existingOpenAssignment.reason,
           assignedAt: existingOpenAssignment.assignedAt.toISOString(),
@@ -1169,7 +1188,9 @@ export class LeadCaptureAssignmentService {
             publication,
             existingOpenAssignment.sponsor.id,
           )) ??
-          this.toPublicAssignedAdvisorFromSponsor(existingOpenAssignment.sponsor),
+          this.toPublicAssignedAdvisorFromSponsor(
+            existingOpenAssignment.sponsor,
+          ),
         wasCreated: false,
       };
     }
@@ -1231,10 +1252,11 @@ export class LeadCaptureAssignmentService {
         ? 'DIRECT'
         : effectiveRoutingInput?.entryContext?.trafficLayer === 'PAID_ADS'
           ? 'PAID_ADS'
-        : 'ORGANIC';
+          : 'ORGANIC';
     const assignment = await tx.assignment.create({
       data: {
         workspaceId: publication.workspaceId,
+        ownershipKey: generateOwnershipKey(),
         leadId: lead.id,
         sponsorId: selectedSponsor.id,
         teamId: publication.teamId,
@@ -1338,6 +1360,7 @@ export class LeadCaptureAssignmentService {
     return {
       assignment: {
         id: assignment.id,
+        ownershipKey: assignment.ownershipKey,
         status: assignment.status,
         reason: assignment.reason,
         assignedAt: assignment.assignedAt.toISOString(),
@@ -1419,7 +1442,14 @@ export class LeadCaptureAssignmentService {
           publicationPath: input.nextStep?.path ?? input.publication.pathPrefix,
         })
       : null;
-    const whatsappUrl = buildPublicWhatsappUrl(whatsappPhone, whatsappMessage);
+    const whatsappMessageWithRef = appendOwnershipRefToMessage(
+      whatsappMessage,
+      input.assignment?.ownershipKey,
+    );
+    const whatsappUrl = buildPublicWhatsappUrl(
+      whatsappPhone,
+      whatsappMessageWithRef,
+    );
     const advisor = input.advisor
       ? {
           name: input.advisor.name,
@@ -1440,7 +1470,7 @@ export class LeadCaptureAssignmentService {
         autoRedirectDelayMs: handoffConfig.autoRedirectDelayMs,
         sponsor,
         whatsappPhone,
-        whatsappMessage,
+        whatsappMessage: whatsappMessageWithRef,
         whatsappUrl,
       },
       advisor,
@@ -1763,8 +1793,10 @@ export class LeadCaptureAssignmentService {
     attribution?: RuntimeAttributionPayload,
   ): Promise<SubmissionEntryContext> {
     const requestedPath =
-      this.extractRequestedPathFromSourceUrl(sourceUrl) ?? publication.pathPrefix;
-    const requestedPathname = this.extractPathnameFromRequestedPath(requestedPath);
+      this.extractRequestedPathFromSourceUrl(sourceUrl) ??
+      publication.pathPrefix;
+    const requestedPathname =
+      this.extractPathnameFromRequestedPath(requestedPath);
     const baseEntryContext = submittedEntryContext
       ? {
           entryMode: submittedEntryContext.entryMode,
@@ -1778,14 +1810,16 @@ export class LeadCaptureAssignmentService {
             submittedEntryContext.runtimePathPrefix ?? publication.pathPrefix,
           referralQueryParam: null,
         }
-      : await this.publicFunnelRuntimeService.resolveEntryContextForPublication({
-          tx,
-          workspaceId: publication.workspaceId,
-          teamId: publication.teamId,
-          publicationId: publication.id,
-          publicationPathPrefix: publication.pathPrefix,
-          requestedPath,
-        });
+      : await this.publicFunnelRuntimeService.resolveEntryContextForPublication(
+          {
+            tx,
+            workspaceId: publication.workspaceId,
+            teamId: publication.teamId,
+            publicationId: publication.id,
+            publicationPathPrefix: publication.pathPrefix,
+            requestedPath,
+          },
+        );
 
     if (
       baseEntryContext.trafficLayer === 'DIRECT' &&
@@ -1799,7 +1833,8 @@ export class LeadCaptureAssignmentService {
       return baseEntryContext;
     }
 
-    const hasPaidWheelPath = this.matchesPaidWheelCampaignPath(requestedPathname);
+    const hasPaidWheelPath =
+      this.matchesPaidWheelCampaignPath(requestedPathname);
     const hasPaidUrlEvidence = this.hasPaidUrlEvidence(attribution, sourceUrl);
 
     if (!hasPaidWheelPath && !hasPaidUrlEvidence) {
@@ -1829,7 +1864,10 @@ export class LeadCaptureAssignmentService {
       return resolvedEntryContext;
     }
 
-    const activeAdWheel = await this.findActivePublicationAdWheel(tx, publication);
+    const activeAdWheel = await this.findActivePublicationAdWheel(
+      tx,
+      publication,
+    );
 
     if (!activeAdWheel) {
       const organicEntryContext = this.toOrganicEntryContext(baseEntryContext);
@@ -1872,14 +1910,17 @@ export class LeadCaptureAssignmentService {
     clientUserAgent?: string | null;
   }): AttributionDecision {
     const requestedPath = normalizePath(
-      this.extractRequestedPathFromSourceUrl(input.attribution.sourceUrl ?? null) ??
+      this.extractRequestedPathFromSourceUrl(
+        input.attribution.sourceUrl ?? null,
+      ) ??
         input.entryContext.runtimePathPrefix ??
         input.publication.pathPrefix,
     );
     const fbclid = input.attribution.fbclid?.trim() || null;
     const gclid = input.attribution.gclid?.trim() || null;
     const ttclid = input.attribution.ttclid?.trim() || null;
-    const requestedPathname = this.extractPathnameFromRequestedPath(requestedPath);
+    const requestedPathname =
+      this.extractPathnameFromRequestedPath(requestedPath);
     const hasPaidUrlEvidence = this.hasPaidUrlEvidence(
       input.attribution,
       input.attribution.sourceUrl ?? null,
@@ -1934,7 +1975,9 @@ export class LeadCaptureAssignmentService {
 
   private matchesPaidWheelCampaignPath(path: string) {
     const normalizedPath = normalizePath(path);
-    return normalizedPath.startsWith('/promo/') || normalizedPath.startsWith('/p/');
+    return (
+      normalizedPath.startsWith('/promo/') || normalizedPath.startsWith('/p/')
+    );
   }
 
   private matchesAdvisorRefPath(path: string) {
@@ -1954,12 +1997,12 @@ export class LeadCaptureAssignmentService {
 
     return Boolean(
       attribution?.fbclid?.trim() ||
-        attribution?.ttclid?.trim() ||
-        attribution?.gclid?.trim() ||
-        urlSearchParams?.get('fbclid')?.trim() ||
-        urlSearchParams?.get('ttclid')?.trim() ||
-        urlSearchParams?.get('gclid')?.trim() ||
-        utmSource === 'ads',
+      attribution?.ttclid?.trim() ||
+      attribution?.gclid?.trim() ||
+      urlSearchParams?.get('fbclid')?.trim() ||
+      urlSearchParams?.get('ttclid')?.trim() ||
+      urlSearchParams?.get('gclid')?.trim() ||
+      utmSource === 'ads',
     );
   }
 
@@ -2276,6 +2319,7 @@ export class LeadCaptureAssignmentService {
     const assignment = await tx.assignment.create({
       data: {
         id: reservation.assignmentId,
+        ownershipKey: generateOwnershipKey(),
         workspaceId: publication.workspaceId,
         leadId: lead.id,
         sponsorId: reservation.sponsor.id,
@@ -2392,6 +2436,7 @@ export class LeadCaptureAssignmentService {
     return {
       assignment: {
         id: assignment.id,
+        ownershipKey: assignment.ownershipKey,
         status: assignment.status,
         reason: assignment.reason,
         assignedAt: assignment.assignedAt.toISOString(),
@@ -2452,6 +2497,7 @@ export class LeadCaptureAssignmentService {
     const assignment = await tx.assignment.create({
       data: {
         workspaceId: publication.workspaceId,
+        ownershipKey: generateOwnershipKey(),
         leadId: lead.id,
         sponsorId: sponsor.id,
         teamId: publication.teamId,
@@ -2564,6 +2610,7 @@ export class LeadCaptureAssignmentService {
     return {
       assignment: {
         id: assignment.id,
+        ownershipKey: assignment.ownershipKey,
         status: assignment.status,
         reason: assignment.reason,
         assignedAt: assignment.assignedAt.toISOString(),
