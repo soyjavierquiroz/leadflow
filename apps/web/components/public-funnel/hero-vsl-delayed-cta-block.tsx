@@ -229,66 +229,68 @@ export function HeroVslDelayedCtaBlock({
 
   return (
     <>
-      <section
-        id={asString(block.key) || undefined}
-        className={cx(
-          "relative left-1/2 min-h-screen w-screen -translate-x-1/2 overflow-hidden bg-black text-white",
-          isBoxed ? "rounded-none border-0" : "",
-        )}
-      >
-        <div className="relative mx-auto grid min-h-screen w-full max-w-7xl content-center items-center gap-6 px-5 py-10 md:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16 lg:py-16">
-          <div className="max-w-3xl text-left">
-            {eyebrow ? (
-              <p className="text-center text-xs font-bold uppercase tracking-[0.24em] text-amber-400 lg:text-left lg:tracking-[0.32em]">
-                {eyebrow}
-              </p>
-            ) : null}
-            <h1 className="mx-auto mt-4 max-w-sm text-center text-[2.25rem] font-bold leading-[0.95] md:max-w-2xl md:text-5xl lg:mx-0 lg:max-w-none lg:text-left lg:text-7xl lg:leading-[1.02]">
-              {renderHighlightedHeadline(headline, highlight)}
-            </h1>
+      <div className="relative left-1/2 w-screen -translate-x-1/2 bg-black text-white">
+        <section
+          id={asString(block.key) || undefined}
+          className={cx(
+            "relative min-h-screen w-full overflow-hidden bg-black text-white",
+            isBoxed ? "rounded-none border-0" : "",
+          )}
+        >
+          <div className="relative mx-auto grid min-h-screen w-full max-w-7xl content-center items-center gap-6 px-5 py-10 md:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16 lg:py-16">
+            <div className="max-w-3xl text-left">
+              {eyebrow ? (
+                <p className="text-center text-xs font-bold uppercase tracking-[0.24em] text-amber-400 lg:text-left lg:tracking-[0.32em]">
+                  {eyebrow}
+                </p>
+              ) : null}
+              <h1 className="mx-auto mt-4 max-w-sm text-center text-[2.25rem] font-bold leading-[0.95] md:max-w-2xl md:text-5xl lg:mx-0 lg:max-w-none lg:text-left lg:text-7xl lg:leading-[1.02]">
+                {renderHighlightedHeadline(headline, highlight)}
+              </h1>
+              {subheadline ? (
+                <p className="mt-6 hidden max-w-2xl text-left text-lg leading-7 text-zinc-300 lg:block">
+                  {subheadline}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="flex w-full justify-center lg:justify-end">
+              <div className="w-full max-w-[360px] overflow-hidden rounded-[2rem] border border-zinc-800 bg-black shadow-[0_24px_90px_rgba(0,0,0,0.55)] md:max-w-[430px] xl:max-w-[460px]">
+                <div className="aspect-[3/4] h-full w-full">
+                  <KurukinPlayer
+                    provider={provider}
+                    videoId={videoUrl}
+                    vslMode={true}
+                    vslProgressBarColor={progressBarColor}
+                    resumePlayback={resumePlayback}
+                    onTimeUpdate={handleTimeUpdate}
+                    hideYoutubeUi={provider === "youtube"}
+                    smartPoster={{
+                      imageUrl: posterImageUrl || undefined,
+                      eyebrow: "VSL",
+                      title: posterTitle,
+                      description: posterDescription,
+                      buttonText: posterButtonText,
+                    }}
+                    className="h-full w-full !aspect-auto !rounded-none [&_video]:h-full [&_video]:w-full [&_video]:object-cover"
+                  />
+                </div>
+              </div>
+            </div>
+
             {subheadline ? (
-              <p className="mt-6 hidden max-w-2xl text-left text-lg leading-7 text-zinc-300 lg:block">
+              <p className="mx-auto mt-0 max-w-sm text-center text-base leading-7 text-zinc-300 lg:hidden">
                 {subheadline}
               </p>
             ) : null}
           </div>
-
-          <div className="flex w-full justify-center lg:justify-end">
-            <div className="w-full max-w-[360px] overflow-hidden rounded-[2rem] border border-zinc-800 bg-black shadow-[0_24px_90px_rgba(0,0,0,0.55)] md:max-w-[420px]">
-              <div className="aspect-[3/4] h-full w-full">
-                <KurukinPlayer
-                  provider={provider}
-                  videoId={videoUrl}
-                  vslMode={true}
-                  vslProgressBarColor={progressBarColor}
-                  resumePlayback={resumePlayback}
-                  onTimeUpdate={handleTimeUpdate}
-                  hideYoutubeUi={provider === "youtube"}
-                  smartPoster={{
-                    imageUrl: posterImageUrl || undefined,
-                    eyebrow: "VSL",
-                    title: posterTitle,
-                    description: posterDescription,
-                    buttonText: posterButtonText,
-                  }}
-                  className="h-full w-full !aspect-auto !rounded-none [&_video]:h-full [&_video]:w-full [&_video]:object-cover"
-                />
-              </div>
-            </div>
-          </div>
-
-          {subheadline ? (
-            <p className="mx-auto mt-0 max-w-sm text-center text-base leading-7 text-zinc-300 lg:hidden">
-              {subheadline}
-            </p>
-          ) : null}
-        </div>
-      </section>
+        </section>
+      </div>
 
       {hasCtaRevealed && showStickyCta ? (
-        <div className="fixed bottom-0 left-0 right-0 z-[60] text-white">
+        <div className="fixed bottom-0 left-0 right-0 z-[60]">
           <div className="absolute inset-0 border-t border-white/10 bg-black/90 shadow-[0_-18px_50px_rgba(0,0,0,0.32)] backdrop-blur-xl" />
-          <div className="relative mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-4 p-4 md:flex-row md:gap-8 md:px-6 md:py-4">
+          <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 p-4 md:flex-row md:gap-8 md:px-6 md:py-4">
             <div className="hidden min-w-0 flex-1 text-left md:block">
               <p className="text-lg font-bold text-white">
                 {stickyTitle}
