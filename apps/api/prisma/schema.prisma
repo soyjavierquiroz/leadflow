@@ -322,6 +322,13 @@ enum AutomationDispatchStatus {
   failed
 }
 
+enum TrackedLinkStatus {
+  active
+  revoked
+  expired
+  deleted
+}
+
 enum EventActorType {
   system
   user
@@ -380,6 +387,7 @@ model Workspace {
   users                     User[]
   messagingConnections      MessagingConnection[]
   automationDispatches      AutomationDispatch[]
+  trackedLinks              TrackedLink[]
   leadNotes                 LeadNote[]
   crmLeadAssignments        CrmLeadAssignment[]
   crmAssignmentEvents       CrmAssignmentEvent[]
@@ -773,6 +781,7 @@ model FunnelInstance {
   leads                Lead[]
   assignments          Assignment[]
   automationDispatches AutomationDispatch[]
+  trackedLinks         TrackedLink[]
 
   @@unique([teamId, code])
   @@index([teamId, structuralType])
@@ -797,6 +806,7 @@ model FunnelStep {
   team             Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
   funnelInstance   FunnelInstance      @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
   history          FunnelStepHistory[]
+  trackedLinks     TrackedLink[]
 
   @@unique([funnelInstanceId, position])
   @@unique([funnelInstanceId, slug])
@@ -848,6 +858,7 @@ model FunnelPublication {
   assignments          Assignment[]
   automationDispatches AutomationDispatch[]
   adWheels             AdWheel[]
+  trackedLinks         TrackedLink[]
 
   @@unique([domainId, pathPrefix])
   @@index([domainId, status, pathPrefix])
@@ -1000,6 +1011,7 @@ model Lead {
   events               DomainEvent[]
   automationDispatches AutomationDispatch[]
   notes                LeadNote[]
+  trackedLinks         TrackedLink[]
   crmLeadAssignments   CrmLeadAssignment[]
   crmAssignmentEvents  CrmAssignmentEvent[]
   crmOutreachQueue     CrmOutreachQueue[]
@@ -1037,6 +1049,48 @@ model Assignment {
   currentForLead       Lead?                @relation("CurrentLeadAssignment")
   events               DomainEvent[]
   automationDispatches AutomationDispatch[]
+  trackedLinks         TrackedLink[]
+}
+
+model TrackedLink {
+  id                  String            @id @default(uuid())
+  workspaceId         String
+  leadId              String
+  assignmentId        String?
+  ownershipKey        String?
+  funnelPublicationId String
+  funnelInstanceId    String
+  funnelStepId        String
+  stepKey             String
+  appKey              String            @default("leadflow")
+  action              String            @default("open_vsl")
+  purpose             String            @default("vsl_followup")
+  longUrl             String
+  shortUrl            String?
+  shortCode           String?
+  shortLinkProvider   String
+  ctxTokenHash        String            @unique
+  status              TrackedLinkStatus @default(active)
+  expiresAt           DateTime?
+  clickCount          Int               @default(0)
+  lastClickedAt       DateTime?
+  createdBy           String?
+  metadataJson        Json?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  workspace           Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead                Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignment          Assignment?       @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  funnelPublication   FunnelPublication @relation(fields: [funnelPublicationId], references: [id], onDelete: Cascade)
+  funnelInstance      FunnelInstance    @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
+  funnelStep          FunnelStep        @relation(fields: [funnelStepId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, status])
+  @@index([assignmentId, status])
+  @@index([ownershipKey])
+  @@index([shortCode])
+  @@index([funnelPublicationId, funnelStepId, status])
+  @@index([workspaceId, status, createdAt])
 }
 
 model AutomationDispatch {
