@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { KurukinPlayer } from "kurukin-video-player-pkg";
 import "kurukin-video-player-pkg/style.css";
 
 import {
+  FunnelButtonContent,
   RichHeadline,
   cx,
 } from "@/components/public-funnel/adapters/public-funnel-primitives";
@@ -19,6 +20,11 @@ import {
 } from "@/components/public-funnel/runtime-block-utils";
 import { resolveRuntimeVariables } from "@/components/public-funnel/runtime-variables";
 import { TrackedCta } from "@/components/public-funnel/tracked-cta";
+import {
+  useSubmissionContext,
+  type StoredSubmissionContext,
+} from "@/lib/public-funnel-session";
+import { resolvePublicFunnelHandoffState } from "@/lib/public-funnel-assigned-sponsor";
 import type {
   JsonValue,
   PublicFunnelRuntimePayload,
@@ -112,6 +118,47 @@ const renderHighlightedHeadline = (headline: string, highlight: string) => {
   );
 };
 
+const isRealAssignmentId = (value: string | null | undefined) => {
+  const normalized = value?.trim();
+  return Boolean(normalized) && !normalized?.startsWith("runtime-");
+};
+
+const mergeRuntimeWithSubmissionContext = (
+  runtime: PublicFunnelRuntimePayload,
+  submissionContext: StoredSubmissionContext | null,
+): PublicFunnelRuntimePayload => {
+  if (!submissionContext) {
+    return runtime;
+  }
+
+  const assignment =
+    submissionContext.assignment ??
+    submissionContext.lastAssignment ??
+    runtime.assignment;
+  const assignedSponsor =
+    assignment?.sponsor ??
+    submissionContext.handoff.sponsor ??
+    runtime.assignedSponsor;
+
+  return {
+    ...runtime,
+    leadId: submissionContext.leadId ?? runtime.leadId,
+    assignment,
+    advisor: submissionContext.advisor
+      ? {
+          ...submissionContext.advisor,
+          role: submissionContext.advisor.role ?? null,
+        }
+      : runtime.advisor,
+    assignedSponsor,
+    handoff: {
+      ...runtime.handoff,
+      ...submissionContext.handoff,
+      sponsor: submissionContext.handoff.sponsor ?? runtime.handoff.sponsor,
+    },
+  };
+};
+
 export function HeroVslDelayedCtaBlock({
   block,
   runtime,
@@ -120,46 +167,55 @@ export function HeroVslDelayedCtaBlock({
 }: HeroVslDelayedCtaBlockProps) {
   const content = asRecord(block.content) ?? {};
   const behavior = asRecord(block.behavior) ?? {};
+  const submissionContext = useSubmissionContext(runtime.publication.id, runtime);
+  const variableRuntime = useMemo(
+    () => mergeRuntimeWithSubmissionContext(runtime, submissionContext),
+    [runtime, submissionContext],
+  );
+  const handoffState = useMemo(
+    () =>
+      resolvePublicFunnelHandoffState({
+        context: submissionContext,
+        runtime,
+      }),
+    [runtime, submissionContext],
+  );
   const eyebrow = resolveRuntimeVariables(
     asString(content.eyebrow, asString(block.eyebrow)),
-    runtime,
+    variableRuntime,
   );
   const headline = resolveRuntimeVariables(
     asString(content.headline, asString(block.headline)),
-    runtime,
+    variableRuntime,
   );
-  const highlight = resolveRuntimeVariables(asString(content.highlight), runtime);
+  const highlight = resolveRuntimeVariables(asString(content.highlight), variableRuntime);
   const subheadline = resolveRuntimeVariables(
     asString(content.subheadline, asString(block.subheadline)),
-    runtime,
+    variableRuntime,
   );
   const ctaText = resolveRuntimeVariables(
     asString(content.cta_text, asString(block.cta_text, "Continuar")),
-    runtime,
+    variableRuntime,
   );
   const stickyTitle = resolveRuntimeVariables(
     asString(content.sticky_title, headline),
-    runtime,
+    variableRuntime,
   );
   const stickySubtitle = resolveRuntimeVariables(
     asString(content.sticky_subtitle, subheadline),
-    runtime,
-  );
-  const stickyMobileSubtitle = resolveRuntimeVariables(
-    asString(content.sticky_mobile_subtitle, stickySubtitle),
-    runtime,
+    variableRuntime,
   );
   const posterTitle = resolveRuntimeVariables(
     asString(content.poster_title, headline || "Ver mensaje"),
-    runtime,
+    variableRuntime,
   );
   const posterDescription = resolveRuntimeVariables(
     asString(content.poster_description, subheadline || "Haz clic para ver el video."),
-    runtime,
+    variableRuntime,
   );
   const posterButtonText = resolveRuntimeVariables(
     asString(content.poster_button_text, "Ver ahora"),
-    runtime,
+    variableRuntime,
   );
   const revealAfterSeconds = Math.max(
     0,
@@ -170,6 +226,16 @@ export function HeroVslDelayedCtaBlock({
     true,
   );
   const ctaMode = asString(behavior.cta_mode, asString(block.cta_mode, "modal"));
+  const isAssignedWhatsappMode = ctaMode === "assigned_whatsapp";
+  const realAssignmentId =
+    submissionContext?.assignment?.id ??
+    submissionContext?.lastAssignment?.id ??
+    runtime.assignment?.id ??
+    null;
+  const canUseAssignedWhatsapp =
+    isAssignedWhatsappMode &&
+    isRealAssignmentId(realAssignmentId) &&
+    Boolean(handoffState.whatsappUrl);
   const resumePlayback = asBoolean(
     behavior.resume_playback ?? block.resume_playback,
     true,
@@ -204,12 +270,14 @@ export function HeroVslDelayedCtaBlock({
         normalizeRuntimeBlockType(candidate.type) === "lead_capture_config",
     ) ?? null;
   const hasModalConfig = Boolean(resolveLeadCaptureModalConfig(leadCaptureConfigBlock));
-  const ctaAction =
-    ctaMode === "modal" || ctaMode === "drawer"
+  const ctaAction = isAssignedWhatsappMode
+    ? "assigned_whatsapp"
+    : ctaMode === "modal" || ctaMode === "drawer"
       ? "open_lead_capture_modal"
       : asString(block.action) || null;
-  const ctaHref =
-    ctaAction === "open_lead_capture_modal" && hasModalConfig
+  const ctaHref = isAssignedWhatsappMode
+    ? handoffState.whatsappUrl ?? "#"
+    : ctaAction === "open_lead_capture_modal" && hasModalConfig
       ? "#lead-capture-modal"
       : asString(block.href, "#public-capture-form");
   const [hasRevealed, setHasRevealed] = useState(false);
@@ -235,6 +303,33 @@ export function HeroVslDelayedCtaBlock({
 
     return () => window.clearTimeout(timeout);
   }, [hasCtaRevealed, revealAfterSeconds]);
+
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV === "production" ||
+      !isAssignedWhatsappMode ||
+      !hasCtaRevealed ||
+      canUseAssignedWhatsapp
+    ) {
+      return;
+    }
+
+    console.warn(
+      "[hero_vsl_delayed_cta] assigned_whatsapp requested but no assigned handoff WhatsApp URL is available.",
+      {
+        publicationId: runtime.publication.id,
+        stepId: runtime.currentStep.id,
+        assignmentId: realAssignmentId,
+      },
+    );
+  }, [
+    canUseAssignedWhatsapp,
+    hasCtaRevealed,
+    isAssignedWhatsappMode,
+    realAssignmentId,
+    runtime.currentStep.id,
+    runtime.publication.id,
+  ]);
 
   if (!videoUrl) {
     return null;
@@ -319,25 +414,36 @@ export function HeroVslDelayedCtaBlock({
       {hasCtaRevealed && showStickyCta ? (
         <div className="fixed bottom-0 left-0 right-0 z-[60] animate-in fade-in slide-in-from-bottom-10 duration-700">
           <div className="absolute inset-0 border-t border-white/10 bg-black/90 backdrop-blur-xl" />
-          <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 p-4 md:flex-row md:px-6 md:py-4">
-            <div className="hidden md:block">
-              <p className="text-lg font-bold text-white">{stickyTitle}</p>
+          <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-4 px-4 py-4 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto] md:gap-8 md:py-4">
+            <div className="min-w-0 text-center md:text-left">
+              <p className="text-base font-bold leading-tight text-white md:text-lg">
+                {stickyTitle}
+              </p>
               {stickySubtitle ? (
-                <p className="text-sm font-medium text-slate-400">
+                <p className="mt-1 text-xs font-medium leading-snug text-slate-400 md:text-sm">
                   {stickySubtitle}
                 </p>
               ) : null}
             </div>
-            <TrackedCta
-              publicationId={runtime.publication.id}
-              currentStepId={runtime.currentStep.id}
-              currentPath={runtime.request.path}
-              href={ctaHref}
-              label={ctaText}
-              subtext={stickyMobileSubtitle || undefined}
-              className="flex w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 px-8 py-3 font-bold uppercase text-slate-950 shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform active:scale-95 md:w-auto hover:scale-105 [&>span]:gap-0.5 [&>span>span:first-child]:text-base [&>span>span:first-child]:tracking-tight [&>span>span:first-child]:md:text-lg [&>span>span:last-child]:text-[10px] [&>span>span:last-child]:font-medium [&>span>span:last-child]:uppercase [&>span>span:last-child]:tracking-[0.1em] [&>span>span:last-child]:opacity-90 [&>span>span:last-child]:md:hidden"
-              action={ctaAction}
-            />
+            {isAssignedWhatsappMode && !canUseAssignedWhatsapp ? (
+              <button
+                type="button"
+                disabled
+                className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-700 px-8 py-3 text-center text-base font-bold uppercase tracking-[0.08em] text-slate-300 opacity-70 shadow-[0_16px_32px_rgba(0,0,0,0.5)] md:w-[340px] lg:w-[380px] [&>span>span:first-child]:whitespace-nowrap"
+              >
+                <FunnelButtonContent text="WhatsApp no disponible" />
+              </button>
+            ) : (
+              <TrackedCta
+                publicationId={runtime.publication.id}
+                currentStepId={runtime.currentStep.id}
+                currentPath={runtime.request.path}
+                href={ctaHref}
+                label={ctaText}
+                className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 px-8 py-3 text-center text-base font-bold uppercase tracking-[0.08em] text-slate-950 shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform hover:scale-[1.03] active:scale-95 md:w-[340px] lg:w-[380px] [&>span>span:first-child]:whitespace-nowrap"
+                action={ctaAction}
+              />
+            )}
           </div>
         </div>
       ) : null}

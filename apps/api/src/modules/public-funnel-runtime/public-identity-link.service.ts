@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { appendOwnershipRefToMessage } from '../runtime-context/ownership-context-key.util';
 import { buildPublicationStepPath, normalizePath } from './public-funnel-runtime.utils';
 import {
   buildPublicWhatsappMessage,
@@ -116,6 +117,10 @@ export class PublicIdentityLinkService {
           publicationPath: targetStepPath,
         })
       : null;
+    const whatsappMessageWithRef = appendOwnershipRefToMessage(
+      whatsappMessage,
+      lead.currentAssignment?.ownershipKey,
+    );
 
     return {
       leadId: lead.id,
@@ -134,7 +139,7 @@ export class PublicIdentityLinkService {
       shortened: shortened.shortened,
       shortLinkProvider: shortened.provider,
       whatsappUrl: sponsorPhone
-        ? buildPublicWhatsappUrl(sponsorPhone, whatsappMessage)
+        ? buildPublicWhatsappUrl(sponsorPhone, whatsappMessageWithRef)
         : null,
     };
   }
@@ -205,8 +210,12 @@ export class PublicIdentityLinkService {
           publicationPath: normalizedTargetPath,
         })
       : null;
+    const whatsappMessageWithRef = appendOwnershipRefToMessage(
+      whatsappMessage,
+      lead.currentAssignment?.ownershipKey,
+    );
     const whatsappUrl = sponsorPhone
-      ? buildPublicWhatsappUrl(sponsorPhone, whatsappMessage)
+      ? buildPublicWhatsappUrl(sponsorPhone, whatsappMessageWithRef)
       : null;
 
     return {
@@ -229,6 +238,7 @@ export class PublicIdentityLinkService {
         assignment: lead.currentAssignment
           ? {
               id: lead.currentAssignment.id,
+              ownershipKey: lead.currentAssignment.ownershipKey,
               status: lead.currentAssignment.status,
               reason: lead.currentAssignment.reason,
               assignedAt: lead.currentAssignment.assignedAt.toISOString(),
@@ -258,7 +268,7 @@ export class PublicIdentityLinkService {
               }
             : null,
           whatsappPhone: sponsorPhone,
-          whatsappMessage,
+          whatsappMessage: whatsappMessageWithRef,
           whatsappUrl,
         },
         advisor: lead.currentAssignment

@@ -360,7 +360,7 @@ export const builderBlockDefinitionsByKey: Record<
       behavior: {
         reveal_after_seconds: 10,
         show_sticky_cta: true,
-        cta_mode: "modal | drawer | link",
+        cta_mode: "modal | drawer | link | assigned_whatsapp",
         resume_playback: true,
         vsl_progress_bar_color: "#dc2626",
       },
@@ -377,10 +377,10 @@ export const builderBlockDefinitionsByKey: Record<
         subheadline:
           "Con LeadFlow genera interesados diarios para cada miembro de tu equipo.",
         video_url: "media:vsl_main",
-        poster_title: "Mensaje urgente de {{sponsor.first_name}}",
+        poster_title: "Mensaje urgente de {{advisor.first_name}}",
         poster_description: "Haz clic para ver el sistema.",
         poster_button_text: "Ver mensaje",
-        cta_text: "Aplicar con {{sponsor.first_name}} ahora",
+        cta_text: "Aplicar con {{advisor.first_name}} ahora",
         sticky_title: "Tu equipo necesita infraestructura, no mas motivacion.",
         sticky_subtitle: "Solo aceptamos equipos listos este mes.",
       },

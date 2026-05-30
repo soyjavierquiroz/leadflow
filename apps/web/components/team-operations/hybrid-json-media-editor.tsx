@@ -653,6 +653,11 @@ export function HybridJsonMediaEditor({
         kind: "action",
       },
       {
+        value: "assigned_whatsapp",
+        label: "Contactar por WhatsApp al asesor asignado",
+        kind: "action",
+      },
+      {
         value: "scroll_to_capture",
         label: "Ir a: Formulario de Captura",
         kind: "action",

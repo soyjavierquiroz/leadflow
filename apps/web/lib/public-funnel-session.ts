@@ -21,6 +21,7 @@ export type LeadCaptureSubmissionResponse = {
   };
   assignment: {
     id: string;
+    ownershipKey: string | null;
     status: string;
     reason: string;
     assignedAt: string;
@@ -304,6 +305,7 @@ const readRuntimeSubmissionContext = (
     assignment: assignmentRecord && sponsorRecord
       ? {
           id: asString(assignmentRecord.id, `${publicationId}-assignment`),
+          ownershipKey: asNullableString(assignmentRecord.ownershipKey),
           status: asString(assignmentRecord.status, "assigned"),
           reason: asString(assignmentRecord.reason, "runtime"),
           assignedAt: asString(
@@ -322,6 +324,7 @@ const readRuntimeSubmissionContext = (
     lastAssignment: assignmentRecord && sponsorRecord
       ? {
           id: asString(assignmentRecord.id, `${publicationId}-assignment`),
+          ownershipKey: asNullableString(assignmentRecord.ownershipKey),
           status: asString(assignmentRecord.status, "assigned"),
           reason: asString(assignmentRecord.reason, "runtime"),
           assignedAt: asString(

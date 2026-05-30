@@ -121,6 +121,7 @@ const normalizeAssignment = (value: unknown) => {
 
   return {
     id: asString(record.id),
+    ownershipKey: asNullableString(record.ownershipKey),
     status: asString(record.status),
     reason: asString(record.reason),
     assignedAt: asString(record.assignedAt),

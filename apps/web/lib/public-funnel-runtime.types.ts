@@ -129,6 +129,7 @@ export type PublicFunnelRuntimePayload = {
   leadId: string | null;
   assignment: {
     id: string;
+    ownershipKey: string | null;
     status: string;
     reason: string;
     assignedAt: string;

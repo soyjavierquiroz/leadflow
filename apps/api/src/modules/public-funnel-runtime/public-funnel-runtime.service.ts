@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { appendOwnershipRefToMessage } from '../runtime-context/ownership-context-key.util';
 import type {
   PublicRuntimeEntryContext,
   PublicRuntimePayload,
@@ -86,6 +87,7 @@ type ResolvedRuntimeEntryContext = PublicRuntimeEntryContext & {
 
 type RuntimeAssignmentPayload = {
   id: string;
+  ownershipKey: string | null;
   status: string;
   reason: string;
   assignedAt: string;
@@ -882,6 +884,7 @@ export class PublicFunnelRuntimeService {
         },
         assignment: {
           id: lead.currentAssignment.id,
+          ownershipKey: lead.currentAssignment.ownershipKey,
           status: lead.currentAssignment.status,
           reason: lead.currentAssignment.reason,
           assignedAt: lead.currentAssignment.assignedAt,
@@ -936,6 +939,7 @@ export class PublicFunnelRuntimeService {
         advisor,
         assignment: {
           id: `runtime-forced-${sponsor.id}`,
+          ownershipKey: null,
           status: 'assigned',
           reason: 'manual',
           assignedAt: new Date(),
@@ -971,6 +975,7 @@ export class PublicFunnelRuntimeService {
           advisor,
           assignment: {
             id: `runtime-wheel-${sponsor.id}`,
+            ownershipKey: null,
             status: 'assigned',
             reason: 'rotation',
             assignedAt: new Date(),
@@ -1017,6 +1022,7 @@ export class PublicFunnelRuntimeService {
       },
       assignment: {
         id: `runtime-direct-${sponsor.id}`,
+        ownershipKey: null,
         status: 'assigned',
         reason: directAdvisor.role === 'TEAM_ADMIN' ? 'fallback' : 'rotation',
         assignedAt: new Date(),
@@ -1050,6 +1056,7 @@ export class PublicFunnelRuntimeService {
     };
     assignment: {
       id: string;
+      ownershipKey: string | null;
       status: string;
       reason: string;
       assignedAt: Date;
@@ -1075,12 +1082,20 @@ export class PublicFunnelRuntimeService {
       funnelName: input.publicationName,
       publicationPath: input.publicationPath,
     });
-    const whatsappUrl = buildPublicWhatsappUrl(whatsappPhone, whatsappMessage);
+    const whatsappMessageWithRef = appendOwnershipRefToMessage(
+      whatsappMessage,
+      input.assignment.ownershipKey,
+    );
+    const whatsappUrl = buildPublicWhatsappUrl(
+      whatsappPhone,
+      whatsappMessageWithRef,
+    );
 
     return {
       leadId: input.leadId,
       assignment: {
         id: input.assignment.id,
+        ownershipKey: input.assignment.ownershipKey,
         status: input.assignment.status,
         reason: input.assignment.reason,
         assignedAt: input.assignment.assignedAt.toISOString(),
@@ -1098,7 +1113,7 @@ export class PublicFunnelRuntimeService {
       handoff: {
         sponsor,
         whatsappPhone,
-        whatsappMessage,
+        whatsappMessage: whatsappMessageWithRef,
         whatsappUrl,
       },
     };
