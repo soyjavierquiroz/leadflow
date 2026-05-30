@@ -5,12 +5,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { appendOwnershipRefToMessage } from '../runtime-context/ownership-context-key.util';
 import { buildPublicationStepPath, normalizePath } from './public-funnel-runtime.utils';
 import {
-  buildPublicWhatsappMessage,
-  buildPublicWhatsappUrl,
-  normalizeWhatsappPhone,
+  buildPublicWhatsappHandoff,
   resolvePublicHandoffConfig,
 } from './reveal-handoff.utils';
 import { IdentityTokenService } from './identity-token.service';
@@ -105,22 +102,16 @@ export class PublicIdentityLinkService {
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
     const handoffConfig = resolvePublicHandoffConfig(handoffStrategy);
     const sponsor = lead.currentAssignment?.sponsor ?? null;
-    const sponsorPhone = normalizeWhatsappPhone(sponsor?.phone ?? null);
-    const whatsappMessage = sponsor
-      ? buildPublicWhatsappMessage({
-          template: handoffConfig.messageTemplate,
-          sponsorName: sponsor.displayName,
-          leadName: lead.fullName ?? null,
-          leadEmail: lead.email ?? null,
-          leadPhone: lead.phone ?? null,
-          funnelName: publication.funnelInstance.name,
-          publicationPath: targetStepPath,
-        })
-      : null;
-    const whatsappMessageWithRef = appendOwnershipRefToMessage(
-      whatsappMessage,
-      lead.currentAssignment?.ownershipKey,
-    );
+    const whatsappHandoff = buildPublicWhatsappHandoff({
+      handoff: handoffConfig,
+      sponsor,
+      leadName: lead.fullName ?? null,
+      leadEmail: lead.email ?? null,
+      leadPhone: lead.phone ?? null,
+      funnelName: publication.funnelInstance.name,
+      publicationPath: targetStepPath,
+      ownershipKey: lead.currentAssignment?.ownershipKey,
+    });
 
     return {
       leadId: lead.id,
@@ -138,9 +129,7 @@ export class PublicIdentityLinkService {
       url: shortened.resolvedUrl,
       shortened: shortened.shortened,
       shortLinkProvider: shortened.provider,
-      whatsappUrl: sponsorPhone
-        ? buildPublicWhatsappUrl(sponsorPhone, whatsappMessageWithRef)
-        : null,
+      whatsappUrl: whatsappHandoff.whatsappUrl,
     };
   }
 
@@ -198,25 +187,16 @@ export class PublicIdentityLinkService {
       lead.funnelPublication.funnelInstance.handoffStrategy;
     const handoffConfig = resolvePublicHandoffConfig(handoffStrategy);
     const sponsor = lead.currentAssignment?.sponsor ?? null;
-    const sponsorPhone = normalizeWhatsappPhone(sponsor?.phone ?? null);
-    const whatsappMessage = sponsor
-      ? buildPublicWhatsappMessage({
-          template: handoffConfig.messageTemplate,
-          sponsorName: sponsor.displayName,
-          leadName: lead.fullName ?? null,
-          leadEmail: lead.email ?? null,
-          leadPhone: lead.phone ?? null,
-          funnelName: lead.funnelPublication.funnelInstance.name,
-          publicationPath: normalizedTargetPath,
-        })
-      : null;
-    const whatsappMessageWithRef = appendOwnershipRefToMessage(
-      whatsappMessage,
-      lead.currentAssignment?.ownershipKey,
-    );
-    const whatsappUrl = sponsorPhone
-      ? buildPublicWhatsappUrl(sponsorPhone, whatsappMessageWithRef)
-      : null;
+    const whatsappHandoff = buildPublicWhatsappHandoff({
+      handoff: handoffConfig,
+      sponsor,
+      leadName: lead.fullName ?? null,
+      leadEmail: lead.email ?? null,
+      leadPhone: lead.phone ?? null,
+      funnelName: lead.funnelPublication.funnelInstance.name,
+      publicationPath: normalizedTargetPath,
+      ownershipKey: lead.currentAssignment?.ownershipKey,
+    });
 
     return {
       publicationId: lead.funnelPublication.id,
@@ -267,9 +247,9 @@ export class PublicIdentityLinkService {
                 avatarUrl: lead.currentAssignment.sponsor.avatarUrl,
               }
             : null,
-          whatsappPhone: sponsorPhone,
-          whatsappMessage: whatsappMessageWithRef,
-          whatsappUrl,
+          whatsappPhone: whatsappHandoff.whatsappPhone,
+          whatsappMessage: whatsappHandoff.whatsappMessage,
+          whatsappUrl: whatsappHandoff.whatsappUrl,
         },
         advisor: lead.currentAssignment
           ? {
@@ -279,10 +259,10 @@ export class PublicIdentityLinkService {
               )
                 ? 'Advisor'
                 : null,
-              phone: sponsorPhone,
+              phone: whatsappHandoff.whatsappPhone,
               photoUrl: lead.currentAssignment.sponsor.avatarUrl,
               bio: null,
-              whatsappUrl,
+              whatsappUrl: whatsappHandoff.whatsappUrl,
             }
           : null,
         capturedAt: lead.updatedAt.toISOString(),

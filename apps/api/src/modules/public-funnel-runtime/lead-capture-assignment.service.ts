@@ -15,10 +15,7 @@ import { TrackingEventsService } from '../events/tracking-events.service';
 import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
 import { MessagingAutomationService } from '../messaging-automation/messaging-automation.service';
 import { OwnershipContextUpsertService } from '../runtime-context/ownership-context-upsert.service';
-import {
-  appendOwnershipRefToMessage,
-  generateOwnershipKey,
-} from '../runtime-context/ownership-context-key.util';
+import { generateOwnershipKey } from '../runtime-context/ownership-context-key.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailerService } from '../shared/mailer.service';
 import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
@@ -38,9 +35,7 @@ import { CapiManagerService } from './capi-manager.service';
 import { pickNextRotationMember } from './lead-capture-assignment.utils';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
 import {
-  buildPublicWhatsappMessage,
-  buildPublicWhatsappUrl,
-  normalizeWhatsappPhone,
+  buildPublicWhatsappHandoff,
   resolvePublicHandoffConfig,
   toPublicVisibleSponsor,
 } from './reveal-handoff.utils';
@@ -1430,34 +1425,24 @@ export class LeadCaptureAssignmentService {
     const sponsor = input.assignment?.sponsor
       ? toPublicVisibleSponsor(input.assignment.sponsor)
       : null;
-    const whatsappPhone = normalizeWhatsappPhone(sponsor?.phone ?? null);
-    const whatsappMessage = sponsor
-      ? buildPublicWhatsappMessage({
-          template: handoffConfig.messageTemplate,
-          sponsorName: sponsor.displayName,
-          leadName: input.lead.fullName,
-          leadEmail: input.lead.email,
-          leadPhone: input.lead.phone,
-          funnelName: input.publication.funnelInstance.name,
-          publicationPath: input.nextStep?.path ?? input.publication.pathPrefix,
-        })
-      : null;
-    const whatsappMessageWithRef = appendOwnershipRefToMessage(
-      whatsappMessage,
-      input.assignment?.ownershipKey,
-    );
-    const whatsappUrl = buildPublicWhatsappUrl(
-      whatsappPhone,
-      whatsappMessageWithRef,
-    );
+    const whatsappHandoff = buildPublicWhatsappHandoff({
+      handoff: handoffConfig,
+      sponsor,
+      leadName: input.lead.fullName,
+      leadEmail: input.lead.email,
+      leadPhone: input.lead.phone,
+      funnelName: input.publication.funnelInstance.name,
+      publicationPath: input.nextStep?.path ?? input.publication.pathPrefix,
+      ownershipKey: input.assignment?.ownershipKey,
+    });
     const advisor = input.advisor
       ? {
           name: input.advisor.name,
           role: input.advisor.role,
           bio: input.advisor.bio,
-          phone: input.advisor.phone ?? whatsappPhone,
+          phone: input.advisor.phone ?? whatsappHandoff.whatsappPhone,
           photoUrl: input.advisor.photoUrl,
-          whatsappUrl,
+          whatsappUrl: whatsappHandoff.whatsappUrl,
         }
       : null;
 
@@ -1469,9 +1454,9 @@ export class LeadCaptureAssignmentService {
         autoRedirect: handoffConfig.autoRedirect,
         autoRedirectDelayMs: handoffConfig.autoRedirectDelayMs,
         sponsor,
-        whatsappPhone,
-        whatsappMessage: whatsappMessageWithRef,
-        whatsappUrl,
+        whatsappPhone: whatsappHandoff.whatsappPhone,
+        whatsappMessage: whatsappHandoff.whatsappMessage,
+        whatsappUrl: whatsappHandoff.whatsappUrl,
       },
       advisor,
       assigned_advisor: advisor

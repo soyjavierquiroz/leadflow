@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { appendOwnershipRefToMessage } from '../runtime-context/ownership-context-key.util';
 
 type JsonValue = Prisma.JsonValue;
 
@@ -22,6 +23,9 @@ export type PublicVisibleSponsor = {
   phone: string | null;
   avatarUrl: string | null;
 };
+
+const DEFAULT_WHATSAPP_MESSAGE_TEMPLATE =
+  'Hola {{sponsorName}}, soy {{leadName}}. Acabo de completar el formulario de {{funnelName}} y quiero continuar por WhatsApp.';
 
 const asRecord = (value: JsonValue | null | undefined) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -95,7 +99,7 @@ export const resolvePublicHandoffConfig = (
       : null,
     messageTemplate:
       asString(settings?.messageTemplate) ||
-      'Hola {{sponsorName}}, soy {{leadName}}. Acabo de completar el formulario de {{funnelName}} y quiero continuar por WhatsApp.',
+      DEFAULT_WHATSAPP_MESSAGE_TEMPLATE,
   };
 };
 
@@ -160,6 +164,44 @@ export const buildPublicWhatsappUrl = (
   }
 
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+};
+
+export const buildPublicWhatsappHandoff = (input: {
+  handoff: Pick<PublicHandoffConfig, 'messageTemplate'>;
+  sponsor: {
+    displayName: string;
+    phone: string | null;
+  } | null;
+  leadName: string | null;
+  leadEmail: string | null;
+  leadPhone: string | null;
+  funnelName: string;
+  publicationPath: string;
+  ownershipKey?: string | null;
+}) => {
+  const whatsappPhone = normalizeWhatsappPhone(input.sponsor?.phone ?? null);
+  const whatsappMessage = input.sponsor
+    ? buildPublicWhatsappMessage({
+        template:
+          input.handoff.messageTemplate ?? DEFAULT_WHATSAPP_MESSAGE_TEMPLATE,
+        sponsorName: input.sponsor.displayName,
+        leadName: input.leadName,
+        leadEmail: input.leadEmail,
+        leadPhone: input.leadPhone,
+        funnelName: input.funnelName,
+        publicationPath: input.publicationPath,
+      })
+    : null;
+  const whatsappMessageWithRef = appendOwnershipRefToMessage(
+    whatsappMessage,
+    input.ownershipKey,
+  );
+
+  return {
+    whatsappPhone,
+    whatsappMessage: whatsappMessageWithRef,
+    whatsappUrl: buildPublicWhatsappUrl(whatsappPhone, whatsappMessageWithRef),
+  };
 };
 
 export const toPublicVisibleSponsor = (input: PublicVisibleSponsor) => ({

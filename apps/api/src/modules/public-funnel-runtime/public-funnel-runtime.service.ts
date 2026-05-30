@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { appendOwnershipRefToMessage } from '../runtime-context/ownership-context-key.util';
 import type {
   PublicRuntimeEntryContext,
   PublicRuntimePayload,
@@ -25,9 +24,7 @@ import {
 import { IdentityTokenService } from './identity-token.service';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
 import {
-  buildPublicWhatsappMessage,
-  buildPublicWhatsappUrl,
-  normalizeWhatsappPhone,
+  buildPublicWhatsappHandoff,
   resolvePublicHandoffConfig,
 } from './reveal-handoff.utils';
 
@@ -1072,24 +1069,16 @@ export class PublicFunnelRuntimeService {
       phone: input.sponsor.phone,
       avatarUrl: input.sponsor.avatarUrl,
     };
-    const whatsappPhone = normalizeWhatsappPhone(input.sponsor.phone);
-    const whatsappMessage = buildPublicWhatsappMessage({
-      template: input.handoff.messageTemplate,
-      sponsorName: input.sponsor.displayName,
+    const whatsappHandoff = buildPublicWhatsappHandoff({
+      handoff: input.handoff,
+      sponsor: input.sponsor,
       leadName: input.leadName,
       leadEmail: input.leadEmail,
       leadPhone: input.leadPhone,
       funnelName: input.publicationName,
       publicationPath: input.publicationPath,
+      ownershipKey: input.assignment.ownershipKey,
     });
-    const whatsappMessageWithRef = appendOwnershipRefToMessage(
-      whatsappMessage,
-      input.assignment.ownershipKey,
-    );
-    const whatsappUrl = buildPublicWhatsappUrl(
-      whatsappPhone,
-      whatsappMessageWithRef,
-    );
 
     return {
       leadId: input.leadId,
@@ -1107,14 +1096,14 @@ export class PublicFunnelRuntimeService {
         phone: input.advisor.phone,
         photoUrl: input.advisor.photoUrl,
         bio: input.advisor.bio,
-        whatsappUrl,
+        whatsappUrl: whatsappHandoff.whatsappUrl,
       },
       assignedSponsor: sponsor,
       handoff: {
         sponsor,
-        whatsappPhone,
-        whatsappMessage: whatsappMessageWithRef,
-        whatsappUrl,
+        whatsappPhone: whatsappHandoff.whatsappPhone,
+        whatsappMessage: whatsappHandoff.whatsappMessage,
+        whatsappUrl: whatsappHandoff.whatsappUrl,
       },
     };
   }
