@@ -3,12 +3,14 @@ import { DomainEventPrismaRepository } from '../../prisma/repositories/domain-ev
 import { DOMAIN_EVENT_REPOSITORY } from '../shared/domain.tokens';
 import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
+import { FunnelEventsService } from './funnel-events.service';
 import { TrackingEventsService } from './tracking-events.service';
 
 @Module({
   controllers: [EventsController],
   providers: [
     EventsService,
+    FunnelEventsService,
     TrackingEventsService,
     DomainEventPrismaRepository,
     {
@@ -16,6 +18,11 @@ import { TrackingEventsService } from './tracking-events.service';
       useExisting: DomainEventPrismaRepository,
     },
   ],
-  exports: [EventsService, TrackingEventsService, DOMAIN_EVENT_REPOSITORY],
+  exports: [
+    EventsService,
+    FunnelEventsService,
+    TrackingEventsService,
+    DOMAIN_EVENT_REPOSITORY,
+  ],
 })
 export class EventsModule {}

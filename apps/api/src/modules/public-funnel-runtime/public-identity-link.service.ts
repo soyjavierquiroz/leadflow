@@ -3,12 +3,17 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { buildPublicationStepPath, normalizePath } from './public-funnel-runtime.utils';
+import { FunnelEventsService } from '../events/funnel-events.service';
+import {
+  buildPublicationStepPath,
+  normalizePath,
+} from './public-funnel-runtime.utils';
 import {
   buildPublicWhatsappHandoff,
   resolveAssignedWhatsappMessageTemplate,
@@ -23,6 +28,7 @@ const TRACKED_LINK_APP_KEY = 'leadflow';
 const TRACKED_LINK_ACTION = 'open_vsl';
 const TRACKED_LINK_PURPOSE = 'vsl_followup';
 const TRACKED_LINK_CREATED_BY = 'n8n';
+const TRACKED_LINK_ACTION_LINK_KEY = `${TRACKED_LINK_APP_KEY}.${TRACKED_LINK_ACTION}`;
 const TRACKED_LINK_UNAVAILABLE_RESPONSE = {
   code: 'TRACKED_LINK_UNAVAILABLE',
   message: 'This tracked link is no longer available.',
@@ -39,12 +45,77 @@ const asString = (value: JsonValue | null | undefined) =>
 const isConversionStructuralType = (value: string | null | undefined) =>
   value === 'two_step_conversion' || value === 'multi_step_conversion';
 
+type TrackedLinkEventLeadContext = {
+  id: string;
+  workspaceId: string;
+  trafficLayer?: string | null;
+  currentAssignment?: {
+    ownershipKey?: string | null;
+    trafficLayer?: string | null;
+  } | null;
+};
+
+type TrackedLinkEventPublicationContext = {
+  id: string;
+  teamId: string;
+  domainId?: string | null;
+  funnelInstanceId: string;
+  domain: {
+    host: string;
+    canonicalHost?: string | null;
+  };
+  funnelInstance: {
+    teamId?: string | null;
+  };
+};
+
+type TrackedLinkEventStepContext = {
+  id: string;
+  slug: string;
+};
+
+type TrackedLinkEventRecordContext = {
+  id: string;
+  longUrl: string;
+  shortUrl: string | null;
+  shortCode: string | null;
+  shortLinkProvider: string;
+};
+
+type TrackedLinkHydrationEventContext = {
+  id: string;
+  workspaceId: string;
+  leadId: string;
+  assignmentId: string | null;
+  funnelPublicationId: string;
+  funnelInstanceId: string;
+  funnelStepId: string;
+  purpose: string;
+  lead?: {
+    trafficLayer: string | null;
+  } | null;
+  assignment?: {
+    teamId: string;
+    trafficLayer: string | null;
+  } | null;
+  funnelPublication?: {
+    teamId: string;
+    domainId: string;
+  } | null;
+  funnelInstance?: {
+    teamId: string;
+  } | null;
+};
+
 @Injectable()
 export class PublicIdentityLinkService {
+  private readonly logger = new Logger(PublicIdentityLinkService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly identityTokenService: IdentityTokenService,
     private readonly shortLinkProvider: ShortLinkProvider,
+    private readonly funnelEventsService: FunnelEventsService,
   ) {}
 
   async generateTrackedLink(input: { leadId: string; stepKey: string }) {
@@ -143,6 +214,16 @@ export class PublicIdentityLinkService {
     };
 
     if (existingTrackedLink) {
+      await this.recordTrackedLinkReusedEvent({
+        lead,
+        publication,
+        targetStep,
+        assignmentId,
+        targetStepPath,
+        stepKey: input.stepKey,
+        record: existingTrackedLink,
+      });
+
       return {
         leadId: lead.id,
         publicationId: publication.id,
@@ -174,7 +255,9 @@ export class PublicIdentityLinkService {
     const longUrl = new URL(targetStepPath, publicBaseUrl);
     longUrl.searchParams.set('ctx', token);
 
-    const shortened = await this.shortLinkProvider.shortenUrl(longUrl.toString());
+    const shortened = await this.shortLinkProvider.shortenUrl(
+      longUrl.toString(),
+    );
     const shortCode = this.shortLinkProvider.extractShortCode(
       shortened.shortUrl,
     );
@@ -193,6 +276,16 @@ export class PublicIdentityLinkService {
     });
 
     if (trackedLink.cached) {
+      await this.recordTrackedLinkReusedEvent({
+        lead,
+        publication,
+        targetStep,
+        assignmentId,
+        targetStepPath,
+        stepKey: input.stepKey,
+        record: trackedLink.record,
+      });
+
       return {
         leadId: lead.id,
         publicationId: publication.id,
@@ -391,6 +484,35 @@ export class PublicIdentityLinkService {
       select: {
         id: true,
         metadataJson: true,
+        workspaceId: true,
+        leadId: true,
+        assignmentId: true,
+        funnelPublicationId: true,
+        funnelInstanceId: true,
+        funnelStepId: true,
+        purpose: true,
+        lead: {
+          select: {
+            trafficLayer: true,
+          },
+        },
+        assignment: {
+          select: {
+            teamId: true,
+            trafficLayer: true,
+          },
+        },
+        funnelPublication: {
+          select: {
+            teamId: true,
+            domainId: true,
+          },
+        },
+        funnelInstance: {
+          select: {
+            teamId: true,
+          },
+        },
       },
     });
 
@@ -419,6 +541,15 @@ export class PublicIdentityLinkService {
     );
 
     await this.prisma.$transaction(updates);
+    await Promise.all(
+      trackedLinks.map((trackedLink) =>
+        this.recordTrackedLinkRevokedEvent({
+          trackedLink,
+          reason: revokedReason,
+          revokedAt,
+        }),
+      ),
+    );
 
     return {
       revoked: trackedLinks.length,
@@ -464,6 +595,35 @@ export class PublicIdentityLinkService {
         id: true,
         status: true,
         expiresAt: true,
+        workspaceId: true,
+        leadId: true,
+        assignmentId: true,
+        funnelPublicationId: true,
+        funnelInstanceId: true,
+        funnelStepId: true,
+        purpose: true,
+        lead: {
+          select: {
+            trafficLayer: true,
+          },
+        },
+        assignment: {
+          select: {
+            teamId: true,
+            trafficLayer: true,
+          },
+        },
+        funnelPublication: {
+          select: {
+            teamId: true,
+            domainId: true,
+          },
+        },
+        funnelInstance: {
+          select: {
+            teamId: true,
+          },
+        },
       },
     });
 
@@ -498,13 +658,14 @@ export class PublicIdentityLinkService {
         lastClickedAt: now,
       },
     });
+    await this.recordTrackedLinkOpenedEvent({
+      trackedLink,
+      openedAt: now,
+    });
   }
 
   private throwTrackedLinkUnavailable(): never {
-    throw new HttpException(
-      TRACKED_LINK_UNAVAILABLE_RESPONSE,
-      HttpStatus.GONE,
-    );
+    throw new HttpException(TRACKED_LINK_UNAVAILABLE_RESPONSE, HttpStatus.GONE);
   }
 
   private async expireActiveTrackedLinks(input: {
@@ -574,16 +735,23 @@ export class PublicIdentityLinkService {
     lead: {
       id: string;
       workspaceId: string;
+      trafficLayer?: string | null;
       currentAssignment?: {
         ownershipKey?: string | null;
+        trafficLayer?: string | null;
       } | null;
     };
     publication: {
       id: string;
+      teamId: string;
+      domainId?: string | null;
       funnelInstanceId: string;
       domain: {
         host: string;
         canonicalHost?: string | null;
+      };
+      funnelInstance: {
+        teamId?: string | null;
       };
     };
     targetStep: {
@@ -640,6 +808,14 @@ export class PublicIdentityLinkService {
           shortLinkProvider: true,
         },
       });
+      await this.recordTrackedLinkCreatedEvent({
+        lead: input.lead,
+        publication: input.publication,
+        targetStep: input.targetStep,
+        assignmentId: input.assignmentId,
+        targetStepPath: input.targetStepPath,
+        record,
+      });
 
       return {
         cached: false,
@@ -668,6 +844,208 @@ export class PublicIdentityLinkService {
 
       throw error;
     }
+  }
+
+  private async recordTrackedLinkCreatedEvent(input: {
+    lead: TrackedLinkEventLeadContext;
+    publication: TrackedLinkEventPublicationContext;
+    targetStep: TrackedLinkEventStepContext;
+    assignmentId: string | null;
+    targetStepPath: string;
+    record: TrackedLinkEventRecordContext;
+  }) {
+    await this.recordTrackedLinkEventSafely('tracked_link_created', {
+      eventName: 'tracked_link_created',
+      eventFamily: 'action_link',
+      source: 'public_identity_link',
+      workspaceId: input.lead.workspaceId,
+      teamId: this.resolvePublicationTeamId(input.publication),
+      domainId: input.publication.domainId ?? null,
+      funnelPublicationId: input.publication.id,
+      funnelInstanceId: input.publication.funnelInstanceId,
+      funnelStepId: input.targetStep.id,
+      leadId: input.lead.id,
+      assignmentId: input.assignmentId,
+      trackedLinkId: input.record.id,
+      actionLinkKey: TRACKED_LINK_ACTION_LINK_KEY,
+      trafficLayer: this.resolveLeadTrafficLayer(input.lead),
+      dedupeKey: `tracked_link_created:${input.record.id}`,
+      payloadJson: {
+        stepKey: input.targetStep.slug,
+        targetStepPath: input.targetStepPath,
+        shortLinkProvider: input.record.shortLinkProvider,
+        shortened: Boolean(input.record.shortUrl),
+        cached: false,
+        purpose: TRACKED_LINK_PURPOSE,
+      },
+    });
+  }
+
+  private async recordTrackedLinkReusedEvent(input: {
+    lead: TrackedLinkEventLeadContext;
+    publication: TrackedLinkEventPublicationContext;
+    targetStep: TrackedLinkEventStepContext;
+    assignmentId: string | null;
+    targetStepPath: string;
+    stepKey: string;
+    record: TrackedLinkEventRecordContext;
+  }) {
+    await this.recordTrackedLinkEventSafely('tracked_link_reused', {
+      eventName: 'tracked_link_reused',
+      eventFamily: 'action_link',
+      source: 'public_identity_link',
+      workspaceId: input.lead.workspaceId,
+      teamId: this.resolvePublicationTeamId(input.publication),
+      domainId: input.publication.domainId ?? null,
+      funnelPublicationId: input.publication.id,
+      funnelInstanceId: input.publication.funnelInstanceId,
+      funnelStepId: input.targetStep.id,
+      leadId: input.lead.id,
+      assignmentId: input.assignmentId,
+      trackedLinkId: input.record.id,
+      actionLinkKey: TRACKED_LINK_ACTION_LINK_KEY,
+      trafficLayer: this.resolveLeadTrafficLayer(input.lead),
+      payloadJson: {
+        stepKey: input.stepKey,
+        targetStepPath: input.targetStepPath,
+        shortLinkProvider: input.record.shortLinkProvider,
+        shortened: Boolean(input.record.shortUrl),
+        cached: true,
+        purpose: TRACKED_LINK_PURPOSE,
+      },
+    });
+  }
+
+  private async recordTrackedLinkOpenedEvent(input: {
+    trackedLink: TrackedLinkHydrationEventContext;
+    openedAt: Date;
+  }) {
+    const eventContext = this.buildTrackedLinkRelationEventContext(
+      input.trackedLink,
+    );
+    if (!eventContext) {
+      return;
+    }
+
+    await this.recordTrackedLinkEventSafely('tracked_link_opened', {
+      eventName: 'tracked_link_opened',
+      eventFamily: 'action_link',
+      source: 'public_identity_link',
+      workspaceId: input.trackedLink.workspaceId,
+      teamId: eventContext.teamId,
+      domainId: eventContext.domainId,
+      funnelPublicationId: input.trackedLink.funnelPublicationId,
+      funnelInstanceId: input.trackedLink.funnelInstanceId,
+      funnelStepId: input.trackedLink.funnelStepId,
+      leadId: input.trackedLink.leadId,
+      assignmentId: input.trackedLink.assignmentId,
+      trackedLinkId: input.trackedLink.id,
+      actionLinkKey: TRACKED_LINK_ACTION_LINK_KEY,
+      trafficLayer: eventContext.trafficLayer,
+      payloadJson: {
+        status: 'active',
+        openedAt: input.openedAt.toISOString(),
+        purpose: input.trackedLink.purpose,
+        clickCountIncremented: true,
+      },
+    });
+  }
+
+  private async recordTrackedLinkRevokedEvent(input: {
+    trackedLink: TrackedLinkHydrationEventContext;
+    reason: string | null;
+    revokedAt: string;
+  }) {
+    const eventContext = this.buildTrackedLinkRelationEventContext(
+      input.trackedLink,
+    );
+    if (!eventContext) {
+      return;
+    }
+
+    await this.recordTrackedLinkEventSafely('tracked_link_revoked', {
+      eventName: 'tracked_link_revoked',
+      eventFamily: 'action_link',
+      source: 'public_identity_link',
+      workspaceId: input.trackedLink.workspaceId,
+      teamId: eventContext.teamId,
+      domainId: eventContext.domainId,
+      funnelPublicationId: input.trackedLink.funnelPublicationId,
+      funnelInstanceId: input.trackedLink.funnelInstanceId,
+      funnelStepId: input.trackedLink.funnelStepId,
+      leadId: input.trackedLink.leadId,
+      assignmentId: input.trackedLink.assignmentId,
+      trackedLinkId: input.trackedLink.id,
+      actionLinkKey: TRACKED_LINK_ACTION_LINK_KEY,
+      trafficLayer: eventContext.trafficLayer,
+      dedupeKey: `tracked_link_revoked:${input.trackedLink.id}`,
+      payloadJson: {
+        reason: input.reason,
+        revokedAt: input.revokedAt,
+        previousStatus: 'active',
+      },
+    });
+  }
+
+  private async recordTrackedLinkEventSafely(
+    eventName: string,
+    input: Parameters<FunnelEventsService['recordEvent']>[0],
+  ) {
+    if (!input.teamId) {
+      this.logger.warn(
+        `Skipping ${eventName} FunnelEvent for trackedLink ${input.trackedLinkId ?? 'unknown'} because teamId is unavailable.`,
+      );
+      return;
+    }
+
+    try {
+      await this.funnelEventsService.recordEvent(input);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to record ${eventName} FunnelEvent for trackedLink ${input.trackedLinkId ?? 'unknown'}: ${message}`,
+      );
+    }
+  }
+
+  private resolveLeadTrafficLayer(lead: TrackedLinkEventLeadContext) {
+    return (
+      lead.trafficLayer?.trim() ||
+      lead.currentAssignment?.trafficLayer?.trim() ||
+      'unknown'
+    );
+  }
+
+  private resolvePublicationTeamId(
+    publication: TrackedLinkEventPublicationContext,
+  ) {
+    return publication.funnelInstance.teamId ?? publication.teamId;
+  }
+
+  private buildTrackedLinkRelationEventContext(
+    trackedLink: TrackedLinkHydrationEventContext,
+  ) {
+    const teamId =
+      trackedLink.funnelInstance?.teamId ??
+      trackedLink.funnelPublication?.teamId ??
+      trackedLink.assignment?.teamId ??
+      null;
+
+    if (!teamId) {
+      this.logger.warn(
+        `Skipping FunnelEvent for trackedLink ${trackedLink.id} because teamId is unavailable.`,
+      );
+      return null;
+    }
+
+    return {
+      teamId,
+      domainId: trackedLink.funnelPublication?.domainId ?? null,
+      trafficLayer:
+        trackedLink.lead?.trafficLayer?.trim() ||
+        trackedLink.assignment?.trafficLayer?.trim() ||
+        'unknown',
+    };
   }
 
   private resolveTargetStep(
