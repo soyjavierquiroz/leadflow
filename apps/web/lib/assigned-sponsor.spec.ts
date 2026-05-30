@@ -27,6 +27,7 @@ const buildRuntime = (advisorName: string) =>
     },
     assignment: {
       id: "assignment-current",
+      ownershipKey: null,
       status: "assigned",
       reason: "wheel",
       assignedAt: "2026-05-06T00:00:00.000Z",
@@ -69,6 +70,7 @@ describe("resolvePublicFunnelHandoffState", () => {
       },
       assignment: {
         id: "assignment-current",
+        ownershipKey: null,
         status: "assigned",
         reason: "wheel",
         assignedAt: "2026-05-06T00:00:00.000Z",
@@ -82,6 +84,7 @@ describe("resolvePublicFunnelHandoffState", () => {
       },
       lastAssignment: {
         id: "assignment-current",
+        ownershipKey: null,
         status: "assigned",
         reason: "wheel",
         assignedAt: "2026-05-06T00:00:00.000Z",
