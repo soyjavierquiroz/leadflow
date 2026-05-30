@@ -87,18 +87,27 @@ const renderHighlightedHeadline = (headline: string, highlight: string) => {
   }
 
   const highlightIndex = headline.indexOf(trimmedHighlight);
-  if (highlightIndex < 0) {
+  if (highlightIndex >= 0) {
+    const before = headline.slice(0, highlightIndex);
+    const after = headline.slice(highlightIndex + trimmedHighlight.length);
+
+    return (
+      <>
+        <RichHeadline text={before} />
+        <span className="text-amber-400">{trimmedHighlight}</span>
+        <RichHeadline text={after} />
+      </>
+    );
+  }
+
+  if (headline.toLowerCase().includes(trimmedHighlight.toLowerCase())) {
     return <RichHeadline text={headline} />;
   }
 
-  const before = headline.slice(0, highlightIndex);
-  const after = headline.slice(highlightIndex + trimmedHighlight.length);
-
   return (
     <>
-      {before}
+      <RichHeadline text={headline} />{" "}
       <span className="text-amber-400">{trimmedHighlight}</span>
-      {after}
     </>
   );
 };
@@ -134,6 +143,10 @@ export function HeroVslDelayedCtaBlock({
   );
   const stickySubtitle = resolveRuntimeVariables(
     asString(content.sticky_subtitle, subheadline),
+    runtime,
+  );
+  const stickyMobileSubtitle = resolveRuntimeVariables(
+    asString(content.sticky_mobile_subtitle, stickySubtitle),
     runtime,
   );
   const posterTitle = resolveRuntimeVariables(
@@ -229,34 +242,50 @@ export function HeroVslDelayedCtaBlock({
 
   return (
     <>
-      <div className="relative left-1/2 w-screen -translate-x-1/2 bg-black text-white">
+      <div className="relative left-1/2 min-h-screen w-screen -translate-x-1/2 overflow-hidden bg-black text-white">
         <section
           id={asString(block.key) || undefined}
           className={cx(
-            "relative min-h-screen w-full overflow-hidden bg-black text-white",
+            "relative overflow-hidden",
             isBoxed ? "rounded-none border-0" : "",
           )}
         >
-          <div className="relative mx-auto grid min-h-screen w-full max-w-7xl content-center items-center gap-6 px-5 py-10 md:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16 lg:py-16">
-            <div className="max-w-3xl text-left">
+          <div className="pointer-events-none absolute left-1/2 top-0 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-amber-500/20 blur-[140px]" />
+          <div className="pointer-events-none absolute -left-32 top-24 h-[24rem] w-[24rem] rounded-full bg-zinc-700/20 blur-[130px]" />
+          <div className="pointer-events-none absolute -right-32 bottom-0 h-[26rem] w-[26rem] rounded-full bg-amber-900/20 blur-[150px]" />
+
+          <div className="relative mx-auto grid max-w-7xl gap-5 px-4 pt-4 pb-16 sm:px-6 sm:pt-6 md:pt-8 md:pb-20 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:gap-14 lg:py-24">
+            <div className="text-center lg:hidden">
               {eyebrow ? (
-                <p className="text-center text-xs font-bold uppercase tracking-[0.24em] text-amber-400 lg:text-left lg:tracking-[0.32em]">
+                <p className="text-sm font-semibold uppercase tracking-[0.32em] text-amber-400">
                   {eyebrow}
                 </p>
               ) : null}
-              <h1 className="mx-auto mt-4 max-w-sm text-center text-[2.25rem] font-bold leading-[0.95] md:max-w-2xl md:text-5xl lg:mx-0 lg:max-w-none lg:text-left lg:text-7xl lg:leading-[1.02]">
+              <h1 className="mt-4 text-3xl font-bold leading-[1.02] text-white sm:text-4xl md:text-5xl">
+                {renderHighlightedHeadline(headline, highlight)}
+              </h1>
+            </div>
+
+            <div className="hidden max-w-none lg:block">
+              {eyebrow ? (
+                <p className="text-sm font-semibold uppercase tracking-[0.32em] text-amber-400">
+                  {eyebrow}
+                </p>
+              ) : null}
+              <h1 className="mt-5 text-3xl font-bold leading-[1.02] text-white md:text-6xl">
                 {renderHighlightedHeadline(headline, highlight)}
               </h1>
               {subheadline ? (
-                <p className="mt-6 hidden max-w-2xl text-left text-lg leading-7 text-zinc-300 lg:block">
+                <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-300 md:text-xl">
                   {subheadline}
                 </p>
               ) : null}
             </div>
 
-            <div className="flex w-full justify-center lg:justify-end">
-              <div className="w-full max-w-[360px] overflow-hidden rounded-[2rem] border border-zinc-800 bg-black shadow-[0_24px_90px_rgba(0,0,0,0.55)] md:max-w-[430px] xl:max-w-[460px]">
-                <div className="aspect-[3/4] h-full w-full">
+            <div className="relative mx-auto w-full max-w-sm lg:max-w-none">
+              <div className="absolute -inset-8 rounded-full bg-zinc-900/30 blur-[120px]" />
+              <div className="relative overflow-hidden rounded-[2rem] border border-zinc-800 bg-zinc-950 p-2 shadow-[0_40px_120px_rgba(0,0,0,0.65)] backdrop-blur-md">
+                <div className="aspect-[3/4] overflow-hidden rounded-[1.5rem] bg-black">
                   <KurukinPlayer
                     provider={provider}
                     videoId={videoUrl}
@@ -279,7 +308,7 @@ export function HeroVslDelayedCtaBlock({
             </div>
 
             {subheadline ? (
-              <p className="mx-auto mt-0 max-w-sm text-center text-base leading-7 text-zinc-300 lg:hidden">
+              <p className="mx-auto max-w-2xl text-center text-base leading-relaxed text-slate-300 sm:text-lg md:text-xl lg:hidden">
                 {subheadline}
               </p>
             ) : null}
@@ -288,15 +317,13 @@ export function HeroVslDelayedCtaBlock({
       </div>
 
       {hasCtaRevealed && showStickyCta ? (
-        <div className="fixed bottom-0 left-0 right-0 z-[60]">
-          <div className="absolute inset-0 border-t border-white/10 bg-black/90 shadow-[0_-18px_50px_rgba(0,0,0,0.32)] backdrop-blur-xl" />
-          <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 p-4 md:flex-row md:gap-8 md:px-6 md:py-4">
-            <div className="hidden min-w-0 flex-1 text-left md:block">
-              <p className="text-lg font-bold text-white">
-                {stickyTitle}
-              </p>
+        <div className="fixed bottom-0 left-0 right-0 z-[60] animate-in fade-in slide-in-from-bottom-10 duration-700">
+          <div className="absolute inset-0 border-t border-white/10 bg-black/90 backdrop-blur-xl" />
+          <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 p-4 md:flex-row md:px-6 md:py-4">
+            <div className="hidden md:block">
+              <p className="text-lg font-bold text-white">{stickyTitle}</p>
               {stickySubtitle ? (
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="text-sm font-medium text-slate-400">
                   {stickySubtitle}
                 </p>
               ) : null}
@@ -307,7 +334,8 @@ export function HeroVslDelayedCtaBlock({
               currentPath={runtime.request.path}
               href={ctaHref}
               label={ctaText}
-              className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 px-5 py-3 text-center text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_14px_34px_rgba(251,191,36,0.25)] transition hover:-translate-y-0.5 hover:from-amber-200 hover:to-orange-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200 md:h-14 md:w-auto md:min-w-[320px] md:px-8 md:py-4"
+              subtext={stickyMobileSubtitle || undefined}
+              className="flex w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 px-8 py-3 font-bold uppercase text-slate-950 shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform active:scale-95 md:w-auto hover:scale-105 [&>span]:gap-0.5 [&>span>span:first-child]:text-base [&>span>span:first-child]:tracking-tight [&>span>span:first-child]:md:text-lg [&>span>span:last-child]:text-[10px] [&>span>span:last-child]:font-medium [&>span>span:last-child]:uppercase [&>span>span:last-child]:tracking-[0.1em] [&>span>span:last-child]:opacity-90 [&>span>span:last-child]:md:hidden"
               action={ctaAction}
             />
           </div>
