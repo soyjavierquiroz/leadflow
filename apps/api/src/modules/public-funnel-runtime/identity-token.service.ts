@@ -3,7 +3,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
 import { getApiRuntimeConfig } from '../../config/runtime';
 
 type IdentityTokenPayload = {
@@ -24,6 +24,15 @@ const decodeBase64Url = (value: string) =>
 export class IdentityTokenService {
   private readonly runtimeConfig = getApiRuntimeConfig();
 
+  hashToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  getDefaultExpiresAt(now = new Date()): Date | null {
+    const ttlHours = Math.max(1, this.runtimeConfig.identityTokenTtlHours);
+    return new Date(now.getTime() + ttlHours * 3600 * 1000);
+  }
+
   issueToken(input: {
     leadId: string;
     publicationId: string;
@@ -38,8 +47,10 @@ export class IdentityTokenService {
     }
 
     const issuedAt = Math.floor(Date.now() / 1000);
-    const expiresAt =
-      issuedAt + Math.max(1, this.runtimeConfig.identityTokenTtlHours) * 3600;
+    const defaultExpiresAt = this.getDefaultExpiresAt(
+      new Date(issuedAt * 1000),
+    );
+    const expiresAt = Math.floor(defaultExpiresAt!.getTime() / 1000);
     const payload: IdentityTokenPayload = {
       leadId: input.leadId,
       publicationId: input.publicationId,

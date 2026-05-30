@@ -13,6 +13,21 @@ export class ShortLinkProvider {
   private readonly logger = new Logger(ShortLinkProvider.name);
   private readonly runtimeConfig = getApiRuntimeConfig();
 
+  extractShortCode(shortUrl?: string | null): string | null {
+    const trimmed = shortUrl?.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    try {
+      const url = new URL(trimmed);
+      return this.extractReasonableLastSegment(url.pathname);
+    } catch {
+      const withoutQuery = trimmed.split('?')[0]?.split('#')[0] ?? '';
+      return this.extractReasonableLastSegment(withoutQuery);
+    }
+  }
+
   async shortenUrl(longUrl: string): Promise<ShortLinkResult> {
     if (!this.runtimeConfig.yourlsApiUrl || !this.runtimeConfig.yourlsSignature) {
       return {
@@ -74,5 +89,21 @@ export class ShortLinkProvider {
         provider: 'fallback_long_url',
       };
     }
+  }
+
+  private extractReasonableLastSegment(value: string) {
+    const segment =
+      value
+        .replace(/\/+$/, '')
+        .split('/')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .pop() ?? null;
+
+    if (!segment || !/^[A-Za-z0-9._~-]+$/.test(segment)) {
+      return null;
+    }
+
+    return segment;
   }
 }
