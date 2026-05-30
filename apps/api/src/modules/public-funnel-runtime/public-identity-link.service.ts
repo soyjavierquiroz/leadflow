@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { buildPublicationStepPath, normalizePath } from './public-funnel-runtime.utils';
 import {
   buildPublicWhatsappHandoff,
+  resolveAssignedWhatsappMessageTemplate,
   resolvePublicHandoffConfig,
 } from './reveal-handoff.utils';
 import { IdentityTokenService } from './identity-token.service';
@@ -49,6 +50,7 @@ export class PublicIdentityLinkService {
         funnelPublication: {
           include: {
             domain: true,
+            team: true,
             handoffStrategy: true,
             funnelInstance: {
               include: {
@@ -101,14 +103,19 @@ export class PublicIdentityLinkService {
     const handoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
     const handoffConfig = resolvePublicHandoffConfig(handoffStrategy);
+    const customMessageTemplate = resolveAssignedWhatsappMessageTemplate(
+      targetStep.blocksJson,
+    );
     const sponsor = lead.currentAssignment?.sponsor ?? null;
     const whatsappHandoff = buildPublicWhatsappHandoff({
       handoff: handoffConfig,
+      customMessageTemplate,
       sponsor,
       leadName: lead.fullName ?? null,
       leadEmail: lead.email ?? null,
       leadPhone: lead.phone ?? null,
       funnelName: publication.funnelInstance.name,
+      teamName: publication.team.name,
       publicationPath: targetStepPath,
       ownershipKey: lead.currentAssignment?.ownershipKey,
     });
@@ -156,10 +163,14 @@ export class PublicIdentityLinkService {
         funnelPublication: {
           include: {
             domain: true,
+            team: true,
             handoffStrategy: true,
             funnelInstance: {
               include: {
                 handoffStrategy: true,
+                steps: {
+                  orderBy: { position: 'asc' },
+                },
               },
             },
           },
@@ -186,14 +197,24 @@ export class PublicIdentityLinkService {
       lead.funnelPublication.handoffStrategy ??
       lead.funnelPublication.funnelInstance.handoffStrategy;
     const handoffConfig = resolvePublicHandoffConfig(handoffStrategy);
+    const targetStep = this.resolveTargetStepByPath({
+      path: normalizedTargetPath,
+      pathPrefix: lead.funnelPublication.pathPrefix,
+      steps: lead.funnelPublication.funnelInstance.steps,
+    });
+    const customMessageTemplate = resolveAssignedWhatsappMessageTemplate(
+      targetStep?.blocksJson,
+    );
     const sponsor = lead.currentAssignment?.sponsor ?? null;
     const whatsappHandoff = buildPublicWhatsappHandoff({
       handoff: handoffConfig,
+      customMessageTemplate,
       sponsor,
       leadName: lead.fullName ?? null,
       leadEmail: lead.email ?? null,
       leadPhone: lead.phone ?? null,
       funnelName: lead.funnelPublication.funnelInstance.name,
+      teamName: lead.funnelPublication.team.name,
       publicationPath: normalizedTargetPath,
       ownershipKey: lead.currentAssignment?.ownershipKey,
     });
@@ -277,6 +298,7 @@ export class PublicIdentityLinkService {
       stepType: string;
       isEntryStep: boolean;
       settingsJson: JsonValue;
+      blocksJson: JsonValue;
     }>,
     stepKey: string,
   ) {
@@ -312,5 +334,30 @@ export class PublicIdentityLinkService {
 
   private buildPublicBaseUrl(host: string) {
     return `https://${host.trim().toLowerCase()}`;
+  }
+
+  private resolveTargetStepByPath(input: {
+    path: string;
+    pathPrefix: string;
+    steps: Array<{
+      slug: string;
+      isEntryStep: boolean;
+      blocksJson: JsonValue;
+    }>;
+  }) {
+    const normalizedPath = normalizePath(input.path);
+
+    return (
+      input.steps.find(
+        (step) =>
+          normalizePath(
+            buildPublicationStepPath(
+              input.pathPrefix,
+              step.slug,
+              step.isEntryStep,
+            ),
+          ) === normalizedPath,
+      ) ?? null
+    );
   }
 }

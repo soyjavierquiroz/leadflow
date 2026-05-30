@@ -25,6 +25,7 @@ import { IdentityTokenService } from './identity-token.service';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
 import {
   buildPublicWhatsappHandoff,
+  resolveAssignedWhatsappMessageTemplate,
   resolvePublicHandoffConfig,
 } from './reveal-handoff.utils';
 
@@ -653,6 +654,9 @@ export class PublicFunnelRuntimeService {
     const effectiveHandoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
     const baseHandoff = resolvePublicHandoffConfig(effectiveHandoffStrategy);
+    const assignedWhatsappMessageTemplate = resolveAssignedWhatsappMessageTemplate(
+      currentStep.blocksJson as Prisma.JsonValue,
+    );
     const handoffWhatsappText = findRuntimeBlockSetting(
       currentStep.blocksJson as Prisma.JsonValue,
       'whatsapp_handoff_cta',
@@ -660,7 +664,10 @@ export class PublicFunnelRuntimeService {
     );
     const handoff = {
       ...baseHandoff,
-      messageTemplate: handoffWhatsappText || baseHandoff.messageTemplate,
+      messageTemplate:
+        assignedWhatsappMessageTemplate ||
+        handoffWhatsappText ||
+        baseHandoff.messageTemplate,
     };
     const runtimeSponsorContext = await this.resolveRuntimeSponsorContext({
       publication,
@@ -887,6 +894,7 @@ export class PublicFunnelRuntimeService {
           assignedAt: lead.currentAssignment.assignedAt,
         },
         publicationName: input.publication.funnelInstance.name,
+        teamName: input.publication.team.name,
         publicationPath: input.currentStepPath,
         handoff: input.handoff,
       });
@@ -942,6 +950,7 @@ export class PublicFunnelRuntimeService {
           assignedAt: new Date(),
         },
         publicationName: input.publication.funnelInstance.name,
+        teamName: input.publication.team.name,
         publicationPath: input.currentStepPath,
         handoff: input.handoff,
       });
@@ -978,6 +987,7 @@ export class PublicFunnelRuntimeService {
             assignedAt: new Date(),
           },
           publicationName: input.publication.funnelInstance.name,
+          teamName: input.publication.team.name,
           publicationPath: input.currentStepPath,
           handoff: input.handoff,
         });
@@ -1025,6 +1035,7 @@ export class PublicFunnelRuntimeService {
         assignedAt: new Date(),
       },
       publicationName: input.publication.funnelInstance.name,
+      teamName: input.publication.team.name,
       publicationPath: input.currentStepPath,
       handoff: input.handoff,
     });
@@ -1059,6 +1070,7 @@ export class PublicFunnelRuntimeService {
       assignedAt: Date;
     };
     publicationName: string;
+    teamName: string;
     publicationPath: string;
     handoff: ReturnType<typeof resolvePublicHandoffConfig>;
   }): RuntimeSponsorContext {
@@ -1076,6 +1088,7 @@ export class PublicFunnelRuntimeService {
       leadEmail: input.leadEmail,
       leadPhone: input.leadPhone,
       funnelName: input.publicationName,
+      teamName: input.teamName,
       publicationPath: input.publicationPath,
       ownershipKey: input.assignment.ownershipKey,
     });

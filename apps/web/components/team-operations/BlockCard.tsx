@@ -172,6 +172,12 @@ const isHeroVslCtaModeField = (block: BlockRecord, path: string[]) =>
   path[0] === "behavior" &&
   path[1] === "cta_mode";
 
+const isHeroVslWhatsappMessageField = (block: BlockRecord, path: string[]) =>
+  block.type === "hero_vsl_delayed_cta" &&
+  path.length === 2 &&
+  path[0] === "content" &&
+  path[1] === "whatsapp_message";
+
 const getValueAtPath = (value: unknown, path: string[]) => {
   let current: unknown = value;
 
@@ -331,11 +337,20 @@ export function BlockCard({
   };
   const definitionSchema = definition?.schema;
   const definitionExample = definition?.example;
+  const heroVslCtaMode =
+    block.type === "hero_vsl_delayed_cta"
+      ? String(getValueAtPath(block, ["behavior", "cta_mode"]) ?? "modal")
+      : null;
   const skipPaths =
     block.type === "hook_and_promise"
       ? omittedHookAndPromisePaths
       : block.type === "hero_vsl_delayed_cta"
-        ? heroVslDelayedCtaSkipPaths
+        ? new Set([
+            ...heroVslDelayedCtaSkipPaths,
+            ...(heroVslCtaMode === "assigned_whatsapp"
+              ? []
+              : ["content.whatsapp_message"]),
+          ])
         : undefined;
   const genericEditableFields = buildEditableFields({
     schemaValue: definitionSchema,
@@ -493,6 +508,33 @@ export function BlockCard({
                     </option>
                   ))}
                 </select>
+              </label>
+            );
+          }
+
+          if (isHeroVslWhatsappMessageField(block, field.path)) {
+            const inputValue = typeof value === "string" ? value : "";
+
+            return (
+              <label
+                key={field.path.join(".")}
+                className="grid gap-1.5 md:col-span-2"
+              >
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  Mensaje de WhatsApp
+                </span>
+                <textarea
+                  value={inputValue}
+                  placeholder="Hola {{advisor.first_name}}, vi la presentación y quiero saber cómo empezar."
+                  onChange={(event) =>
+                    onPatch(setValueAtPath({}, field.path, event.target.value))
+                  }
+                  rows={3}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100"
+                />
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  El sistema agregará automáticamente el Ref de seguimiento al final.
+                </span>
               </label>
             );
           }
