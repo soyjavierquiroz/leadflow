@@ -33,6 +33,7 @@ COPY --from=builder /workspace/node_modules ./node_modules
 COPY --from=builder /workspace/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /workspace/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /workspace/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /workspace/apps/api/scripts ./apps/api/scripts
 COPY --from=builder /workspace/packages/shared/mail/package.json ./packages/shared/mail/package.json
 COPY --from=builder /workspace/packages/shared/mail/node_modules ./packages/shared/mail/node_modules
 COPY --from=builder /workspace/packages/shared/mail/dist ./packages/shared/mail/dist

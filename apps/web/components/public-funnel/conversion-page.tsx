@@ -185,16 +185,37 @@ export function ConversionPage({
   const [isMobileWhatsappDevice, setIsMobileWhatsappDevice] = useState<
     boolean | null
   >(null);
-  const context = useSubmissionContext(runtime.publication.id);
+  const [hasHydrated, setHasHydrated] = useState(false);
+  const context = useSubmissionContext(runtime.publication.id, runtime);
   const queryAdvisor = useMemo(
     () => readAdvisorFromSearchParams(searchParams),
     [searchParams],
   );
 
   const advisor = useMemo<ConversionAdvisor>(() => {
-    const handoffSponsor = context?.handoff?.sponsor ?? null;
-    const assignedSponsor = context?.assignment?.sponsor ?? null;
-    const resolvedSponsor = handoffSponsor ?? assignedSponsor;
+    const assignedSponsor =
+      context?.assignment?.sponsor ??
+      context?.lastAssignment?.sponsor ??
+      runtime.assignment?.sponsor ??
+      runtime.assignedSponsor ??
+      null;
+    const resolvedSponsor =
+      assignedSponsor ??
+      context?.handoff?.sponsor ??
+      runtime.handoff.sponsor ??
+      null;
+
+    if (resolvedSponsor) {
+      return {
+        name: resolvedSponsor.displayName,
+        phone: resolvedSponsor.phone,
+        photoUrl: normalizeAdvisorPhotoUrl(resolvedSponsor.avatarUrl),
+        bio:
+          fallbackAdvisor.bio ?? "Especialista en Protocolos de Recuperación",
+        whatsappUrl:
+          context?.handoff?.whatsappUrl ?? fallbackAdvisor.whatsappUrl,
+      };
+    }
 
     if (queryAdvisor) {
       return {
@@ -218,23 +239,11 @@ export function ConversionPage({
       };
     }
 
-    if (resolvedSponsor) {
-      return {
-        name: resolvedSponsor.displayName,
-        phone: resolvedSponsor.phone,
-        photoUrl: normalizeAdvisorPhotoUrl(resolvedSponsor.avatarUrl),
-        bio:
-          fallbackAdvisor.bio ?? "Especialista en Protocolos de Recuperación",
-        whatsappUrl:
-          context?.handoff?.whatsappUrl ?? fallbackAdvisor.whatsappUrl,
-      };
-    }
-
     return {
       ...fallbackAdvisor,
       photoUrl: normalizeAdvisorPhotoUrl(fallbackAdvisor.photoUrl),
     };
-  }, [context, fallbackAdvisor, queryAdvisor]);
+  }, [context, fallbackAdvisor, queryAdvisor, runtime]);
 
   const handoffMode = context?.handoff?.mode ?? runtime.handoff.mode;
   const handoffButtonLabel =
@@ -293,8 +302,13 @@ export function ConversionPage({
     forceAutoRedirectFromContent ||
     (handoffMode === "immediate_whatsapp" &&
       (context?.handoff?.autoRedirect ?? runtime.handoff.autoRedirect));
-  const shouldAutoRedirect = autoRedirectRequested && Boolean(whatsappUrl);
+  const shouldAutoRedirect =
+    hasHydrated && autoRedirectRequested && Boolean(whatsappUrl);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (typeof navigator === "undefined") {
@@ -375,6 +389,23 @@ export function ConversionPage({
     redirectHandledRef.current = true;
     window.location.href = whatsappUrl;
   }, [countdownSeconds, shouldAutoRedirect, whatsappUrl]);
+
+  if (!hasHydrated) {
+    return (
+      <section className="w-full">
+        <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl items-center justify-center px-4 py-4 md:px-6 md:py-6">
+          <div className="w-full rounded-[2rem] border border-emerald-100 bg-white p-5 text-center shadow-[0_32px_80px_rgba(15,23,42,0.12)] md:p-8">
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.28em] text-emerald-700">
+              Especialista Asignado
+            </span>
+            <h1 className="mt-4 text-[1.75rem] font-black leading-tight tracking-tight text-slate-950 md:mt-5 md:text-5xl">
+              Confirmando tu asesor asignado
+            </h1>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="w-full">

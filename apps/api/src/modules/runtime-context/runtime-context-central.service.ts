@@ -10,10 +10,19 @@ import {
   normalizeUrlPath,
   sanitizeNullableText,
 } from '../shared/url.utils';
+import {
+  DEFAULT_AI_BUSINESS_MODEL_TYPE,
+  DEFAULT_AI_BRAND_KEY,
+  DEFAULT_AI_VERTICAL_KEY,
+  normalizeRuntimeRoutingToken,
+} from '../ai-config/ai-config.defaults';
 
 type RuntimeContextRegistrationInput = {
   instanceName: string;
   tenantId: string;
+  verticalKey?: string | null;
+  brandKey?: string | null;
+  businessModelType?: string | null;
 };
 
 type RuntimeContextRegistrationPayload = {
@@ -21,6 +30,9 @@ type RuntimeContextRegistrationPayload = {
   channel: 'whatsapp';
   instance_name: string;
   tenant_id: string;
+  vertical_key: string;
+  brand_key: string;
+  business_model_type: string;
   service_owner_key: 'lead-handler';
   status: 'active';
 };
@@ -146,6 +158,7 @@ export class RuntimeContextCentralService {
       MessagingConnection,
       | 'id'
       | 'workspaceId'
+      | 'teamId'
       | 'externalInstanceId'
       | 'runtimeContextStatus'
       | 'runtimeContextTenantId'
@@ -165,7 +178,10 @@ export class RuntimeContextCentralService {
       } as const;
     }
 
-    const tenantId = connection.runtimeContextTenantId ?? connection.workspaceId;
+    const tenantId =
+      connection.runtimeContextTenantId ??
+      connection.teamId ??
+      connection.workspaceId;
     let currentStatus = connection.runtimeContextStatus;
     const registrationInput = {
       instanceName: connection.externalInstanceId,
@@ -195,7 +211,8 @@ export class RuntimeContextCentralService {
     if (
       connection.runtimeContextStatus !==
         MessagingRuntimeContextStatus.PROVISIONED &&
-      connection.runtimeContextStatus !== MessagingRuntimeContextStatus.REGISTERED
+      connection.runtimeContextStatus !==
+        MessagingRuntimeContextStatus.REGISTERED
     ) {
       await this.markConnectionProvisioned({
         connectionId: connection.id,
@@ -294,7 +311,10 @@ export class RuntimeContextCentralService {
     this.ensureConfigured();
 
     const payload = this.buildPayload(input);
-    const response = await this.requestWithFallback(this.registerPaths, payload);
+    const response = await this.requestWithFallback(
+      this.registerPaths,
+      payload,
+    );
 
     if (
       (response.status >= 200 && response.status < 300) ||
@@ -349,9 +369,7 @@ export class RuntimeContextCentralService {
         lastError =
           error instanceof Error
             ? error
-            : new Error(
-                'Runtime context resolve-full failed unexpectedly.',
-              );
+            : new Error('Runtime context resolve-full failed unexpectedly.');
 
         if (attempt >= this.resolveRetries - 1) {
           break;
@@ -373,6 +391,14 @@ export class RuntimeContextCentralService {
       channel: 'whatsapp',
       instance_name: input.instanceName,
       tenant_id: input.tenantId,
+      vertical_key:
+        normalizeRuntimeRoutingToken(input.verticalKey) ??
+        DEFAULT_AI_VERTICAL_KEY,
+      brand_key:
+        normalizeRuntimeRoutingToken(input.brandKey) ?? DEFAULT_AI_BRAND_KEY,
+      business_model_type:
+        normalizeRuntimeRoutingToken(input.businessModelType) ??
+        DEFAULT_AI_BUSINESS_MODEL_TYPE,
       service_owner_key: 'lead-handler',
       status: 'active',
     };

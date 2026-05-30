@@ -8,6 +8,26 @@ export type AiSettingsRouteContexts = {
   business: string;
 };
 
+export type KloserSettings = {
+  strategy: {
+    cadence_minutes: number[];
+  };
+  compliance_policy: {
+    quiet_hours: {
+      start: string;
+      end: string;
+    };
+  };
+  cta_policy: {
+    type: string;
+    base_url: string | null;
+    requires_shortener: boolean;
+  };
+  message_policy: {
+    forbidden_claims: string[];
+  };
+};
+
 export type AiSettingsSnapshot = {
   configId: string | null;
   tenantId: string;
@@ -19,6 +39,7 @@ export type AiSettingsSnapshot = {
   ctaPolicy: {
     defaultCta: string | null;
   };
+  kloser: KloserSettings;
   resolution: {
     strategy: "member_override" | "tenant_default" | "empty";
     tenantConfigId: string | null;
@@ -36,8 +57,10 @@ const getErrorMessage = (payload: unknown) =>
     ? payload.message
     : null) ?? "No pudimos cargar la configuración de IA.";
 
-export const getMyAiSettingsSnapshot = async (): Promise<AiSettingsSnapshot> => {
-  const response = await apiFetchWithSession("/ai-config/me");
+const getAiSettingsSnapshot = async (
+  path: string,
+): Promise<AiSettingsSnapshot> => {
+  const response = await apiFetchWithSession(path);
   const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
@@ -46,3 +69,28 @@ export const getMyAiSettingsSnapshot = async (): Promise<AiSettingsSnapshot> => 
 
   return payload as AiSettingsSnapshot;
 };
+
+export const getMyAiSettingsSnapshot = async (): Promise<AiSettingsSnapshot> =>
+  getAiSettingsSnapshot("/ai-config/me");
+
+export const getTeamAiSettingsSnapshot = async (): Promise<AiSettingsSnapshot> =>
+  getAiSettingsSnapshot("/ai-config/team");
+
+export const getManagementAiSettingsSnapshot =
+  async (): Promise<AiSettingsSnapshot> => {
+    const [personalSettings, teamSettings] = await Promise.all([
+      getMyAiSettingsSnapshot(),
+      getTeamAiSettingsSnapshot(),
+    ]);
+
+    return {
+      ...personalSettings,
+      basePrompt: teamSettings.basePrompt || personalSettings.basePrompt,
+      kloser: teamSettings.kloser,
+      resolution: {
+        ...personalSettings.resolution,
+        tenantConfigId:
+          teamSettings.configId ?? teamSettings.resolution.tenantConfigId,
+      },
+    };
+  };

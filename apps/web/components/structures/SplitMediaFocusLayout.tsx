@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import {
   jakawiPremiumClassNames,
   jakawiPremiumThemeStyle,
@@ -14,6 +15,7 @@ type SplitMediaFocusLayoutProps = {
   mediaPanelClassName?: string;
   contentPanelClassName?: string;
   contentInnerClassName?: string;
+  runtime?: PublicFunnelRuntimePayload;
   style?: CSSProperties;
 };
 
@@ -29,10 +31,12 @@ export function SplitMediaFocusLayout({
   mediaPanelClassName,
   contentPanelClassName,
   contentInnerClassName,
+  runtime,
   style,
 }: SplitMediaFocusLayoutProps) {
   return (
     <div
+      data-runtime-step-path={runtime?.currentStep.path}
       className={joinClasses(
         jakawiPremiumClassNames.scope,
         "font-body",

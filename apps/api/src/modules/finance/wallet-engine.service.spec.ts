@@ -5,7 +5,7 @@ import type {
 } from 'axios';
 import { BadGatewayException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import {
   readWalletEngineException,
   WalletEngineService,
@@ -74,7 +74,7 @@ describe('WalletEngineService', () => {
     await service.getTeamBalance('account-1');
 
     expect(httpService.get).toHaveBeenCalledWith(
-      'http://wallet-engine:3000/wallets/account-1/balance',
+      'http://wallet-engine:3000/wallets/account-1/balance?platform_key=leadflow&product_key=ads_wheel',
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: 'Bearer wallet-secret',
@@ -134,7 +134,7 @@ describe('WalletEngineService', () => {
       of(
         buildAxiosResponse({
           account_id: 'account-kredit-1',
-          platform_key: 'kurukin',
+          platform_key: 'leadflow',
           product_key: 'leadflow',
           tenant_id: 'sponsor-1',
           status: 'active',
@@ -153,7 +153,7 @@ describe('WalletEngineService', () => {
       {
         tenant_id: 'sponsor-1',
         external_ref: 'sponsor-1',
-        platform_key: 'kurukin',
+        platform_key: 'leadflow',
         product_key: 'leadflow',
         unit_code: 'KREDIT',
         unit_scale: 6,
@@ -165,6 +165,43 @@ describe('WalletEngineService', () => {
         }),
       }),
     );
+  });
+
+  it('retries idempotent wallet writes before surfacing an upstream failure', async () => {
+    const { service, httpService } = createService();
+
+    jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    httpService.post
+      .mockReturnValueOnce(throwError(() => ({ message: 'socket hang up' })))
+      .mockReturnValueOnce(
+        throwError(() => ({
+          response: {
+            status: 503,
+            data: {
+              error: {
+                message: 'temporarily unavailable',
+              },
+            },
+          },
+          message: 'temporarily unavailable',
+        })),
+      )
+      .mockReturnValueOnce(
+        of(
+          buildAxiosResponse({
+            account_id: 'account-kredit-1',
+            platform_key: 'leadflow',
+            product_key: 'leadflow',
+            tenant_id: 'sponsor-1',
+          }),
+        ),
+      );
+
+    await expect(service.upsertAccount('sponsor-1')).resolves.toEqual({
+      accountId: 'account-kredit-1',
+    });
+
+    expect(httpService.post).toHaveBeenCalledTimes(3);
   });
 
   it('credits the welcome KREDIT bonus with an explicit idempotency key', async () => {
@@ -200,7 +237,7 @@ describe('WalletEngineService', () => {
       of(
         buildAxiosResponse({
           account_id: 'account-kredit-1',
-          platform_key: 'kurukin',
+          platform_key: 'leadflow',
           product_key: 'leadflow',
           tenant_id: 'sponsor-1',
         }),
@@ -212,7 +249,7 @@ describe('WalletEngineService', () => {
     expect(httpService.post).toHaveBeenCalledWith(
       'http://wallet-api:3000/accounts/upsert',
       expect.objectContaining({
-        platform_key: 'kurukin',
+        platform_key: 'leadflow',
         product_key: 'leadflow',
       }),
       expect.objectContaining({
@@ -255,6 +292,14 @@ describe('WalletEngineService', () => {
 
     await expect(service.getSponsorKredits('account-kredit-1')).resolves.toBe(
       '5.000000',
+    );
+    expect(httpService.get).toHaveBeenCalledWith(
+      'http://wallet-engine:3000/wallets/account-kredit-1/balance?platform_key=leadflow&product_key=leadflow',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer wallet-secret',
+        }),
+      }),
     );
   });
 

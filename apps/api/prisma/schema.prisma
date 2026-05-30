@@ -233,6 +233,53 @@ enum AssignmentReason {
   handoff
 }
 
+enum CrmAssignmentStatus {
+  pending_assignment
+  accepted
+  auto_accepted
+  expired
+  reassigned
+  closed
+}
+
+enum CrmAssignmentSource {
+  wheel
+  organic
+  whatsapp_inbound
+  manual
+  campaign
+  reassignment
+}
+
+enum CrmAssignmentEventType {
+  assignment_created
+  assignment_accepted
+  assignment_auto_accepted
+  ownership_changed
+  assignment_expired
+  assignment_reassigned
+  conversation_detected
+}
+
+enum CrmOutreachStatus {
+  queued
+  scheduled
+  ready
+  blocked
+  processing
+  handed_off
+  dispatched
+  completed
+  failed
+  cancelled
+}
+
+enum CrmOutreachIntentType {
+  initial_contact
+  followup
+  reactivation
+}
+
 enum UserRole {
   SUPER_ADMIN
   TEAM_ADMIN
@@ -304,35 +351,39 @@ enum EventAggregateType {
 }
 
 model Workspace {
-  id                   String                @id @default(uuid())
-  name                 String
-  slug                 String                @unique
-  status               WorkspaceStatus
-  timezone             String
-  defaultCurrency      String
-  primaryLocale        String
-  primaryDomain        String?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  teams                Team[]
-  sponsors             Sponsor[]
-  funnels              Funnel[]
-  domains              Domain[]
-  funnelTemplates      FunnelTemplate[]
-  funnelInstances      FunnelInstance[]
-  funnelSteps          FunnelStep[]
-  funnelPublications   FunnelPublication[]
-  trackingProfiles     TrackingProfile[]
-  handoffStrategies    HandoffStrategy[]
-  rotationPools        RotationPool[]
-  visitors             Visitor[]
-  leads                Lead[]
-  assignments          Assignment[]
-  events               DomainEvent[]
-  users                User[]
-  messagingConnections MessagingConnection[]
-  automationDispatches AutomationDispatch[]
-  leadNotes            LeadNote[]
+  id                        String                @id @default(uuid())
+  name                      String
+  slug                      String                @unique
+  status                    WorkspaceStatus
+  timezone                  String
+  defaultCurrency           String
+  primaryLocale             String
+  primaryDomain             String?
+  emailNotificationsEnabled Boolean               @default(true)
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+  teams                     Team[]
+  sponsors                  Sponsor[]
+  funnels                   Funnel[]
+  domains                   Domain[]
+  funnelTemplates           FunnelTemplate[]
+  funnelInstances           FunnelInstance[]
+  funnelSteps               FunnelStep[]
+  funnelPublications        FunnelPublication[]
+  trackingProfiles          TrackingProfile[]
+  handoffStrategies         HandoffStrategy[]
+  rotationPools             RotationPool[]
+  visitors                  Visitor[]
+  leads                     Lead[]
+  assignments               Assignment[]
+  events                    DomainEvent[]
+  users                     User[]
+  messagingConnections      MessagingConnection[]
+  automationDispatches      AutomationDispatch[]
+  leadNotes                 LeadNote[]
+  crmLeadAssignments        CrmLeadAssignment[]
+  crmAssignmentEvents       CrmAssignmentEvent[]
+  crmOutreachQueue          CrmOutreachQueue[]
 }
 
 model Team {
@@ -369,38 +420,47 @@ model Team {
   automationDispatches  AutomationDispatch[]
   leadNotes             LeadNote[]
   knowledgeAudits       KnowledgeAudit[]
+  crmLeadAssignments    CrmLeadAssignment[]
+  crmAssignmentEvents   CrmAssignmentEvent[]
+  crmOutreachQueue      CrmOutreachQueue[]
 
   @@unique([workspaceId, code])
 }
 
 model Sponsor {
-  id                   String               @id @default(uuid())
-  workspaceId          String
-  teamId               String
-  displayName          String
-  publicSlug           String?              @unique
-  status               SponsorStatus
-  isActive             Boolean              @default(false)
-  avatarUrl            String?
-  email                String?
-  phone                String?
-  availabilityStatus   AvailabilityStatus
-  routingWeight        Int
-  memberPortalEnabled  Boolean
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  workspace            Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  team                 Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  rotationMembers      RotationMember[]
-  adWheelParticipants  AdWheelParticipant[]
-  adWheelTurns         AdWheelTurn[]
-  assignments          Assignment[]
-  user                 User?
-  messagingConnection  MessagingConnection?
-  aiAgentConfigs       AiAgentConfig[]
-  channelInstances     ChannelInstance[]
-  automationDispatches AutomationDispatch[]
-  leadNotes            LeadNote[]
+  id                              String               @id @default(uuid())
+  workspaceId                     String
+  teamId                          String
+  displayName                     String
+  publicSlug                      String?              @unique
+  status                          SponsorStatus
+  isActive                        Boolean              @default(false)
+  avatarUrl                       String?
+  email                           String?
+  phone                           String?
+  availabilityStatus              AvailabilityStatus
+  routingWeight                   Int
+  memberPortalEnabled             Boolean
+  createdAt                       DateTime             @default(now())
+  updatedAt                       DateTime             @updatedAt
+  workspace                       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                            Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  rotationMembers                 RotationMember[]
+  adWheelParticipants             AdWheelParticipant[]
+  adWheelTurns                    AdWheelTurn[]
+  assignments                     Assignment[]
+  user                            User?
+  messagingConnection             MessagingConnection?
+  aiAgentConfigs                  AiAgentConfig[]
+  channelInstances                ChannelInstance[]
+  automationDispatches            AutomationDispatch[]
+  leadNotes                       LeadNote[]
+  attributedCrmAssignments        CrmLeadAssignment[]  @relation("CrmAssignmentAttributedSponsor")
+  assignedCrmAssignments          CrmLeadAssignment[]  @relation("CrmAssignmentAssignedSponsor")
+  acceptedCrmAssignments          CrmLeadAssignment[]  @relation("CrmAssignmentAcceptedSponsor")
+  conversationOwnerCrmAssignments CrmLeadAssignment[]  @relation("CrmAssignmentConversationOwnerSponsor")
+  actorCrmAssignmentEvents        CrmAssignmentEvent[]
+  crmOutreachQueue                CrmOutreachQueue[]
 }
 
 model AdWheel {
@@ -456,26 +516,26 @@ model AdWheelTurn {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  workspaceId  String?
-  teamId       String?
-  sponsorId    String?       @unique
-  fullName     String
-  email        String        @unique
-  passwordHash String
-  resetToken        String?       @unique
+  id                String           @id @default(uuid())
+  workspaceId       String?
+  teamId            String?
+  sponsorId         String?          @unique
+  fullName          String
+  email             String           @unique
+  passwordHash      String
+  resetToken        String?          @unique
   resetTokenExpires DateTime?
-  role         UserRole
-  status       UserStatus
-  lastLoginAt  DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  workspace    Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  team         Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  sponsor      Sponsor?      @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
-  sessions     AuthSession[]
-  leadNotes    LeadNote[]
-  knowledgeAudits KnowledgeAudit[]
+  role              UserRole
+  status            UserStatus
+  lastLoginAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  workspace         Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  team              Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  sponsor           Sponsor?         @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+  sessions          AuthSession[]
+  leadNotes         LeadNote[]
+  knowledgeAudits   KnowledgeAudit[]
 
   @@index([workspaceId, role])
   @@index([teamId, role])
@@ -607,7 +667,7 @@ model Funnel {
   workspace             Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   defaultTeam           Team?               @relation("TeamDefaultFunnels", fields: [defaultTeamId], references: [id], onDelete: SetNull)
   defaultRotationPool   RotationPool?       @relation("PoolDefaultFunnels", fields: [defaultRotationPoolId], references: [id], onDelete: SetNull)
-  funnelInstanceBridge  FunnelInstance?     @relation("LegacyFunnelLink")
+  funnelInstanceBridge  FunnelInstance?     @relation("FunnelInstanceFunnelLink")
   linkedDomains         Domain[]            @relation("DomainLinkedFunnel")
   leads                 Lead[]
   assignments           Assignment[]
@@ -687,7 +747,7 @@ model FunnelInstance {
   workspaceId          String
   teamId               String
   templateId           String
-  legacyFunnelId       String?              @unique
+  funnelId             String?              @unique
   name                 String
   code                 String
   thumbnailUrl         String?
@@ -704,7 +764,7 @@ model FunnelInstance {
   workspace            Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team                 Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
   template             FunnelTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  legacyFunnel         Funnel?              @relation("LegacyFunnelLink", fields: [legacyFunnelId], references: [id], onDelete: SetNull)
+  funnel               Funnel?              @relation("FunnelInstanceFunnelLink", fields: [funnelId], references: [id], onDelete: SetNull)
   rotationPool         RotationPool?        @relation(fields: [rotationPoolId], references: [id], onDelete: SetNull)
   trackingProfile      TrackingProfile?     @relation(fields: [trackingProfileId], references: [id], onDelete: SetNull)
   handoffStrategy      HandoffStrategy?     @relation("InstanceHandoffStrategy", fields: [handoffStrategyId], references: [id], onDelete: SetNull)
@@ -719,23 +779,23 @@ model FunnelInstance {
 }
 
 model FunnelStep {
-  id               String         @id @default(uuid())
+  id               String              @id @default(uuid())
   workspaceId      String
   teamId           String
   funnelInstanceId String
   stepType         FunnelStepType
   slug             String
   position         Int
-  isEntryStep      Boolean        @default(false)
-  isConversionStep Boolean        @default(false)
+  isEntryStep      Boolean             @default(false)
+  isConversionStep Boolean             @default(false)
   blocksJson       Json
   mediaMap         Json
   settingsJson     Json
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  workspace        Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  team             Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  funnelInstance   FunnelInstance @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team             Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  funnelInstance   FunnelInstance      @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
   history          FunnelStepHistory[]
 
   @@unique([funnelInstanceId, position])
@@ -755,7 +815,7 @@ model FunnelStepHistory {
 }
 
 model FunnelPublication {
-  id                   String                  @id @default(uuid())
+  id                   String                    @id @default(uuid())
   workspaceId          String
   teamId               String
   domainId             String
@@ -766,7 +826,7 @@ model FunnelPublication {
   seoDescription       String?
   ogImageUrl           String?
   faviconUrl           String?
-  manifestVersion      Int                     @default(1)
+  manifestVersion      Int                       @default(1)
   runtimeHealthStatus  FunnelRuntimeHealthStatus @default(healthy)
   metaPixelId          String?
   tiktokPixelId        String?
@@ -774,16 +834,16 @@ model FunnelPublication {
   tiktokAccessToken    String?
   pathPrefix           String
   status               FunnelPublicationStatus
-  isActive             Boolean                 @default(true)
-  isPrimary            Boolean                 @default(false)
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  workspace            Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  team                 Team                    @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  domain               Domain                  @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  funnelInstance       FunnelInstance          @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
-  trackingProfile      TrackingProfile?        @relation(fields: [trackingProfileId], references: [id], onDelete: SetNull)
-  handoffStrategy      HandoffStrategy?        @relation("PublicationHandoffStrategy", fields: [handoffStrategyId], references: [id], onDelete: SetNull)
+  isActive             Boolean                   @default(true)
+  isPrimary            Boolean                   @default(false)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  workspace            Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                 Team                      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  domain               Domain                    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  funnelInstance       FunnelInstance            @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
+  trackingProfile      TrackingProfile?          @relation(fields: [trackingProfileId], references: [id], onDelete: SetNull)
+  handoffStrategy      HandoffStrategy?          @relation("PublicationHandoffStrategy", fields: [handoffStrategyId], references: [id], onDelete: SetNull)
   leads                Lead[]
   assignments          Assignment[]
   automationDispatches AutomationDispatch[]
@@ -940,10 +1000,14 @@ model Lead {
   events               DomainEvent[]
   automationDispatches AutomationDispatch[]
   notes                LeadNote[]
+  crmLeadAssignments   CrmLeadAssignment[]
+  crmAssignmentEvents  CrmAssignmentEvent[]
+  crmOutreachQueue     CrmOutreachQueue[]
 }
 
 model Assignment {
   id                   String               @id @default(uuid())
+  ownershipKey         String?              @unique
   workspaceId          String
   leadId               String
   sponsorId            String
@@ -989,6 +1053,14 @@ model AutomationDispatch {
   status                AutomationDispatchStatus
   targetWebhookUrl      String?
   payloadSnapshot       Json
+  /// Payload maestro estructurado enviado al motor de IA (n8n/OpenAI)
+  masterPayload         Json?
+  /// Captura inmutable del contexto del lead en el momento de la creación
+  contextSnapshot       Json?
+  /// Reglas de cumplimiento (compliance) heredadas del Tenant en este instante
+  compliancePolicy      Json?
+  /// Reglas de Call to Action (CTA) heredadas del Tenant en este instante
+  ctaPolicy             Json?
   responseSnapshot      Json?
   responseStatusCode    Int?
   errorCode             String?
@@ -1011,6 +1083,96 @@ model AutomationDispatch {
   @@index([sponsorId, createdAt])
   @@index([assignmentId, createdAt])
   @@index([messagingConnectionId, createdAt])
+}
+
+model CrmLeadAssignment {
+  id                         String              @id @default(uuid())
+  workspaceId                String              @map("workspace_id")
+  teamId                     String              @map("team_id")
+  leadId                     String              @map("lead_id")
+  attributedSponsorId        String?             @map("attributed_sponsor_id")
+  assignedSponsorId          String?             @map("assigned_sponsor_id")
+  acceptedBySponsorId        String?             @map("accepted_by_sponsor_id")
+  conversationOwnerSponsorId String?             @map("conversation_owner_sponsor_id")
+  assignmentStatus           CrmAssignmentStatus @map("assignment_status")
+  assignmentSource           CrmAssignmentSource @map("assignment_source")
+  ownershipLockedUntil       DateTime?           @map("ownership_locked_until")
+  assignedAt                 DateTime?           @map("assigned_at")
+  acceptedAt                 DateTime?           @map("accepted_at")
+  lastConversationAt         DateTime?           @map("last_conversation_at")
+  metadataJson               Json?               @map("metadata_json")
+  createdAt                  DateTime            @default(now()) @map("created_at")
+  updatedAt                  DateTime            @updatedAt @map("updated_at")
+  workspace                  Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                       Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  lead                       Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  attributedSponsor          Sponsor?            @relation("CrmAssignmentAttributedSponsor", fields: [attributedSponsorId], references: [id], onDelete: SetNull)
+  assignedSponsor            Sponsor?            @relation("CrmAssignmentAssignedSponsor", fields: [assignedSponsorId], references: [id], onDelete: SetNull)
+  acceptedBySponsor          Sponsor?            @relation("CrmAssignmentAcceptedSponsor", fields: [acceptedBySponsorId], references: [id], onDelete: SetNull)
+  conversationOwnerSponsor   Sponsor?            @relation("CrmAssignmentConversationOwnerSponsor", fields: [conversationOwnerSponsorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, teamId, assignmentStatus], map: "crm_lead_assignments_scope_status_idx")
+  @@index([leadId, assignmentStatus], map: "crm_lead_assignments_lead_status_idx")
+  @@index([assignedSponsorId, assignmentStatus], map: "crm_lead_assignments_assigned_sponsor_status_idx")
+  @@index([conversationOwnerSponsorId, assignmentStatus], map: "crm_lead_assignments_conversation_owner_status_idx")
+  @@index([ownershipLockedUntil], map: "crm_lead_assignments_lock_idx")
+  @@map("crm_lead_assignments")
+}
+
+model CrmAssignmentEvent {
+  id             String                 @id @default(uuid())
+  workspaceId    String                 @map("workspace_id")
+  teamId         String                 @map("team_id")
+  leadId         String                 @map("lead_id")
+  eventType      CrmAssignmentEventType @map("event_type")
+  actorSponsorId String?                @map("actor_sponsor_id")
+  source         CrmAssignmentSource
+  metadataJson   Json?                  @map("metadata_json")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  workspace      Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team           Team                   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  lead           Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actorSponsor   Sponsor?               @relation(fields: [actorSponsorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, teamId, createdAt], map: "crm_assignment_events_scope_created_idx")
+  @@index([leadId, createdAt], map: "crm_assignment_events_lead_created_idx")
+  @@index([eventType, createdAt], map: "crm_assignment_events_type_created_idx")
+  @@map("crm_assignment_events")
+}
+
+model CrmOutreachQueue {
+  id                String                @id @default(uuid())
+  workspaceId       String                @map("workspace_id")
+  teamId            String                @map("team_id")
+  leadId            String                @map("lead_id")
+  sponsorId         String                @map("sponsor_id")
+  intentType        CrmOutreachIntentType @map("intent_type")
+  status            CrmOutreachStatus
+  scheduledAt       DateTime?             @map("scheduled_at")
+  randomizedDelayMs Int?                  @map("randomized_delay_ms")
+  payloadJson       Json?                 @map("payload_json")
+  retryCount        Int                   @default(0) @map("retry_count")
+  lastAttemptAt     DateTime?             @map("last_attempt_at")
+  nextRetryAt       DateTime?             @map("next_retry_at")
+  failureReason     Json?                 @map("failure_reason")
+  externalMissionId String?               @map("external_mission_id")
+  externalHandoffStatus String?           @map("external_handoff_status")
+  lastHandoffAt     DateTime?             @map("last_handoff_at")
+  lastHandoffError  Json?                 @map("last_handoff_error")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  workspace         Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team              Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  lead              Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sponsor           Sponsor               @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, teamId, status, scheduledAt], map: "crm_outreach_queue_scope_status_schedule_idx")
+  @@index([workspaceId, teamId, status, nextRetryAt], map: "crm_outreach_queue_scope_status_retry_idx")
+  @@index([workspaceId, teamId, externalHandoffStatus], map: "crm_outreach_queue_scope_external_status_idx")
+  @@index([externalMissionId], map: "crm_outreach_queue_external_mission_idx")
+  @@index([sponsorId, status, createdAt], map: "crm_outreach_queue_sponsor_status_created_idx")
+  @@index([leadId, intentType, status], map: "crm_outreach_queue_lead_intent_status_idx")
+  @@map("crm_outreach_queue")
 }
 
 model LeadNote {

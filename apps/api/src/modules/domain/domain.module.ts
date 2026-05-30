@@ -4,6 +4,7 @@ import { AiConfigModule } from '../ai-config/ai-config.module';
 import { BlockDefinitionsModule } from '../block-definitions/block-definitions.module';
 import { AssignmentsModule } from '../assignments/assignments.module';
 import { ConversionEventMappingsModule } from '../conversion-event-mappings/conversion-event-mappings.module';
+import { CrmModule } from '../crm/crm.module';
 import { DomainsModule } from '../domains/domains.module';
 import { EventsModule } from '../events/events.module';
 import { WalletEngineModule } from '../finance/wallet-engine.module';
@@ -16,6 +17,7 @@ import { HandoffStrategiesModule } from '../handoff-strategies/handoff-strategie
 import { HybridFunnelPublicationsModule } from '../hybrid-funnel-publications/hybrid-funnel-publications.module';
 import { IncomingWebhooksModule } from '../incoming-webhooks/incoming-webhooks.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { KloserModule } from '../kloser/kloser.module';
 import { LeadsModule } from '../leads/leads.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
@@ -35,6 +37,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     AiConfigModule,
     AdWheelsModule,
     BlockDefinitionsModule,
+    CrmModule,
     WorkspacesModule,
     TeamsModule,
     SponsorsModule,
@@ -51,6 +54,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     HybridFunnelPublicationsModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
+    KloserModule,
     KnowledgeModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
@@ -67,6 +71,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     AiConfigModule,
     AdWheelsModule,
     BlockDefinitionsModule,
+    CrmModule,
     WorkspacesModule,
     TeamsModule,
     SponsorsModule,
@@ -83,6 +88,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     HybridFunnelPublicationsModule,
     ConversionEventMappingsModule,
     IncomingWebhooksModule,
+    KloserModule,
     KnowledgeModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,

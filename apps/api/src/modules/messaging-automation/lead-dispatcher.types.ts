@@ -7,6 +7,8 @@ export type LeadContextUpsertPayload = {
     type: 'external_app';
     version: '1.0.0';
   };
+  config_version: string;
+  runtime_config: Record<string, unknown>;
   routing: {
     provider: 'evolution';
     channel: 'whatsapp';

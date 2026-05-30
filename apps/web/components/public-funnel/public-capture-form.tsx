@@ -19,10 +19,11 @@ import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-r
 import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 import {
   getOrCreateAnonymousId,
-  readSubmissionContext,
   persistSubmissionContext,
+  readSubmissionContext,
   submitPublicLeadCapture,
 } from "@/lib/public-funnel-session";
+import { resolveRuntimeNextStepPath } from "@/lib/funnel-runtime-routing";
 import {
   createRuntimeEventId,
   emitPublicRuntimeEvent,
@@ -33,14 +34,17 @@ import type {
   RuntimeLeadCaptureFormBlock,
 } from "@/components/public-funnel/runtime-block-utils";
 import { resolveKnownLeadFieldName } from "@/components/public-funnel/runtime-block-utils";
-import type { PublicRuntimeEntryContext } from "@/lib/public-funnel-runtime.types";
+import type {
+  PublicFunnelRuntimePayload,
+  PublicRuntimeEntryContext,
+} from "@/lib/public-funnel-runtime.types";
 
 type PublicCaptureFormProps = {
   publicationId: string;
   currentStepId: string;
   block: RuntimeLeadCaptureFormBlock;
+  runtime: PublicFunnelRuntimePayload;
   runtimeEntryContext: PublicRuntimeEntryContext;
-  nextStepPath?: string | null;
   sectionId?: string;
   isBoxed?: boolean;
 };
@@ -182,8 +186,8 @@ export function PublicCaptureForm({
   publicationId,
   currentStepId,
   block,
+  runtime,
   runtimeEntryContext,
-  nextStepPath,
   sectionId = "public-capture-form",
   isBoxed = false,
 }: PublicCaptureFormProps) {
@@ -283,9 +287,7 @@ export function PublicCaptureForm({
         },
       });
 
-      const submitLeadCapture =
-        runtimeLeadSubmit?.submitLeadCapture ?? submitPublicLeadCapture;
-      const response = await submitLeadCapture({
+      const submissionPayload = {
         publicationId,
         currentStepId,
         anonymousId,
@@ -312,9 +314,31 @@ export function PublicCaptureForm({
         fieldValues,
         tags: block.settings.tags,
         sourceChannel: block.settings.sourceChannel,
-      });
+      };
+      const response = runtimeLeadSubmit?.submitLeadCapture
+        ? await runtimeLeadSubmit.submitLeadCapture(submissionPayload, {
+            block: {
+              type: "lead_capture_form",
+              outcome: block.outcome ?? "submit_success",
+              successRedirect: block.redirectUrl,
+              successMode: block.successMode,
+              handoffEnabled: block.handoffEnabled,
+              handoffDuration: block.handoffDuration,
+              handoffTitle: block.handoffTitle,
+              handoffSubtitle: block.handoffSubtitle,
+              loaderType: block.loaderType,
+            },
+          })
+        : await submitPublicLeadCapture(submissionPayload);
 
-      persistSubmissionContext(publicationId, response);
+      if (response.success === false) {
+        throw new Error("No pudimos asignarte un asesor en este momento.");
+      }
+
+      if (!runtimeLeadSubmit?.submitLeadCapture) {
+        persistSubmissionContext(publicationId, response);
+      }
+
       setSuccessMessage(
         block.settings.successMessage ??
           (response.assignment?.sponsor.displayName
@@ -322,11 +346,14 @@ export function PublicCaptureForm({
             : "Lead capturado correctamente."),
       );
 
-      if (block.successMode === "next_step") {
+      if (!runtimeLeadSubmit?.submitLeadCapture && block.successMode === "next_step") {
         const redirectPath =
-          block.redirectUrl?.trim() ||
           response.nextStep?.path?.trim() ||
-          nextStepPath?.trim();
+          resolveRuntimeNextStepPath({
+            runtime,
+            outcome: block.outcome ?? "submit_success",
+            successRedirect: block.redirectUrl,
+          });
 
         if (redirectPath) {
           router.push(redirectPath);

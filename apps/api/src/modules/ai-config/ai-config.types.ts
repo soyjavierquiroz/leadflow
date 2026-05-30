@@ -1,5 +1,8 @@
 export type AiRuntimeContext = {
   version: 'leadflow.ai-runtime-context.v1';
+  config_version: string;
+  basePrompt: string;
+  base_prompt: string;
   routing: {
     provider: string;
     channel: 'whatsapp';
@@ -10,6 +13,9 @@ export type AiRuntimeContext = {
     id: string;
     name: string;
     code: string;
+    vertical_key: string;
+    brand_key: string;
+    business_model_type: string;
   };
   member: {
     id: string;
@@ -31,11 +37,13 @@ export type AiRuntimeContext = {
     reason: string | null;
   };
   ai_agent: {
+    basePrompt: string;
     base_prompt: string;
     route_contexts: Record<string, unknown>;
     cta_policy: Record<string, unknown>;
     ai_policy: Record<string, unknown>;
   };
+  kloser: KloserTenantConfig;
   resolution: {
     strategy: 'member_override' | 'tenant_default' | 'development_fallback';
     tenant_config_id: string | null;
@@ -43,12 +51,44 @@ export type AiRuntimeContext = {
   };
 };
 
+export interface KloserTenantConfig {
+  strategy: {
+    id: string;
+    version: string;
+    enabled: boolean;
+    max_attempts: number;
+    cadence_minutes: number[];
+  };
+  compliance_policy: {
+    has_whatsapp_opt_in: boolean;
+    quiet_hours: { start: string; end: string };
+  };
+  cta_policy: {
+    type: string;
+    required: boolean;
+    shortener: string;
+    allowed_domains: string[];
+    base_url: string | null;
+    requires_shortener: boolean;
+  };
+  message_policy: {
+    template_id: string;
+    language: string;
+    variables: Record<string, any>;
+    max_length: number;
+    requires_personalization: boolean;
+    forbidden_claims: string[];
+  };
+}
+
 export type ResolveFullRuntimeResponse = {
   tenant_id: string;
   app_key: 'leadflow_api';
-  platform_key: 'kurukin';
+  platform_key: 'leadflow';
   product_key: 'leadflow';
   vertical_key: string;
+  brand_key: string;
+  business_model_type: string;
   service_owner_key: 'lead-handler';
   wallet_subject: {
     type: 'sponsor';
@@ -58,8 +98,10 @@ export type ResolveFullRuntimeResponse = {
     status: 'resolved' | 'unavailable';
     reason: string | null;
   };
+  basePrompt: string;
+  base_prompt: string;
   runtime_config: AiRuntimeContext;
-  config_version: AiRuntimeContext['version'];
+  config_version: string;
   status: 'active';
 };
 
@@ -81,6 +123,7 @@ export type AiConfigEditorSnapshot = {
   ctaPolicy: {
     defaultCta: string | null;
   };
+  kloser: KloserTenantConfig;
   resolution: {
     strategy: 'member_override' | 'tenant_default' | 'empty';
     tenantConfigId: string | null;

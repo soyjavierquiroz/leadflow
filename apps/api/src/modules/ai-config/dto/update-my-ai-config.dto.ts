@@ -1,3 +1,8 @@
+type PersonalAiPolicyPatch = Record<string, unknown> & {
+  readonly kloser?: never;
+  readonly kloser_config?: never;
+};
+
 export class UpdateMyAiConfigDto {
   readonly basePrompt!: string;
   readonly routeContexts?: {
@@ -8,4 +13,5 @@ export class UpdateMyAiConfigDto {
     readonly business?: string | null;
   };
   readonly defaultCta?: string | null;
+  readonly aiPolicy?: PersonalAiPolicyPatch | null;
 }

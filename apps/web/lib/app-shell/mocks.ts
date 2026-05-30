@@ -36,10 +36,10 @@ export const mockWorkspace: WorkspaceRecord = {
 
 export const mockTeamMetadata: TeamMetadata[] = [
   {
-    id: "team-sales-core",
+    id: "team-demo",
     workspaceId: mockWorkspace.id,
-    name: "Sales Core",
-    code: "sales-core",
+    name: "Demo Team",
+    code: "demo-team",
     status: "active",
     description: "Equipo operativo base para funnels, tracking y handoff.",
     maxSeats: 10,
@@ -71,7 +71,7 @@ export const mockFunnelInstances: FunnelInstanceRecord[] = [
     workspaceId: mockWorkspace.id,
     teamId: mockTeamMetadata[0].id,
     templateId: mockTemplates[0].id,
-    legacyFunnelId: "legacy-core-acquisition",
+    funnelId: "legacy-core-acquisition",
     name: "Core Acquisition",
     code: "core-acquisition",
     thumbnailUrl: null,

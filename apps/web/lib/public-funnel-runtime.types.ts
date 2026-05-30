@@ -17,10 +17,14 @@ export type RuntimeBlock = {
 
 export type PublicRuntimeEntryContext = {
   entryMode: "organic_asesor" | "paid_ads";
-  trafficLayer: "DIRECT" | "PAID_WHEEL" | "ORGANIC";
+  trafficLayer: "DIRECT" | "PAID_WHEEL" | "PAID_ADS" | "ORGANIC";
   forcedSponsorId: string | null;
   adWheelId: string | null;
   browserPixelsEnabled: boolean;
+  attributionType: "promo" | "ref" | "organic";
+  attributionSlug: string | null;
+  runtimePathPrefix: string | null;
+  referralQueryParam: string | null;
 };
 
 export type PublicFunnelRuntimePayload = {
@@ -38,6 +42,11 @@ export type PublicFunnelRuntimePayload = {
     isPrimary: boolean;
     canonicalHost: string | null;
     redirectToPrimary: boolean;
+  };
+  team: {
+    id: string;
+    name: string;
+    description: string | null;
   };
   entryContext: PublicRuntimeEntryContext;
   publication: {
@@ -106,7 +115,47 @@ export type PublicFunnelRuntimePayload = {
     autoRedirect: boolean;
     autoRedirectDelayMs: number | null;
     messageTemplate: string | null;
+    sponsor: {
+      id: string;
+      displayName: string;
+      email: string | null;
+      phone: string | null;
+      avatarUrl: string | null;
+    } | null;
+    whatsappPhone: string | null;
+    whatsappMessage: string | null;
+    whatsappUrl: string | null;
   };
+  leadId: string | null;
+  assignment: {
+    id: string;
+    ownershipKey: string | null;
+    status: string;
+    reason: string;
+    assignedAt: string;
+    sponsor: {
+      id: string;
+      displayName: string;
+      email: string | null;
+      phone: string | null;
+      avatarUrl: string | null;
+    } | null;
+  } | null;
+  advisor: {
+    name: string;
+    role: string | null;
+    phone: string | null;
+    photoUrl: string | null;
+    bio: string | null;
+    whatsappUrl: string | null;
+  } | null;
+  assignedSponsor: {
+    id: string;
+    displayName: string;
+    email: string | null;
+    phone: string | null;
+    avatarUrl: string | null;
+  } | null;
   currentStep: {
     id: string;
     slug: string;

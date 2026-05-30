@@ -2,6 +2,8 @@
 
 Fecha: 2026-03-21 (UTC)
 
+Actualizacion: 2026-05-13 (UTC)
+
 ## Objetivo
 
 Implementar el runtime publico minimo de Leadflow para resolver `host + path` hacia una `FunnelPublication`, cargar la `FunnelInstance` correcta, seleccionar el `FunnelStep` actual y renderizar su `blocks_json` en `apps/web`.
@@ -20,6 +22,8 @@ Implementar el runtime publico minimo de Leadflow para resolver `host + path` ha
 - handoff mode efectivo disponible para thank-you o redirect inmediato
 - CTA a WhatsApp construido desde el contexto real del assignment
 - emision browser-side de eventos clave del runtime
+- resolucion de trafico `DIRECT`, `ORGANIC`, `PAID_ADS` y `PAID_WHEEL`
+- limpieza de sesion cuando `ctx` o `publicationId` quedan obsoletos
 
 ## Endpoints publicos implementados
 
@@ -72,6 +76,8 @@ El runtime en web:
 - puede revelar sponsor asignado en el siguiente step usando contexto local de la sesion
 - soporta `thank_you_then_whatsapp` e `immediate_whatsapp`
 - emite `funnel_viewed`, `step_viewed`, `form_started`, `form_submitted`, `cta_clicked` y `handoff_completed`
+- preserva contexto pagado solo cuando la URL actual mantiene evidencia de campana
+- espera hidratacion cliente antes de revelar advisor o disparar redirect automatico
 
 ## Preview local
 
@@ -95,6 +101,7 @@ Regla:
 - `form_placeholder`
 - `thank_you`
 - `sponsor_reveal_placeholder`
+- `whatsapp_handoff_cta`
 
 ## Seed ajustado para runtime
 
@@ -112,16 +119,17 @@ El seed de desarrollo ahora deja:
 
 ## Limitaciones intencionales de esta fase
 
-- no hay tracking real a Meta/TikTok
+- no hay pixel browser real a Meta/TikTok
 - no hay integracion real con Evolution API, n8n ni confirmacion de entrega de WhatsApp
 - no hay editor visual de templates
 - no hay auth publica ni privada aplicada a este runtime
 - no hay antifraude complejo ni sticky assignment
 - no hay deduplicacion avanzada de browser/server
+- el CAPI server-side cubre conversiones Lead pagadas, sin cola persistente de retry
 
 ## Que queda listo para la siguiente fase
 
-- hacer dispatch real a Meta/TikTok
+- ampliar dispatch Meta/TikTok con mapeos declarativos y retries persistentes
 - integrar providers externos para handoff y confirmaciones reales
 - introducir reglas avanzadas de routing y filtros
 - introducir permisos y auth sobre el modelo consolidado

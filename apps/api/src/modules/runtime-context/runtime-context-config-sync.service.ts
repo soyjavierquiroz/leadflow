@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { normalizeBaseUrl, sanitizeNullableText } from '../shared/url.utils';
 import {
-  normalizeBaseUrl,
-  sanitizeNullableText,
-} from '../shared/url.utils';
+  DEFAULT_TENANT_AI_BASE_PROMPT,
+  resolveAiRuntimeRoutingMetadata,
+} from '../ai-config/ai-config.defaults';
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const RUNTIME_CONTEXT_CONFIG_SYNC_PATH = '/v1/config/sync';
@@ -12,6 +13,12 @@ const RUNTIME_CONTEXT_SERVICE_KEY = 'leadflow_api' as const;
 const FUNNEL_HANDLER_MEMBER_PREFIX = 'lead-handler' as const;
 
 type JsonRecord = Record<string, Prisma.JsonValue>;
+type TenantAiAgentConfig = Prisma.AiAgentConfigGetPayload<
+  Record<string, never>
+>;
+type AiAgentConfigRecord = Prisma.AiAgentConfigGetPayload<
+  Record<string, never>
+>;
 
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -45,8 +52,72 @@ const cloneJsonValue = (value: Prisma.JsonValue): Prisma.JsonValue => {
   return value;
 };
 
-const toJsonRecord = (value: Prisma.JsonValue | null | undefined): JsonRecord =>
+const toJsonRecord = (
+  value: Prisma.JsonValue | null | undefined,
+): JsonRecord =>
   isJsonRecord(value) ? (cloneJsonValue(value) as JsonRecord) : {};
+
+const isValidBasePrompt = (value: string | null | undefined) =>
+  Boolean(sanitizeNullableText(value));
+
+const isCustomTenantBasePrompt = (value: string | null | undefined) => {
+  const prompt = sanitizeNullableText(value);
+
+  return Boolean(prompt && prompt !== DEFAULT_TENANT_AI_BASE_PROMPT);
+};
+
+const selectTenantConfigByPromptPriority = (configs: TenantAiAgentConfig[]) => {
+  return (
+    configs.find((config) => isCustomTenantBasePrompt(config.basePrompt)) ??
+    configs.find((config) => isValidBasePrompt(config.basePrompt)) ??
+    configs[0] ??
+    null
+  );
+};
+
+type RuntimeContextConfigSyncPayloadInput = {
+  tenantId: string;
+  memberId: string | null;
+  basePrompt: string;
+  verticalKey: string;
+  brandKey: string;
+  businessModelType: string;
+  routeContexts: JsonRecord;
+  funnelContext: JsonRecord;
+  ctaPolicy: JsonRecord;
+  aiPolicy: JsonRecord;
+  status: 'active' | 'inactive';
+};
+
+type RuntimeContextConfigSyncPayload = {
+  tenant_id: string;
+  member_id: string | null;
+  base_prompt: string;
+  vertical_key: string;
+  brand_key: string;
+  business_model_type: string;
+  route_contexts: JsonRecord;
+  funnel_context: JsonRecord;
+  cta_policy: JsonRecord;
+  ai_policy: JsonRecord;
+  status: 'active' | 'inactive';
+};
+
+export const buildRuntimeContextConfigSyncPayload = (
+  input: RuntimeContextConfigSyncPayloadInput,
+): RuntimeContextConfigSyncPayload => ({
+  tenant_id: input.tenantId,
+  member_id: input.memberId,
+  base_prompt: input.basePrompt,
+  vertical_key: input.verticalKey,
+  brand_key: input.brandKey,
+  business_model_type: input.businessModelType,
+  route_contexts: input.routeContexts,
+  funnel_context: input.funnelContext,
+  cta_policy: input.ctaPolicy,
+  ai_policy: input.aiPolicy,
+  status: input.status,
+});
 
 @Injectable()
 export class RuntimeContextConfigSyncService {
@@ -64,6 +135,21 @@ export class RuntimeContextConfigSyncService {
   );
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private async findActiveTenantConfig(tenantId: string) {
+    const configs = await this.prisma.aiAgentConfig.findMany({
+      where: {
+        tenantId,
+        memberId: null,
+        isActive: true,
+      },
+      orderBy: {
+        id: 'asc',
+      },
+    });
+
+    return selectTenantConfigByPromptPriority(configs);
+  }
 
   async syncFunnelContextForInstance(input: {
     tenantId: string;
@@ -84,6 +170,11 @@ export class RuntimeContextConfigSyncService {
             teamId: input.tenantId,
           },
           include: {
+            team: {
+              select: {
+                code: true,
+              },
+            },
             publications: {
               where: {
                 teamId: input.tenantId,
@@ -102,16 +193,7 @@ export class RuntimeContextConfigSyncService {
             },
           },
         }),
-        this.prisma.aiAgentConfig.findFirst({
-          where: {
-            tenantId: input.tenantId,
-            memberId: null,
-            isActive: true,
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-        }),
+        this.findActiveTenantConfig(input.tenantId),
       ]);
 
       if (!funnelInstance) {
@@ -139,6 +221,12 @@ export class RuntimeContextConfigSyncService {
       const routeContexts = toJsonRecord(
         tenantConfig.routeContexts as Prisma.JsonValue,
       );
+      const aiPolicy = toJsonRecord(tenantConfig.aiPolicy as Prisma.JsonValue);
+      const routingMetadata = resolveAiRuntimeRoutingMetadata({
+        tenantCode: funnelInstance.team.code,
+        routeContexts,
+        aiPolicy,
+      });
       const funnelContext = {
         funnel_instance_id: funnelInstance.id,
         funnel_name: funnelInstance.name,
@@ -159,16 +247,21 @@ export class RuntimeContextConfigSyncService {
         synced_by: RUNTIME_CONTEXT_SERVICE_KEY,
       };
 
-      await this.request({
-        tenant_id: input.tenantId,
-        member_id: memberId,
-        base_prompt: tenantConfig.basePrompt,
-        route_contexts: routeContexts,
-        funnel_context: funnelContext,
-        cta_policy: toJsonRecord(tenantConfig.ctaPolicy as Prisma.JsonValue),
-        ai_policy: toJsonRecord(tenantConfig.aiPolicy as Prisma.JsonValue),
-        status: tenantConfig.isActive ? 'active' : 'inactive',
-      });
+      await this.request(
+        buildRuntimeContextConfigSyncPayload({
+          tenantId: input.tenantId,
+          memberId,
+          basePrompt: tenantConfig.basePrompt,
+          verticalKey: routingMetadata.vertical_key,
+          brandKey: routingMetadata.brand_key,
+          businessModelType: routingMetadata.business_model_type,
+          routeContexts,
+          funnelContext,
+          ctaPolicy: toJsonRecord(tenantConfig.ctaPolicy as Prisma.JsonValue),
+          aiPolicy,
+          status: tenantConfig.isActive ? 'active' : 'inactive',
+        }),
+      );
 
       this.logger.log(
         `Runtime context synced for tenant ${input.tenantId}, funnel ${input.funnelInstanceId}, member ${memberId}.`,
@@ -182,20 +275,56 @@ export class RuntimeContextConfigSyncService {
     }
   }
 
+  async syncAiAgentConfig(input: {
+    config: AiAgentConfigRecord;
+    tenantCode?: string | null;
+  }): Promise<void> {
+    if (!this.isConfigured()) {
+      this.logger.warn(
+        `Skipping runtime context AI config sync for tenant ${input.config.tenantId}, config ${input.config.id}: runtime context is not configured.`,
+      );
+      return;
+    }
+
+    const routeContexts = toJsonRecord(input.config.routeContexts);
+    const aiPolicy = toJsonRecord(input.config.aiPolicy);
+    const ctaPolicy = toJsonRecord(input.config.ctaPolicy);
+    const routingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: input.tenantCode,
+      routeContexts,
+      aiPolicy,
+    });
+    const aiPolicyWithRoutingMetadata = {
+      ...aiPolicy,
+      ...routingMetadata,
+    } satisfies JsonRecord;
+
+    await this.request(
+      buildRuntimeContextConfigSyncPayload({
+        tenantId: input.config.tenantId,
+        memberId: input.config.memberId,
+        basePrompt: input.config.basePrompt,
+        verticalKey: routingMetadata.vertical_key,
+        brandKey: routingMetadata.brand_key,
+        businessModelType: routingMetadata.business_model_type,
+        routeContexts,
+        funnelContext: {},
+        ctaPolicy,
+        aiPolicy: aiPolicyWithRoutingMetadata,
+        status: input.config.isActive ? 'active' : 'inactive',
+      }),
+    );
+
+    this.logger.log(
+      `Runtime context AI config synced for tenant ${input.config.tenantId}, config ${input.config.id}, member ${input.config.memberId ?? 'global'}.`,
+    );
+  }
+
   private isConfigured() {
     return Boolean(this.baseUrl && this.apiKey);
   }
 
-  private async request(body: {
-    tenant_id: string;
-    member_id: string | null;
-    base_prompt: string;
-    route_contexts: JsonRecord;
-    funnel_context: JsonRecord;
-    cta_policy: JsonRecord;
-    ai_policy: JsonRecord;
-    status: 'active' | 'inactive';
-  }) {
+  private async request(body: RuntimeContextConfigSyncPayload) {
     const baseUrl = this.baseUrl!;
     const apiKey = this.apiKey!;
     const controller = new AbortController();

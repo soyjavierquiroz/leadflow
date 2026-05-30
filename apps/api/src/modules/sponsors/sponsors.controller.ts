@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -20,12 +21,15 @@ import type { UpdateTeamSponsorDto } from './dto/update-team-sponsor.dto';
 import { SponsorsService } from './sponsors.service';
 import { LeadsService } from '../leads/leads.service';
 import type { UpdateMemberLeadDto } from '../leads/dto/update-member-lead.dto';
+import { AdvisorCrmInboxService } from '../crm/advisor-crm-inbox.service';
+import type { AdvisorCrmInboxQuery } from '../crm/advisor-crm.types';
 
 @Controller('sponsors')
 export class SponsorsController {
   constructor(
     private readonly sponsorsService: SponsorsService,
     private readonly leadsService: LeadsService,
+    private readonly advisorCrmInboxService: AdvisorCrmInboxService,
   ) {}
 
   @Get()
@@ -87,6 +91,26 @@ export class SponsorsController {
       teamId: user.teamId!,
       sponsorId: user.sponsorId!,
     });
+  }
+
+  @Get('me/crm/inbox')
+  @RequireOperationalMemberAccess()
+  getAdvisorCrmInbox(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Query() query: AdvisorCrmInboxQuery,
+  ) {
+    if (!user.workspaceId || !user.teamId || !user.sponsorId) {
+      throw new ForbiddenException('Sponsor context is required.');
+    }
+
+    return this.advisorCrmInboxService.getInbox(
+      {
+        workspaceId: user.workspaceId,
+        teamId: user.teamId,
+        sponsorId: user.sponsorId,
+      },
+      query,
+    );
   }
 
   @Patch('me')

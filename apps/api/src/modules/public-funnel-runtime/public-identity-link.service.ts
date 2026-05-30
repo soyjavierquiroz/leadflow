@@ -7,9 +7,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildPublicationStepPath, normalizePath } from './public-funnel-runtime.utils';
 import {
-  buildPublicWhatsappMessage,
-  buildPublicWhatsappUrl,
-  normalizeWhatsappPhone,
+  buildPublicWhatsappHandoff,
+  resolveAssignedWhatsappMessageTemplate,
   resolvePublicHandoffConfig,
 } from './reveal-handoff.utils';
 import { IdentityTokenService } from './identity-token.service';
@@ -51,6 +50,7 @@ export class PublicIdentityLinkService {
         funnelPublication: {
           include: {
             domain: true,
+            team: true,
             handoffStrategy: true,
             funnelInstance: {
               include: {
@@ -103,19 +103,22 @@ export class PublicIdentityLinkService {
     const handoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
     const handoffConfig = resolvePublicHandoffConfig(handoffStrategy);
+    const customMessageTemplate = resolveAssignedWhatsappMessageTemplate(
+      targetStep.blocksJson,
+    );
     const sponsor = lead.currentAssignment?.sponsor ?? null;
-    const sponsorPhone = normalizeWhatsappPhone(sponsor?.phone ?? null);
-    const whatsappMessage = sponsor
-      ? buildPublicWhatsappMessage({
-          template: handoffConfig.messageTemplate,
-          sponsorName: sponsor.displayName,
-          leadName: lead.fullName ?? null,
-          leadEmail: lead.email ?? null,
-          leadPhone: lead.phone ?? null,
-          funnelName: publication.funnelInstance.name,
-          publicationPath: targetStepPath,
-        })
-      : null;
+    const whatsappHandoff = buildPublicWhatsappHandoff({
+      handoff: handoffConfig,
+      customMessageTemplate,
+      sponsor,
+      leadName: lead.fullName ?? null,
+      leadEmail: lead.email ?? null,
+      leadPhone: lead.phone ?? null,
+      funnelName: publication.funnelInstance.name,
+      teamName: publication.team.name,
+      publicationPath: targetStepPath,
+      ownershipKey: lead.currentAssignment?.ownershipKey,
+    });
 
     return {
       leadId: lead.id,
@@ -133,9 +136,7 @@ export class PublicIdentityLinkService {
       url: shortened.resolvedUrl,
       shortened: shortened.shortened,
       shortLinkProvider: shortened.provider,
-      whatsappUrl: sponsorPhone
-        ? buildPublicWhatsappUrl(sponsorPhone, whatsappMessage)
-        : null,
+      whatsappUrl: whatsappHandoff.whatsappUrl,
     };
   }
 
@@ -162,10 +163,14 @@ export class PublicIdentityLinkService {
         funnelPublication: {
           include: {
             domain: true,
+            team: true,
             handoffStrategy: true,
             funnelInstance: {
               include: {
                 handoffStrategy: true,
+                steps: {
+                  orderBy: { position: 'asc' },
+                },
               },
             },
           },
@@ -192,22 +197,27 @@ export class PublicIdentityLinkService {
       lead.funnelPublication.handoffStrategy ??
       lead.funnelPublication.funnelInstance.handoffStrategy;
     const handoffConfig = resolvePublicHandoffConfig(handoffStrategy);
+    const targetStep = this.resolveTargetStepByPath({
+      path: normalizedTargetPath,
+      pathPrefix: lead.funnelPublication.pathPrefix,
+      steps: lead.funnelPublication.funnelInstance.steps,
+    });
+    const customMessageTemplate = resolveAssignedWhatsappMessageTemplate(
+      targetStep?.blocksJson,
+    );
     const sponsor = lead.currentAssignment?.sponsor ?? null;
-    const sponsorPhone = normalizeWhatsappPhone(sponsor?.phone ?? null);
-    const whatsappMessage = sponsor
-      ? buildPublicWhatsappMessage({
-          template: handoffConfig.messageTemplate,
-          sponsorName: sponsor.displayName,
-          leadName: lead.fullName ?? null,
-          leadEmail: lead.email ?? null,
-          leadPhone: lead.phone ?? null,
-          funnelName: lead.funnelPublication.funnelInstance.name,
-          publicationPath: normalizedTargetPath,
-        })
-      : null;
-    const whatsappUrl = sponsorPhone
-      ? buildPublicWhatsappUrl(sponsorPhone, whatsappMessage)
-      : null;
+    const whatsappHandoff = buildPublicWhatsappHandoff({
+      handoff: handoffConfig,
+      customMessageTemplate,
+      sponsor,
+      leadName: lead.fullName ?? null,
+      leadEmail: lead.email ?? null,
+      leadPhone: lead.phone ?? null,
+      funnelName: lead.funnelPublication.funnelInstance.name,
+      teamName: lead.funnelPublication.team.name,
+      publicationPath: normalizedTargetPath,
+      ownershipKey: lead.currentAssignment?.ownershipKey,
+    });
 
     return {
       publicationId: lead.funnelPublication.id,
@@ -229,6 +239,7 @@ export class PublicIdentityLinkService {
         assignment: lead.currentAssignment
           ? {
               id: lead.currentAssignment.id,
+              ownershipKey: lead.currentAssignment.ownershipKey,
               status: lead.currentAssignment.status,
               reason: lead.currentAssignment.reason,
               assignedAt: lead.currentAssignment.assignedAt.toISOString(),
@@ -257,9 +268,9 @@ export class PublicIdentityLinkService {
                 avatarUrl: lead.currentAssignment.sponsor.avatarUrl,
               }
             : null,
-          whatsappPhone: sponsorPhone,
-          whatsappMessage,
-          whatsappUrl,
+          whatsappPhone: whatsappHandoff.whatsappPhone,
+          whatsappMessage: whatsappHandoff.whatsappMessage,
+          whatsappUrl: whatsappHandoff.whatsappUrl,
         },
         advisor: lead.currentAssignment
           ? {
@@ -269,10 +280,10 @@ export class PublicIdentityLinkService {
               )
                 ? 'Advisor'
                 : null,
-              phone: sponsorPhone,
+              phone: whatsappHandoff.whatsappPhone,
               photoUrl: lead.currentAssignment.sponsor.avatarUrl,
               bio: null,
-              whatsappUrl,
+              whatsappUrl: whatsappHandoff.whatsappUrl,
             }
           : null,
         capturedAt: lead.updatedAt.toISOString(),
@@ -287,6 +298,7 @@ export class PublicIdentityLinkService {
       stepType: string;
       isEntryStep: boolean;
       settingsJson: JsonValue;
+      blocksJson: JsonValue;
     }>,
     stepKey: string,
   ) {
@@ -322,5 +334,30 @@ export class PublicIdentityLinkService {
 
   private buildPublicBaseUrl(host: string) {
     return `https://${host.trim().toLowerCase()}`;
+  }
+
+  private resolveTargetStepByPath(input: {
+    path: string;
+    pathPrefix: string;
+    steps: Array<{
+      slug: string;
+      isEntryStep: boolean;
+      blocksJson: JsonValue;
+    }>;
+  }) {
+    const normalizedPath = normalizePath(input.path);
+
+    return (
+      input.steps.find(
+        (step) =>
+          normalizePath(
+            buildPublicationStepPath(
+              input.pathPrefix,
+              step.slug,
+              step.isEntryStep,
+            ),
+          ) === normalizedPath,
+      ) ?? null
+    );
   }
 }

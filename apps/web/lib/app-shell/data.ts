@@ -135,7 +135,7 @@ const fetchSingleton = async <T>(
 
 const buildTeamCatalog = (ids: string[], workspaceId: string) => {
   if (ids.length === 0) {
-    return mockTeamMetadata;
+    return [];
   }
 
   return ids.map((teamId, index) => {
@@ -146,7 +146,7 @@ const buildTeamCatalog = (ids: string[], workspaceId: string) => {
       workspaceId,
       name:
         ids.length === 1
-          ? (mock?.name ?? "Sales Core")
+          ? (mock?.name ?? "Team operativo")
           : (mock?.name ?? `Team ${index + 1}`),
       code: mock?.code ?? `team-${index + 1}`,
       status: mock?.status ?? "active",
@@ -482,7 +482,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           source: "live" as const,
         }),
     canReadAdminCollections
-      ? fetchCollection<TeamMetadata>("/teams", mockTeamMetadata)
+      ? fetchCollection<TeamMetadata>("/teams", [])
       : Promise.resolve({
           data:
             currentUser?.teamId && currentUser.team
@@ -513,7 +513,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     canReadAdminCollections
       ? fetchCollection<FunnelInstanceRecord>(
           "/funnel-instances",
-          mockFunnelInstances,
+          [],
         )
       : Promise.resolve({
           data: mockFunnelInstances,
@@ -522,14 +522,14 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     canReadAdminCollections
       ? fetchCollection<FunnelPublicationRecord>(
           "/funnel-publications",
-          mockPublications,
+          [],
         )
       : Promise.resolve({
           data: mockPublications,
           source: "mock" as const,
         }),
     canReadAdminCollections
-      ? fetchCollection<DomainRecord>("/domains", mockDomains)
+      ? fetchCollection<DomainRecord>("/domains", [])
       : Promise.resolve({
           data: mockDomains,
           source: "mock" as const,
@@ -543,7 +543,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           source: result.source,
         }))
       : canReadAdminCollections
-        ? fetchCollection<SponsorRecord>("/sponsors", mockSponsors)
+        ? fetchCollection<SponsorRecord>("/sponsors", [])
         : Promise.resolve({
             data: mockSponsors,
             source: "mock" as const,
@@ -551,7 +551,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     canReadAdminCollections
       ? fetchCollection<RotationPoolRecord>(
           "/rotation-pools",
-          mockRotationPools,
+          [],
         )
       : Promise.resolve({
           data: mockRotationPools,
@@ -560,10 +560,7 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
     canReadAdminCollections
       ? fetchCollection<RotationPoolMemberRecord>(
           "/rotation-pools/members",
-          buildMockRotationPoolMembers({
-            rotationPools: mockRotationPools,
-            sponsors: mockSponsors,
-          }),
+          [],
         )
       : Promise.resolve({
           data: [],
@@ -581,8 +578,14 @@ export const getAppShellSnapshot = async (): Promise<AppShellSnapshot> => {
           data: [],
           source: "mock" as const,
         }),
-    fetchCollection<LeadRecord>("/leads", mockLeads),
-    fetchCollection<AssignmentRecord>("/assignments", mockAssignments),
+    fetchCollection<LeadRecord>(
+      "/leads",
+      canReadAdminCollections ? [] : mockLeads,
+    ),
+    fetchCollection<AssignmentRecord>(
+      "/assignments",
+      canReadAdminCollections ? [] : mockAssignments,
+    ),
     fetchSingleton<LeadRemindersSummary>(
       "/leads/reminders/summary",
       remindersFallback,

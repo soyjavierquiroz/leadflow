@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { FunnelRuntimePage } from "@/components/public-funnel/funnel-runtime-page";
+import { PublicRuntimeLeadSubmitProvider } from "@/components/public-runtime/public-runtime-lead-submit-provider";
 import {
   fetchPublicFunnelRuntime,
   resolveRuntimeHost,
@@ -31,5 +32,13 @@ export default async function InmunoConfirmationPage({
     notFound();
   }
 
-  return <FunnelRuntimePage runtime={runtime} previewHost={previewHost} />;
+  return (
+    <PublicRuntimeLeadSubmitProvider
+      hostname={runtime.domain.host}
+      path={runtime.request.path}
+      runtime={runtime}
+    >
+      <FunnelRuntimePage runtime={runtime} previewHost={previewHost} />
+    </PublicRuntimeLeadSubmitProvider>
+  );
 }

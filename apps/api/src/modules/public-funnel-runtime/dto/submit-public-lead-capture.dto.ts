@@ -1,10 +1,14 @@
 import type { LeadSourceChannel } from '../../shared/domain.types';
+import type { PublicRuntimeEntryContext } from '../public-funnel-runtime.types';
+
+export type SubmittedPublicEntryContext = PublicRuntimeEntryContext;
 
 export class SubmitPublicLeadCaptureDto {
   readonly submissionEventId?: string | null;
   readonly publicationId!: string;
   readonly currentStepId!: string;
   readonly anonymousId!: string;
+  readonly entryContext?: SubmittedPublicEntryContext | null;
   readonly sourceChannel?: LeadSourceChannel;
   readonly sourceUrl?: string | null;
   readonly utmSource?: string | null;
@@ -15,6 +19,8 @@ export class SubmitPublicLeadCaptureDto {
   readonly fbclid?: string | null;
   readonly gclid?: string | null;
   readonly ttclid?: string | null;
+  readonly clientIpAddress?: string | null;
+  readonly clientUserAgent?: string | null;
   readonly fullName?: string | null;
   readonly email?: string | null;
   readonly phone?: string | null;

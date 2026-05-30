@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
 import { MailModule } from '../mail/mail.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
+import { RuntimeContextModule } from '../runtime-context/runtime-context.module';
 import { SystemApiGuard } from '../webhooks/system-api.guard';
+import { CapiManagerService } from './capi-manager.service';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
 import { IdentityTokenService } from './identity-token.service';
 import { PublicIdentityLinkService } from './public-identity-link.service';
@@ -14,13 +16,19 @@ import { PublicRuntimeService } from './public-runtime.service';
 import { ShortLinkProvider } from './short-link.provider';
 
 @Module({
-  imports: [EventsModule, MessagingAutomationModule, MailModule],
+  imports: [
+    EventsModule,
+    MessagingAutomationModule,
+    MailModule,
+    RuntimeContextModule,
+  ],
   controllers: [
     PublicFunnelRuntimeController,
     PublicRuntimeController,
     PublicTrackedLinksController,
   ],
   providers: [
+    CapiManagerService,
     PublicFunnelRuntimeService,
     PublicRuntimeService,
     LeadCaptureAssignmentService,
@@ -33,6 +41,7 @@ import { ShortLinkProvider } from './short-link.provider';
     PublicFunnelRuntimeService,
     PublicRuntimeService,
     LeadCaptureAssignmentService,
+    CapiManagerService,
     IdentityTokenService,
     PublicIdentityLinkService,
   ],

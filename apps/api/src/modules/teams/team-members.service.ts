@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AiConfigService } from '../ai-config/ai-config.service';
 import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { MailerService } from '../shared/mailer.service';
@@ -177,6 +178,7 @@ export class TeamMembersService {
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
     private readonly mailerService: MailerService,
+    private readonly aiConfigService: AiConfigService,
   ) {}
 
   async list(scope: TeamMemberScope): Promise<TeamMembersSnapshot> {
@@ -345,6 +347,14 @@ export class TeamMembersService {
 
     const invitation = await this.prisma.$transaction(async (tx) => {
       const team = await this.requireTeam(scope, tx);
+
+      await this.aiConfigService.ensureTenantDefaultConfig(
+        {
+          tenantId: scope.teamId,
+          brandKey: team.code,
+        },
+        tx,
+      );
 
       const existingUser = await tx.user.findUnique({
         where: {
@@ -520,6 +530,7 @@ export class TeamMembersService {
       select: {
         id: true,
         name: true,
+        code: true,
         maxSeats: true,
       },
     });
@@ -717,11 +728,13 @@ export class TeamMembersService {
         continue;
       }
 
-      const conditions = tableColumns.map((columnName) => Prisma.sql`
+      const conditions = tableColumns.map(
+        (columnName) => Prisma.sql`
         ${Prisma.raw(this.quotePgIdentifier(columnName))} IN (${Prisma.join(
           targetIds,
         )})
-      `);
+      `,
+      );
 
       await tx.$executeRaw(Prisma.sql`
         DELETE FROM ${Prisma.raw(this.quotePgIdentifier(tableName))}
@@ -874,9 +887,8 @@ export class TeamMembersService {
 
   private async provisionSponsorWelcomeKredits(sponsorId: string) {
     try {
-      const account = await this.walletEngineService.upsertSponsorAccount(
-        sponsorId,
-      );
+      const account =
+        await this.walletEngineService.upsertSponsorAccount(sponsorId);
 
       await this.walletEngineService.creditInitialKredits(
         account.accountId,
@@ -891,13 +903,11 @@ export class TeamMembersService {
     }
   }
 
-  private async dispatchAdvisorWelcomeEmail(
-    input: {
-      email: string;
-      temporaryPassword: string;
-      teamName: string;
-    },
-  ) {
+  private async dispatchAdvisorWelcomeEmail(input: {
+    email: string;
+    temporaryPassword: string;
+    teamName: string;
+  }) {
     try {
       await this.mailerService.sendAdvisorWelcomeEmail({
         email: input.email,
@@ -932,9 +942,7 @@ export class TeamMembersService {
   }
 
   private async generateAvailablePublicSlug(
-    tx:
-      | Prisma.TransactionClient
-      | Pick<PrismaService, 'sponsor'>,
+    tx: Prisma.TransactionClient | Pick<PrismaService, 'sponsor'>,
     fullName: string,
   ) {
     const baseSlug = slugify(fullName) || 'asesor';

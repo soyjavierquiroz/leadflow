@@ -17,7 +17,7 @@ export type FunnelStructuralType =
 export interface FunnelInstance
   extends BaseDomainEntity, WorkspaceScoped, TeamScoped {
   templateId: DomainId;
-  legacyFunnelId: DomainId | null;
+  funnelId: DomainId | null;
   name: string;
   code: string;
   thumbnailUrl: string | null;

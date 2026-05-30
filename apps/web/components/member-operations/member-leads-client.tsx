@@ -250,8 +250,8 @@ export function MemberLeadsClient({
     const matchesSource =
       sourceFilter === "all" ||
       (sourceFilter === "paid"
-        ? row.trafficLayer === "PAID_WHEEL"
-        : row.trafficLayer !== "PAID_WHEEL");
+        ? row.trafficLayer === "PAID_WHEEL" || row.trafficLayer === "PAID_ADS"
+        : row.trafficLayer !== "PAID_WHEEL" && row.trafficLayer !== "PAID_ADS");
 
     return Boolean(
       matchesSearch &&

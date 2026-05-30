@@ -35,6 +35,10 @@ export const authenticatedOperationRequest = async <T>(
       headers,
     });
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+
     throw new Error(
       error instanceof Error
         ? `No pudimos conectar con el API del team (${error.message}).`

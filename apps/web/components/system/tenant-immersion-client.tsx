@@ -17,13 +17,16 @@ import { StatusBadge } from "@/components/app-shell/status-badge";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { formatCompactNumber, formatDateTime, toSentenceCase } from "@/lib/app-shell/utils";
-import type {
-  SystemFunnelTemplateRecord,
-  SystemTenantDomainDeleteResponse,
-  SystemTenantDomainRecord,
-  SystemTenantDomainVerificationResponse,
-  SystemTenantDetailRecord,
-  SystemTenantFunnelRecord,
+import {
+  buildSystemTemplateDeploymentBuilderUrl,
+  type SystemTemplateDeploymentResponse,
+  type SystemTemplateRecord,
+  type SystemUnifiedFunnelLibraryRecord,
+  type SystemTenantDomainDeleteResponse,
+  type SystemTenantDomainRecord,
+  type SystemTenantDomainVerificationResponse,
+  type SystemTenantDetailRecord,
+  type SystemTenantFunnelRecord,
 } from "@/lib/system-tenants.types";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
@@ -37,7 +40,7 @@ type TenantImmersionClientProps = {
 type ImmersionTab = "overview" | "funnels" | "domains";
 
 type CloneFormState = {
-  templateFunnelId: string;
+  sourceId: string;
   newName: string;
 };
 
@@ -60,7 +63,7 @@ const dangerButtonClassName =
   "rounded-full bg-app-danger-text px-4 py-2 text-sm font-semibold text-app-bg transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent-soft disabled:cursor-not-allowed disabled:opacity-60";
 
 const buildInitialCloneFormState = (): CloneFormState => ({
-  templateFunnelId: "",
+  sourceId: "",
   newName: "",
 });
 
@@ -101,16 +104,6 @@ const buildVerificationBadgeClassName = (isVerified: boolean) =>
     ? "border-app-success-border bg-app-success-bg text-app-success-text"
     : "border-app-warning-border bg-app-warning-bg text-app-warning-text";
 
-const isTemplateEngineFunnel = (config: unknown) =>
-  Boolean(
-    config &&
-      typeof config === "object" &&
-      !Array.isArray(config) &&
-      "source" in config &&
-      (config as { source?: unknown }).source === "global-template-engine" &&
-      "blocks" in config,
-  );
-
 export function TenantImmersionClient({
   teamId,
   initialTenant,
@@ -142,10 +135,13 @@ export function TenantImmersionClient({
   const [deleteTarget, setDeleteTarget] = useState<SystemTenantDomainRecord | null>(
     null,
   );
-  const [templateOptions, setTemplateOptions] = useState<
-    SystemFunnelTemplateRecord[] | null
+  const [deletingFunnelId, setDeletingFunnelId] = useState<string | null>(null);
+  const [funnelDeleteTarget, setFunnelDeleteTarget] =
+    useState<SystemTenantFunnelRecord | null>(null);
+  const [globalTemplateOptions, setGlobalTemplateOptions] = useState<
+    SystemTemplateRecord[] | null
   >(null);
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [cloneFormState, setCloneFormState] = useState(
     buildInitialCloneFormState(),
   );
@@ -175,51 +171,63 @@ export function TenantImmersionClient({
   }, []);
 
   useEffect(() => {
-    if (!isAssignOpen || templateOptions !== null || isLoadingTemplates) {
+    if (!isAssignOpen || !teamId) {
       return;
     }
 
-    let isCancelled = false;
+    const abortController = new AbortController();
 
-    const loadTemplates = async () => {
-      setIsLoadingTemplates(true);
+    const loadLibrary = async () => {
+      setIsLoadingLibrary(true);
+      setGlobalTemplateOptions(null);
 
       try {
-        const payload = await authenticatedOperationRequest<
-          SystemFunnelTemplateRecord[]
-        >("/system/funnels/templates", {
-          method: "GET",
-        });
+        const libraryPayload =
+          await authenticatedOperationRequest<SystemUnifiedFunnelLibraryRecord>(
+            "/system/funnels/library",
+            {
+              method: "GET",
+              signal: abortController.signal,
+            },
+          );
 
-        if (!isCancelled) {
-          setTemplateOptions(payload);
-        }
+        const globalTemplates = libraryPayload.modernTemplates ?? [];
+
+        setGlobalTemplateOptions(globalTemplates);
+        setCloneFormState((current) => ({
+          ...current,
+          sourceId: "",
+        }));
       } catch (error) {
-        if (!isCancelled) {
-          setFeedback({
-            tone: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : "No pudimos cargar la librería de funnels.",
-          });
+        if (abortController.signal.aborted) {
+          return;
         }
+
+        setFeedback({
+          tone: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "No pudimos cargar la librería de funnels.",
+        });
       } finally {
-        if (!isCancelled) {
-          setIsLoadingTemplates(false);
+        if (!abortController.signal.aborted) {
+          setIsLoadingLibrary(false);
         }
       }
     };
 
-    void loadTemplates();
+    void loadLibrary();
 
     return () => {
-      isCancelled = true;
+      abortController.abort();
     };
-  }, [isAssignOpen, isLoadingTemplates, templateOptions]);
+  }, [isAssignOpen, teamId]);
 
   const closeAssignModal = () => {
     setIsAssignOpen(false);
+    setIsLoadingLibrary(false);
+    setGlobalTemplateOptions(null);
     setCloneFormState(buildInitialCloneFormState());
   };
 
@@ -234,6 +242,14 @@ export function TenantImmersionClient({
     }
 
     setDeleteTarget(null);
+  };
+
+  const closeFunnelDeleteModal = () => {
+    if (deletingFunnelId !== null) {
+      return;
+    }
+
+    setFunnelDeleteTarget(null);
   };
 
   const showToast = (
@@ -325,41 +341,41 @@ export function TenantImmersionClient({
     event.preventDefault();
     setFeedback(null);
 
-    const templateFunnelId = cloneFormState.templateFunnelId.trim();
-    const newName = cloneFormState.newName.trim();
+    const sourceId = cloneFormState.sourceId.trim();
+    const cloneName = cloneFormState.newName.trim();
 
-    if (!templateFunnelId) {
+    if (!sourceId) {
       setFeedback({
         tone: "error",
-        message: "Selecciona una plantilla antes de asignarla al tenant.",
+        message: "Selecciona una fuente antes de crear el funnel del tenant.",
+      });
+      return;
+    }
+
+    if (!cloneName) {
+      setFeedback({
+        tone: "error",
+        message: "Nombra el funnel antes de crearlo.",
       });
       return;
     }
 
     startTransition(async () => {
       try {
-        await authenticatedOperationRequest<SystemTenantFunnelRecord>(
-          `/system/funnels/${encodeURIComponent(templateFunnelId)}/clone`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              targetTeamId: teamId,
-              newName: newName || undefined,
-            }),
-          },
-        );
+        const payload =
+          await authenticatedOperationRequest<SystemTemplateDeploymentResponse>(
+            `/system/templates/${encodeURIComponent(sourceId)}/deploy`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                teamId,
+                cloneName,
+              }),
+            },
+          );
 
-        const nextFunnels = await reloadFunnels();
         closeAssignModal();
-
-        if (nextFunnels) {
-          setActiveTab("funnels");
-          setFeedback({
-            tone: "success",
-            message:
-              "Funnel asignado correctamente. La tabla ya refleja la nueva clonación.",
-          });
-        }
+        router.push(buildSystemTemplateDeploymentBuilderUrl(payload, teamId));
       } catch (error) {
         setFeedback({
           tone: "error",
@@ -562,6 +578,59 @@ export function TenantImmersionClient({
       );
     } finally {
       setDeletingDomainId(null);
+    }
+  };
+
+  const handleDeleteFunnel = async () => {
+    if (!funnelDeleteTarget) {
+      return;
+    }
+
+    setFeedback(null);
+    setDeletingFunnelId(funnelDeleteTarget.id);
+
+    try {
+      const payload = await authenticatedOperationRequest<{
+        id: string;
+        name: string;
+        deleted: true;
+      }>(
+        `/system/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(funnelDeleteTarget.id)}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      setFunnels((current) =>
+        current.filter((funnel) => funnel.id !== payload.id),
+      );
+      setTenant((current) => ({
+        ...current,
+        funnelCount: Math.max(0, current.funnelCount - 1),
+      }));
+      setDomains((current) =>
+        current.map((domain) =>
+          domain.linkedFunnelId === payload.id
+            ? { ...domain, linkedFunnelId: null }
+            : domain,
+        ),
+      );
+      setFunnelDeleteTarget(null);
+      showToast(
+        "success",
+        "Funnel eliminado",
+        `${payload.name} salió del inventario operativo del tenant.`,
+      );
+    } catch (error) {
+      showToast(
+        "error",
+        "No pudimos eliminar el funnel",
+        error instanceof Error
+          ? error.message
+          : "La operación falló antes de devolver un estado nuevo.",
+      );
+    } finally {
+      setDeletingFunnelId(null);
     }
   };
 
@@ -900,21 +969,29 @@ export function TenantImmersionClient({
                 key: "actions",
                 header: "Acciones",
                 render: (row) => (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      router.push(
-                        isTemplateEngineFunnel(row.config)
-                          ? `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(row.id)}/edit`
-                          : `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(row.id)}/builder`,
-                      )
-                    }
-                    className={secondaryButtonClassName}
-                  >
-                    {isTemplateEngineFunnel(row.config)
-                      ? "Editar Funnel JSON"
-                      : "Abrir Funnel Builder"}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(row.id)}/builder`,
+                        )
+                      }
+                      className={secondaryButtonClassName}
+                    >
+                      Abrir Builder
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFunnelDeleteTarget(row)}
+                      disabled={deletingFunnelId === row.id}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-app-danger-border bg-app-danger-bg text-app-danger-text transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label={`Eliminar funnel ${row.name}`}
+                      title="Eliminar funnel"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 ),
               },
             ]}
@@ -1145,33 +1222,33 @@ export function TenantImmersionClient({
         <ModalShell
           eyebrow="System Funnels Library"
           title={`Asignar funnel a ${tenant.name}`}
-          description="Selecciona una plantilla de la librería global y clónala dentro de este tenant. El nuevo funnel quedará ligado al team actual."
+          description="Despliega un template global moderno como funnel operativo del tenant."
           onClose={closeAssignModal}
         >
           <form className="space-y-5" onSubmit={handleCloneSubmit}>
             <label className="block">
               <span className="text-sm font-medium text-app-text-muted">
-                Plantilla base
+                Template global
               </span>
               <select
-                value={cloneFormState.templateFunnelId}
+                value={cloneFormState.sourceId}
                 onChange={(event) =>
                   setCloneFormState((current) => ({
                     ...current,
-                    templateFunnelId: event.target.value,
+                    sourceId: event.target.value,
                   }))
                 }
-                disabled={isLoadingTemplates || isPending}
+                disabled={isLoadingLibrary || isPending}
                 className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted"
               >
                 <option value="">
-                  {isLoadingTemplates
-                    ? "Cargando librería..."
-                    : "Selecciona una plantilla"}
+                  {isLoadingLibrary
+                    ? "Cargando opciones..."
+                    : "Selecciona una opción"}
                 </option>
-                {(templateOptions ?? []).map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name} ({template.code})
+                {(globalTemplateOptions ?? []).map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name} ({option.code})
                   </option>
                 ))}
               </select>
@@ -1179,7 +1256,7 @@ export function TenantImmersionClient({
 
             <label className="block">
               <span className="text-sm font-medium text-app-text-muted">
-                Nombre del clon (opcional)
+                Nombre del clon
               </span>
               <input
                 type="text"
@@ -1190,17 +1267,23 @@ export function TenantImmersionClient({
                     newName: event.target.value,
                   }))
                 }
-                placeholder="Copia de Funnel Base Premium"
+                placeholder="Nombre identificador para el Tenant (ej: Campaña Mayo)"
                 disabled={isPending}
                 className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft disabled:cursor-not-allowed disabled:bg-app-surface-muted"
               />
             </label>
 
             <div className="rounded-3xl border border-app-border bg-app-surface-muted px-4 py-4 text-sm leading-6 text-app-text-muted">
-              El backend recibirá `targetTeamId={teamId}` para clonar la
-              plantilla sobre este tenant y luego refrescar la tabla sin salir
-              de la vista de inmersión.
+              Se desplegará un template global moderno directamente en este tenant,
+              creando el funnel operativo base, su instancia y sus pasos iniciales.
             </div>
+
+            {(globalTemplateOptions?.length ?? 0) === 0 ? (
+              <div className="rounded-3xl border border-app-warning-border bg-app-warning-bg px-4 py-4 text-sm leading-6 text-app-warning-text">
+                No hay templates globales disponibles para crear un funnel desde
+                esta vista.
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap justify-end gap-3">
               <button
@@ -1215,12 +1298,14 @@ export function TenantImmersionClient({
                 type="submit"
                 disabled={
                   isPending ||
-                  isLoadingTemplates ||
-                  (templateOptions?.length ?? 0) === 0
+                  isLoadingLibrary ||
+                  !cloneFormState.sourceId ||
+                  !cloneFormState.newName.trim() ||
+                  (globalTemplateOptions?.length ?? 0) === 0
                 }
                 className={primaryButtonClassName}
               >
-                {isPending ? "Asignando..." : "Clonar al tenant"}
+                {isPending ? "Creando..." : "Desplegar en tenant"}
               </button>
             </div>
           </form>
@@ -1262,6 +1347,46 @@ export function TenantImmersionClient({
                 className={dangerButtonClassName}
               >
                 {deletingDomainId !== null ? "Eliminando..." : "Eliminar dominio"}
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      ) : null}
+
+      {funnelDeleteTarget ? (
+        <ModalShell
+          eyebrow="Super Admin / Funnels"
+          title="Eliminar funnel operativo"
+          description="Esta acción elimina el funnel operativo, sus steps, publicaciones y datos dependientes. Las plantillas globales no se tocan."
+          onClose={closeFunnelDeleteModal}
+        >
+          <div className="space-y-6">
+            <div className="rounded-[1.5rem] border border-app-danger-border bg-app-danger-bg px-4 py-4 text-sm text-app-danger-text">
+              <p className="font-semibold">{funnelDeleteTarget.name}</p>
+              <p className="mt-1">
+                Se eliminará del inventario del tenant y dejará de aparecer en
+                publicaciones y dominios enlazados.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeFunnelDeleteModal}
+                disabled={deletingFunnelId !== null}
+                className={secondaryButtonClassName}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleDeleteFunnel();
+                }}
+                disabled={deletingFunnelId !== null}
+                className={dangerButtonClassName}
+              >
+                {deletingFunnelId !== null ? "Eliminando..." : "Eliminar funnel"}
               </button>
             </div>
           </div>

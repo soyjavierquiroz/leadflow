@@ -14,49 +14,20 @@ type PublicRuntimePageProps = {
     hostname: string;
     slug?: string[];
   }>;
-  searchParams: Promise<{
-    awid?: string;
-    ref?: string;
-  }>;
-};
-
-const appendRuntimeQuery = (
-  path: string,
-  query: {
-    awid?: string;
-    ref?: string;
-  },
-) => {
-  const params = new URLSearchParams();
-
-  if (query.awid?.trim()) {
-    params.set("awid", query.awid.trim());
-  }
-
-  if (query.ref?.trim()) {
-    params.set("ref", query.ref.trim());
-  }
-
-  const serialized = params.toString();
-  return serialized
-    ? `${path}${path.includes("?") ? "&" : "?"}${serialized}`
-    : path;
 };
 
 export default async function PublicRuntimePage({
   params,
-  searchParams,
 }: PublicRuntimePageProps) {
-  const [{ hostname, slug }, query] = await Promise.all([params, searchParams]);
+  const { hostname, slug } = await params;
   const path = resolvePublicRuntimePath(slug);
-  const runtimePath = appendRuntimeQuery(path, query);
 
   let runtime = null;
 
   try {
     runtime = await fetchPublicFunnelRuntime({
       host: hostname,
-      path: runtimePath,
+      path,
     });
   } catch (error) {
     console.error('[public-runtime] Runtime resolution failed', {
@@ -81,7 +52,8 @@ export default async function PublicRuntimePage({
     <>
       <PublicRuntimeLeadSubmitProvider
         hostname={runtime.domain.host}
-        path={runtimePath}
+        path={runtime.request.path}
+        runtime={runtime}
       >
         <FunnelRuntimePage runtime={runtime} />
       </PublicRuntimeLeadSubmitProvider>

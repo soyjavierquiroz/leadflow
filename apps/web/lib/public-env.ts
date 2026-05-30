@@ -75,7 +75,7 @@ export const webPublicConfig: WebPublicConfig = {
       sanitizeEnv(process.env.NEXT_PUBLIC_KNOWLEDGE_UPLOAD_WEBHOOK_URL) ?? null,
   },
   runtime: {
-    platformKey: withFallback(process.env.NEXT_PUBLIC_PLATFORM_KEY, "kurukin"),
+    platformKey: withFallback(process.env.NEXT_PUBLIC_PLATFORM_KEY, "leadflow"),
     productKey: withFallback(process.env.NEXT_PUBLIC_PRODUCT_KEY, "leadflow"),
   },
   saas: {

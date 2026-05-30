@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { mapAssignmentRecord } from '../prisma.mappers';
+import { generateOwnershipKey } from '../../modules/runtime-context/ownership-context-key.util';
 import type { CreateAssignmentDto } from '../../modules/assignments/dto/create-assignment.dto';
 import type {
   Assignment,
@@ -98,6 +99,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
   async create(data: CreateAssignmentDto): Promise<Assignment> {
     const record = await this.prisma.assignment.create({
       data: {
+        ownershipKey: generateOwnershipKey(),
         workspaceId: data.workspaceId,
         leadId: data.leadId,
         sponsorId: data.sponsorId,
@@ -125,6 +127,7 @@ export class AssignmentPrismaRepository implements AssignmentRepository {
       where: { id: entity.id },
       create: {
         id: entity.id,
+        ownershipKey: generateOwnershipKey(),
         workspaceId: entity.workspaceId,
         leadId: entity.leadId,
         sponsorId: entity.sponsorId,

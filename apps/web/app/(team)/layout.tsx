@@ -15,6 +15,11 @@ const teamNav = [
     icon: "inbox",
   },
   {
+    href: "/team/crm",
+    label: "CRM Unificado",
+    icon: "network",
+  },
+  {
     href: "/team/members",
     label: "Equipo",
     icon: "users",

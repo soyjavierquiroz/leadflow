@@ -130,7 +130,7 @@ export function TeamLeadsClient({
           row.funnelName,
           row.domainHost,
           row.originAdWheelName,
-          row.trafficLayer === "PAID_WHEEL"
+          row.trafficLayer === "PAID_WHEEL" || row.trafficLayer === "PAID_ADS"
             ? "campaña pagada publicidad"
             : "organico directo",
           row.sponsor?.displayName,
@@ -153,8 +153,8 @@ export function TeamLeadsClient({
       const matchesSource =
         sourceFilter === "all" ||
         (sourceFilter === "paid"
-          ? row.trafficLayer === "PAID_WHEEL"
-          : row.trafficLayer !== "PAID_WHEEL");
+          ? row.trafficLayer === "PAID_WHEEL" || row.trafficLayer === "PAID_ADS"
+          : row.trafficLayer !== "PAID_WHEEL" && row.trafficLayer !== "PAID_ADS");
 
       return (
         matchesSearch &&

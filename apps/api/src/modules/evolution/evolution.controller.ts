@@ -11,6 +11,12 @@ import {
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import { type AuthenticatedUser } from '../auth/auth.types';
 import { RequireAuth } from '../auth/roles.decorator';
+import {
+  DEFAULT_AI_BUSINESS_MODEL_TYPE,
+  DEFAULT_AI_BRAND_KEY,
+  DEFAULT_AI_VERTICAL_KEY,
+  normalizeRuntimeRoutingToken,
+} from '../ai-config/ai-config.defaults';
 import { sanitizeNullableText } from '../shared/url.utils';
 import { ConnectEvolutionDto } from './dto/connect-evolution.dto';
 import { EvolutionService } from './evolution.service';
@@ -29,11 +35,16 @@ export class EvolutionController {
     @CurrentAuthUser() user: AuthenticatedUser,
     @Body() dto: ConnectEvolutionDto,
   ) {
-    const instanceName = this.requireBodyText(dto?.instanceName, 'instanceName');
+    const instanceName = this.requireBodyText(
+      dto?.instanceName,
+      'instanceName',
+    );
     this.assertOwnedInstanceName(user, instanceName);
     const tenantId = this.resolveTenantId(user);
     const ownerKey = this.resolveOwnerKey(user);
     const verticalKey = this.resolveVerticalKey(user);
+    const brandKey = this.resolveBrandKey(user);
+    const businessModelType = this.resolveBusinessModelType();
 
     const connectionState =
       await this.evolutionService.getConnectionState(instanceName);
@@ -47,6 +58,8 @@ export class EvolutionController {
       instanceName,
       tenantId,
       verticalKey,
+      brandKey,
+      businessModelType,
     });
 
     const qrCode = await this.evolutionService.getQrCode(instanceName);
@@ -73,9 +86,11 @@ export class EvolutionController {
       'instanceName',
     );
     this.assertOwnedInstanceName(user, normalizedInstanceName);
-    const connectionState =
-      await this.evolutionService.getConnectionState(normalizedInstanceName);
-    const state = sanitizeNullableText(connectionState?.instance?.state) ?? 'close';
+    const connectionState = await this.evolutionService.getConnectionState(
+      normalizedInstanceName,
+    );
+    const state =
+      sanitizeNullableText(connectionState?.instance?.state) ?? 'close';
 
     return {
       instanceName: normalizedInstanceName,
@@ -127,7 +142,22 @@ export class EvolutionController {
         })
       | null;
 
-    return sanitizeNullableText(teamWithVertical?.vertical) ?? 'unknown';
+    return (
+      normalizeRuntimeRoutingToken(teamWithVertical?.vertical) ??
+      DEFAULT_AI_VERTICAL_KEY
+    );
+  }
+
+  private resolveBrandKey(user: AuthenticatedUser) {
+    return (
+      normalizeRuntimeRoutingToken(user.team?.code) ??
+      normalizeRuntimeRoutingToken(user.workspace?.slug) ??
+      DEFAULT_AI_BRAND_KEY
+    );
+  }
+
+  private resolveBusinessModelType() {
+    return DEFAULT_AI_BUSINESS_MODEL_TYPE;
   }
 
   private resolveOwnerKey(user: AuthenticatedUser) {
@@ -139,8 +169,7 @@ export class EvolutionController {
 
     throw new BadRequestException({
       code: 'EVOLUTION_OWNER_SCOPE_REQUIRED',
-      message:
-        'The authenticated user does not have an operational owner key.',
+      message: 'The authenticated user does not have an operational owner key.',
     });
   }
 

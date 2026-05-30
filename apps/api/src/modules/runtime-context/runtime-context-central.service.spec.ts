@@ -122,6 +122,7 @@ describe('RuntimeContextCentralService', () => {
     const result = await service.ensureConnectionReady({
       id: 'conn-1',
       workspaceId: 'workspace-1',
+      teamId: 'team-1',
       externalInstanceId: 'instance-1',
       runtimeContextStatus: MessagingRuntimeContextStatus.PROVISIONED,
       runtimeContextTenantId: 'workspace-1',
@@ -161,6 +162,7 @@ describe('RuntimeContextCentralService', () => {
     const result = await service.ensureConnectionReady({
       id: 'conn-2',
       workspaceId: 'workspace-2',
+      teamId: 'team-2',
       externalInstanceId: 'instance-2',
       runtimeContextStatus: MessagingRuntimeContextStatus.PROVISIONED,
       runtimeContextTenantId: 'workspace-2',

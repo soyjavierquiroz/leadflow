@@ -43,7 +43,7 @@ export class FunnelInstancesService {
       workspaceId: dto.workspaceId,
       teamId: dto.teamId,
       templateId: dto.templateId,
-      legacyFunnelId: dto.legacyFunnelId ?? null,
+      funnelId: dto.funnelId ?? null,
       name: dto.name,
       code: dto.code,
       thumbnailUrl: null,
@@ -135,7 +135,7 @@ export class FunnelInstancesService {
     }
 
     const record = await this.prisma.$transaction(async (tx) => {
-      const legacyFunnel = await tx.funnel.create({
+      const funnel = await tx.funnel.create({
         data: {
           workspaceId: scope.workspaceId,
           name,
@@ -154,7 +154,7 @@ export class FunnelInstancesService {
           workspaceId: scope.workspaceId,
           teamId: scope.teamId,
           templateId: template.id,
-          legacyFunnelId: legacyFunnel.id,
+          funnelId: funnel.id,
           name,
           code,
           thumbnailUrl: null,
@@ -241,9 +241,9 @@ export class FunnelInstancesService {
     });
 
     const record = await this.prisma.$transaction(async (tx) => {
-      if (existing.legacyFunnelId) {
+      if (existing.funnelId) {
         await tx.funnel.update({
-          where: { id: existing.legacyFunnelId },
+          where: { id: existing.funnelId },
           data: {
             name,
             code,

@@ -43,7 +43,6 @@ export type SystemPublicationRecord = LooseRecord & {
   };
   funnel: LooseRecord & {
     id: string;
-    legacyFunnelId: string | null;
     name: string;
     code: string;
     status: string;
@@ -81,7 +80,6 @@ export type SystemPublicationFunnelOption = LooseRecord & {
   workspaceId: string;
   teamId: string;
   templateId: string;
-  legacyFunnelId: string | null;
   trackingProfileId?: string | null;
   handoffStrategyId?: string | null;
   theme?: string | null;

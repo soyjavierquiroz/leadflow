@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -62,6 +63,8 @@ type RecordTrackingEventInput = {
 
 @Injectable()
 export class TrackingEventsService {
+  private readonly logger = new Logger(TrackingEventsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async trackPublicRuntimeEvent(dto: TrackPublicRuntimeEventDto) {
@@ -175,25 +178,98 @@ export class TrackingEventsService {
   ) {
     const occurredAt = input.occurredAt ?? new Date();
     const eventId = input.eventId?.trim() || randomUUID();
+    const assignmentId = await this.resolveValidAssignmentId(
+      tx,
+      input.assignmentId ?? null,
+      input.eventName,
+      input.aggregateId,
+    );
 
-    return tx.domainEvent.create({
-      data: {
-        workspaceId: input.workspaceId,
-        eventId,
-        aggregateType: this.toDbAggregateType(input.aggregateType),
-        aggregateId: input.aggregateId,
-        eventName: input.eventName,
-        actorType: input.actorType,
-        payload: (input.payload ?? {}) as Prisma.InputJsonValue,
-        occurredAt,
-        funnelInstanceId: input.funnelInstanceId ?? null,
-        funnelPublicationId: input.funnelPublicationId ?? null,
-        funnelStepId: input.funnelStepId ?? null,
-        visitorId: input.visitorId ?? null,
-        leadId: input.leadId ?? null,
-        assignmentId: input.assignmentId ?? null,
+    try {
+      return await tx.domainEvent.create({
+        data: this.buildDomainEventCreateInput(
+          input,
+          eventId,
+          occurredAt,
+          assignmentId,
+        ),
+      });
+    } catch (error) {
+      if (
+        assignmentId &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        this.logger.warn(
+          `Tracking event ${input.eventName} dropped invalid assignmentId ${assignmentId}; retrying without assignment relation.`,
+        );
+
+        return tx.domainEvent.create({
+          data: this.buildDomainEventCreateInput(
+            input,
+            eventId,
+            occurredAt,
+            null,
+          ),
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  private buildDomainEventCreateInput(
+    input: RecordTrackingEventInput,
+    eventId: string,
+    occurredAt: Date,
+    assignmentId: string | null,
+  ): Prisma.DomainEventUncheckedCreateInput {
+    return {
+      workspaceId: input.workspaceId,
+      eventId,
+      aggregateType: this.toDbAggregateType(input.aggregateType),
+      aggregateId: input.aggregateId,
+      eventName: input.eventName,
+      actorType: input.actorType,
+      payload: (input.payload ?? {}) as Prisma.InputJsonValue,
+      occurredAt,
+      funnelInstanceId: input.funnelInstanceId ?? null,
+      funnelPublicationId: input.funnelPublicationId ?? null,
+      funnelStepId: input.funnelStepId ?? null,
+      visitorId: input.visitorId ?? null,
+      leadId: input.leadId ?? null,
+      assignmentId,
+    };
+  }
+
+  private async resolveValidAssignmentId(
+    tx: TransactionClient,
+    assignmentId: string | null,
+    eventName: string,
+    aggregateId: string,
+  ) {
+    const normalizedAssignmentId = assignmentId?.trim() || null;
+    if (!normalizedAssignmentId) {
+      return null;
+    }
+
+    const assignment = await tx.assignment.findUnique({
+      where: {
+        id: normalizedAssignmentId,
+      },
+      select: {
+        id: true,
       },
     });
+
+    if (assignment?.id) {
+      return assignment.id;
+    }
+
+    this.logger.warn(
+      `Tracking event ${eventName} skipped missing assignmentId ${normalizedAssignmentId} for aggregate ${aggregateId}.`,
+    );
+    return null;
   }
 
   private async getPublicationContextOrThrow(

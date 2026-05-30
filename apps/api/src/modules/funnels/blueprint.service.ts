@@ -69,6 +69,10 @@ type BlueprintMutationScope = {
   teamId?: string | null;
 };
 
+type ApplyBlueprintOptions = {
+  allowDestructiveOverwrite?: boolean;
+};
+
 type ApplyBlueprintResult = FunnelLintReport & {
   blueprintType: BlueprintType;
   graph: FlowGraphV1;
@@ -226,6 +230,7 @@ export class BlueprintService {
     funnelInstanceId: string,
     type: string,
     mode?: 'replace' | 'merge',
+    options?: ApplyBlueprintOptions,
   ): Promise<ApplyBlueprintResult> {
     if (!user.workspaceId) {
       throw new BadRequestException({
@@ -242,6 +247,7 @@ export class BlueprintService {
       funnelInstanceId,
       type,
       mode,
+      options,
     );
   }
 
@@ -250,6 +256,7 @@ export class BlueprintService {
     funnelInstanceId: string,
     type: string,
     mode: 'replace' | 'merge' = 'replace',
+    options: ApplyBlueprintOptions = {},
   ): Promise<ApplyBlueprintResult> {
     const blueprint = this.resolveBlueprint(type);
 
@@ -274,17 +281,44 @@ export class BlueprintService {
         });
       }
 
-      if (mode === 'replace' && funnelInstance.steps.length > 0) {
+      const activePublicationCount = await tx.funnelPublication.count({
+        where: {
+          funnelInstanceId: funnelInstance.id,
+          status: 'active',
+        },
+      });
+      const hasActivePublication = activePublicationCount > 0;
+      const hasExistingSteps = funnelInstance.steps.length > 0;
+      const allExistingStepsBoilerplate =
+        hasExistingSteps &&
+        funnelInstance.steps.every((step) => this.isBoilerplateStep(step));
+      const canDestructivelyReplace =
+        mode === 'replace' &&
+        hasExistingSteps &&
+        !hasActivePublication &&
+        (allExistingStepsBoilerplate ||
+          options.allowDestructiveOverwrite === true);
+
+      if (mode === 'replace' && hasExistingSteps && !canDestructivelyReplace) {
         throw new ConflictException({
           code: 'FUNNEL_BLUEPRINT_REQUIRES_EMPTY_GRAPH',
-          message:
-            'Blueprints can only be applied to funnel instances without steps.',
+          message: hasActivePublication
+            ? 'This funnel already has an active publication. Duplicate it or remove the publication before replacing its blueprint.'
+            : 'This funnel already has steps. Replace is allowed automatically only for boilerplate draft steps, or when destructive overwrite is explicitly requested from the UI.',
+        });
+      }
+
+      if (canDestructivelyReplace) {
+        await tx.funnelStep.deleteMany({
+          where: {
+            funnelInstanceId: funnelInstance.id,
+          },
         });
       }
 
       const existingGraph = this.toFlowGraph(
         funnelInstance.conversionContract as Prisma.JsonValue,
-        funnelInstance.steps,
+        canDestructivelyReplace ? [] : funnelInstance.steps,
       );
       const usedExistingNodeIds = new Set<string>();
       const createdSteps: Array<{
@@ -374,7 +408,12 @@ export class BlueprintService {
             isConversionStep: this.isConversionRole(stepDefinition.role),
             blocksJson: toInputJson(defaults.blocksJson),
             mediaMap: toInputJson(defaults.mediaMap),
-            settingsJson: toInputJson(defaults.settingsJson),
+            settingsJson: toInputJson(
+              this.markStepAsBlueprintManaged(defaults.settingsJson, {
+                blueprintType: blueprint.type,
+                boilerplate: false,
+              }),
+            ),
           },
         });
 
@@ -489,6 +528,7 @@ export class BlueprintService {
             ...existingContract,
             blueprintType: blueprint.type,
             blueprintMode: mode,
+            blueprintReplacedBoilerplate: canDestructivelyReplace,
             flowGraph: graph,
           }),
         },
@@ -540,6 +580,35 @@ export class BlueprintService {
     }
 
     return blueprint;
+  }
+
+  private isBoilerplateStep(step: { settingsJson: Prisma.JsonValue }) {
+    if (!isRecord(step.settingsJson)) {
+      return false;
+    }
+
+    if (step.settingsJson.isBoilerplate === true) {
+      return true;
+    }
+
+    return step.settingsJson.editorSource === 'system-template-deploy';
+  }
+
+  private markStepAsBlueprintManaged(
+    value: JsonValue,
+    input: {
+      blueprintType: BlueprintType;
+      boilerplate: boolean;
+    },
+  ): JsonValue {
+    const current = isRecord(value) ? value : {};
+
+    return {
+      ...current,
+      isBoilerplate: input.boilerplate,
+      blueprintManaged: true,
+      blueprintType: input.blueprintType,
+    } as JsonValue;
   }
 
   private async createUniqueSlug(

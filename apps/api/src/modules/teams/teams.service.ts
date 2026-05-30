@@ -18,8 +18,11 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { mapFunnelRecord } from '../../prisma/prisma.mappers';
 import { AdWheelSequenceGeneratorService } from '../ad-wheels/ad-wheel-sequence-generator.service';
+import { AiConfigService } from '../ai-config/ai-config.service';
 import { hashPassword } from '../auth/password-hash.util';
 import { WalletEngineService } from '../finance/wallet-engine.service';
+import { BlueprintService } from '../funnels/blueprint.service';
+import type { ApplyBlueprintDto } from '../funnels/dto/apply-blueprint.dto';
 import { FunnelsService } from '../funnels/funnels.service';
 import { MailService } from '../mail/mail.service';
 import { RuntimeContextConfigSyncService } from '../runtime-context/runtime-context-config-sync.service';
@@ -27,6 +30,7 @@ import { buildEntity } from '../shared/domain.factory';
 import { TEAM_REPOSITORY } from '../shared/domain.tokens';
 import type { JsonValue } from '../shared/domain.types';
 import { assertSupportedFunnelBlocksJson } from '../shared/funnel-block-validation';
+import { TemplateService } from '../templates/template.service';
 import type { CreateSystemTenantDto } from './dto/create-system-tenant.dto';
 import type { CreateTeamDto } from './dto/create-team.dto';
 import type { ProvisionTenantDto } from './dto/provision-tenant.dto';
@@ -106,6 +110,7 @@ export type SystemTenantSummary = {
   workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
+  emailNotificationsEnabled: boolean;
   managerUserId: string | null;
   managerEmail: string | null;
   name: string;
@@ -135,6 +140,7 @@ export type SystemTenantDetail = SystemTenantSummary & {
     defaultCurrency: string;
     primaryLocale: string;
     primaryDomain: string | null;
+    emailNotificationsEnabled: boolean;
   };
 };
 
@@ -197,9 +203,12 @@ export class TeamsService {
     private readonly configService: ConfigService,
     private readonly walletEngineService: WalletEngineService,
     private readonly funnelsService: FunnelsService,
+    private readonly blueprintService: BlueprintService,
+    private readonly templateService: TemplateService,
     private readonly mailService: MailService,
     private readonly adWheelSequenceGeneratorService: AdWheelSequenceGeneratorService,
     private readonly runtimeContextConfigSyncService: RuntimeContextConfigSyncService,
+    private readonly aiConfigService: AiConfigService,
     @Optional()
     @Inject(TEAM_REPOSITORY)
     private readonly repository?: TeamRepository,
@@ -422,6 +431,7 @@ export class TeamsService {
             id: true,
             name: true,
             slug: true,
+            emailNotificationsEnabled: true,
           },
         },
         users: {
@@ -459,6 +469,7 @@ export class TeamsService {
         workspaceId: record.workspaceId,
         workspaceName: record.workspace.name,
         workspaceSlug: record.workspace.slug,
+        emailNotificationsEnabled: record.workspace.emailNotificationsEnabled,
         managerUserId: record.managerUserId,
         managerEmail: managerUser?.email ?? null,
         name: record.name,
@@ -495,6 +506,7 @@ export class TeamsService {
             defaultCurrency: true,
             primaryLocale: true,
             primaryDomain: true,
+            emailNotificationsEnabled: true,
           },
         },
         users: {
@@ -551,6 +563,7 @@ export class TeamsService {
       workspaceId: record.workspaceId,
       workspaceName: record.workspace.name,
       workspaceSlug: record.workspace.slug,
+      emailNotificationsEnabled: record.workspace.emailNotificationsEnabled,
       managerEmail: managerUser?.email ?? null,
       name: record.name,
       code: record.code,
@@ -576,6 +589,7 @@ export class TeamsService {
         defaultCurrency: record.workspace.defaultCurrency,
         primaryLocale: record.workspace.primaryLocale,
         primaryDomain: record.workspace.primaryDomain,
+        emailNotificationsEnabled: record.workspace.emailNotificationsEnabled,
       },
       createdAt: toIso(record.createdAt),
       updatedAt: toIso(record.updatedAt),
@@ -622,9 +636,114 @@ export class TeamsService {
         (funnelInstance?.settingsJson as JsonValue) ?? {},
       ),
       steps:
-        funnelInstance?.steps.map((step) => this.mapSystemTenantFunnelStep(step)) ??
-        [],
+        funnelInstance?.steps.map((step) =>
+          this.mapSystemTenantFunnelStep(step),
+        ) ?? [],
     };
+  }
+
+  async cloneSystemTenantFunnel(
+    id: string,
+    funnelId: string,
+    newName?: string,
+  ) {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const normalizedFunnelId = sanitizeRequiredText(funnelId, 'funnelId');
+
+    await this.assertSystemTenantExists(tenantId);
+
+    const existing = await this.requireSystemTenantFunnelRecord(
+      tenantId,
+      normalizedFunnelId,
+    );
+    const sourceInstance = await this.findPrimarySystemTenantFunnelInstance(
+      tenantId,
+      normalizedFunnelId,
+    );
+    const name = sanitizeOptionalText(newName) ?? `${existing.name} Copy`;
+    const code = await this.createAvailableTenantFunnelCode(
+      existing.workspaceId,
+      existing.code,
+    );
+
+    const record = await this.prisma.$transaction(async (tx) => {
+      const clonedFunnel = await tx.funnel.create({
+        data: {
+          workspaceId: existing.workspaceId,
+          name,
+          description: existing.description,
+          code,
+          thumbnailUrl: existing.thumbnailUrl,
+          config: toInputJson(
+            this.cloneJsonValue(existing.config as JsonValue),
+          ),
+          status: existing.status,
+          isTemplate: false,
+          stages: [...existing.stages],
+          entrySources: [...existing.entrySources],
+          defaultTeamId: tenantId,
+          defaultRotationPoolId: existing.defaultRotationPoolId,
+        },
+      });
+
+      if (sourceInstance) {
+        const clonedInstance = await tx.funnelInstance.create({
+          data: {
+            workspaceId: sourceInstance.workspaceId,
+            teamId: sourceInstance.teamId,
+            templateId: sourceInstance.templateId,
+            funnelId: clonedFunnel.id,
+            name,
+            code,
+            thumbnailUrl: sourceInstance.thumbnailUrl,
+            status: sourceInstance.status,
+            structuralType: sourceInstance.structuralType,
+            conversionContract: toInputJson(
+              this.cloneJsonValue(
+                sourceInstance.conversionContract as JsonValue,
+              ),
+            ),
+            rotationPoolId: sourceInstance.rotationPoolId,
+            trackingProfileId: sourceInstance.trackingProfileId,
+            handoffStrategyId: sourceInstance.handoffStrategyId,
+            settingsJson: toInputJson(
+              this.cloneJsonValue(sourceInstance.settingsJson as JsonValue),
+            ),
+            mediaMap: toInputJson(
+              this.cloneJsonValue(sourceInstance.mediaMap as JsonValue),
+            ),
+          },
+        });
+
+        if (sourceInstance.steps.length > 0) {
+          await tx.funnelStep.createMany({
+            data: sourceInstance.steps.map((step) => ({
+              workspaceId: step.workspaceId,
+              teamId: step.teamId,
+              funnelInstanceId: clonedInstance.id,
+              stepType: step.stepType,
+              slug: step.slug,
+              position: step.position,
+              isEntryStep: step.isEntryStep,
+              isConversionStep: step.isConversionStep,
+              blocksJson: toInputJson(
+                this.cloneJsonValue(step.blocksJson as JsonValue),
+              ),
+              mediaMap: toInputJson(
+                this.cloneJsonValue(step.mediaMap as JsonValue),
+              ),
+              settingsJson: toInputJson(
+                this.cloneJsonValue(step.settingsJson as JsonValue),
+              ),
+            })),
+          });
+        }
+      }
+
+      return clonedFunnel;
+    });
+
+    return mapFunnelRecord(record);
   }
 
   async updateSystemTenantFunnel(
@@ -648,8 +767,7 @@ export class TeamsService {
     if (!existing) {
       throw new NotFoundException({
         code: 'TENANT_FUNNEL_NOT_FOUND',
-        message:
-          'The requested funnel was not found for the selected tenant.',
+        message: 'The requested funnel was not found for the selected tenant.',
       });
     }
 
@@ -729,6 +847,190 @@ export class TeamsService {
     return mapFunnelRecord(record);
   }
 
+  async deleteSystemTenantFunnel(id: string, funnelId: string) {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const normalizedFunnelId = sanitizeRequiredText(funnelId, 'funnelId');
+
+    await this.assertSystemTenantExists(tenantId);
+
+    const existing = await this.prisma.funnel.findFirst({
+      where: {
+        id: normalizedFunnelId,
+        defaultTeamId: tenantId,
+        isTemplate: false,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException({
+        code: 'TENANT_FUNNEL_NOT_FOUND',
+        message: 'The requested funnel was not found for the selected tenant.',
+      });
+    }
+
+    const deleted = await this.prisma.$transaction(async (tx) => {
+      const instances = await tx.funnelInstance.findMany({
+        where: {
+          teamId: tenantId,
+          funnelId: normalizedFunnelId,
+        },
+        select: { id: true },
+      });
+      const instanceIds = instances.map((item) => item.id);
+      const publications =
+        instanceIds.length > 0
+          ? await tx.funnelPublication.findMany({
+              where: {
+                teamId: tenantId,
+                funnelInstanceId: { in: instanceIds },
+              },
+              select: { id: true },
+            })
+          : [];
+      const publicationIds = publications.map((item) => item.id);
+      const leads = await tx.lead.findMany({
+        where: {
+          OR: [
+            { funnelId: normalizedFunnelId },
+            ...(instanceIds.length > 0
+              ? [{ funnelInstanceId: { in: instanceIds } }]
+              : []),
+          ],
+        },
+        select: { id: true },
+      });
+      const leadIds = leads.map((item) => item.id);
+      const assignments = await tx.assignment.findMany({
+        where: {
+          teamId: tenantId,
+          OR: [
+            { funnelId: normalizedFunnelId },
+            ...(instanceIds.length > 0
+              ? [{ funnelInstanceId: { in: instanceIds } }]
+              : []),
+          ],
+        },
+        select: { id: true },
+      });
+      const assignmentIds = assignments.map((item) => item.id);
+      const domainEventFilters: Prisma.DomainEventWhereInput[] = [
+        ...(instanceIds.length > 0
+          ? [{ funnelInstanceId: { in: instanceIds } }]
+          : []),
+        ...(publicationIds.length > 0
+          ? [{ funnelPublicationId: { in: publicationIds } }]
+          : []),
+        ...(leadIds.length > 0 ? [{ leadId: { in: leadIds } }] : []),
+        ...(assignmentIds.length > 0
+          ? [{ assignmentId: { in: assignmentIds } }]
+          : []),
+      ];
+      const automationDispatchFilters: Prisma.AutomationDispatchWhereInput[] = [
+        ...(leadIds.length > 0 ? [{ leadId: { in: leadIds } }] : []),
+        ...(assignmentIds.length > 0
+          ? [{ assignmentId: { in: assignmentIds } }]
+          : []),
+        ...(instanceIds.length > 0
+          ? [{ funnelInstanceId: { in: instanceIds } }]
+          : []),
+        ...(publicationIds.length > 0
+          ? [{ funnelPublicationId: { in: publicationIds } }]
+          : []),
+      ];
+
+      const domainEvents =
+        domainEventFilters.length > 0
+          ? await tx.domainEvent.deleteMany({
+              where: { OR: domainEventFilters },
+            })
+          : { count: 0 };
+
+      const automationDispatches =
+        automationDispatchFilters.length > 0
+          ? await tx.automationDispatch.deleteMany({
+              where: { OR: automationDispatchFilters },
+            })
+          : { count: 0 };
+
+      const leadNotes =
+        leadIds.length > 0
+          ? await tx.leadNote.deleteMany({
+              where: { leadId: { in: leadIds } },
+            })
+          : { count: 0 };
+
+      if (leadIds.length > 0) {
+        await tx.lead.updateMany({
+          where: { id: { in: leadIds } },
+          data: { currentAssignmentId: null },
+        });
+      }
+
+      const deletedAssignments =
+        assignmentIds.length > 0
+          ? await tx.assignment.deleteMany({
+              where: { id: { in: assignmentIds } },
+            })
+          : { count: 0 };
+      const deletedLeads =
+        leadIds.length > 0
+          ? await tx.lead.deleteMany({ where: { id: { in: leadIds } } })
+          : { count: 0 };
+      const deletedPublications =
+        publicationIds.length > 0
+          ? await tx.funnelPublication.deleteMany({
+              where: { id: { in: publicationIds } },
+            })
+          : { count: 0 };
+      const deletedInstances =
+        instanceIds.length > 0
+          ? await tx.funnelInstance.deleteMany({
+              where: { id: { in: instanceIds } },
+            })
+          : { count: 0 };
+
+      await tx.domain.updateMany({
+        where: { linkedFunnelId: normalizedFunnelId },
+        data: { linkedFunnelId: null },
+      });
+
+      const deletedFunnel = await tx.funnel.delete({
+        where: { id: normalizedFunnelId },
+        select: { id: true, name: true },
+      });
+
+      return {
+        funnel: deletedFunnel,
+        domainEvents: domainEvents.count,
+        automationDispatches: automationDispatches.count,
+        leadNotes: leadNotes.count,
+        assignments: deletedAssignments.count,
+        leads: deletedLeads.count,
+        publications: deletedPublications.count,
+        instances: deletedInstances.count,
+      };
+    });
+
+    return {
+      id: deleted.funnel.id,
+      name: deleted.funnel.name,
+      deleted: true as const,
+      counts: {
+        domainEvents: deleted.domainEvents,
+        automationDispatches: deleted.automationDispatches,
+        leadNotes: deleted.leadNotes,
+        assignments: deleted.assignments,
+        leads: deleted.leads,
+        publications: deleted.publications,
+        instances: deleted.instances,
+      },
+    };
+  }
+
   async updateSystemTenantFunnelStep(
     id: string,
     funnelId: string,
@@ -753,7 +1055,7 @@ export class TeamsService {
         funnelInstance: {
           is: {
             teamId: tenantId,
-            legacyFunnelId: normalizedFunnelId,
+            funnelId: normalizedFunnelId,
           },
         },
       },
@@ -825,6 +1127,47 @@ export class TeamsService {
     };
   }
 
+  async applySystemTenantFunnelBlueprint(
+    id: string,
+    funnelId: string,
+    dto: ApplyBlueprintDto,
+  ) {
+    const tenantId = sanitizeRequiredText(id, 'id');
+    const normalizedFunnelId = sanitizeRequiredText(funnelId, 'funnelId');
+    const normalizedType = sanitizeRequiredText(dto.type, 'type');
+
+    await this.assertSystemTenantExists(tenantId);
+    const funnelRecord = await this.requireSystemTenantFunnelRecord(
+      tenantId,
+      normalizedFunnelId,
+    );
+    const funnelInstance = await this.findPrimarySystemTenantFunnelInstance(
+      tenantId,
+      funnelRecord.id,
+    );
+
+    if (!funnelInstance) {
+      throw new NotFoundException({
+        code: 'TENANT_FUNNEL_INSTANCE_NOT_FOUND',
+        message:
+          'The requested funnel instance was not found for the selected tenant funnel.',
+      });
+    }
+
+    return this.blueprintService.applyBlueprint(
+      {
+        workspaceId: funnelInstance.workspaceId,
+        teamId: tenantId,
+      },
+      funnelInstance.id,
+      normalizedType,
+      dto.mode,
+      {
+        allowDestructiveOverwrite: dto.allowDestructiveOverwrite,
+      },
+    );
+  }
+
   async listSystemTenantFunnelStepHistory(
     id: string,
     funnelId: string,
@@ -843,7 +1186,7 @@ export class TeamsService {
         funnelInstance: {
           is: {
             teamId: tenantId,
-            legacyFunnelId: normalizedFunnelId,
+            funnelId: normalizedFunnelId,
           },
         },
       },
@@ -863,7 +1206,9 @@ export class TeamsService {
       });
     }
 
-    return step.history.map((entry) => this.mapSystemTenantFunnelStepHistory(entry));
+    return step.history.map((entry) =>
+      this.mapSystemTenantFunnelStepHistory(entry),
+    );
   }
 
   async createSystemTenant(dto: CreateSystemTenantDto) {
@@ -898,6 +1243,13 @@ export class TeamsService {
         ? null
         : sanitizeRequiredText(dto.tenantName, 'tenantName');
     const statusFlags = this.resolveProvisioningStatusFlags(provisioningStatus);
+    const emailNotificationsEnabled =
+      dto.emailNotificationsEnabled === undefined
+        ? undefined
+        : this.normalizeBoolean(
+            dto.emailNotificationsEnabled,
+            'emailNotificationsEnabled',
+          );
 
     const existing = await this.prisma.team.findUnique({
       where: {
@@ -958,6 +1310,9 @@ export class TeamsService {
                 : existing.workspace.status === 'archived'
                   ? 'archived'
                   : 'active',
+            ...(emailNotificationsEnabled === undefined
+              ? {}
+              : { emailNotificationsEnabled }),
           },
         });
 
@@ -1047,7 +1402,10 @@ export class TeamsService {
     const normalizedTeamCode =
       slugify(
         sanitizeRequiredText(
-          dto.teamCode ?? dto.workspaceSlug ?? dto.teamName ?? dto.workspaceName,
+          dto.teamCode ??
+            dto.workspaceSlug ??
+            dto.teamName ??
+            dto.workspaceName,
           'teamCode',
         ),
       ) || null;
@@ -1118,18 +1476,20 @@ export class TeamsService {
     }
 
     if (templateFunnelId) {
-      const template = await this.prisma.funnel.findFirst({
+      const template = await this.prisma.funnelTemplate.findFirst({
         where: {
           id: templateFunnelId,
-          isTemplate: true,
-          defaultTeamId: null,
+          workspaceId: null,
+          status: {
+            in: ['active', 'draft'],
+          },
         },
         select: { id: true },
       });
 
       if (!template) {
         throw new NotFoundException({
-          code: 'FUNNEL_TEMPLATE_NOT_FOUND',
+          code: 'TEMPLATE_NOT_FOUND',
           message: 'The selected base funnel template was not found.',
         });
       }
@@ -1315,6 +1675,14 @@ export class TeamsService {
           },
         });
 
+        await this.aiConfigService.ensureTenantDefaultConfig(
+          {
+            tenantId: linkedTeam.id,
+            brandKey: linkedTeam.code,
+          },
+          tx,
+        );
+
         return {
           workspace,
           team: linkedTeam,
@@ -1330,10 +1698,10 @@ export class TeamsService {
       });
 
       if (templateFunnelId) {
-        await this.funnelsService.cloneTemplateToTeam(
-          templateFunnelId,
-          provisionedTenant.team.id,
-        );
+        await this.templateService.deploy(templateFunnelId, {
+          teamId: provisionedTenant.team.id,
+          cloneName: provisionedTenant.team.name,
+        });
       }
 
       try {
@@ -1349,7 +1717,8 @@ export class TeamsService {
           }`,
         );
       }
-      void this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
+      await this.provisionTenantKreditAccount(provisionedTenant.team.id);
+      await this.provisionSponsorWelcomeKredits(provisionedTenant.sponsor.id);
 
       return provisionedTenant;
     } catch (error) {
@@ -1371,11 +1740,23 @@ export class TeamsService {
     }
   }
 
+  private async provisionTenantKreditAccount(tenantId: string) {
+    try {
+      await this.walletEngineService.upsertAccount(tenantId);
+    } catch (error) {
+      this.logger.error(
+        `Tenant ${tenantId} wallet provisioning failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      throw error;
+    }
+  }
+
   private async provisionSponsorWelcomeKredits(sponsorId: string) {
     try {
-      const account = await this.walletEngineService.upsertSponsorAccount(
-        sponsorId,
-      );
+      const account =
+        await this.walletEngineService.upsertSponsorAccount(sponsorId);
 
       await this.walletEngineService.creditInitialKredits(
         account.accountId,
@@ -1387,6 +1768,7 @@ export class TeamsService {
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );
+      throw error;
     }
   }
 
@@ -1394,7 +1776,10 @@ export class TeamsService {
     const alphabet =
       'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
-    return Array.from(randomBytes(10), (byte) => alphabet[byte % alphabet.length])
+    return Array.from(
+      randomBytes(10),
+      (byte) => alphabet[byte % alphabet.length],
+    )
       .join('')
       .slice(0, 10);
   }
@@ -1410,8 +1795,7 @@ export class TeamsService {
       .split(/[^a-zA-Z0-9]+/)
       .filter(Boolean)
       .map(
-        (chunk: string) =>
-          `${chunk[0]?.toUpperCase() ?? ''}${chunk.slice(1)}`,
+        (chunk: string) => `${chunk[0]?.toUpperCase() ?? ''}${chunk.slice(1)}`,
       );
 
     if (words.length === 0) {
@@ -1732,7 +2116,24 @@ export class TeamsService {
     return normalized;
   }
 
-  private resolveProvisioningStatusFlags(status: SystemTenantProvisioningStatus) {
+  private normalizeBoolean(
+    value: boolean | null | undefined,
+    field: string,
+  ): boolean {
+    if (typeof value !== 'boolean') {
+      throw new BadRequestException({
+        code: 'INVALID_BOOLEAN',
+        message: `${field} must be a boolean value.`,
+        field,
+      });
+    }
+
+    return value;
+  }
+
+  private resolveProvisioningStatusFlags(
+    status: SystemTenantProvisioningStatus,
+  ) {
     switch (status) {
       case 'active':
         return {
@@ -1936,7 +2337,10 @@ export class TeamsService {
     });
   }
 
-  private async requireSystemTenantFunnelRecord(tenantId: string, funnelId: string) {
+  private async requireSystemTenantFunnelRecord(
+    tenantId: string,
+    funnelId: string,
+  ) {
     const existing = await this.prisma.funnel.findFirst({
       where: {
         id: funnelId,
@@ -1948,8 +2352,7 @@ export class TeamsService {
     if (!existing) {
       throw new NotFoundException({
         code: 'TENANT_FUNNEL_NOT_FOUND',
-        message:
-          'The requested funnel was not found for the selected tenant.',
+        message: 'The requested funnel was not found for the selected tenant.',
       });
     }
 
@@ -1963,7 +2366,7 @@ export class TeamsService {
     const instances = await this.prisma.funnelInstance.findMany({
       where: {
         teamId: tenantId,
-        legacyFunnelId: funnelId,
+        funnelId: funnelId,
       },
       include: {
         steps: {
@@ -1973,13 +2376,15 @@ export class TeamsService {
       orderBy: [{ updatedAt: 'desc' }],
     });
 
-    return [...instances].sort((left, right) => {
-      if ((left.status === 'active') !== (right.status === 'active')) {
-        return left.status === 'active' ? -1 : 1;
-      }
+    return (
+      [...instances].sort((left, right) => {
+        if ((left.status === 'active') !== (right.status === 'active')) {
+          return left.status === 'active' ? -1 : 1;
+        }
 
-      return right.updatedAt.getTime() - left.updatedAt.getTime();
-    })[0] ?? null;
+        return right.updatedAt.getTime() - left.updatedAt.getTime();
+      })[0] ?? null
+    );
   }
 
   private async findSystemTenantFunnelInstanceById(
@@ -1995,7 +2400,7 @@ export class TeamsService {
       where: {
         id: normalizedFunnelInstanceId,
         teamId: tenantId,
-        legacyFunnelId: funnelId,
+        funnelId: funnelId,
       },
       include: {
         steps: {
@@ -2015,6 +2420,40 @@ export class TeamsService {
     return funnelInstance;
   }
 
+  private async createAvailableTenantFunnelCode(
+    workspaceId: string,
+    baseCode: string,
+  ): Promise<string> {
+    const normalizedBaseCode =
+      sanitizeRequiredText(baseCode, 'code')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'funnel';
+
+    let candidate = `${normalizedBaseCode}-copy`;
+    let suffix = 2;
+
+    while (true) {
+      const existing = await this.prisma.funnel.findFirst({
+        where: {
+          workspaceId,
+          code: candidate,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+
+      candidate = `${normalizedBaseCode}-copy-${suffix}`;
+      suffix += 1;
+    }
+  }
+
   private async assertSystemTenantExists(id: string) {
     const tenant = await this.prisma.team.findUnique({
       where: {
@@ -2032,5 +2471,4 @@ export class TeamsService {
       });
     }
   }
-
 }

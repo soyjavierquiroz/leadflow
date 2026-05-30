@@ -8,6 +8,12 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  DEFAULT_TENANT_AI_BASE_PROMPT,
+  resolveAiRuntimeRoutingMetadata,
+  withDefaultAiRuntimeRoutingMetadata,
+} from '../ai-config/ai-config.defaults';
+import { resolveKloserTenantConfig } from '../ai-config/kloser-tenant-config';
+import {
   buildPublicWhatsappMessage,
   buildPublicWhatsappUrl,
   normalizeWhatsappPhone,
@@ -46,7 +52,27 @@ const sponsorSnapshotInclude = {
 
 const assignmentDispatchInclude = {
   workspace: true,
-  team: true,
+  team: {
+    include: {
+      aiAgentConfigs: {
+        where: {
+          memberId: null,
+          isActive: true,
+        },
+        orderBy: {
+          id: 'asc',
+        },
+        select: {
+          id: true,
+          basePrompt: true,
+          aiPolicy: true,
+          ctaPolicy: true,
+          routeContexts: true,
+          updatedAt: true,
+        },
+      },
+    },
+  },
   funnel: true,
   lead: {
     include: {
@@ -79,7 +105,93 @@ type AssignmentDispatchRecord = Prisma.AssignmentGetPayload<{
   include: typeof assignmentDispatchInclude;
 }>;
 
+type JsonRecord = Record<string, unknown>;
+
 const toIso = (value: Date | null) => (value ? value.toISOString() : null);
+
+const sanitizeText = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed ? trimmed : null;
+};
+
+const isJsonRecord = (value: unknown): value is JsonRecord =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const cloneJsonValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneJsonValue(item));
+  }
+
+  if (isJsonRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        cloneJsonValue(nestedValue),
+      ]),
+    );
+  }
+
+  return value;
+};
+
+const toJsonRecord = (value: unknown): JsonRecord =>
+  isJsonRecord(value) ? (cloneJsonValue(value) as JsonRecord) : {};
+
+const readTenantKloserPolicy = (
+  tenantConfigRecord:
+    | AssignmentDispatchRecord['team']['aiAgentConfigs'][number]
+    | null,
+  key: 'compliance_policy' | 'cta_policy',
+): Prisma.InputJsonValue => {
+  const aiPolicy = toJsonRecord(tenantConfigRecord?.aiPolicy);
+  const kloser = toJsonRecord(aiPolicy.kloser ?? aiPolicy.kloser_config);
+
+  return toJsonRecord(kloser[key]) as Prisma.InputJsonValue;
+};
+
+const isValidBasePrompt = (value: string | null | undefined) =>
+  Boolean(sanitizeText(value));
+
+const isCustomTenantBasePrompt = (value: string | null | undefined) => {
+  const prompt = sanitizeText(value);
+
+  return Boolean(prompt && prompt !== DEFAULT_TENANT_AI_BASE_PROMPT);
+};
+
+const selectTenantConfigByPromptPriority = (
+  configs: AssignmentDispatchRecord['team']['aiAgentConfigs'],
+) => {
+  return (
+    configs.find((config) => isCustomTenantBasePrompt(config.basePrompt)) ??
+    configs.find((config) => isValidBasePrompt(config.basePrompt)) ??
+    configs[0] ??
+    null
+  );
+};
+
+const readTenantBasePrompt = (
+  tenantConfigRecord:
+    | AssignmentDispatchRecord['team']['aiAgentConfigs'][number]
+    | null,
+) =>
+  sanitizeText(tenantConfigRecord?.basePrompt) ?? DEFAULT_TENANT_AI_BASE_PROMPT;
+
+const buildTenantConfigVersion = (
+  tenantConfigRecord:
+    | AssignmentDispatchRecord['team']['aiAgentConfigs'][number]
+    | null,
+) => {
+  if (!tenantConfigRecord) {
+    return 'ai-agent-config:fallback';
+  }
+
+  return `ai-agent-config:${tenantConfigRecord.id}:${tenantConfigRecord.updatedAt.toISOString()}`;
+};
 
 @Injectable()
 export class MessagingAutomationService {
@@ -176,6 +288,12 @@ export class MessagingAutomationService {
       input,
       targetWebhookUrl,
     });
+    const masterPayloadArtifacts = this.buildKloserMasterPayloadArtifacts({
+      assignment,
+      payload,
+      queuedAt,
+      triggerType: input.triggerType,
+    });
 
     await this.prisma.automationDispatch.create({
       data: {
@@ -192,6 +310,10 @@ export class MessagingAutomationService {
         status: AutomationDispatchStatus.pending,
         targetWebhookUrl,
         payloadSnapshot: payload,
+        masterPayload: masterPayloadArtifacts.masterPayload,
+        contextSnapshot: masterPayloadArtifacts.contextSnapshot,
+        compliancePolicy: masterPayloadArtifacts.compliancePolicy,
+        ctaPolicy: masterPayloadArtifacts.ctaPolicy,
         responseStatusCode: null,
         errorCode: null,
         errorMessage: null,
@@ -358,9 +480,19 @@ export class MessagingAutomationService {
         '/',
     });
     const whatsappUrl = buildPublicWhatsappUrl(whatsappPhone, whatsappMessage);
+    const tenantConfigRecord = selectTenantConfigByPromptPriority(
+      assignment.team.aiAgentConfigs,
+    );
+    const runtimeConfig = this.buildRuntimeConfig({
+      assignment,
+      connection: input.connection,
+      tenantConfigRecord,
+    });
 
     return {
       version: 'leadflow.messaging-automation.v1',
+      config_version: buildTenantConfigVersion(tenantConfigRecord),
+      runtime_config: runtimeConfig,
       dispatch: {
         id: input.dispatchId,
         triggerType: input.input.triggerType,
@@ -501,7 +633,145 @@ export class MessagingAutomationService {
         utmSource: assignment.lead.visitor?.utmSource ?? null,
         utmCampaign: assignment.lead.visitor?.utmCampaign ?? null,
       },
+    } as unknown as Prisma.InputJsonValue;
+  }
+
+  private buildKloserMasterPayloadArtifacts(input: {
+    assignment: AssignmentDispatchRecord;
+    payload: Prisma.InputJsonValue;
+    queuedAt: Date;
+    triggerType: string;
+  }) {
+    const tenantConfigRecord = selectTenantConfigByPromptPriority(
+      input.assignment.team.aiAgentConfigs,
+    );
+    const compliancePolicy = readTenantKloserPolicy(
+      tenantConfigRecord,
+      'compliance_policy',
+    );
+    const ctaPolicy = readTenantKloserPolicy(tenantConfigRecord, 'cta_policy');
+    const contextSnapshot = {
+      leadStage: input.assignment.lead.status,
+      routeMode: input.triggerType,
+      verticalFlow: this.resolveVerticalFlow(input.assignment),
+      leadId: input.assignment.lead.id,
+      assignmentId: input.assignment.id,
+      trafficLayer:
+        input.assignment.trafficLayer ??
+        input.assignment.lead.trafficLayer ??
+        'ORGANIC',
+      capturedAt: input.queuedAt.toISOString(),
     } satisfies Prisma.JsonObject;
+
+    return {
+      contextSnapshot,
+      compliancePolicy,
+      ctaPolicy,
+      masterPayload: {
+        version: 'leadflow.kloser-master-payload.v1',
+        config_version: buildTenantConfigVersion(tenantConfigRecord),
+        createdAt: input.queuedAt.toISOString(),
+        tenantId: input.assignment.teamId,
+        leadId: input.assignment.lead.id,
+        assignmentId: input.assignment.id,
+        runtime_config: toJsonRecord(input.payload).runtime_config ?? null,
+        automationPayload: input.payload,
+        contextSnapshot,
+        compliancePolicy,
+        ctaPolicy,
+      } as Prisma.InputJsonValue,
+    };
+  }
+
+  private resolveVerticalFlow(assignment: AssignmentDispatchRecord) {
+    const tenantConfigRecord = selectTenantConfigByPromptPriority(
+      assignment.team.aiAgentConfigs,
+    );
+    const aiPolicy = toJsonRecord(tenantConfigRecord?.aiPolicy);
+    const routeContexts = toJsonRecord(tenantConfigRecord?.routeContexts);
+    const kloser = toJsonRecord(aiPolicy.kloser ?? aiPolicy.kloser_config);
+    const candidates = [
+      kloser.vertical,
+      kloser.vertical_key,
+      aiPolicy.vertical_key,
+      aiPolicy.vertical,
+      routeContexts.vertical,
+      assignment.funnelPublication?.pathPrefix?.replace(/^\/+/, ''),
+      assignment.funnelInstance?.code,
+    ];
+
+    for (const candidate of candidates) {
+      const normalized = sanitizeText(candidate);
+
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    return 'multinivel';
+  }
+
+  private buildRuntimeConfig(input: {
+    assignment: AssignmentDispatchRecord;
+    connection: MessagingConnection | null | undefined;
+    tenantConfigRecord:
+      | AssignmentDispatchRecord['team']['aiAgentConfigs'][number]
+      | null;
+  }) {
+    const routeContexts = toJsonRecord(input.tenantConfigRecord?.routeContexts);
+    const aiPolicy = withDefaultAiRuntimeRoutingMetadata(
+      input.tenantConfigRecord?.aiPolicy,
+      {
+        tenantCode: input.assignment.team.code,
+        brandKey: input.assignment.team.code,
+      },
+    );
+    const ctaPolicy = toJsonRecord(input.tenantConfigRecord?.ctaPolicy);
+    const routingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: input.assignment.team.code,
+      aiPolicy,
+      routeContexts,
+    });
+    const basePrompt = readTenantBasePrompt(input.tenantConfigRecord);
+    const normalizedSponsorPhone = normalizeWhatsappPhone(
+      input.assignment.sponsor.phone,
+    );
+
+    return {
+      version: 'leadflow.ai-runtime-context.v1',
+      base_prompt: basePrompt,
+      routing: {
+        provider: input.connection?.provider ?? 'evolution',
+        channel: 'whatsapp',
+        instance_name: input.connection?.externalInstanceId ?? '',
+        service_owner_key: 'lead-handler',
+      },
+      tenant: {
+        id: input.assignment.teamId,
+        name: input.assignment.team.name,
+        code: input.assignment.team.code,
+        ...routingMetadata,
+      },
+      member: {
+        id: input.assignment.sponsor.id,
+        name: input.assignment.sponsor.displayName,
+        email: sanitizeText(input.assignment.sponsor.email),
+        phone: sanitizeText(input.assignment.sponsor.phone),
+        whatsapp_link: normalizedSponsorPhone
+          ? `https://wa.me/${normalizedSponsorPhone}`
+          : null,
+      },
+      ai_agent: {
+        base_prompt: basePrompt,
+        route_contexts: routeContexts,
+        cta_policy: ctaPolicy,
+        ai_policy: aiPolicy,
+      },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy,
+        ctaPolicy,
+      }),
+    } as unknown as Prisma.InputJsonValue;
   }
 
   private async recordDomainEvent(input: {

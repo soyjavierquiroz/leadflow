@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SystemTenantAccessGuard } from '../teams/system-tenant-access.guard';
+import { TemplateService } from '../templates/template.service';
 import type { CloneFunnelTemplateDto } from './dto/clone-funnel-template.dto';
 import type { CreateSystemFunnelTemplateDto } from './dto/create-system-funnel-template.dto';
 import type { UpdateSystemFunnelTemplateDto } from './dto/update-system-funnel-template.dto';
@@ -17,7 +18,20 @@ import { FunnelsService } from './funnels.service';
 @Controller('system/funnels')
 @UseGuards(SystemTenantAccessGuard)
 export class SystemFunnelsController {
-  constructor(private readonly funnelsService: FunnelsService) {}
+  constructor(
+    private readonly funnelsService: FunnelsService,
+    private readonly templateService: TemplateService,
+  ) {}
+
+  @Get('library')
+  async getUnifiedLibrary() {
+    const modernTemplates = await this.templateService.list();
+
+    return {
+      legacyTemplates: [],
+      modernTemplates,
+    };
+  }
 
   @Get('templates')
   listTemplates() {

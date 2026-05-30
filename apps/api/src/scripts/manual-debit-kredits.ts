@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import { createHash } from 'node:crypto';
 
-const KREDIT_PLATFORM_KEY = 'kurukin';
+const KREDIT_PLATFORM_KEY = 'leadflow';
 const KREDIT_PRODUCT_KEY = 'leadflow';
 const KREDIT_UNIT_CODE = 'KREDIT';
 const KREDIT_UNIT_SCALE = 6;
@@ -274,8 +274,14 @@ async function getWalletBalance(
   walletConfig: { baseUrl: string; apiKey: string },
   accountId: string,
 ) {
+  const query = new URLSearchParams({
+    platform_key: KREDIT_PLATFORM_KEY,
+    product_key: KREDIT_PRODUCT_KEY,
+  });
   const response = await axios.get<WalletBalanceResponse>(
-    `${walletConfig.baseUrl}/wallets/${encodeURIComponent(accountId)}/balance`,
+    `${walletConfig.baseUrl}/wallets/${encodeURIComponent(
+      accountId,
+    )}/balance?${query.toString()}`,
     {
       headers: {
         Accept: 'application/json',

@@ -75,6 +75,9 @@ export const funnelThemeRegistry = {
         urgencyHover: "#de4b4b",
         urgencyActive: "#a72b2b",
       },
+      radius: {
+        xl: "25px",
+      },
     },
     primitives: {
       button: {

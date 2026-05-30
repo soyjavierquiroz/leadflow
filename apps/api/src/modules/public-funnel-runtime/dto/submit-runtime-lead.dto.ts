@@ -1,8 +1,10 @@
 import type { LeadSourceChannel } from '../../shared/domain.types';
+import type { SubmittedPublicEntryContext } from './submit-public-lead-capture.dto';
 
 export class SubmitRuntimeLeadDto {
   readonly hostname!: string;
   readonly path?: string;
+  readonly entryContext?: SubmittedPublicEntryContext | null;
   readonly submissionEventId?: string | null;
   readonly anonymousId?: string | null;
   readonly sourceChannel?: LeadSourceChannel;
@@ -15,6 +17,8 @@ export class SubmitRuntimeLeadDto {
   readonly fbclid?: string | null;
   readonly gclid?: string | null;
   readonly ttclid?: string | null;
+  readonly clientIpAddress?: string | null;
+  readonly clientUserAgent?: string | null;
   readonly firstName?: string | null;
   readonly lastName?: string | null;
   readonly fullName?: string | null;

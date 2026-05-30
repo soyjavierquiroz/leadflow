@@ -50,7 +50,7 @@ export type FunnelInstanceRecord = {
   workspaceId: string;
   teamId: string;
   templateId: string;
-  legacyFunnelId: string | null;
+  funnelId: string | null;
   name: string;
   code: string;
   thumbnailUrl: string | null;
@@ -182,7 +182,7 @@ export type LeadRecord = {
   funnelId: string;
   funnelInstanceId: string | null;
   funnelPublicationId: string | null;
-  trafficLayer: "DIRECT" | "PAID_WHEEL" | "ORGANIC";
+  trafficLayer: "DIRECT" | "PAID_WHEEL" | "PAID_ADS" | "ORGANIC";
   originAdWheelId: string | null;
   originAdWheelName: string | null;
   visitorId: string | null;
@@ -229,7 +229,7 @@ export type AssignmentRecord = {
   funnelInstanceId: string | null;
   funnelPublicationId: string | null;
   rotationPoolId: string | null;
-  trafficLayer: "DIRECT" | "PAID_WHEEL" | "ORGANIC";
+  trafficLayer: "DIRECT" | "PAID_WHEEL" | "PAID_ADS" | "ORGANIC";
   originAdWheelId: string | null;
   originAdWheelName: string | null;
   status: string;

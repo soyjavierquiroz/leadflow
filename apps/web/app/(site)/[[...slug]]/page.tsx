@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { FunnelUnderConstruction } from '@/components/public-funnel/funnel-under-construction';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
+import { PublicRuntimeLeadSubmitProvider } from '@/components/public-runtime/public-runtime-lead-submit-provider';
 import { getSessionUser } from '@/lib/auth';
 import {
   fetchPublicFunnelRuntime,
@@ -22,8 +23,6 @@ type SiteRuntimePageProps = {
   }>;
   searchParams: Promise<{
     previewHost?: string;
-    awid?: string;
-    ref?: string;
   }>;
 };
 
@@ -31,6 +30,56 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+
+const BOLT_NEW_SEO_TITLE = 'kurukin ai automation landing page';
+
+const isBoltNewSeoValue = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+
+  return (
+    normalized === BOLT_NEW_SEO_TITLE ||
+    normalized.includes('bolt.new') ||
+    normalized.includes('bolt.new/')
+  );
+};
+
+const cleanSeoText = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed || isBoltNewSeoValue(trimmed)) {
+    return undefined;
+  }
+
+  return trimmed;
+};
+
+const cleanSeoImageUrl = (value: unknown, host: string) => {
+  const trimmed = cleanSeoText(value);
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const imageUrl = new URL(trimmed, `https://${host}`);
+
+    if (!['http:', 'https:'].includes(imageUrl.protocol)) {
+      return undefined;
+    }
+
+    if (imageUrl.hostname.toLowerCase().includes('bolt.new')) {
+      return undefined;
+    }
+
+    return imageUrl.toString();
+  } catch {
+    return undefined;
+  }
+};
 
 const normalizeHost = (value: string | null | undefined) =>
   (value ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/\.+$/, '');
@@ -46,29 +95,6 @@ const canonicalSiteHost = (() => {
 const isCanonicalAppHomeRequest = (host: string, path: string) =>
   normalizeRuntimePath(path) === '/' && normalizeHost(host) === canonicalSiteHost;
 
-const appendRuntimeQuery = (
-  path: string,
-  query: {
-    awid?: string;
-    ref?: string;
-  },
-) => {
-  const params = new URLSearchParams();
-
-  if (query.awid?.trim()) {
-    params.set('awid', query.awid.trim());
-  }
-
-  if (query.ref?.trim()) {
-    params.set('ref', query.ref.trim());
-  }
-
-  const serialized = params.toString();
-  return serialized
-    ? `${path}${path.includes('?') ? '&' : '?'}${serialized}`
-    : path;
-};
-
 const resolveSeoFromRuntime = (runtime: PublicFunnelRuntimePayload) => {
   const publication = runtime.publication;
   const stepSettings = asRecord(runtime.currentStep.settingsJson);
@@ -76,39 +102,37 @@ const resolveSeoFromRuntime = (runtime: PublicFunnelRuntimePayload) => {
   const stepSeo = asRecord(stepSettings?.seo);
   const funnelSeo = asRecord(funnelSettings?.seo);
   const title =
-    (typeof publication.seoTitle === 'string' && publication.seoTitle.trim()) ||
-    (typeof stepSeo?.title === 'string' && stepSeo.title.trim()) ||
-    (typeof stepSettings?.title === 'string' && stepSettings.title.trim()) ||
-    (typeof funnelSeo?.title === 'string' && funnelSeo.title.trim()) ||
-    (typeof funnelSettings?.title === 'string' && funnelSettings.title.trim()) ||
-    runtime.funnel.name;
+    cleanSeoText(publication.seoTitle) ||
+    cleanSeoText(stepSeo?.title) ||
+    cleanSeoText(stepSettings?.title) ||
+    cleanSeoText(funnelSeo?.title) ||
+    cleanSeoText(funnelSettings?.title) ||
+    cleanSeoText(runtime.funnel.name) ||
+    runtime.domain.host;
   const description =
-    (typeof publication.seoDescription === 'string' &&
-      publication.seoDescription.trim()) ||
-    (typeof stepSeo?.metaDescription === 'string' &&
-      stepSeo.metaDescription.trim()) ||
-    (typeof stepSettings?.metaDescription === 'string' &&
-      stepSettings.metaDescription.trim()) ||
-    (typeof stepSettings?.summary === 'string' && stepSettings.summary.trim()) ||
-    (typeof stepSettings?.description === 'string' &&
-      stepSettings.description.trim()) ||
-    (typeof funnelSeo?.metaDescription === 'string' &&
-      funnelSeo.metaDescription.trim()) ||
-    (typeof funnelSettings?.metaDescription === 'string' &&
-      funnelSettings.metaDescription.trim()) ||
-    (typeof funnelSettings?.summary === 'string' &&
-      funnelSettings.summary.trim()) ||
-    (typeof funnelSettings?.description === 'string' &&
-      funnelSettings.description.trim()) ||
-    undefined;
+    cleanSeoText(publication.seoDescription) ||
+    cleanSeoText(stepSeo?.metaDescription) ||
+    cleanSeoText(stepSeo?.description) ||
+    cleanSeoText(stepSettings?.metaDescription) ||
+    cleanSeoText(stepSettings?.summary) ||
+    cleanSeoText(stepSettings?.description) ||
+    cleanSeoText(funnelSeo?.metaDescription) ||
+    cleanSeoText(funnelSeo?.description) ||
+    cleanSeoText(funnelSettings?.metaDescription) ||
+    cleanSeoText(funnelSettings?.summary) ||
+    cleanSeoText(funnelSettings?.description);
   const ogImage =
-    typeof publication.ogImageUrl === 'string' && publication.ogImageUrl.trim()
-      ? publication.ogImageUrl.trim()
-      : undefined;
+    cleanSeoImageUrl(publication.ogImageUrl, runtime.domain.host) ||
+    cleanSeoImageUrl(stepSeo?.ogImageUrl, runtime.domain.host) ||
+    cleanSeoImageUrl(stepSeo?.ogImage, runtime.domain.host) ||
+    cleanSeoImageUrl(stepSeo?.image, runtime.domain.host) ||
+    cleanSeoImageUrl(funnelSeo?.ogImageUrl, runtime.domain.host) ||
+    cleanSeoImageUrl(funnelSeo?.ogImage, runtime.domain.host) ||
+    cleanSeoImageUrl(funnelSeo?.image, runtime.domain.host);
   const favicon =
-    typeof publication.faviconUrl === 'string' && publication.faviconUrl.trim()
-      ? publication.faviconUrl.trim()
-      : undefined;
+    cleanSeoImageUrl(publication.faviconUrl, runtime.domain.host) ||
+    cleanSeoImageUrl(funnelSeo?.faviconUrl, runtime.domain.host) ||
+    cleanSeoImageUrl(funnelSeo?.favicon, runtime.domain.host);
 
   return { title, description, ogImage, favicon };
 };
@@ -141,7 +165,7 @@ export async function generateMetadata({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtime = await loadRuntimeSafely(host, appendRuntimeQuery(path, query));
+  const runtime = await loadRuntimeSafely(host, path);
 
   if (!runtime) {
     return {};
@@ -196,7 +220,6 @@ export default async function SiteRuntimePage({
     requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host');
   const host = resolveRuntimeHost(requestHost, previewHost);
   const path = resolveRuntimePath(slug);
-  const runtimePath = appendRuntimeQuery(path, query);
 
   if (!previewHost && isCanonicalAppHomeRequest(host, path)) {
     const user = await getSessionUser();
@@ -205,11 +228,11 @@ export default async function SiteRuntimePage({
 
   const runtimeResolution = await fetchPublicFunnelRuntimeResolution({
     host,
-    path: runtimePath,
+    path,
   }).catch((error) => {
     console.error('[site-runtime] Failed to load public funnel runtime', {
       host,
-      path: runtimePath,
+      path,
       error,
     });
     return { status: 'not_found' as const };
@@ -233,8 +256,12 @@ export default async function SiteRuntimePage({
   }
 
   return (
-    <>
+    <PublicRuntimeLeadSubmitProvider
+      hostname={runtime.domain.host}
+      path={runtime.request.path}
+      runtime={runtime}
+    >
       <FunnelRuntimePage runtime={runtime} previewHost={previewHost} />
-    </>
+    </PublicRuntimeLeadSubmitProvider>
   );
 }

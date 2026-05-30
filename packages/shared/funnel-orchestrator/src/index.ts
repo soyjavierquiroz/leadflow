@@ -91,6 +91,27 @@ export type ReorderBlocksInput = {
 
 const LEAD_CAPTURE_CONFIG_TYPE = "lead_capture_config";
 
+const CONTENT_STEP_TYPES: FunnelStepType[] = [
+  "landing",
+  "lead_capture",
+  "vsl",
+  "presentation",
+  "qualification",
+  "cta_bridge",
+];
+
+const HANDOFF_STEP_TYPES: FunnelStepType[] = [
+  "thank_you",
+  "confirmation",
+  "handoff",
+  "redirect",
+];
+
+const ALL_STEP_TYPES: FunnelStepType[] = [
+  ...CONTENT_STEP_TYPES,
+  ...HANDOFF_STEP_TYPES,
+];
+
 const STEP_TYPE_ALIASES: Record<string, FunnelStepType> = {
   LANDING: "landing",
   Landing: "landing",
@@ -180,6 +201,108 @@ const normalizePath = (value: string) => {
 
 const getBlockType = (block: FunnelBlock) =>
   typeof block.type === "string" ? block.type : "";
+
+const defaultCompatibleStepTypes = (
+  definition: Partial<Pick<SmartBlockDefinition, "key" | "compatibleStepTypes">> & {
+    category?: string | null;
+  },
+): FunnelStepType[] => {
+  if (
+    Array.isArray(definition.compatibleStepTypes) &&
+    definition.compatibleStepTypes.length > 0
+  ) {
+    return [...definition.compatibleStepTypes];
+  }
+
+  if (definition.category === "handoff") {
+    return [...HANDOFF_STEP_TYPES];
+  }
+
+  if (definition.key === LEAD_CAPTURE_CONFIG_TYPE) {
+    return [...CONTENT_STEP_TYPES, "confirmation"];
+  }
+
+  return [...ALL_STEP_TYPES];
+};
+
+const defaultRequiredCapabilities = (
+  definition: Partial<Pick<SmartBlockDefinition, "key" | "requiredCapabilities">>,
+): FunnelCapability[] => {
+  if (
+    Array.isArray(definition.requiredCapabilities) &&
+    definition.requiredCapabilities.length > 0
+  ) {
+    return [...definition.requiredCapabilities];
+  }
+
+  if (
+    definition.key === "lead_capture_form" ||
+    definition.key === LEAD_CAPTURE_CONFIG_TYPE ||
+    definition.key === "hook_and_promise" ||
+    definition.key === "sticky_conversion_bar" ||
+    definition.key === "cta" ||
+    definition.key === "grand_slam_offer"
+  ) {
+    return ["lead_capture"];
+  }
+
+  return [];
+};
+
+const defaultEmitsOutcomes = (
+  definition: Partial<Pick<SmartBlockDefinition, "key" | "emitsOutcomes">> & {
+    category?: string | null;
+  },
+): BusinessOutcome[] => {
+  if (Array.isArray(definition.emitsOutcomes) && definition.emitsOutcomes.length > 0) {
+    return [...definition.emitsOutcomes];
+  }
+
+  if (definition.key === "lead_capture_form") {
+    return ["submit_success"];
+  }
+
+  if (definition.category === "conversion") {
+    return ["cta_click"];
+  }
+
+  return ["view"];
+};
+
+const defaultAutoWiring = (
+  definition: Partial<Pick<SmartBlockDefinition, "key" | "autoWiring">>,
+): AutoWiringRule[] => {
+  if (Array.isArray(definition.autoWiring) && definition.autoWiring.length > 0) {
+    return [...definition.autoWiring];
+  }
+
+  if (
+    definition.key === "hook_and_promise" ||
+    definition.key === "sticky_conversion_bar" ||
+    definition.key === "cta" ||
+    definition.key === "grand_slam_offer"
+  ) {
+    return [
+      {
+        when: "inserted",
+        ensureBlockType: LEAD_CAPTURE_CONFIG_TYPE,
+        bindFields: { action: "open_lead_capture_modal" },
+      },
+    ];
+  }
+
+  return [];
+};
+
+const normalizeBlockDefinition = (
+  definition: SmartBlockDefinition & { category?: string | null },
+): SmartBlockDefinition => ({
+  ...definition,
+  compatibleStepTypes: defaultCompatibleStepTypes(definition),
+  requiredCapabilities: defaultRequiredCapabilities(definition),
+  emitsOutcomes: defaultEmitsOutcomes(definition),
+  autoWiring: defaultAutoWiring(definition),
+});
 
 const blockIdentity = (block: FunnelBlock, index: number) => {
   const type = slugify(getBlockType(block) || "block");
@@ -352,37 +475,41 @@ export const SmartWiringService = {
 
   insertBlock(input: InsertBlockInput) {
     const existingBlocks = parseBlocksArray(input.blocks);
-    const autoBindFields = input.definition.autoWiring.reduce<
+    const normalizedDefinition = normalizeBlockDefinition(input.definition);
+    const autoBindFields = normalizedDefinition.autoWiring.reduce<
       Record<string, JsonValue>
     >((fields, rule) => ({ ...fields, ...(rule.bindFields ?? {}) }), {});
-    const insertedBlock = bindFields(cloneBlock(input.definition.example), autoBindFields);
-    const scopedIdentity = `${input.definition.key}:${existingBlocks.length}`;
+    const insertedBlock = bindFields(
+      cloneBlock(normalizedDefinition.example),
+      autoBindFields,
+    );
+    const scopedIdentity = `${normalizedDefinition.key}:${existingBlocks.length}`;
     const normalizedInsertedBlock: FunnelBlock = {
       ...insertedBlock,
       type:
         typeof insertedBlock.type === "string"
           ? insertedBlock.type
-          : input.definition.key,
+          : normalizedDefinition.key,
       key:
         typeof insertedBlock.key === "string" && insertedBlock.key.trim()
           ? insertedBlock.key
-          : `${slugify(input.definition.key)}-${existingBlocks.length + 1}`,
+          : `${slugify(normalizedDefinition.key)}-${existingBlocks.length + 1}`,
       block_id:
         typeof insertedBlock.block_id === "string" && insertedBlock.block_id.trim()
           ? insertedBlock.block_id
-          : stableBlockId(input.definition.key, scopedIdentity),
+          : stableBlockId(normalizedDefinition.key, scopedIdentity),
     };
 
     const withInserted = [...existingBlocks, normalizedInsertedBlock];
     const withCapabilities = ensureLeadCaptureCapability(
       withInserted,
-      input.definition.requiredCapabilities,
+      normalizedDefinition.requiredCapabilities,
       input.successRedirect,
       normalizedInsertedBlock.block_id,
     );
     const withRules = applyAutoWiringRules(
       withCapabilities,
-      input.definition.autoWiring,
+      normalizedDefinition.autoWiring,
       input.successRedirect,
     );
 
@@ -397,7 +524,12 @@ export const SmartWiringService = {
   },
 
   applyRecipe(input: ApplyRecipeInput) {
-    const byKey = new Map(input.catalog.map((definition) => [definition.key, definition]));
+    const normalizedCatalog = input.catalog.map((definition) =>
+      normalizeBlockDefinition(definition),
+    );
+    const byKey = new Map(
+      normalizedCatalog.map((definition) => [definition.key, definition]),
+    );
     const seedBlocks = input.replace ? [] : parseBlocksArray(input.blocks);
     const recipeBlocks = input.recipe.blockTypes
       .map((blockType, index) => {
@@ -444,12 +576,14 @@ export const SmartWiringService = {
       input.successRedirect ?? input.recipe.successRedirect,
     );
     const wired = input.catalog.reduce(
-      (blocks, definition) =>
-        applyAutoWiringRules(
+      (blocks, rawDefinition) => {
+        const definition = normalizeBlockDefinition(rawDefinition);
+        return applyAutoWiringRules(
           blocks,
           definition.autoWiring.filter((rule) => rule.when === "recipe_applied"),
           input.successRedirect ?? input.recipe.successRedirect,
-        ),
+        );
+      },
       withCapabilities,
     );
     const successRedirect =

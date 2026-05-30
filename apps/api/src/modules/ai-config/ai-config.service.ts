@@ -11,11 +11,16 @@ import {
 import { Prisma, UserRole } from '@prisma/client';
 import { WalletEngineService } from '../finance/wallet-engine.service';
 import { normalizeMessagingPhone } from '../shared/messaging-channel.utils';
+import { normalizeBaseUrl, sanitizeNullableText } from '../shared/url.utils';
+import { RuntimeContextConfigSyncService } from '../runtime-context/runtime-context-config-sync.service';
 import {
-  normalizeBaseUrl,
-  sanitizeNullableText,
-} from '../shared/url.utils';
+  DEFAULT_TENANT_AI_BASE_PROMPT,
+  resolveAiRuntimeRoutingMetadata,
+  withDefaultAiRuntimeRoutingMetadata,
+} from './ai-config.defaults';
+import { resolveKloserTenantConfig } from './kloser-tenant-config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TenantConfigCacheService } from './tenant-config-cache.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
   AiConfigEditorSnapshot,
@@ -30,16 +35,60 @@ import type {
 } from './ai-config.types';
 
 type JsonRecord = Record<string, unknown>;
+type AiAgentConfigStore =
+  | Pick<PrismaService, 'aiAgentConfig'>
+  | Prisma.TransactionClient;
+type TenantAiAgentConfig = Prisma.AiAgentConfigGetPayload<
+  Record<string, never>
+>;
+type RuntimeChannelInstanceRecord = Prisma.ChannelInstanceGetPayload<{
+  include: {
+    tenant: true;
+    member: true;
+  };
+}>;
+type RuntimeMessagingConnectionRecord = Prisma.MessagingConnectionGetPayload<{
+  include: {
+    team: true;
+    sponsor: true;
+  };
+}>;
+type RuntimeContextResolveInput =
+  | string
+  | {
+      instanceName?: string | null;
+      tenantId?: string | null;
+    };
+type RuntimeContextSource = {
+  instanceName: string;
+  provider: string;
+  tenantId: string;
+  memberId: string;
+  tenant: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  member: {
+    id: string;
+    teamId: string;
+    displayName: string;
+    email: string | null;
+    phone: string | null;
+    publicSlug: string | null;
+  };
+};
 
 const AI_RUNTIME_CONTEXT_VERSION = 'leadflow.ai-runtime-context.v1' as const;
 const AI_SERVICE_OWNER_KEY = 'lead-handler' as const;
 const AI_RUNTIME_CHANNEL = 'whatsapp' as const;
-const DEFAULT_GATEWAY_TIMEOUT_MS = 10_000;
-const DEFAULT_GATEWAY_BASE_URL = 'http://ia_gateway:3000';
+const DEFAULT_GATEWAY_TIMEOUT_MS = 90_000;
+const DEFAULT_GATEWAY_BASE_URL = 'http://ia-gateway_ia-gateway:3000';
+const SWARM_GATEWAY_BASE_URL = 'http://ia-gateway_ia-gateway:3000';
 const DEFAULT_DEVELOPMENT_ORCHESTRATION_INSTANCE_NAME =
   'default-constructor' as const;
 const DEFAULT_DEVELOPMENT_ORCHESTRATION_PROMPT =
-  'Actua como el constructor de Smart Wiring de Leadflow y responde con un contrato JSON claro, conservador y aplicable por el builder.' as const;
+  'Actua como el electricista de Smart Wiring de Leadflow. Prioriza estructura sobre copy, valida esquemas, corrige wiring y responde con JSON aplicable por el builder.' as const;
 const IA_GATEWAY_SESSION_INIT_PATH = '/v1/session/init';
 const IA_GATEWAY_EXECUTE_PATH = '/v1/execute';
 const IA_GATEWAY_SESSION_CLOSE_PATH = '/v1/session/close';
@@ -82,7 +131,10 @@ const cloneJsonValue = (value: unknown): unknown => {
   return value;
 };
 
-const mergeJsonValues = (baseValue: unknown, overrideValue: unknown): unknown => {
+const mergeJsonValues = (
+  baseValue: unknown,
+  overrideValue: unknown,
+): unknown => {
   if (overrideValue === null || overrideValue === undefined) {
     return cloneJsonValue(baseValue);
   }
@@ -146,7 +198,10 @@ const readRouteContextFields = (
   const record = toJsonRecord(value);
 
   return Object.fromEntries(
-    AI_CONFIG_ROUTE_CONTEXT_KEYS.map((key) => [key, readStringValue(record[key])]),
+    AI_CONFIG_ROUTE_CONTEXT_KEYS.map((key) => [
+      key,
+      readStringValue(record[key]),
+    ]),
   ) as Record<AiConfigRouteContextKey, string>;
 };
 
@@ -189,6 +244,33 @@ const mergeDefaultCta = (input: {
   return Object.keys(current).length > 0 ? current : null;
 };
 
+const mergeAiPolicyFields = (input: {
+  existing: unknown;
+  updates: unknown;
+}) => {
+  const current = toJsonRecord(mergeJsonValues(input.existing, input.updates));
+
+  return Object.keys(current).length > 0 ? current : null;
+};
+
+const hasKloserPolicyKey = (value: unknown) => {
+  const record = toJsonRecord(value);
+
+  return (
+    Object.prototype.hasOwnProperty.call(record, 'kloser') ||
+    Object.prototype.hasOwnProperty.call(record, 'kloser_config')
+  );
+};
+
+const omitKloserPolicyKeys = (value: unknown) => {
+  const record = toJsonRecord(value);
+
+  delete record.kloser;
+  delete record.kloser_config;
+
+  return Object.keys(record).length > 0 ? record : null;
+};
+
 const parsePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10);
 
@@ -197,6 +279,122 @@ const parsePositiveInt = (value: string | undefined, fallback: number) => {
   }
 
   return parsed;
+};
+
+const readNetworkErrorCode = (error: unknown): string | null => {
+  if (typeof error !== 'object' || error === null) {
+    return null;
+  }
+
+  if ('code' in error && typeof error.code === 'string') {
+    return error.code;
+  }
+
+  if (
+    'cause' in error &&
+    typeof error.cause === 'object' &&
+    error.cause !== null &&
+    'code' in error.cause &&
+    typeof error.cause.code === 'string'
+  ) {
+    return error.cause.code;
+  }
+
+  return null;
+};
+
+const slugifySmartWiringToken = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const normalizeBlockIdFromContext = (block: JsonRecord, index: number) => {
+  const explicitId = sanitizeNullableText(block.block_id as any);
+
+  if (explicitId) {
+    return explicitId;
+  }
+
+  const preferredKey = sanitizeNullableText(block.key as any);
+  if (preferredKey) {
+    return slugifySmartWiringToken(preferredKey);
+  }
+
+  const type = sanitizeNullableText(block.type as any) ?? 'block';
+  const normalizedType = slugifySmartWiringToken(type) || 'block';
+  return `${normalizedType}_${index + 1}`;
+};
+
+const extractSmartWiringBlocks = (value: unknown): JsonRecord[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is JsonRecord => isPlainObject(item))
+    .map((item) => ({ ...item }));
+};
+
+const extractSmartWiringEdges = (value: unknown): JsonRecord[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is JsonRecord => isPlainObject(item))
+    .map((item) => ({ ...item }));
+};
+
+const buildSequentialRecoveryEdges = (blocks: JsonRecord[]) => {
+  if (blocks.length < 2) {
+    return [];
+  }
+
+  return blocks.slice(0, -1).map((block, index) => ({
+    from_block_id: normalizeBlockIdFromContext(block, index),
+    to_block_id: normalizeBlockIdFromContext(blocks[index + 1]!, index + 1),
+    outcome: 'default',
+    rationale: 'recovery_sequential_order',
+  }));
+};
+
+const normalizeOrchestrationFunnelContext = (
+  value: Record<string, unknown> | null | undefined,
+) => {
+  const context = toJsonRecord(value);
+  const normalizedBlocks = extractSmartWiringBlocks(context.blocks).map(
+    (block, index) => ({
+      ...block,
+      block_id: normalizeBlockIdFromContext(block, index),
+    }),
+  );
+  const currentEdges = extractSmartWiringEdges(context.edges);
+  const needsRecovery =
+    normalizedBlocks.length > 1 && currentEdges.length === 0;
+  const recoveryEdges = needsRecovery
+    ? buildSequentialRecoveryEdges(normalizedBlocks)
+    : currentEdges;
+
+  return {
+    ...context,
+    blocks: normalizedBlocks,
+    edges: recoveryEdges,
+    smart_wiring: {
+      mode: needsRecovery ? 'recovery' : 'validate',
+      structure_priority: 'edges_first',
+      validate_block_ids: true,
+      preserve_content: true,
+      recovery_strategy: needsRecovery ? 'sequential_block_order' : null,
+      diagnostics: {
+        block_count: normalizedBlocks.length,
+        edge_count: currentEdges.length,
+        recovery_edge_count: recoveryEdges.length,
+        missing_graph_detected: needsRecovery,
+      },
+    },
+  };
 };
 
 const buildMergedPrompt = (input: {
@@ -217,6 +415,59 @@ const buildMergedPrompt = (input: {
   return memberPrompt ?? tenantPrompt ?? null;
 };
 
+const isValidBasePrompt = (value: string | null | undefined) =>
+  Boolean(sanitizeNullableText(value));
+
+const isCustomTenantBasePrompt = (value: string | null | undefined) => {
+  const prompt = sanitizeNullableText(value);
+
+  return Boolean(prompt && prompt !== DEFAULT_TENANT_AI_BASE_PROMPT);
+};
+
+const selectTenantConfigByPromptPriority = (configs: TenantAiAgentConfig[]) => {
+  return (
+    configs.find((config) => isCustomTenantBasePrompt(config.basePrompt)) ??
+    configs.find((config) => isValidBasePrompt(config.basePrompt)) ??
+    configs[0] ??
+    null
+  );
+};
+
+const buildConfigVersionPart = (
+  scope: 'tenant' | 'member',
+  config: TenantAiAgentConfig | null,
+) => {
+  if (!config) {
+    return `${scope}:none`;
+  }
+
+  const updatedAt =
+    config.updatedAt instanceof Date
+      ? config.updatedAt.toISOString()
+      : String(config.updatedAt ?? 'unknown');
+
+  return `${scope}:${config.id}:${updatedAt}`;
+};
+
+const buildRuntimeConfigVersion = (input: {
+  tenantConfig: TenantAiAgentConfig | null;
+  memberConfig: TenantAiAgentConfig | null;
+}) =>
+  [
+    AI_RUNTIME_CONTEXT_VERSION,
+    buildConfigVersionPart('tenant', input.tenantConfig),
+    buildConfigVersionPart('member', input.memberConfig),
+  ].join('|');
+
+const buildTenantBypassConfigVersion = (config: TenantAiAgentConfig) => {
+  const updatedAt =
+    config.updatedAt instanceof Date
+      ? config.updatedAt.toISOString()
+      : String(config.updatedAt ?? 'unknown');
+
+  return `ai-agent-config:${config.id}:${updatedAt}`;
+};
+
 const replacePromptPlaceholders = (
   prompt: string,
   placeholders: {
@@ -228,10 +479,7 @@ const replacePromptPlaceholders = (
   return prompt
     .replace(/\{\{\s*name\s*\}\}/gi, placeholders.name)
     .replace(/\{\{\s*team_name\s*\}\}/gi, placeholders.team_name)
-    .replace(
-      /\{\{\s*whatsapp_link\s*\}\}/gi,
-      placeholders.whatsapp_link ?? '',
-    );
+    .replace(/\{\{\s*whatsapp_link\s*\}\}/gi, placeholders.whatsapp_link ?? '');
 };
 
 @Injectable()
@@ -251,7 +499,417 @@ export class AiConfigService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
+    private readonly tenantConfigCacheService?: TenantConfigCacheService,
+    private readonly runtimeContextConfigSyncService?: RuntimeContextConfigSyncService,
   ) {}
+
+  private async findTenantConfig(input: {
+    tenantId: string;
+    activeOnly?: boolean;
+    tx?: AiAgentConfigStore;
+  }) {
+    const tx = input.tx ?? this.prisma;
+    const configs = await tx.aiAgentConfig.findMany({
+      where: {
+        tenantId: input.tenantId,
+        memberId: null,
+        ...(input.activeOnly ? { isActive: true } : {}),
+      },
+      orderBy: {
+        id: 'asc',
+      },
+    });
+
+    return selectTenantConfigByPromptPriority(configs);
+  }
+
+  private async purgeTenantConfigCache(tenantId: string) {
+    await this.tenantConfigCacheService?.purgeTenantConfig(tenantId);
+  }
+
+  private async safeSyncAiConfigToRuntimeContext(input: {
+    config: TenantAiAgentConfig;
+    tenantCode?: string | null;
+  }) {
+    try {
+      await this.runtimeContextConfigSyncService?.syncAiAgentConfig({
+        config: input.config,
+        tenantCode: input.tenantCode,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Runtime context AI config sync failed for tenant ${input.config.tenantId}, config ${input.config.id}, member ${input.config.memberId ?? 'global'}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      );
+    }
+  }
+
+  private toRuntimeContextSourceFromChannelInstance(
+    channelInstance: RuntimeChannelInstanceRecord,
+  ): RuntimeContextSource {
+    if (channelInstance.member.teamId !== channelInstance.tenantId) {
+      throw new InternalServerErrorException({
+        code: 'AI_CHANNEL_INSTANCE_OWNERSHIP_MISMATCH',
+        message:
+          'The resolved ChannelInstance points to a member that does not belong to the same tenant.',
+      });
+    }
+
+    return {
+      instanceName: channelInstance.instanceName,
+      provider: channelInstance.provider,
+      tenantId: channelInstance.tenantId,
+      memberId: channelInstance.memberId,
+      tenant: {
+        id: channelInstance.tenant.id,
+        name: channelInstance.tenant.name,
+        code: channelInstance.tenant.code,
+      },
+      member: {
+        id: channelInstance.member.id,
+        teamId: channelInstance.member.teamId,
+        displayName: channelInstance.member.displayName,
+        email: channelInstance.member.email,
+        phone: channelInstance.member.phone,
+        publicSlug: channelInstance.member.publicSlug,
+      },
+    };
+  }
+
+  private toRuntimeContextSourceFromMessagingConnection(
+    connection: RuntimeMessagingConnectionRecord,
+  ): RuntimeContextSource {
+    return {
+      instanceName: connection.externalInstanceId ?? '',
+      provider: connection.provider.toLowerCase(),
+      tenantId: connection.teamId,
+      memberId: connection.sponsorId,
+      tenant: {
+        id: connection.team.id,
+        name: connection.team.name,
+        code: connection.team.code,
+      },
+      member: {
+        id: connection.sponsor.id,
+        teamId: connection.sponsor.teamId,
+        displayName: connection.sponsor.displayName,
+        email: connection.sponsor.email,
+        phone: connection.sponsor.phone,
+        publicSlug: connection.sponsor.publicSlug,
+      },
+    };
+  }
+
+  private async findChannelInstanceRuntimeSource(input: {
+    instanceName: string;
+    tenantId?: string | null;
+  }): Promise<RuntimeContextSource | null> {
+    const channelInstance = input.tenantId
+      ? await this.prisma.channelInstance.findFirst({
+          where: {
+            instanceName: input.instanceName,
+            tenantId: input.tenantId,
+          },
+          include: {
+            tenant: true,
+            member: true,
+          },
+        })
+      : await this.prisma.channelInstance.findUnique({
+          where: {
+            instanceName: input.instanceName,
+          },
+          include: {
+            tenant: true,
+            member: true,
+          },
+        });
+
+    return channelInstance
+      ? this.toRuntimeContextSourceFromChannelInstance(channelInstance)
+      : null;
+  }
+
+  private async findMessagingConnectionRuntimeSource(input: {
+    instanceName: string;
+    tenantId?: string | null;
+  }): Promise<RuntimeContextSource | null> {
+    const connection = await this.prisma.messagingConnection.findFirst({
+      where: {
+        externalInstanceId: input.instanceName,
+        ...(input.tenantId ? { teamId: input.tenantId } : {}),
+      },
+      include: {
+        team: true,
+        sponsor: true,
+      },
+    });
+
+    return connection
+      ? this.toRuntimeContextSourceFromMessagingConnection(connection)
+      : null;
+  }
+
+  private async resolveRuntimeContextSource(input: {
+    instanceName: string;
+    tenantId?: string | null;
+  }) {
+    if (input.tenantId) {
+      const scopedMessagingConnection =
+        await this.findMessagingConnectionRuntimeSource(input);
+
+      if (scopedMessagingConnection) {
+        return scopedMessagingConnection;
+      }
+
+      const scopedChannelInstance =
+        await this.findChannelInstanceRuntimeSource(input);
+
+      if (scopedChannelInstance) {
+        return scopedChannelInstance;
+      }
+    } else {
+      const channelInstance =
+        await this.findChannelInstanceRuntimeSource(input);
+
+      if (channelInstance) {
+        return channelInstance;
+      }
+
+      const messagingConnection =
+        await this.findMessagingConnectionRuntimeSource(input);
+
+      if (messagingConnection) {
+        return messagingConnection;
+      }
+    }
+
+    throw new NotFoundException({
+      code: 'AI_CHANNEL_INSTANCE_NOT_FOUND',
+      message: input.tenantId
+        ? `No runtime context source was found for instance ${input.instanceName} in tenant ${input.tenantId}.`
+        : `No runtime context source was found for instance ${input.instanceName}.`,
+    });
+  }
+
+  private async resolveTenantBypassRuntimeSource(input: {
+    instanceName: string;
+    tenantId: string;
+  }): Promise<RuntimeContextSource> {
+    const messagingConnection =
+      await this.findMessagingConnectionRuntimeSource(input);
+
+    if (messagingConnection) {
+      return messagingConnection;
+    }
+
+    const channelInstance = await this.findChannelInstanceRuntimeSource(input);
+
+    if (channelInstance) {
+      return channelInstance;
+    }
+
+    const [team, sponsor] = await Promise.all([
+      this.prisma.team.findUnique({
+        where: {
+          id: input.tenantId,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      }),
+      this.prisma.sponsor.findFirst({
+        where: {
+          teamId: input.tenantId,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        select: {
+          id: true,
+          teamId: true,
+          displayName: true,
+          email: true,
+          phone: true,
+          publicSlug: true,
+        },
+      }),
+    ]);
+
+    if (!team) {
+      throw new NotFoundException({
+        code: 'AI_RUNTIME_TENANT_NOT_FOUND',
+        message: `No tenant was found for runtime context bypass ${input.tenantId}.`,
+      });
+    }
+
+    return {
+      instanceName: input.instanceName,
+      provider: 'evolution',
+      tenantId: team.id,
+      memberId: sponsor?.id ?? `tenant:${team.id}`,
+      tenant: team,
+      member: {
+        id: sponsor?.id ?? `tenant:${team.id}`,
+        teamId: team.id,
+        displayName: sponsor?.displayName ?? team.name,
+        email: sponsor?.email ?? null,
+        phone: sponsor?.phone ?? null,
+        publicSlug: sponsor?.publicSlug ?? null,
+      },
+    };
+  }
+
+  private async buildTenantBypassRuntimeContext(input: {
+    instanceName: string;
+    tenantId: string;
+    customConfig: TenantAiAgentConfig;
+  }): Promise<AiRuntimeContext> {
+    const runtimeSource = await this.resolveTenantBypassRuntimeSource({
+      instanceName: input.instanceName,
+      tenantId: input.tenantId,
+    });
+    const placeholders = this.buildPlaceholders({
+      name: runtimeSource.member.displayName,
+      teamName: runtimeSource.tenant.name,
+      phone: runtimeSource.member.phone,
+    });
+    const basePrompt = sanitizeNullableText(input.customConfig.basePrompt)!;
+    const resolvedBasePrompt = replacePromptPlaceholders(
+      basePrompt,
+      placeholders,
+    );
+    const routeContexts = toJsonRecord(input.customConfig.routeContexts);
+    const aiPolicy = toJsonRecord(input.customConfig.aiPolicy);
+    const ctaPolicy = toJsonRecord(input.customConfig.ctaPolicy);
+    const runtimeRoutingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: runtimeSource.tenant.code,
+      aiPolicy,
+      routeContexts,
+    });
+    const configVersion = buildTenantBypassConfigVersion(input.customConfig);
+    const wallet = await this.resolveWalletContext(runtimeSource.memberId);
+
+    return {
+      version: AI_RUNTIME_CONTEXT_VERSION,
+      config_version: configVersion,
+      basePrompt: resolvedBasePrompt,
+      base_prompt: resolvedBasePrompt,
+      routing: {
+        provider: runtimeSource.provider,
+        channel: AI_RUNTIME_CHANNEL,
+        instance_name: runtimeSource.instanceName,
+        service_owner_key: AI_SERVICE_OWNER_KEY,
+      },
+      tenant: {
+        id: runtimeSource.tenant.id,
+        name: runtimeSource.tenant.name,
+        code: runtimeSource.tenant.code,
+        ...runtimeRoutingMetadata,
+      },
+      member: {
+        id: runtimeSource.member.id,
+        name: runtimeSource.member.displayName,
+        email: sanitizeNullableText(runtimeSource.member.email),
+        phone: sanitizeNullableText(runtimeSource.member.phone),
+        public_slug: sanitizeNullableText(runtimeSource.member.publicSlug),
+        whatsapp_link: placeholders.whatsapp_link,
+      },
+      placeholders,
+      wallet,
+      ai_agent: {
+        basePrompt: resolvedBasePrompt,
+        base_prompt: resolvedBasePrompt,
+        route_contexts: routeContexts,
+        cta_policy: ctaPolicy,
+        ai_policy: aiPolicy,
+      },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy,
+        ctaPolicy,
+      }),
+      resolution: {
+        strategy: 'tenant_default',
+        tenant_config_id: input.customConfig.id,
+        member_config_id: null,
+      },
+    };
+  }
+
+  async ensureTenantDefaultConfig(
+    input: {
+      tenantId: string;
+      brandKey?: string | null;
+    },
+    tx: AiAgentConfigStore = this.prisma,
+  ) {
+    const tenantId = sanitizeNullableText(input.tenantId);
+
+    if (!tenantId) {
+      throw new BadRequestException({
+        code: 'AI_CONFIG_TENANT_REQUIRED',
+        message: 'tenantId is required to provision the default AI config.',
+      });
+    }
+
+    const existingConfig = await this.findTenantConfig({
+      tenantId,
+      tx,
+    });
+    const baseAiPolicy = withDefaultAiRuntimeRoutingMetadata(
+      existingConfig?.aiPolicy,
+      {
+        tenantCode: input.brandKey,
+        brandKey: input.brandKey,
+      },
+    );
+    const aiPolicy = {
+      ...baseAiPolicy,
+      // Preserve any Kloser-adjacent tenant metadata while enforcing the v2.2 base contract.
+      kloser: {
+        ...toJsonRecord(baseAiPolicy.kloser),
+        ...resolveKloserTenantConfig({
+          aiPolicy: baseAiPolicy,
+          ctaPolicy: existingConfig?.ctaPolicy,
+        }),
+      },
+    } as Prisma.InputJsonValue;
+
+    if (!existingConfig) {
+      const createdConfig = await tx.aiAgentConfig.create({
+        data: {
+          tenantId,
+          memberId: null,
+          basePrompt: DEFAULT_TENANT_AI_BASE_PROMPT,
+          routeContexts: Prisma.JsonNull,
+          ctaPolicy: Prisma.JsonNull,
+          aiPolicy,
+          isActive: true,
+        },
+      });
+
+      await this.purgeTenantConfigCache(tenantId);
+
+      return createdConfig;
+    }
+
+    const updatedConfig = await tx.aiAgentConfig.update({
+      where: {
+        id: existingConfig.id,
+      },
+      data: {
+        aiPolicy,
+        isActive: true,
+      },
+    });
+
+    await this.purgeTenantConfigCache(tenantId);
+
+    return updatedConfig;
+  }
 
   async getMemberEditorSnapshot(scope: {
     workspaceId: string;
@@ -270,15 +928,9 @@ export class AiConfigService {
           updatedAt: 'desc',
         },
       }),
-      this.prisma.aiAgentConfig.findFirst({
-        where: {
-          tenantId: sponsor.teamId,
-          memberId: null,
-          isActive: true,
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
+      this.findTenantConfig({
+        tenantId: sponsor.teamId,
+        activeOnly: true,
       }),
     ]);
 
@@ -304,6 +956,10 @@ export class AiConfigService {
               | undefined,
           ) ?? null,
       },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy: tenantConfig?.aiPolicy,
+        ctaPolicy: tenantConfig?.ctaPolicy,
+      }),
       resolution: {
         strategy: memberConfig
           ? 'member_override'
@@ -318,6 +974,48 @@ export class AiConfigService {
     };
   }
 
+  async getTeamEditorSnapshot(scope: {
+    workspaceId: string;
+    teamId: string;
+    sponsorId: string;
+  }): Promise<AiConfigEditorSnapshot> {
+    const sponsor = await this.requireScopedSponsor(scope);
+    const tenantConfig = await this.findTenantConfig({
+      tenantId: sponsor.teamId,
+      activeOnly: true,
+    });
+
+    return {
+      configId: tenantConfig?.id ?? null,
+      tenantId: sponsor.team.id,
+      memberId: sponsor.id,
+      tenantName: sponsor.team.name,
+      memberName: sponsor.displayName,
+      basePrompt: sanitizeNullableText(tenantConfig?.basePrompt) ?? '',
+      routeContexts: readRouteContextFields(tenantConfig?.routeContexts),
+      ctaPolicy: {
+        defaultCta:
+          sanitizeNullableText(
+            toJsonRecord(tenantConfig?.ctaPolicy).default_cta as
+              | string
+              | null
+              | undefined,
+          ) ?? null,
+      },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy: tenantConfig?.aiPolicy,
+        ctaPolicy: tenantConfig?.ctaPolicy,
+      }),
+      resolution: {
+        strategy: tenantConfig ? 'tenant_default' : 'empty',
+        tenantConfigId: tenantConfig?.id ?? null,
+        memberConfigId: null,
+      },
+      availablePlaceholders: [...AI_CONFIG_PLACEHOLDERS],
+      updatedAt: tenantConfig?.updatedAt?.toISOString() ?? null,
+    };
+  }
+
   async updateMemberSettings(
     scope: {
       workspaceId: string;
@@ -328,6 +1026,7 @@ export class AiConfigService {
       basePrompt: string;
       routeContexts?: Partial<Record<AiConfigRouteContextKey, string | null>>;
       defaultCta?: string | null;
+      aiPolicy?: unknown;
     },
   ): Promise<AiConfigEditorSnapshot> {
     const sponsor = await this.requireScopedSponsor(scope);
@@ -340,6 +1039,14 @@ export class AiConfigService {
       });
     }
 
+    if (hasKloserPolicyKey(input.aiPolicy)) {
+      throw new BadRequestException({
+        code: 'AI_CONFIG_KLOSER_PERSONAL_FORBIDDEN',
+        message:
+          'Kloser follow-up strategy is a team-level setting and cannot be saved on a personal AI config.',
+      });
+    }
+
     const existingConfig = await this.prisma.aiAgentConfig.findUnique({
       where: {
         tenantId_memberId: {
@@ -348,8 +1055,12 @@ export class AiConfigService {
         },
       },
     });
+    const aiPolicy = mergeAiPolicyFields({
+      existing: omitKloserPolicyKeys(existingConfig?.aiPolicy),
+      updates: input.aiPolicy,
+    });
 
-    await this.prisma.aiAgentConfig.upsert({
+    const savedConfig = await this.prisma.aiAgentConfig.upsert({
       where: {
         tenantId_memberId: {
           tenantId: sponsor.teamId,
@@ -366,7 +1077,7 @@ export class AiConfigService {
           existing: existingConfig?.ctaPolicy,
           defaultCta: input.defaultCta,
         }) ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-        aiPolicy: existingConfig?.aiPolicy ?? undefined,
+        aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         isActive: true,
       },
       create: {
@@ -381,16 +1092,110 @@ export class AiConfigService {
           existing: null,
           defaultCta: input.defaultCta,
         }) ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-        aiPolicy: Prisma.JsonNull,
+        aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         isActive: true,
       },
+    });
+
+    await this.purgeTenantConfigCache(sponsor.teamId);
+    // Member saves sync only the sponsor scope; the team endpoint owns the tenant-level global prompt.
+    await this.safeSyncAiConfigToRuntimeContext({
+      config: savedConfig,
+      tenantCode: sponsor.team.code,
     });
 
     return await this.getMemberEditorSnapshot(scope);
   }
 
-  async resolveRuntimeContext(instanceName: string): Promise<AiRuntimeContext> {
-    const normalizedInstanceName = sanitizeNullableText(instanceName);
+  async updateTeamSettings(
+    scope: {
+      workspaceId: string;
+      teamId: string;
+      sponsorId: string;
+    },
+    input: {
+      basePrompt?: string | null;
+      aiPolicy?: unknown;
+    },
+  ): Promise<AiConfigEditorSnapshot> {
+    const sponsor = await this.requireScopedSponsor(scope);
+    const normalizedBasePrompt =
+      input.basePrompt === undefined
+        ? undefined
+        : sanitizeNullableText(input.basePrompt);
+
+    if (input.aiPolicy === undefined && input.basePrompt === undefined) {
+      throw new BadRequestException({
+        code: 'AI_CONFIG_TEAM_UPDATE_EMPTY',
+        message: 'At least one team AI config field is required.',
+      });
+    }
+
+    if (input.basePrompt !== undefined && !normalizedBasePrompt) {
+      throw new BadRequestException({
+        code: 'AI_CONFIG_BASE_PROMPT_REQUIRED',
+        message: 'basePrompt is required to persist the AI configuration.',
+      });
+    }
+
+    const existingConfig = await this.findTenantConfig({
+      tenantId: sponsor.teamId,
+    });
+    const existingAiPolicy = withDefaultAiRuntimeRoutingMetadata(
+      existingConfig?.aiPolicy,
+      {
+        tenantCode: sponsor.team.code,
+        brandKey: sponsor.team.code,
+      },
+    );
+    const aiPolicy = mergeAiPolicyFields({
+      existing: existingAiPolicy,
+      updates: input.aiPolicy,
+    });
+
+    const savedConfig = existingConfig
+      ? await this.prisma.aiAgentConfig.update({
+          where: {
+            id: existingConfig.id,
+          },
+          data: {
+            ...(normalizedBasePrompt
+              ? { basePrompt: normalizedBasePrompt }
+              : {}),
+            aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+            isActive: true,
+          },
+        })
+      : await this.prisma.aiAgentConfig.create({
+          data: {
+            tenantId: sponsor.teamId,
+            memberId: null,
+            basePrompt: normalizedBasePrompt ?? DEFAULT_TENANT_AI_BASE_PROMPT,
+            routeContexts: Prisma.JsonNull,
+            ctaPolicy: Prisma.JsonNull,
+            aiPolicy: (aiPolicy ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+            isActive: true,
+          },
+        });
+
+    await this.purgeTenantConfigCache(sponsor.teamId);
+    await this.safeSyncAiConfigToRuntimeContext({
+      config: savedConfig,
+      tenantCode: sponsor.team.code,
+    });
+
+    return await this.getTeamEditorSnapshot(scope);
+  }
+
+  async resolveRuntimeContext(
+    input: RuntimeContextResolveInput,
+  ): Promise<AiRuntimeContext> {
+    const normalizedInstanceName =
+      typeof input === 'string'
+        ? sanitizeNullableText(input)
+        : sanitizeNullableText(input.instanceName);
+    const normalizedTenantId =
+      typeof input === 'string' ? null : sanitizeNullableText(input.tenantId);
 
     if (!normalizedInstanceName) {
       throw new NotFoundException({
@@ -399,51 +1204,44 @@ export class AiConfigService {
       });
     }
 
-    const channelInstance = await this.prisma.channelInstance.findUnique({
-      where: {
-        instanceName: normalizedInstanceName,
-      },
-      include: {
-        tenant: true,
-        member: true,
-      },
+    if (normalizedTenantId) {
+      const customConfig = await this.prisma.aiAgentConfig.findFirst({
+        where: {
+          tenantId: normalizedTenantId,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+      });
+
+      if (customConfig && isValidBasePrompt(customConfig.basePrompt)) {
+        return this.buildTenantBypassRuntimeContext({
+          instanceName: normalizedInstanceName,
+          tenantId: normalizedTenantId,
+          customConfig,
+        });
+      }
+    }
+
+    const runtimeSource = await this.resolveRuntimeContextSource({
+      instanceName: normalizedInstanceName,
+      tenantId: normalizedTenantId,
     });
-
-    if (!channelInstance) {
-      throw new NotFoundException({
-        code: 'AI_CHANNEL_INSTANCE_NOT_FOUND',
-        message: `No ChannelInstance was found for instance ${normalizedInstanceName}.`,
-      });
-    }
-
-    if (channelInstance.member.teamId !== channelInstance.tenantId) {
-      throw new InternalServerErrorException({
-        code: 'AI_CHANNEL_INSTANCE_OWNERSHIP_MISMATCH',
-        message:
-          'The resolved ChannelInstance points to a member that does not belong to the same tenant.',
-      });
-    }
 
     const [memberConfig, tenantConfig] = await Promise.all([
       this.prisma.aiAgentConfig.findFirst({
         where: {
-          tenantId: channelInstance.tenantId,
-          memberId: channelInstance.memberId,
+          tenantId: runtimeSource.tenantId,
+          memberId: runtimeSource.memberId,
           isActive: true,
         },
         orderBy: {
           updatedAt: 'desc',
         },
       }),
-      this.prisma.aiAgentConfig.findFirst({
-        where: {
-          tenantId: channelInstance.tenantId,
-          memberId: null,
-          isActive: true,
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
+      this.findTenantConfig({
+        tenantId: runtimeSource.tenantId,
+        activeOnly: true,
       }),
     ]);
 
@@ -456,9 +1254,9 @@ export class AiConfigService {
     }
 
     const placeholders = this.buildPlaceholders({
-      name: channelInstance.member.displayName,
-      teamName: channelInstance.tenant.name,
-      phone: channelInstance.member.phone,
+      name: runtimeSource.member.displayName,
+      teamName: runtimeSource.tenant.name,
+      phone: runtimeSource.member.phone,
     });
     const basePrompt = buildMergedPrompt({
       tenantPrompt: tenantConfig?.basePrompt ?? null,
@@ -473,46 +1271,70 @@ export class AiConfigService {
       });
     }
 
-    const wallet = await this.resolveWalletContext(channelInstance.memberId);
+    const wallet = await this.resolveWalletContext(runtimeSource.memberId);
+    const routeContexts = toJsonRecord(
+      mergeJsonValues(tenantConfig?.routeContexts, memberConfig?.routeContexts),
+    );
+    const aiPolicy = toJsonRecord(
+      mergeJsonValues(
+        tenantConfig?.aiPolicy,
+        omitKloserPolicyKeys(memberConfig?.aiPolicy),
+      ),
+    );
+    const ctaPolicy = toJsonRecord(
+      mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
+    );
+    const runtimeRoutingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: runtimeSource.tenant.code,
+      aiPolicy,
+      routeContexts,
+    });
+    const resolvedBasePrompt = replacePromptPlaceholders(
+      basePrompt,
+      placeholders,
+    );
 
     return {
       version: AI_RUNTIME_CONTEXT_VERSION,
+      config_version: buildRuntimeConfigVersion({
+        tenantConfig,
+        memberConfig,
+      }),
+      basePrompt: resolvedBasePrompt,
+      base_prompt: resolvedBasePrompt,
       routing: {
-        provider: channelInstance.provider,
+        provider: runtimeSource.provider,
         channel: AI_RUNTIME_CHANNEL,
-        instance_name: channelInstance.instanceName,
+        instance_name: runtimeSource.instanceName,
         service_owner_key: AI_SERVICE_OWNER_KEY,
       },
       tenant: {
-        id: channelInstance.tenant.id,
-        name: channelInstance.tenant.name,
-        code: channelInstance.tenant.code,
+        id: runtimeSource.tenant.id,
+        name: runtimeSource.tenant.name,
+        code: runtimeSource.tenant.code,
+        ...runtimeRoutingMetadata,
       },
       member: {
-        id: channelInstance.member.id,
-        name: channelInstance.member.displayName,
-        email: sanitizeNullableText(channelInstance.member.email),
-        phone: sanitizeNullableText(channelInstance.member.phone),
-        public_slug: sanitizeNullableText(channelInstance.member.publicSlug),
+        id: runtimeSource.member.id,
+        name: runtimeSource.member.displayName,
+        email: sanitizeNullableText(runtimeSource.member.email),
+        phone: sanitizeNullableText(runtimeSource.member.phone),
+        public_slug: sanitizeNullableText(runtimeSource.member.publicSlug),
         whatsapp_link: placeholders.whatsapp_link,
       },
       placeholders,
       wallet,
       ai_agent: {
-        base_prompt: replacePromptPlaceholders(basePrompt, placeholders),
-        route_contexts: toJsonRecord(
-          mergeJsonValues(
-            tenantConfig?.routeContexts,
-            memberConfig?.routeContexts,
-          ),
-        ),
-        cta_policy: toJsonRecord(
-          mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
-        ),
-        ai_policy: toJsonRecord(
-          mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
-        ),
+        basePrompt: resolvedBasePrompt,
+        base_prompt: resolvedBasePrompt,
+        route_contexts: routeContexts,
+        cta_policy: ctaPolicy,
+        ai_policy: aiPolicy,
       },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy,
+        ctaPolicy,
+      }),
       resolution: {
         strategy: memberConfig ? 'member_override' : 'tenant_default',
         tenant_config_id: tenantConfig?.id ?? null,
@@ -532,19 +1354,24 @@ export class AiConfigService {
     if (!instanceName) {
       throw new BadRequestException({
         code: 'AI_ORCHESTRATION_INSTANCE_REQUIRED',
-        message: 'instanceName is required to initialize the orchestration session.',
+        message:
+          'instanceName is required to initialize the orchestration session.',
       });
     }
 
     if (!funnelId) {
       throw new BadRequestException({
         code: 'AI_ORCHESTRATION_FUNNEL_REQUIRED',
-        message: 'funnelId is required to initialize the orchestration session.',
+        message:
+          'funnelId is required to initialize the orchestration session.',
       });
     }
 
     const runtimeContext = await this.resolveRuntimeContext(instanceName);
-    return this.initOrchestrationSessionWithRuntimeContext(runtimeContext, input);
+    return this.initOrchestrationSessionWithRuntimeContext(
+      runtimeContext,
+      input,
+    );
   }
 
   async executeOrchestration(
@@ -596,7 +1423,10 @@ export class AiConfigService {
     }
 
     const runtimeContext = await this.resolveRuntimeContext(instanceName);
-    return this.closeOrchestrationSessionWithRuntimeContext(runtimeContext, input);
+    return this.closeOrchestrationSessionWithRuntimeContext(
+      runtimeContext,
+      input,
+    );
   }
 
   private async initOrchestrationSessionWithRuntimeContext(
@@ -608,7 +1438,8 @@ export class AiConfigService {
     if (!funnelId) {
       throw new BadRequestException({
         code: 'AI_ORCHESTRATION_FUNNEL_REQUIRED',
-        message: 'funnelId is required to initialize the orchestration session.',
+        message:
+          'funnelId is required to initialize the orchestration session.',
       });
     }
 
@@ -616,19 +1447,23 @@ export class AiConfigService {
       instanceName: runtimeContext.routing.instance_name,
       funnelId,
     });
+    const normalizedFunnelContext = normalizeOrchestrationFunnelContext(
+      input.funnelContext,
+    );
+    const payload = {
+      sessionId,
+      system_prompt: this.buildGatewaySystemPrompt({
+        runtimeContext,
+        funnelContext: normalizedFunnelContext,
+        metadata: input.metadata ?? null,
+      }),
+    };
 
     try {
       const { response, data } = await this.sendGatewayRequest({
         path: IA_GATEWAY_SESSION_INIT_PATH,
         runtimeContext,
-        body: {
-          sessionId,
-          system_prompt: this.buildGatewaySystemPrompt({
-            runtimeContext,
-            funnelContext: input.funnelContext ?? null,
-            metadata: input.metadata ?? null,
-          }),
-        },
+        body: payload,
         errorCode: 'AI_GATEWAY_SESSION_INIT_FAILED',
         errorMessage: 'IA Gateway session initialization failed.',
       });
@@ -656,10 +1491,75 @@ export class AiConfigService {
         throw error;
       }
 
+      const networkErrorCode = readNetworkErrorCode(error);
+
+      if (networkErrorCode === 'ENOTFOUND') {
+        const fallbackBaseUrl = this.resolveSwarmGatewayBaseUrl();
+
+        if (fallbackBaseUrl && fallbackBaseUrl !== this.gatewayBaseUrl) {
+          this.logger.warn(
+            `IA Gateway DNS lookup failed against ${this.gatewayBaseUrl}; retrying session init against ${fallbackBaseUrl}.`,
+          );
+
+          try {
+            const { response, data } = await this.sendGatewayRequest({
+              path: IA_GATEWAY_SESSION_INIT_PATH,
+              runtimeContext,
+              body: payload,
+              errorCode: 'AI_GATEWAY_SESSION_INIT_FAILED',
+              errorMessage: 'IA Gateway session initialization failed.',
+              baseUrlOverride: fallbackBaseUrl,
+            });
+
+            return {
+              status: response.status,
+              sessionId,
+              runtimeContext,
+              data,
+            };
+          } catch (retryError) {
+            const retryNetworkErrorCode = readNetworkErrorCode(retryError);
+
+            throw new BadGatewayException({
+              code: 'AI_GATEWAY_UNREACHABLE',
+              message: 'IA Gateway session initialization request failed.',
+              details: {
+                message:
+                  retryError instanceof Error
+                    ? retryError.message
+                    : 'Unknown upstream error.',
+                networkErrorCode: retryNetworkErrorCode ?? networkErrorCode,
+                attemptedBaseUrl: fallbackBaseUrl,
+              },
+            });
+          }
+        }
+      }
+
+      if (
+        networkErrorCode === 'ETIMEDOUT' ||
+        networkErrorCode === 'ENOTFOUND' ||
+        networkErrorCode === 'ECONNREFUSED'
+      ) {
+        throw new BadGatewayException({
+          code: 'AI_GATEWAY_UNREACHABLE',
+          message: 'IA Gateway session initialization request failed.',
+          details: {
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Unknown upstream error.',
+            networkErrorCode,
+            attemptedBaseUrl: this.gatewayBaseUrl,
+          },
+        });
+      }
+
       throw new BadGatewayException({
         code: 'AI_GATEWAY_UNREACHABLE',
         message: 'IA Gateway session initialization request failed.',
-        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+        details:
+          error instanceof Error ? error.message : 'Unknown upstream error.',
       });
     }
   }
@@ -681,6 +1581,14 @@ export class AiConfigService {
       sanitizeNullableText(input.intent) ??
       sanitizeNullableText(input.prompt) ??
       runtimeContext.ai_agent.base_prompt;
+    const funnelId = this.readFunnelIdFromSessionId({
+      sessionId,
+      instanceName: runtimeContext.routing.instance_name,
+    });
+
+    this.logger.log(
+      `Iniciando orquestacion pesada para funnel ${funnelId ?? 'unknown'}... esperando hasta ${Math.round(this.gatewayTimeoutMs / 1000)}s`,
+    );
 
     try {
       const { response, data } = await this.sendGatewayRequest({
@@ -720,7 +1628,8 @@ export class AiConfigService {
       throw new BadGatewayException({
         code: 'AI_GATEWAY_UNREACHABLE',
         message: 'IA Gateway orchestration request failed.',
-        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+        details:
+          error instanceof Error ? error.message : 'Unknown upstream error.',
       });
     }
   }
@@ -775,7 +1684,8 @@ export class AiConfigService {
       throw new BadGatewayException({
         code: 'AI_GATEWAY_UNREACHABLE',
         message: 'IA Gateway session close request failed.',
-        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+        details:
+          error instanceof Error ? error.message : 'Unknown upstream error.',
       });
     }
   }
@@ -836,7 +1746,13 @@ export class AiConfigService {
     try {
       return await this.resolveRuntimeContext(explicitInstanceName);
     } catch (error) {
-      if (!this.shouldUseDevelopmentRuntimeFallback(user, explicitInstanceName, error)) {
+      if (
+        !this.shouldUseDevelopmentRuntimeFallback(
+          user,
+          explicitInstanceName,
+          error,
+        )
+      ) {
         throw error;
       }
 
@@ -867,7 +1783,8 @@ export class AiConfigService {
     if (!sponsor) {
       throw new NotFoundException({
         code: 'AI_CONFIG_MEMBER_NOT_FOUND',
-        message: 'The requested sponsor was not found for this AI config scope.',
+        message:
+          'The requested sponsor was not found for this AI config scope.',
       });
     }
 
@@ -945,8 +1862,7 @@ export class AiConfigService {
     }
 
     const sponsor =
-      sanitizeNullableText(input.user.sponsorId) &&
-      input.user.teamId === teamId
+      sanitizeNullableText(input.user.sponsorId) && input.user.teamId === teamId
         ? await this.prisma.sponsor.findFirst({
             where: {
               id: input.user.sponsorId ?? undefined,
@@ -992,15 +1908,9 @@ export class AiConfigService {
             },
           })
         : Promise.resolve(null),
-      this.prisma.aiAgentConfig.findFirst({
-        where: {
-          tenantId: team.id,
-          memberId: null,
-          isActive: true,
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
+      this.findTenantConfig({
+        tenantId: team.id,
+        activeOnly: true,
       }),
     ]);
 
@@ -1017,9 +1927,36 @@ export class AiConfigService {
         tenantPrompt: tenantConfig?.basePrompt ?? null,
         memberPrompt: memberConfig?.basePrompt ?? null,
       }) ?? DEFAULT_DEVELOPMENT_ORCHESTRATION_PROMPT;
+    const routeContexts = toJsonRecord(
+      mergeJsonValues(tenantConfig?.routeContexts, memberConfig?.routeContexts),
+    );
+    const aiPolicy = toJsonRecord(
+      mergeJsonValues(
+        tenantConfig?.aiPolicy,
+        omitKloserPolicyKeys(memberConfig?.aiPolicy),
+      ),
+    );
+    const ctaPolicy = toJsonRecord(
+      mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
+    );
+    const runtimeRoutingMetadata = resolveAiRuntimeRoutingMetadata({
+      tenantCode: team.code,
+      aiPolicy,
+      routeContexts,
+    });
+    const resolvedBasePrompt = replacePromptPlaceholders(
+      basePrompt,
+      placeholders,
+    );
 
     return {
       version: AI_RUNTIME_CONTEXT_VERSION,
+      config_version: buildRuntimeConfigVersion({
+        tenantConfig,
+        memberConfig,
+      }),
+      basePrompt: resolvedBasePrompt,
+      base_prompt: resolvedBasePrompt,
       routing: {
         provider: 'leadflow_builder',
         channel: AI_RUNTIME_CHANNEL,
@@ -1030,6 +1967,7 @@ export class AiConfigService {
         id: team.id,
         name: team.name,
         code: team.code,
+        ...runtimeRoutingMetadata,
       },
       member: {
         id: sponsor?.id ?? input.user.id,
@@ -1056,20 +1994,16 @@ export class AiConfigService {
               'Development orchestration fallback does not bind a sponsor wallet.',
           },
       ai_agent: {
-        base_prompt: replacePromptPlaceholders(basePrompt, placeholders),
-        route_contexts: toJsonRecord(
-          mergeJsonValues(
-            tenantConfig?.routeContexts,
-            memberConfig?.routeContexts,
-          ),
-        ),
-        cta_policy: toJsonRecord(
-          mergeJsonValues(tenantConfig?.ctaPolicy, memberConfig?.ctaPolicy),
-        ),
-        ai_policy: toJsonRecord(
-          mergeJsonValues(tenantConfig?.aiPolicy, memberConfig?.aiPolicy),
-        ),
+        basePrompt: resolvedBasePrompt,
+        base_prompt: resolvedBasePrompt,
+        route_contexts: routeContexts,
+        cta_policy: ctaPolicy,
+        ai_policy: aiPolicy,
       },
+      kloser: resolveKloserTenantConfig({
+        aiPolicy,
+        ctaPolicy,
+      }),
       resolution: {
         strategy: memberConfig
           ? 'member_override'
@@ -1098,7 +2032,9 @@ export class AiConfigService {
     };
   }
 
-  private async resolveWalletContext(memberId: string): Promise<AiRuntimeContext['wallet']> {
+  private async resolveWalletContext(
+    memberId: string,
+  ): Promise<AiRuntimeContext['wallet']> {
     if (!this.walletEngineService.isConfigured()) {
       return {
         account_id: null,
@@ -1109,9 +2045,8 @@ export class AiConfigService {
     }
 
     try {
-      const account = await this.walletEngineService.upsertSponsorAccount(
-        memberId,
-      );
+      const account =
+        await this.walletEngineService.upsertSponsorAccount(memberId);
       const balance = await this.walletEngineService.getSponsorKredits(
         account.accountId,
       );
@@ -1165,6 +2100,20 @@ export class AiConfigService {
   }) {
     const sections = [
       input.runtimeContext.ai_agent.base_prompt,
+      'Reglas obligatorias del contrato:',
+      [
+        'Solo puedes responder en formato JSON.',
+        'No puedes responder con markdown, prose, backticks ni explicaciones fuera del JSON.',
+        'Prioriza estructura sobre copy. Tu tarea principal es validar el cableado, no redactar texto.',
+        'Responde como validador de esquemas: verifica consistencia de block_id, continuidad de edges y preservacion conservadora del JSON existente.',
+        'Debes devolver un objeto JSON con las claves mode, blocks y edges.',
+        'Cada bloque debe seguir estrictamente el esquema BuilderBlockDefinitionV2.',
+        'Es obligatorio incluir autoWiring, compatibleStepTypes, requiredCapabilities y emitsOutcomes en cada definicion de bloque cuando corresponda.',
+        'No inventes block_id nuevos si ya existe uno valido; si falta, normalizalo de forma estable.',
+        'Si el funnel llega sin grafo o con edges vacios, entra en mode="recovery" y propone conexiones logicas usando el orden actual de los bloques.',
+        'Para bloques como hook_and_promise, la estructura de content debe permanecer anidada y completa dentro del JSON final.',
+        'Si no conoces un valor exacto, usa un valor conservador valido para el esquema en lugar de omitir la propiedad.',
+      ].join('\n'),
       'Contexto operativo del runtime:',
       stringifyJsonForPrompt({
         tenant: input.runtimeContext.tenant,
@@ -1191,7 +2140,7 @@ export class AiConfigService {
     }
 
     sections.push(
-      'Responde con un contrato JSON aplicable por Leadflow para Smart Wiring.',
+      'Responde con un contrato JSON aplicable por Leadflow para Smart Wiring, priorizando wiring y consistencia estructural.',
     );
 
     return sections.join('\n\n');
@@ -1203,25 +2152,32 @@ export class AiConfigService {
     body: Record<string, unknown>;
     errorCode: string;
     errorMessage: string;
+    baseUrlOverride?: string;
   }) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.gatewayTimeoutMs);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      this.gatewayTimeoutMs,
+    );
+    const baseUrl = input.baseUrlOverride ?? this.gatewayBaseUrl;
+    const requestUrl = `${baseUrl!.replace(/\/+$/, '')}${input.path}`;
 
     try {
-      const response = await fetch(
-        `${this.gatewayBaseUrl!.replace(/\/+$/, '')}${input.path}`,
-        {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${this.gatewayAuthToken}`,
-            'Content-Type': 'application/json',
-            'x-service-key': input.runtimeContext.routing.service_owner_key,
-          },
-          body: JSON.stringify(input.body),
-        },
+      this.logger.log(
+        `IA Gateway handshake request ${input.path}: ${JSON.stringify(input.body)}`,
       );
+
+      const response = await fetch(requestUrl, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${this.gatewayAuthToken}`,
+          'Content-Type': 'application/json',
+          'x-service-key': input.runtimeContext.routing.service_owner_key,
+        },
+        body: JSON.stringify(input.body),
+      });
       const rawBody = await response.text();
       const data = this.parseGatewayResponse(rawBody);
 
@@ -1253,5 +2209,24 @@ export class AiConfigService {
     } catch {
       return rawBody;
     }
+  }
+
+  private resolveSwarmGatewayBaseUrl() {
+    const normalizedSwarmBaseUrl = normalizeBaseUrl(SWARM_GATEWAY_BASE_URL);
+    return normalizedSwarmBaseUrl ?? null;
+  }
+
+  private readFunnelIdFromSessionId(input: {
+    sessionId: string;
+    instanceName: string;
+  }) {
+    const prefix = `${input.instanceName}-`;
+
+    if (!input.sessionId.startsWith(prefix)) {
+      return null;
+    }
+
+    const funnelId = sanitizeNullableText(input.sessionId.slice(prefix.length));
+    return funnelId ?? null;
   }
 }

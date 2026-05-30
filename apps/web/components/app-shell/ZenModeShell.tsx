@@ -16,6 +16,8 @@ export type StepSelectorStep = {
 
 type ZenModeShellProps = {
   funnelName: string;
+  contextLabel?: string | null;
+  contextDescription?: string | null;
   publicationStatus: PublicationStatus;
   runtimeHealthStatus: PublicationRuntimeHealthStatus;
   isPublishing?: boolean;
@@ -57,6 +59,8 @@ const healthLabels: Record<PublicationRuntimeHealthStatus, string> = {
 
 export function ZenModeShell({
   funnelName,
+  contextLabel,
+  contextDescription,
   publicationStatus,
   runtimeHealthStatus,
   isPublishing = false,
@@ -86,12 +90,17 @@ export function ZenModeShell({
           ) : null}
 
           <div className="min-w-0">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-app-text-soft">
-              Zen Builder
+            <p className="truncate text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-app-text-soft">
+              {contextLabel?.trim() || "Zen Builder"}
             </p>
             <h1 className="truncate text-base font-semibold text-app-text md:text-lg">
               {safeFunnelName}
             </h1>
+            {contextDescription?.trim() ? (
+              <p className="hidden truncate text-xs text-app-text-soft md:block">
+                {contextDescription}
+              </p>
+            ) : null}
           </div>
         </div>
 

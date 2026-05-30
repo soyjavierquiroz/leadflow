@@ -18,6 +18,11 @@ const memberNav: ShellNavItem[] = [
     icon: "layout-dashboard",
   },
   {
+    href: "/member/crm",
+    label: "CRM",
+    icon: "inbox",
+  },
+  {
     href: "/member/leads",
     label: "Leads",
     icon: "inbox",

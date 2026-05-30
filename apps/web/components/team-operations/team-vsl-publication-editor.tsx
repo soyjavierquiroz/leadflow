@@ -25,6 +25,7 @@ import {
 import { ZenModeShell } from "@/components/app-shell/ZenModeShell";
 import { StepManagerSidebar } from "@/components/admin/funnel-builder/StepManagerSidebar";
 import type { FlowGraphV1 } from "../../../../packages/shared/funnel-lint/src";
+import { FlowNodeRole, FlowOutcome } from "../../../../packages/shared/funnel-lint/src";
 import type { PublicationTrackingFieldName } from "@/components/forms/publication-tracking-fields";
 import { PublicationInspectorDrawer } from "@/components/team-operations/PublicationInspectorDrawer";
 import {
@@ -47,6 +48,7 @@ import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import { webPublicConfig } from "@/lib/public-env";
 import { uploadFileWithPresignedUrl } from "@/lib/storage";
+import type { SystemPublicationRecord } from "@/lib/system-publications.types";
 import { teamOperationRequest } from "@/lib/team-operations";
 import {
   type PublicationLintIssue,
@@ -69,18 +71,7 @@ const defaultMediaRows = requiredMediaKeys.map((key) => ({
 
 const defaultDevelopmentOrchestrationInstanceName = "default-constructor";
 
-const editorStepDefinitions = [
-  {
-    key: "captura",
-    label: "Paso 1: Landing (Captura)",
-  },
-  {
-    key: "confirmado",
-    label: "Paso 2: Handoff (Confirmación)",
-  },
-] as const;
-
-type EditorStepTabKey = (typeof editorStepDefinitions)[number]["key"];
+type EditorStepTabKey = "captura" | "confirmado";
 
 const trimOuterSlashes = (value: string) => value.replace(/^\/+|\/+$/g, "");
 
@@ -293,6 +284,14 @@ type TeamVslPublicationEditorProps = {
   templates: PublicationEditorTemplateOption[];
   mode?: "team" | "system";
   teamId?: string;
+  initialFunnel?: {
+    id: string;
+    name: string;
+    description?: string | null;
+    funnelInstanceId?: string | null;
+    settingsJson?: unknown;
+    steps?: HybridPublicationStepDetail[];
+  } | null;
   initialPublicationId?: string | null;
   backHref?: string;
   backLabel?: string;
@@ -393,6 +392,23 @@ const extractOrchestrationBlocks = (value: unknown) => {
   return null;
 };
 
+const extractOrchestrationEdges = (value: unknown) => {
+  const candidates = [
+    readNestedValue(value, ["edges"]),
+    readNestedValue(value, ["output", "edges"]),
+    readNestedValue(value, ["result", "edges"]),
+    readNestedValue(value, ["funnel_context", "edges"]),
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
+};
+
 const extractOrchestrationMediaMap = (value: unknown) => {
   const candidates = [
     readNestedValue(value, ["media_map"]),
@@ -464,6 +480,83 @@ const extractOrchestrationReplace = (value: unknown) => {
   return false;
 };
 
+const normalizeValidationBlockId = (
+  block: Record<string, unknown>,
+  index: number,
+) => {
+  const explicitBlockId =
+    typeof block.block_id === "string" && block.block_id.trim()
+      ? block.block_id.trim()
+      : null;
+
+  if (explicitBlockId) {
+    return explicitBlockId;
+  }
+
+  const explicitKey =
+    typeof block.key === "string" && block.key.trim() ? block.key.trim() : null;
+  if (explicitKey) {
+    return explicitKey;
+  }
+
+  const type =
+    typeof block.type === "string" && block.type.trim() ? block.type.trim() : "block";
+  return `${type}_${index + 1}`;
+};
+
+const buildSmartWiringValidationRows = (input: {
+  currentBlocks: unknown[];
+  proposedBlocks: unknown[];
+  currentEdges: unknown[];
+  proposedEdges: unknown[];
+}) => {
+  const blockRows = input.proposedBlocks.map((candidate, index) => {
+    const proposedBlock = asRecord(candidate) ?? {};
+    const currentBlock = asRecord(input.currentBlocks[index]) ?? {};
+
+    return {
+      row_type: "block",
+      index,
+      current_block_id: normalizeValidationBlockId(currentBlock, index),
+      proposed_block_id: normalizeValidationBlockId(proposedBlock, index),
+      current_type:
+        typeof currentBlock.type === "string" ? currentBlock.type : "(missing)",
+      proposed_type:
+        typeof proposedBlock.type === "string" ? proposedBlock.type : "(missing)",
+    };
+  });
+
+  const edgeRows = input.proposedEdges.map((candidate, index) => {
+    const proposedEdge = asRecord(candidate) ?? {};
+    const currentEdge = asRecord(input.currentEdges[index]) ?? {};
+
+    return {
+      row_type: "edge",
+      index,
+      current_from:
+        typeof currentEdge.from_block_id === "string"
+          ? currentEdge.from_block_id
+          : "(none)",
+      proposed_from:
+        typeof proposedEdge.from_block_id === "string"
+          ? proposedEdge.from_block_id
+          : "(missing)",
+      current_to:
+        typeof currentEdge.to_block_id === "string"
+          ? currentEdge.to_block_id
+          : "(none)",
+      proposed_to:
+        typeof proposedEdge.to_block_id === "string"
+          ? proposedEdge.to_block_id
+          : "(missing)",
+      proposed_outcome:
+        typeof proposedEdge.outcome === "string" ? proposedEdge.outcome : "default",
+    };
+  });
+
+  return [...blockRows, ...edgeRows];
+};
+
 const extractFlowGraphFromContract = (value: unknown): FlowGraphV1 | null => {
   const contract = asRecord(value);
   const flowGraph = asRecord(contract?.flowGraph);
@@ -479,6 +572,20 @@ const extractFlowGraphFromContract = (value: unknown): FlowGraphV1 | null => {
 const extractThemeFromSettings = (value: unknown) => {
   const record = asRecord(value);
   return resolveFunnelThemeId(record?.theme);
+};
+
+const extractTemplateIdFromSettings = (value: unknown) => {
+  const record = asRecord(value);
+  const directTemplateId = record?.templateId;
+  if (typeof directTemplateId === "string" && directTemplateId.trim()) {
+    return directTemplateId.trim();
+  }
+
+  const hybridEditor = asRecord(record?.hybridEditor);
+  const hybridTemplateId = hybridEditor?.templateId;
+  return typeof hybridTemplateId === "string" && hybridTemplateId.trim()
+    ? hybridTemplateId.trim()
+    : "";
 };
 
 const toStepReferenceLabel = (
@@ -529,16 +636,90 @@ const syncStepRecordsWithGraph = (
   });
 };
 
+const deriveFlowNodeRole = (step: HybridPublicationStepDetail): FlowNodeRole => {
+  if (step.isEntryStep) {
+    return FlowNodeRole.ENTRY;
+  }
+
+  if (["thank_you", "confirmation", "handoff"].includes(step.stepType)) {
+    return FlowNodeRole.THANK_YOU;
+  }
+
+  if (step.stepType === "redirect") {
+    return FlowNodeRole.REDIRECT;
+  }
+
+  if (step.isConversionStep || ["lead_capture", "landing"].includes(step.stepType)) {
+    return FlowNodeRole.CAPTURE;
+  }
+
+  return FlowNodeRole.CONTENT;
+};
+
+const deriveFlowGraphFromSteps = (
+  steps: HybridPublicationStepDetail[],
+): FlowGraphV1 | null => {
+  if (steps.length === 0) {
+    return null;
+  }
+
+  const orderedSteps = [...steps].sort((left, right) => left.position - right.position);
+  const nodes = Object.fromEntries(
+    orderedSteps.map((step, index) => {
+      const nextStep = orderedSteps[index + 1] ?? null;
+
+      return [
+        step.id,
+        {
+          stepId: step.id,
+          slug: step.slug,
+          stepType: step.stepType,
+          role: deriveFlowNodeRole(step),
+          isTerminal: nextStep === null,
+          meta: {
+            title:
+              (asRecord(step.settingsJson)?.seo &&
+              typeof asRecord(asRecord(step.settingsJson)?.seo)?.title === "string"
+                ? (asRecord(asRecord(step.settingsJson)?.seo)?.title as string)
+                : null) ?? `Paso ${step.position}`,
+          },
+          exits: nextStep
+            ? {
+                [FlowOutcome.DEFAULT]: {
+                  outcome: FlowOutcome.DEFAULT,
+                  toStepId: nextStep.id,
+                  label: "Secuencia recuperada",
+                },
+              }
+            : {},
+        },
+      ];
+    }),
+  ) as FlowGraphV1["nodes"];
+
+  return {
+    version: 1,
+    entryStepId:
+      orderedSteps.find((step) => step.isEntryStep)?.id ?? orderedSteps[0]?.id ?? null,
+    defaultOutcome: FlowOutcome.DEFAULT,
+    nodes,
+    stepOrder: orderedSteps.map((step) => step.id),
+  } as FlowGraphV1;
+};
+
 export function TeamVslPublicationEditor({
   domains,
   templates,
   mode = "team",
   teamId,
+  initialFunnel = null,
   initialPublicationId = null,
   backHref = "/team/publications",
   backLabel = "Volver a publicaciones",
   editorHref,
+  headerEyebrow,
   headerTitle = "Crear o editar funnel VSL/Landing",
+  headerDescription,
   availableBlocks,
 }: TeamVslPublicationEditorProps) {
   const orchestrationInstanceName =
@@ -551,11 +732,22 @@ export function TeamVslPublicationEditor({
     () => buildTemplateOptions(templates),
     [templates],
   );
+  const initialFunnelSteps = useMemo(
+    () => (Array.isArray(initialFunnel?.steps) ? initialFunnel.steps : []),
+    [initialFunnel],
+  );
+  const initialFunnelCaptureStep = useMemo(
+    () => pickPrimaryCaptureStep(initialFunnelSteps),
+    [initialFunnelSteps],
+  );
+  const isSystemFunnelDraft =
+    mode === "system" && Boolean(initialFunnel) && !publicationId;
   const activeDomains = useMemo(
     () => domains.filter((domain) => domain.status === "active"),
     [domains],
   );
   const [isPending, startTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
   const [isOrchestrating, setIsOrchestrating] = useState(false);
   const [orchestrationSessionId, setOrchestrationSessionId] = useState<
     string | null
@@ -570,7 +762,7 @@ export function TeamVslPublicationEditor({
     string | null
   >(publicationId);
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
-  const [funnelName, setFunnelName] = useState("");
+  const [funnelName, setFunnelName] = useState(initialFunnel?.name ?? "");
   const [selectedDomainId, setSelectedDomainId] = useState(
     activeDomains[0]?.id ?? "",
   );
@@ -580,18 +772,37 @@ export function TeamVslPublicationEditor({
   const [metaCapiToken, setMetaCapiToken] = useState("");
   const [tiktokAccessToken, setTiktokAccessToken] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState(
-    templateOptions[0]?.id ?? "",
+    extractTemplateIdFromSettings(initialFunnel?.settingsJson) ||
+      templateOptions[0]?.id ||
+      "",
   );
-  const [selectedThemeId, setSelectedThemeId] = useState("default");
-  const [funnelInstanceId, setFunnelInstanceId] = useState<string | null>(null);
+  const [selectedThemeId, setSelectedThemeId] = useState<string>(
+    extractThemeFromSettings(initialFunnel?.settingsJson),
+  );
+  const [funnelInstanceId, setFunnelInstanceId] = useState<string | null>(
+    initialFunnel?.funnelInstanceId ?? null,
+  );
   const [flowGraph, setFlowGraph] = useState<FlowGraphV1 | null>(null);
   const [seoTitle, setSeoTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
-  const [blocksText, setBlocksText] = useState(defaultBlocksSeed);
-  const [mediaRows, setMediaRows] = useState<MediaRow[]>([...defaultMediaRows]);
-  const [stepSettingsJson, setStepSettingsJson] = useState<unknown>({});
-  const [stepRecords, setStepRecords] = useState<HybridPublicationStepDetail[]>([]);
-  const [stepDrafts, setStepDrafts] = useState<Record<string, StepDraft>>({});
+  const [blocksText, setBlocksText] = useState(
+    initialFunnelCaptureStep
+      ? toBlocksText(initialFunnelCaptureStep.blocksJson)
+      : defaultBlocksSeed,
+  );
+  const [mediaRows, setMediaRows] = useState<MediaRow[]>(
+    initialFunnelCaptureStep
+      ? toMediaRows(initialFunnelCaptureStep.mediaMap)
+      : [...defaultMediaRows],
+  );
+  const [stepSettingsJson, setStepSettingsJson] = useState<unknown>(
+    initialFunnelCaptureStep?.settingsJson ?? {},
+  );
+  const [stepRecords, setStepRecords] =
+    useState<HybridPublicationStepDetail[]>(initialFunnelSteps);
+  const [stepDrafts, setStepDrafts] = useState<Record<string, StepDraft>>(
+    () => buildStepDraftMap(initialFunnelSteps),
+  );
   const [fallbackDrafts, setFallbackDrafts] = useState<
     Record<EditorStepTabKey, StepDraft>
   >({
@@ -608,6 +819,9 @@ export function TeamVslPublicationEditor({
   );
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [activeStepTab, setActiveStepTab] = useState<EditorStepTabKey>("captura");
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(
+    initialFunnelCaptureStep?.id ?? initialFunnelSteps[0]?.id ?? null,
+  );
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
   const visibleTemplateOptions = useMemo(
@@ -637,12 +851,49 @@ export function TeamVslPublicationEditor({
 
   useEffect(() => {
     if (!publicationId) {
+      if (initialFunnel) {
+        const nextStepRecords = Array.isArray(initialFunnel.steps)
+          ? initialFunnel.steps
+          : [];
+        const nextCaptureStep = pickPrimaryCaptureStep(nextStepRecords);
+
+        setOrchestrationSessionId(null);
+        setCurrentPublicationId(null);
+        setFunnelInstanceId(initialFunnel.funnelInstanceId ?? null);
+        setFlowGraph(deriveFlowGraphFromSteps(nextStepRecords));
+        setFunnelName(initialFunnel.name);
+        setSelectedTemplateId(
+          extractTemplateIdFromSettings(initialFunnel.settingsJson) ||
+            templateOptions[0]?.id ||
+            "",
+        );
+        setSelectedThemeId(extractThemeFromSettings(initialFunnel.settingsJson));
+        setBlocksText(
+          nextCaptureStep ? toBlocksText(nextCaptureStep.blocksJson) : defaultBlocksSeed,
+        );
+        setMediaRows(
+          nextCaptureStep ? toMediaRows(nextCaptureStep.mediaMap) : [...defaultMediaRows],
+        );
+        setStepSettingsJson(nextCaptureStep?.settingsJson ?? {});
+        setStepRecords(nextStepRecords);
+        setStepDrafts(buildStepDraftMap(nextStepRecords));
+        setSelectedStepId(nextCaptureStep?.id ?? nextStepRecords[0]?.id ?? null);
+        setMetaPixelId("");
+        setTiktokPixelId("");
+        setMetaCapiToken("");
+        setTiktokAccessToken("");
+        setErrorMessage(null);
+        setIsLoadingExisting(false);
+        return;
+      }
+
       setOrchestrationSessionId(null);
       setCurrentPublicationId(null);
       setFunnelInstanceId(null);
       setFlowGraph(null);
       setStepRecords([]);
       setStepDrafts({});
+      setSelectedStepId(null);
       setStepSettingsJson({});
       setMetaPixelId("");
       setTiktokPixelId("");
@@ -679,8 +930,10 @@ export function TeamVslPublicationEditor({
         setStepSettingsJson(payload.step.settingsJson);
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
+        setSelectedStepId(payload.step.id ?? nextStepRecords[0]?.id ?? null);
         setFlowGraph(
-          extractFlowGraphFromContract(payload.funnelInstance.conversionContract),
+          extractFlowGraphFromContract(payload.funnelInstance.conversionContract) ??
+            deriveFlowGraphFromSteps(nextStepRecords),
         );
       })
       .catch((error) => {
@@ -691,9 +944,18 @@ export function TeamVslPublicationEditor({
         );
       })
       .finally(() => setIsLoadingExisting(false));
-  }, [publicationApiBasePath, publicationId]);
+  }, [initialFunnel, publicationApiBasePath, publicationId, templateOptions]);
 
-  const showStepSwitcher = Boolean(currentPublicationId) && stepRecords.length > 1;
+  const showStepSwitcher = stepRecords.length > 1;
+
+  useEffect(() => {
+    if (stepRecords.length === 0) {
+      setFlowGraph(null);
+      return;
+    }
+
+    setFlowGraph((current) => current ?? deriveFlowGraphFromSteps(stepRecords));
+  }, [stepRecords]);
 
   const captureStep = useMemo(
     () => pickPrimaryCaptureStep(stepRecords),
@@ -703,32 +965,58 @@ export function TeamVslPublicationEditor({
     () => pickPrimaryConfirmStep(stepRecords, captureStep?.id ?? null),
     [stepRecords, captureStep?.id],
   );
-  const stepTabs = useMemo(
-    () =>
-      editorStepDefinitions.map((definition) => ({
-        ...definition,
-        step: definition.key === "captura" ? captureStep : confirmStep,
-      })),
-    [captureStep, confirmStep],
+  const orderedStepRecords = useMemo(
+    () => [...stepRecords].sort((left, right) => left.position - right.position),
+    [stepRecords],
   );
-  const activeStep = showStepSwitcher
-    ? stepTabs.find((tab) => tab.key === activeStepTab)?.step ?? null
+  const activeStepRecord = useMemo(() => {
+    if (!showStepSwitcher) {
+      return null;
+    }
+
+    if (selectedStepId) {
+      return (
+        stepRecords.find(
+          (step) => step.id === selectedStepId || step.slug === selectedStepId,
+        ) ?? null
+      );
+    }
+
+    return captureStep ?? orderedStepRecords[0] ?? null;
+  }, [captureStep, orderedStepRecords, selectedStepId, showStepSwitcher, stepRecords]);
+  const activeStep = activeStepRecord;
+  const activeFlowNode = activeStep
+    ? flowGraph?.nodes[activeStep.id] ??
+      Object.values(flowGraph?.nodes ?? {}).find(
+        (node) => node.stepId === activeStep.id || node.slug === activeStep.slug,
+      ) ??
+      null
     : null;
-  const activeStepTabLabel =
-    stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
-    "Paso activo";
+  const activeStepTitle =
+    activeFlowNode?.meta?.title?.trim() ||
+    (activeStep ? `Paso ${activeStep.position}` : "Paso activo");
+  const activeStepType = activeFlowNode?.stepType ?? activeStep?.stepType ?? null;
+  const activeStepTabLabel = activeStep
+    ? `Paso ${activeStep.position}: ${activeStepTitle}`
+    : "Paso activo";
   const activeDraft = showStepSwitcher
     ? activeStep
       ? stepDrafts[activeStep.id] ?? buildStepDraft(activeStep)
-      : fallbackDrafts[activeStepTab] ?? createEmptyStepDraft()
+      : selectedStepId
+        ? createEmptyStepDraft()
+        : fallbackDrafts[activeStepTab] ?? createEmptyStepDraft()
     : null;
   const editorBlocksText = activeDraft?.blocksText ?? blocksText;
   const editorMediaRows = activeDraft?.mediaRows ?? mediaRows;
   const editorSettingsJson = activeDraft?.settingsJson ?? stepSettingsJson;
   const editorLayoutOverride = readStepLayoutOverride(editorSettingsJson);
-  const editorContext = showStepSwitcher
-      ? {
-        stepName: activeStepTabLabel,
+  const activeEditorContext = showStepSwitcher
+    ? {
+        stepName: activeStep
+          ? `Paso ${activeStep.position} / ${String(
+              activeStepType ?? activeStep.stepType,
+            ).toUpperCase()} / ${activeStepTitle}`
+          : activeStepTabLabel,
         stepPath: activeStep
           ? buildPublicationStepPath(
               pathPrefix,
@@ -738,7 +1026,7 @@ export function TeamVslPublicationEditor({
           : activeStepTab === "captura"
             ? normalizePublicationPath(pathPrefix)
             : buildPublicationStepPath(pathPrefix, "confirmado", false),
-        stepType: activeStep?.stepType ?? activeStepTab,
+        stepType: activeStepType ?? activeStepTab,
       }
     : null;
   const previewDraftKey =
@@ -753,6 +1041,25 @@ export function TeamVslPublicationEditor({
     : activeStepTabLabel;
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "development") {
+      return;
+    }
+
+    console.debug("[Funnel Builder] active editor step", {
+      selectedStepId,
+      activeStepRecordId: activeStepRecord?.id ?? null,
+      activeStepSlug: activeStepRecord?.slug ?? null,
+      activeStepType,
+    });
+  }, [
+    activeStepRecord?.id,
+    activeStepRecord?.slug,
+    activeStepRecord?.stepType,
+    activeStepType,
+    selectedStepId,
+  ]);
+
+  useEffect(() => {
     const handleStepManagerChange = (event: Event) => {
       if (!showStepSwitcher) {
         return;
@@ -765,22 +1072,27 @@ export function TeamVslPublicationEditor({
           .map((value) => value.trim()),
       );
 
-      const directMatch = stepTabs.find(
-        (tab) =>
-          tab.step &&
-          (candidateIds.has(tab.step.id) || candidateIds.has(tab.step.slug)),
+      const directMatch = stepRecords.find(
+        (step) => candidateIds.has(step.id) || candidateIds.has(step.slug),
       );
       const orderedFallback =
-        typeof detail.orderIndex === "number" ? stepTabs[detail.orderIndex] : null;
-      const targetTab = directMatch ?? (orderedFallback?.step ? orderedFallback : null);
+        typeof detail.orderIndex === "number"
+          ? orderedStepRecords[detail.orderIndex]
+          : null;
+      const targetStep = directMatch ?? orderedFallback ?? null;
 
-      if (!targetTab || targetTab.key === activeStepTab) {
+      if (!targetStep || targetStep.id === selectedStepId) {
         return;
       }
 
       setErrorMessage(null);
       setSuccessMessage(null);
-      setActiveStepTab(targetTab.key);
+      setSelectedStepId(targetStep.id);
+      if (targetStep.id === captureStep?.id) {
+        setActiveStepTab("captura");
+      } else if (targetStep.id === confirmStep?.id) {
+        setActiveStepTab("confirmado");
+      }
     };
 
     window.addEventListener(
@@ -794,7 +1106,14 @@ export function TeamVslPublicationEditor({
         handleStepManagerChange,
       );
     };
-  }, [activeStepTab, showStepSwitcher, stepTabs]);
+  }, [
+    captureStep?.id,
+    confirmStep?.id,
+    orderedStepRecords,
+    selectedStepId,
+    showStepSwitcher,
+    stepRecords,
+  ]);
 
   const updateEditorDraft = (patch: Partial<StepDraft>) => {
     if (!showStepSwitcher) {
@@ -946,6 +1265,7 @@ export function TeamVslPublicationEditor({
   const draftStorageId =
     currentPublicationId ??
     publicationId ??
+    initialFunnel?.id ??
     `${mode}-${teamId ?? "local"}-new-vsl`;
 
   useEffect(() => {
@@ -988,14 +1308,20 @@ export function TeamVslPublicationEditor({
     lintIssues,
   ]);
 
+  const publicationBlockerMessage =
+    isSystemFunnelDraft && stepRecords.length === 0
+      ? "Este funnel no tiene pasos. Agrega al menos un paso antes de publicarlo."
+      : null;
+  const isPublishing = isPending || isSaving;
   const isSaveDisabled =
-    isPending ||
+    isPublishing ||
     isLoadingExisting ||
     uploadingRowIndex !== null ||
     !funnelName.trim() ||
     !selectedDomainId ||
     !selectedTemplateId ||
     !pathPrefix.trim() ||
+    Boolean(publicationBlockerMessage) ||
     Boolean(parsedBlocks.error) ||
     Boolean(mediaValidation);
 
@@ -1033,7 +1359,7 @@ export function TeamVslPublicationEditor({
       return [];
     }
 
-    return Object.entries(flowGraph.nodes).map(([nodeId, node]) => ({
+    return Object.values(flowGraph.nodes).map((node) => ({
       value: buildPublicationStepPath(
         pathPrefix,
         node.slug,
@@ -1098,12 +1424,13 @@ export function TeamVslPublicationEditor({
       },
       activeStep: {
         id: activeStep?.id ?? null,
-        slug: activeStep?.slug ?? captureStep?.slug ?? "captura",
-        stepType: activeStep?.stepType ?? captureStep?.stepType ?? "landing",
+        slug: activeStep?.slug ?? null,
+        stepType: activeStepType,
         label: activeStepTabLabel,
-        path: editorContext?.stepPath ?? normalizePublicationPath(pathPrefix),
+        path: activeEditorContext?.stepPath ?? normalizePublicationPath(pathPrefix),
       },
       graph: flowGraph,
+      edges: [],
       stepRecords,
       blocks: parsedBlocks.value,
       mediaMap,
@@ -1113,15 +1440,11 @@ export function TeamVslPublicationEditor({
   }, [
     activeStep?.id,
     activeStep?.slug,
-    activeStep?.stepType,
+    activeStepType,
     activeStepTabLabel,
-    captureStep?.slug,
-    captureStep?.stepType,
-    confirmStep?.id,
-    confirmStep?.isEntryStep,
-    confirmStep?.slug,
+    confirmStep,
     currentPublicationId,
-    editorContext?.stepPath,
+    activeEditorContext?.stepPath,
     editorSettingsJson,
     flowGraph,
     funnelInstanceId,
@@ -1138,8 +1461,8 @@ export function TeamVslPublicationEditor({
   ]);
 
   const initializeOrchestrationSession = async () => {
-    if (!currentPublicationId || !funnelInstanceId || !orchestrationFunnelContext) {
-      throw new Error("Guarda o carga una publicación antes de inicializar Smart Wiring.");
+    if (!funnelInstanceId || !orchestrationFunnelContext) {
+      throw new Error("Carga un funnel operativo antes de inicializar Smart Wiring.");
     }
 
     const response = await teamOperationRequest<InitOrchestrationSessionApiResponse>(
@@ -1152,7 +1475,8 @@ export function TeamVslPublicationEditor({
           funnel_id: funnelInstanceId,
           funnel_context: orchestrationFunnelContext,
           metadata: {
-            publication_id: currentPublicationId,
+            publication_id: currentPublicationId ?? null,
+            funnel_id: initialFunnel?.id ?? null,
             funnel_instance_id: funnelInstanceId,
             editor_mode: mode,
             active_step_id: activeStep?.id ?? null,
@@ -1168,7 +1492,6 @@ export function TeamVslPublicationEditor({
   useEffect(() => {
     if (
       orchestrationSessionId ||
-      !currentPublicationId ||
       !funnelInstanceId ||
       !orchestrationFunnelContext
     ) {
@@ -1185,7 +1508,8 @@ export function TeamVslPublicationEditor({
           funnel_id: funnelInstanceId,
           funnel_context: orchestrationFunnelContext,
           metadata: {
-            publication_id: currentPublicationId,
+            publication_id: currentPublicationId ?? null,
+            funnel_id: initialFunnel?.id ?? null,
             funnel_instance_id: funnelInstanceId,
             editor_mode: mode,
             active_step_id: activeStep?.id ?? null,
@@ -1203,6 +1527,7 @@ export function TeamVslPublicationEditor({
     activeStep?.id,
     currentPublicationId,
     funnelInstanceId,
+    initialFunnel?.id,
     mode,
     orchestrationInstanceName,
     orchestrationFunnelContext,
@@ -1335,7 +1660,19 @@ export function TeamVslPublicationEditor({
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    startTransition(async () => {
+    if (publicationBlockerMessage) {
+      setErrorMessage(publicationBlockerMessage);
+      return;
+    }
+
+    if (!selectedDomainId) {
+      setErrorMessage("Selecciona un dominio activo antes de publicar.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    void (async () => {
       try {
         const payload = {
           name: funnelName.trim(),
@@ -1350,11 +1687,100 @@ export function TeamVslPublicationEditor({
           seoTitle: seoTitle.trim(),
           metaDescription: metaDescription.trim(),
           stepId: activeStep?.id,
-          stepKey: showStepSwitcher ? activeStepTab : undefined,
+          stepKey:
+            showStepSwitcher && activeStep?.id === captureStep?.id
+              ? "captura"
+              : showStepSwitcher && activeStep?.id === confirmStep?.id
+                ? "confirmado"
+                : undefined,
           blocksJson: parsedBlocks.value,
           mediaMap,
           settingsJson: editorSettingsJson,
         };
+
+        if (!currentPublicationId && isSystemFunnelDraft && initialFunnel && teamId) {
+          if (!activeStep) {
+            throw new Error("El funnel operativo no tiene un paso activo para guardar.");
+          }
+
+          const funnelSettingsJson = {
+            ...(asRecord(initialFunnel.settingsJson) ?? {}),
+            theme: selectedThemeId,
+            templateId: selectedTemplateId,
+            hybridEditor: {
+              ...(asRecord(asRecord(initialFunnel.settingsJson)?.hybridEditor) ?? {}),
+              mode: "visual-builder",
+              funnelId: initialFunnel.id,
+              funnelInstanceId,
+              templateId: selectedTemplateId,
+            },
+          };
+
+          await teamOperationRequest(
+            `/system/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(initialFunnel.id)}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({
+                funnelInstanceId,
+                name: funnelName.trim(),
+                settingsJson: funnelSettingsJson,
+              }),
+            },
+          );
+
+          const response = await teamOperationRequest<{
+            step: HybridPublicationStepDetail;
+          }>(
+            `/system/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(initialFunnel.id)}/steps/${encodeURIComponent(activeStep.id)}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({
+                name: funnelName.trim(),
+                blocksJson: parsedBlocks.value,
+                mediaMap,
+                settingsJson: editorSettingsJson,
+              }),
+            },
+          );
+
+          setStepRecords((current) =>
+            current.map((step) =>
+              step.id === response.step.id ? response.step : step,
+            ),
+          );
+          setStepDrafts((current) => ({
+            ...current,
+            [response.step.id]: buildStepDraft(response.step),
+          }));
+          if (!funnelInstanceId) {
+            throw new Error("El funnel operativo no tiene instancia para publicar.");
+          }
+
+          const publicationResponse =
+            await teamOperationRequest<SystemPublicationRecord>(
+              "/system/publications",
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  domainId: selectedDomainId,
+                  funnelId: funnelInstanceId,
+                  path: pathPrefix.trim(),
+                  isActive: true,
+                  metaPixelId: metaPixelId.trim() || null,
+                  tiktokPixelId: tiktokPixelId.trim() || null,
+                  metaCapiToken: metaCapiToken.trim() || null,
+                  tiktokAccessToken: tiktokAccessToken.trim() || null,
+                }),
+              },
+            );
+
+          setCurrentPublicationId(publicationResponse.id);
+          setSuccessMessage("Funnel publicado y listo para recibir tráfico.");
+          startTransition(() => {
+            router.refresh();
+          });
+          return;
+        }
 
         if (!currentPublicationId && mode === "system") {
           throw new Error(
@@ -1395,36 +1821,41 @@ export function TeamVslPublicationEditor({
         setStepSettingsJson(response.step.settingsJson);
         setStepRecords(nextStepRecords);
         setStepDrafts(buildStepDraftMap(nextStepRecords));
+        setSelectedStepId(response.step.id ?? activeStep?.id ?? null);
         setFlowGraph(
           extractFlowGraphFromContract(response.funnelInstance.conversionContract),
         );
         setSuccessMessage(
           currentPublicationId
             ? showStepSwitcher
-              ? `${
-                  stepTabs.find((tab) => tab.key === activeStepTab)?.label ?? "Paso"
-                } actualizado y publicado.`
+              ? `${activeStepTabLabel} actualizado y publicado.`
               : "Funnel híbrido actualizado y publicado."
             : "Funnel híbrido creado, publicado y listo para edición.",
         );
         if (editorHref) {
-          router.replace(editorHref);
-          router.refresh();
+          startTransition(() => {
+            router.replace(editorHref);
+            router.refresh();
+          });
           return;
         }
 
-        router.replace(
-          `/team/publications/new-vsl?publicationId=${response.publication.id}`,
-        );
-        router.refresh();
+        startTransition(() => {
+          router.replace(
+            `/team/publications/new-vsl?publicationId=${response.publication.id}`,
+          );
+          router.refresh();
+        });
       } catch (error) {
         setErrorMessage(
           error instanceof Error
             ? error.message
             : "No pudimos guardar el funnel híbrido.",
         );
+      } finally {
+        setIsSaving(false);
       }
-    });
+    })();
   };
 
   const updateTrackingField = (
@@ -1492,8 +1923,8 @@ export function TeamVslPublicationEditor({
   };
 
   const handleSmartWiring = async () => {
-    if (!currentPublicationId || !funnelInstanceId) {
-      setErrorMessage("Guarda o carga una publicación antes de ejecutar Smart Wiring.");
+    if (!funnelInstanceId) {
+      setErrorMessage("Carga un funnel operativo antes de ejecutar Smart Wiring.");
       return;
     }
 
@@ -1503,7 +1934,7 @@ export function TeamVslPublicationEditor({
     }
 
     const userIntent =
-      "Optimiza el wiring del funnel actual, preserva el contrato de navegación y mejora la continuidad entre CTA, captura y confirmación.";
+      "Valida y repara el wiring estructural del funnel actual. Prioriza edges, consistencia de block_id y continuidad de navegación antes que el copy.";
     const successRedirect = confirmStep
       ? buildPublicationStepPath(
           pathPrefix,
@@ -1530,8 +1961,10 @@ export function TeamVslPublicationEditor({
           }),
         },
       );
+      console.log("[SmartWiring] IA contract response", response.data);
       const recipeKey = extractOrchestrationRecipeKey(response.data);
       const replace = extractOrchestrationReplace(response.data);
+      const proposedEdges = extractOrchestrationEdges(response.data);
       const catalog = availableBlocks ?? [];
       let nextBlocks: unknown = null;
 
@@ -1545,7 +1978,7 @@ export function TeamVslPublicationEditor({
             blocks: editorBlocksText,
             recipe,
             catalog,
-            stepType: editorContext?.stepType ?? activeStep?.stepType ?? null,
+            stepType: activeEditorContext?.stepType ?? activeStep?.stepType ?? null,
             successRedirect,
             replace,
           });
@@ -1566,6 +1999,15 @@ export function TeamVslPublicationEditor({
           successRedirect,
         });
       }
+
+      console.table(
+        buildSmartWiringValidationRows({
+          currentBlocks: parsedBlocks.value,
+          proposedBlocks: Array.isArray(nextBlocks) ? nextBlocks : [],
+          currentEdges: orchestrationFunnelContext?.edges ?? [],
+          proposedEdges,
+        }),
+      );
 
       updateEditorDraft({
         blocksText: SmartWiringService.serialize(nextBlocks),
@@ -1615,9 +2057,11 @@ export function TeamVslPublicationEditor({
   return (
     <ZenModeShell
       funnelName={funnelName || headerTitle}
+      contextLabel={headerEyebrow ?? null}
+      contextDescription={headerDescription ?? null}
       publicationStatus={currentPublicationId ? "published" : "draft"}
       runtimeHealthStatus={runtimeHealthStatus}
-      isPublishing={isPending}
+      isPublishing={isPublishing}
       publishDisabled={isSaveDisabled}
       onPublish={handleSave}
       onOpenInspector={() => setIsInspectorOpen(true)}
@@ -1644,15 +2088,31 @@ export function TeamVslPublicationEditor({
       <div className="flex min-h-full w-full gap-5 px-4 py-5 text-left text-slate-900 dark:text-slate-100 md:px-6">
         <StepManagerSidebar
           funnelInstanceId={funnelInstanceId}
+          teamId={teamId ?? null}
+          funnelId={initialFunnel?.id ?? null}
+          mode={mode}
           graph={flowGraph}
           runtimeHealthStatus={runtimeHealthStatus}
           isOrchestrating={isOrchestrating}
+          activeStepId={activeStepRecord?.id ?? selectedStepId}
+          onActiveStepChange={(stepId) => {
+            setSelectedStepId(stepId);
+            const nextStep = stepRecords.find((step) => step.id === stepId);
+            if (nextStep?.id === captureStep?.id) {
+              setActiveStepTab("captura");
+            } else if (nextStep?.id === confirmStep?.id) {
+              setActiveStepTab("confirmado");
+            }
+          }}
           onGraphUpdated={handleGraphUpdated}
           onSmartWiring={handleSmartWiring}
         />
 
         <div className="min-w-0 flex-1">
           <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 text-left">
+            {publicationBlockerMessage ? (
+              <OperationBanner tone="error" message={publicationBlockerMessage} />
+            ) : null}
             {errorMessage ? (
               <OperationBanner tone="error" message={errorMessage} />
             ) : null}
@@ -1704,8 +2164,7 @@ export function TeamVslPublicationEditor({
                 </p>
                 <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {showStepSwitcher
-                    ? stepTabs.find((tab) => tab.key === activeStepTab)?.label ??
-                      "Paso activo"
+                    ? activeStepTabLabel
                     : selectedDomain
                       ? `${selectedDomain.host}${pathPrefix}`
                       : "Selecciona dominio y ruta"}
@@ -1811,10 +2270,11 @@ export function TeamVslPublicationEditor({
         </details>
 
         <HybridJsonMediaEditor
-          key={activeStep?.id ?? activeStepTab}
+          key={activeStepRecord?.id ?? activeStepTab}
           blocksText={editorBlocksText}
           previewDraftKey={previewDraftKey}
-          editorContext={editorContext}
+          activeStepRecord={activeStepRecord}
+          editorContext={activeEditorContext}
           onBlocksTextChange={(value) => updateEditorDraft({ blocksText: value })}
           parsedBlocksError={parsedBlocks.error}
           parsedBlocksCount={parsedBlocks.value?.length ?? 0}

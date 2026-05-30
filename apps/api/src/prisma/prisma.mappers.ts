@@ -30,7 +30,10 @@ const toJson = (value: unknown): JsonValue => value as JsonValue;
 const mapLeadSourceChannel = (value: string): LeadSourceChannel =>
   value === 'landing_page' ? 'landing-page' : (value as LeadSourceChannel);
 const mapTrafficLayer = (value: string | null | undefined): TrafficLayer =>
-  value === 'DIRECT' || value === 'PAID_WHEEL' || value === 'ORGANIC'
+  value === 'DIRECT' ||
+  value === 'PAID_WHEEL' ||
+  value === 'PAID_ADS' ||
+  value === 'ORGANIC'
     ? value
     : 'ORGANIC';
 const readNullableString = (record: object, key: string) => {
@@ -248,7 +251,7 @@ export const mapFunnelInstanceRecord = (
   workspaceId: record.workspaceId,
   teamId: record.teamId,
   templateId: record.templateId,
-  legacyFunnelId: record.legacyFunnelId,
+  funnelId: record.funnelId,
   name: record.name,
   code: record.code,
   thumbnailUrl: record.thumbnailUrl,

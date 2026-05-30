@@ -98,6 +98,53 @@ const normalizeAdjacentStep = (
   };
 };
 
+const normalizeSponsor = (value: unknown) => {
+  const record = isRecord(value) ? value : null;
+  if (!record) {
+    return null;
+  }
+
+  return {
+    id: asString(record.id),
+    displayName: asString(record.displayName),
+    email: asNullableString(record.email),
+    phone: asNullableString(record.phone),
+    avatarUrl: asNullableString(record.avatarUrl),
+  };
+};
+
+const normalizeAssignment = (value: unknown) => {
+  const record = isRecord(value) ? value : null;
+  if (!record) {
+    return null;
+  }
+
+  return {
+    id: asString(record.id),
+    ownershipKey: asNullableString(record.ownershipKey),
+    status: asString(record.status),
+    reason: asString(record.reason),
+    assignedAt: asString(record.assignedAt),
+    sponsor: normalizeSponsor(record.sponsor),
+  };
+};
+
+const normalizeAdvisor = (value: unknown) => {
+  const record = isRecord(value) ? value : null;
+  if (!record) {
+    return null;
+  }
+
+  return {
+    name: asString(record.name),
+    role: asNullableString(record.role),
+    phone: asNullableString(record.phone),
+    photoUrl: asNullableString(record.photoUrl),
+    bio: asNullableString(record.bio),
+    whatsappUrl: asNullableString(record.whatsappUrl),
+  };
+};
+
 export function normalizePublicFunnelRuntimePayload(
   value: unknown,
   fallback: RuntimeFallback = {},
@@ -105,6 +152,7 @@ export function normalizePublicFunnelRuntimePayload(
   const record = isRecord(value) ? value : {};
   const requestRecord = isRecord(record.request) ? record.request : {};
   const domainRecord = isRecord(record.domain) ? record.domain : {};
+  const teamRecord = isRecord(record.team) ? record.team : {};
   const entryContextRecord = isRecord(record.entryContext)
     ? record.entryContext
     : {};
@@ -118,6 +166,12 @@ export function normalizePublicFunnelRuntimePayload(
     ? record.handoffStrategy
     : null;
   const handoffRecord = isRecord(record.handoff) ? record.handoff : {};
+  const assignment = normalizeAssignment(record.assignment);
+  const advisor = normalizeAdvisor(record.advisor);
+  const assignedSponsor =
+    normalizeSponsor(record.assignedSponsor) ??
+    assignment?.sponsor ??
+    normalizeSponsor(handoffRecord.sponsor);
   const resolvedHost =
     asString(requestRecord.host, asString(domainRecord.host, fallback.host ?? 'localhost')) ||
     fallback.host ||
@@ -173,6 +227,11 @@ export function normalizePublicFunnelRuntimePayload(
         typeof domainRecord.canonicalHost === 'string' ? domainRecord.canonicalHost : null,
       redirectToPrimary: asBoolean(domainRecord.redirectToPrimary),
     },
+    team: {
+      id: asString(teamRecord.id, 'runtime-team'),
+      name: asString(teamRecord.name, 'LeadFlow'),
+      description: asNullableString(teamRecord.description),
+    },
     entryContext: {
       entryMode:
         entryContextRecord.entryMode === 'organic_asesor'
@@ -181,6 +240,7 @@ export function normalizePublicFunnelRuntimePayload(
       trafficLayer:
         entryContextRecord.trafficLayer === 'DIRECT' ||
         entryContextRecord.trafficLayer === 'PAID_WHEEL' ||
+        entryContextRecord.trafficLayer === 'PAID_ADS' ||
         entryContextRecord.trafficLayer === 'ORGANIC'
           ? entryContextRecord.trafficLayer
           : 'ORGANIC',
@@ -196,6 +256,21 @@ export function normalizePublicFunnelRuntimePayload(
         entryContextRecord.browserPixelsEnabled,
         true,
       ),
+      attributionType:
+        entryContextRecord.attributionType === 'promo' ||
+        entryContextRecord.attributionType === 'ref' ||
+        entryContextRecord.attributionType === 'organic'
+          ? entryContextRecord.attributionType
+          : 'organic',
+      attributionSlug:
+        typeof entryContextRecord.attributionSlug === 'string'
+          ? entryContextRecord.attributionSlug
+          : null,
+      runtimePathPrefix:
+        typeof entryContextRecord.runtimePathPrefix === 'string'
+          ? normalizePath(entryContextRecord.runtimePathPrefix)
+          : null,
+      referralQueryParam: null,
     },
     publication: {
       id: asString(publicationRecord.id, 'runtime-publication'),
@@ -303,7 +378,15 @@ export function normalizePublicFunnelRuntimePayload(
         typeof handoffRecord.messageTemplate === 'string'
           ? handoffRecord.messageTemplate
           : null,
+      sponsor: normalizeSponsor(handoffRecord.sponsor),
+      whatsappPhone: asNullableString(handoffRecord.whatsappPhone),
+      whatsappMessage: asNullableString(handoffRecord.whatsappMessage),
+      whatsappUrl: asNullableString(handoffRecord.whatsappUrl),
     },
+    leadId: asNullableString(record.leadId),
+    assignment,
+    advisor,
+    assignedSponsor,
     currentStep: activeCurrentStep,
     nextStep: normalizeAdjacentStep(record.nextStep, activeCurrentStep.path, activeCurrentStep.stepType),
     previousStep: normalizeAdjacentStep(
@@ -312,5 +395,5 @@ export function normalizePublicFunnelRuntimePayload(
       activeCurrentStep.stepType,
     ),
     steps: normalizedSteps,
-  };
+  } as PublicFunnelRuntimePayload;
 }

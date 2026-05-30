@@ -132,6 +132,7 @@ const defaultRequiredCapabilities = (
   if (
     definition.key === "lead_capture_form" ||
     definition.key === "lead_capture_config" ||
+    definition.key === "hero_vsl_delayed_cta" ||
     definition.key === "hook_and_promise" ||
     definition.key === "sticky_conversion_bar" ||
     definition.key === "cta" ||
@@ -170,6 +171,7 @@ const defaultAutoWiring = (
 
   if (
     definition.key === "hook_and_promise" ||
+    definition.key === "hero_vsl_delayed_cta" ||
     definition.key === "sticky_conversion_bar" ||
     definition.key === "cta" ||
     definition.key === "grand_slam_offer"
@@ -321,6 +323,77 @@ export const builderBlockDefinitionsByKey: Record<
         "Jerarquía visual lista para mobile",
         "CTA conectado al flujo de captura",
       ],
+    },
+  }),
+  hero_vsl_delayed_cta: defineBlock({
+    key: "hero_vsl_delayed_cta",
+    name: "Hero VSL Delayed CTA",
+    description:
+      "Hero VSL con CTA principal y sticky CTA revelados por tiempo de reproduccion del video.",
+    category: "conversion",
+    compatibleStepTypes: ["landing", "vsl", "presentation", "lead_capture"],
+    requiredCapabilities: ["lead_capture"],
+    emitsOutcomes: ["view", "cta_click"],
+    autoWiring: [
+      {
+        when: "inserted",
+        ensureBlockType: "lead_capture_config",
+        bindFields: { action: "open_lead_capture_modal" },
+      },
+    ],
+    schema: {
+      type: "hero_vsl_delayed_cta",
+      key: "string",
+      content: {
+        eyebrow: "string with {{team.name}} variables",
+        headline: "string",
+        highlight: "string",
+        subheadline: "string",
+        video_url: "media:vsl_main | https://...",
+        poster_title: "string with {{sponsor.first_name}} variables",
+        poster_description: "string",
+        poster_button_text: "string",
+        cta_text: "string",
+        whatsapp_message: "string",
+        sticky_title: "string",
+        sticky_subtitle: "string",
+      },
+      behavior: {
+        reveal_after_seconds: 10,
+        show_sticky_cta: true,
+        cta_mode: "modal | assigned_whatsapp",
+        resume_playback: true,
+        vsl_progress_bar_color: "#dc2626",
+      },
+    },
+    example: {
+      type: "hero_vsl_delayed_cta",
+      key: "hero-vsl-delayed-main",
+      is_boxed: false,
+      content: {
+        eyebrow: "ATENCION {{team.name}}",
+        headline:
+          "Si tu equipo no prospecta sin ti... tienes un empleo disfrazado.",
+        highlight: "tienes un empleo disfrazado.",
+        subheadline:
+          "Con LeadFlow genera interesados diarios para cada miembro de tu equipo.",
+        video_url: "media:vsl_main",
+        poster_title: "Mensaje urgente de {{advisor.first_name}}",
+        poster_description: "Haz clic para ver el sistema.",
+        poster_button_text: "Ver mensaje",
+        cta_text: "Aplicar con {{advisor.first_name}} ahora",
+        whatsapp_message:
+          "Hola {{advisor.first_name}}, vi la presentación y quiero saber cómo empezar.",
+        sticky_title: "Tu equipo necesita infraestructura, no mas motivacion.",
+        sticky_subtitle: "Solo aceptamos equipos listos este mes.",
+      },
+      behavior: {
+        reveal_after_seconds: 10,
+        show_sticky_cta: true,
+        cta_mode: "modal",
+        resume_playback: true,
+        vsl_progress_bar_color: "#dc2626",
+      },
     },
   }),
   hook_and_promise: defineBlock({
@@ -953,8 +1026,10 @@ export const builderBlockDefinitionsByKey: Record<
       variant: "confirmation_reveal",
       headline: "string",
       subheadline: "string",
-      reveal_headline: "string",
-      reveal_subheadline: "string",
+      settings: {
+        title: "string",
+        subtitlePrefix: "string",
+      },
     },
     example: {
       type: "thank_you_reveal",
@@ -962,9 +1037,10 @@ export const builderBlockDefinitionsByKey: Record<
       variant: "confirmation_reveal",
       headline: "Gracias, ya estas dentro",
       subheadline: "Tu lead fue registrado y el siguiente paso ya esta listo.",
-      reveal_headline: "Asesor asignado para esta sesion",
-      reveal_subheadline:
-        "Mostramos continuidad real usando el assignment resuelto por el runtime.",
+      settings: {
+        title: "¡Felicidades! Te has registrado con éxito",
+        subtitlePrefix: "Tu asesor asignado es: {{advisorName}}",
+      },
     },
   }),
   conversion_page_config: defineBlock({
@@ -1019,15 +1095,41 @@ export const builderBlockDefinitionsByKey: Record<
     schema: {
       type: "sponsor_reveal_placeholder",
       key: "string",
-      title: "string",
-      description: "string",
+      settings: {
+        title: "string",
+        subtitlePrefix: "string",
+      },
     },
     example: {
       type: "sponsor_reveal_placeholder",
       key: "sponsor-reveal-main",
-      title: "Tu sponsor asignado aparecera aqui",
-      description:
-        "El runtime completa este espacio usando el assignment guardado en sesion.",
+      settings: {
+        title: "¡Felicidades! Te has registrado con éxito",
+        subtitlePrefix: "Tu asesor asignado es: {{advisorName}}",
+      },
+    },
+  }),
+  mobile_gallery: defineBlock({
+    key: "mobile_gallery",
+    name: "Mobile Gallery",
+    description:
+      "Galeria fluida solo para mobile que inserta la media del funnel dentro del flujo del contenido.",
+    category: "media",
+    schema: {
+      type: "mobile_gallery",
+      key: "string",
+      settings: {
+        headline: "string",
+        text: "string",
+      },
+    },
+    example: {
+      type: "mobile_gallery",
+      key: "mobile-gallery-main",
+      settings: {
+        headline: "Así se ve el resultado en personas reales",
+        text: "Desliza la galería para ver referencias rápidas antes de continuar.",
+      },
     },
   }),
   social_proof: defineBlock({
@@ -1476,20 +1578,26 @@ export const builderBlockDefinitionsByKey: Record<
     schema: {
       type: "whatsapp_handoff_cta",
       key: "string",
-      headline: "string",
-      subheadline: "string",
-      button_text: "string",
-      helper_text: "string",
-      variant: "handoff_primary",
+      settings: {
+        headline: "string",
+        buttonPrefix: "string",
+        redirectText: "string",
+        whatsappText: "string",
+        autoRedirectSeconds: "number",
+        buttonColor: "string",
+      },
     },
     example: {
       type: "whatsapp_handoff_cta",
       key: "whatsapp-handoff-main",
-      headline: "Continua ahora por WhatsApp",
-      subheadline: "Tu asesor asignado recibira el contexto de esta sesion.",
-      button_text: "Abrir WhatsApp",
-      helper_text: "Si no abre de inmediato, este bloque mantiene el handoff visible.",
-      variant: "handoff_primary",
+      settings: {
+        headline: "Continua ahora por WhatsApp",
+        buttonPrefix: "Continuar con {{advisorName}}",
+        redirectText: "{{advisorName}} te está esperando. Redirigiendo en {{seconds}}",
+        whatsappText: "Hola soy {{leadName}}, deseo más información",
+        autoRedirectSeconds: 5,
+        buttonColor: "#25D366",
+      },
     },
   }),
   step_by_step: defineBlock({
@@ -1565,6 +1673,7 @@ export const defaultBuilderBlockDefinitions = [
   stickyConversionBarDefinition,
   builderBlockDefinitionsByKey.announcement,
   builderBlockDefinitionsByKey.hero,
+  builderBlockDefinitionsByKey.hero_vsl_delayed_cta,
   builderBlockDefinitionsByKey.hook_and_promise,
   builderBlockDefinitionsByKey.who_am_i,
   builderBlockDefinitionsByKey.qualification_checklist,
@@ -1593,6 +1702,7 @@ export const defaultBuilderBlockDefinitions = [
   builderBlockDefinitionsByKey.thank_you_reveal,
   builderBlockDefinitionsByKey.conversion_page_config,
   builderBlockDefinitionsByKey.sponsor_reveal_placeholder,
+  builderBlockDefinitionsByKey.mobile_gallery,
   builderBlockDefinitionsByKey.whatsapp_handoff_cta,
 ];
 
@@ -1602,6 +1712,7 @@ export const getBuilderBlockDefinition = (key: string) =>
 export const BlockRegistry: Record<string, FC<any>> = {
   announcement: PublicAnnouncementBlockBridge,
   hero: PublicStickyRuntimeBlockBridge,
+  hero_vsl_delayed_cta: PublicStickyRuntimeBlockBridge,
   hook_and_promise: PublicHookAndPromiseBlockBridge,
   who_am_i: PublicStickyRuntimeBlockBridge,
   qualification_checklist: PublicStickyRuntimeBlockBridge,
@@ -1620,6 +1731,7 @@ export const BlockRegistry: Record<string, FC<any>> = {
   thank_you_reveal: PublicStickyRuntimeBlockBridge,
   conversion_page_config: PublicStickyRuntimeBlockBridge,
   sponsor_reveal_placeholder: PublicStickyRuntimeBlockBridge,
+  mobile_gallery: PublicStickyRuntimeBlockBridge,
   social_proof: PublicStickyRuntimeBlockBridge,
   social_proof_grid: PublicStickyRuntimeBlockBridge,
   risk_reversal: PublicStickyRuntimeBlockBridge,

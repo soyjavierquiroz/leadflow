@@ -56,7 +56,7 @@ export class PublicRuntimeService {
             id: true,
             name: true,
             code: true,
-            legacyFunnel: {
+            funnel: {
               select: {
                 id: true,
                 name: true,
@@ -77,7 +77,7 @@ export class PublicRuntimeService {
     }
 
     const funnel =
-      publication.funnelInstance.legacyFunnel ?? publication.domain.linkedFunnel;
+      publication.funnelInstance.funnel ?? publication.domain.linkedFunnel;
 
     if (!funnel) {
       throw new NotFoundException({
@@ -118,7 +118,10 @@ export class PublicRuntimeService {
     };
   }
 
-  async submitLead(dto: SubmitRuntimeLeadDto) {
+  async submitLead(
+    dto: SubmitRuntimeLeadDto,
+    requestHeaders?: Record<string, string | string[] | undefined>,
+  ) {
     if (!dto.hostname?.trim()) {
       throw new BadRequestException({
         code: 'HOSTNAME_REQUIRED',
@@ -145,28 +148,41 @@ export class PublicRuntimeService {
             : `/${fallbackSourcePath}`
         }`;
 
-    return this.leadCaptureAssignmentService.submitLeadCapture({
-      submissionEventId: dto.submissionEventId ?? `runtime-submit-${randomUUID()}`,
-      publicationId: runtime.publication.id,
-      currentStepId: runtime.currentStep.id,
-      anonymousId: dto.anonymousId?.trim() || `runtime-anon-${randomUUID()}`,
-      sourceChannel: dto.sourceChannel ?? 'form',
-      sourceUrl: dto.sourceUrl?.trim() ?? fallbackSourceUrl,
-      utmSource: dto.utmSource ?? null,
-      utmCampaign: dto.utmCampaign ?? null,
-      utmMedium: dto.utmMedium ?? null,
-      utmContent: dto.utmContent ?? null,
-      utmTerm: dto.utmTerm ?? null,
-      fbclid: dto.fbclid ?? null,
-      gclid: dto.gclid ?? null,
-      ttclid: dto.ttclid ?? null,
-      fullName,
-      email: dto.email?.trim() || null,
-      phone: dto.phone?.trim() || null,
-      companyName: dto.companyName?.trim() || null,
-      fieldValues: dto.fieldValues ?? {},
-      tags: dto.tags ?? ['runtime-public-submit'],
-    });
+    return this.leadCaptureAssignmentService.submitLeadCapture(
+      {
+        submissionEventId:
+          dto.submissionEventId ?? `runtime-submit-${randomUUID()}`,
+        publicationId: runtime.publication.id,
+        currentStepId: runtime.currentStep.id,
+        anonymousId: dto.anonymousId?.trim() || `runtime-anon-${randomUUID()}`,
+        entryContext: dto.entryContext
+          ? {
+              ...dto.entryContext,
+              runtimePathPrefix:
+                dto.entryContext.runtimePathPrefix ??
+                runtime.request.publicationPathPrefix,
+              referralQueryParam: null,
+            }
+          : undefined,
+        sourceChannel: dto.sourceChannel ?? 'form',
+        sourceUrl: dto.sourceUrl?.trim() ?? fallbackSourceUrl,
+        utmSource: dto.utmSource ?? null,
+        utmCampaign: dto.utmCampaign ?? null,
+        utmMedium: dto.utmMedium ?? null,
+        utmContent: dto.utmContent ?? null,
+        utmTerm: dto.utmTerm ?? null,
+        fbclid: dto.fbclid ?? null,
+        gclid: dto.gclid ?? null,
+        ttclid: dto.ttclid ?? null,
+        fullName,
+        email: dto.email?.trim() || null,
+        phone: dto.phone?.trim() || null,
+        companyName: dto.companyName?.trim() || null,
+        fieldValues: dto.fieldValues ?? {},
+        tags: dto.tags ?? ['runtime-public-submit'],
+      },
+      requestHeaders,
+    );
   }
 
   private buildLegacyRuntimeConfig(runtime: Awaited<ReturnType<PublicFunnelRuntimeService['resolveByHostAndPath']>>, existingConfig: unknown) {

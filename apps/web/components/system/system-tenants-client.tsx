@@ -80,6 +80,7 @@ const buildEditFormState = (
     subdomain: row.workspaceSlug,
     provisioningStatus:
       provisioningStatus === "archived" ? "pending" : provisioningStatus,
+    emailNotificationsEnabled: row.emailNotificationsEnabled,
   };
 };
 
@@ -342,6 +343,7 @@ export function SystemTenantsClient({
               name: parsed.data.tenantName,
               workspaceName: parsed.data.tenantName,
               workspaceSlug: parsed.data.subdomain,
+              emailNotificationsEnabled: parsed.data.emailNotificationsEnabled,
               managerEmail: parsed.data.adminEmail,
               status: nextFlags.status,
               isActive: nextFlags.isActive,
@@ -936,6 +938,33 @@ export function SystemTenantsClient({
                   {editFormErrors.provisioningStatus}
                 </p>
               ) : null}
+            </label>
+
+            <label className="flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-4">
+              <input
+                type="checkbox"
+                checked={editFormState.emailNotificationsEnabled}
+                onChange={(event) =>
+                  setEditFormState((current) =>
+                    current
+                      ? {
+                          ...current,
+                          emailNotificationsEnabled: event.target.checked,
+                        }
+                      : current,
+                  )
+                }
+                className="mt-1 h-4 w-4 rounded border-app-border bg-app-card text-app-accent focus:ring-app-accent-soft"
+              />
+              <span className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-slate-200">
+                  Habilitar correos del tenant
+                </span>
+                <span className="text-sm leading-6 text-app-text-muted">
+                  Si lo desactivas, el runtime omite el envío de emails para este
+                  tenant y registra `MAIL_SILENCED` sin romper la captura del lead.
+                </span>
+              </span>
             </label>
 
             <div className="flex flex-wrap justify-end gap-3">

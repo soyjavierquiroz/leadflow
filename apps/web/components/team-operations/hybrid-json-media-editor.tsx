@@ -342,6 +342,43 @@ const getBlockIdentity = (block: ComposerBlock, index: number) =>
 const cloneJson = <T,>(value: T): T =>
   value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
 
+const mergeJsonObjectPatch = (
+  current: Record<string, JsonValue | undefined>,
+  patch: Record<string, JsonValue | undefined>,
+): Record<string, JsonValue | undefined> => {
+  const merged: Record<string, JsonValue | undefined> = { ...current };
+
+  for (const [key, patchValue] of Object.entries(patch)) {
+    const currentValue = current[key];
+
+    merged[key] =
+      isRecord(currentValue) && isRecord(patchValue)
+        ? (mergeJsonObjectPatch(
+            currentValue as Record<string, JsonValue | undefined>,
+            patchValue as Record<string, JsonValue | undefined>,
+          ) as JsonValue)
+        : patchValue;
+  }
+
+  return merged;
+};
+
+const normalizeComposerBlockSingleSourceFields = (
+  block: ComposerBlock,
+): ComposerBlock => {
+  if (block.type !== "hero_vsl_delayed_cta") {
+    return block;
+  }
+
+  const { action: _action, cta_mode: _ctaMode, ...rest } = block;
+  return rest;
+};
+
+const serializeComposerBlocks = (blocks: ComposerBlock[]) =>
+  SmartWiringService.serialize(
+    blocks.map(normalizeComposerBlockSingleSourceFields),
+  );
+
 export const isAbsoluteHttpUrl = (value: string) =>
   /^https?:\/\//i.test(value.trim());
 
@@ -380,9 +417,17 @@ type HybridJsonMediaEditorProps = {
   onAddMediaRow: (key?: string) => void;
   onUploadMediaClick: (index: number) => void;
   onRemoveMediaRow: (index: number) => void;
+  hardDeleteAssets?: boolean;
+  onHardDeleteAssetsChange?: (value: boolean) => void;
   previewTheme?: string;
   previewSettingsJson?: unknown;
   previewDraftKey?: string | null;
+  activeStepRecord?: {
+    id: string;
+    slug: string;
+    stepType: string;
+    position: number;
+  } | null;
   editorContext?: {
     stepName: string;
     stepPath: string;
@@ -444,9 +489,12 @@ export function HybridJsonMediaEditor({
   onAddMediaRow,
   onUploadMediaClick,
   onRemoveMediaRow,
+  hardDeleteAssets = false,
+  onHardDeleteAssetsChange,
   previewTheme = "default",
   previewSettingsJson = null,
   previewDraftKey = null,
+  activeStepRecord = null,
   editorContext = null,
   availableBlocks = defaultBuilderBlockDefinitions,
   routingReference = null,
@@ -468,7 +516,8 @@ export function HybridJsonMediaEditor({
 
     return Array.from(merged.values());
   }, [availableBlocks]);
-  const currentStepType = editorContext?.stepType ?? stepSwitcher?.badge ?? null;
+  const currentStepType =
+    activeStepRecord?.stepType ?? editorContext?.stepType ?? stepSwitcher?.badge ?? null;
   const compatibleCatalogBlocks = useMemo(
     () =>
       catalogBlocks.filter((definition) =>
@@ -588,7 +637,7 @@ export function HybridJsonMediaEditor({
           })
         : blocks;
 
-    onBlocksTextChange(SmartWiringService.serialize(syncedBlocks));
+    onBlocksTextChange(serializeComposerBlocks(syncedBlocks as ComposerBlock[]));
   };
 
   const buildComposerDestinations = useCallback((blocks: ComposerBlock[]) => {
@@ -659,7 +708,9 @@ export function HybridJsonMediaEditor({
   const patchComposerBlock = (blockId: string, patch: Partial<ComposerBlock>) => {
     writeComposerBlocks(
       composerBlocks.map((block, index) =>
-        getBlockIdentity(block, index) === blockId ? { ...block, ...patch } : block,
+        getBlockIdentity(block, index) === blockId
+          ? (mergeJsonObjectPatch(block, patch) as ComposerBlock)
+          : block,
       ),
     );
   };
@@ -732,7 +783,7 @@ export function HybridJsonMediaEditor({
       successRedirect: routingReference?.items[0]?.path ?? null,
     });
 
-    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+    onBlocksTextChange(serializeComposerBlocks(nextBlocks as ComposerBlock[]));
   };
 
   const handleApplyReadyMadeRecipe = (recipe: SmartWiringRecipe) => {
@@ -745,7 +796,7 @@ export function HybridJsonMediaEditor({
       replace: isBlankCanvas,
     });
 
-    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+    onBlocksTextChange(serializeComposerBlocks(nextBlocks as ComposerBlock[]));
   };
 
   const handleSyncSuccessRedirect = (successRedirect: string) => {
@@ -754,7 +805,7 @@ export function HybridJsonMediaEditor({
       successRedirect,
     });
 
-    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+    onBlocksTextChange(serializeComposerBlocks(nextBlocks as ComposerBlock[]));
   };
 
   const handleInjectScaffold = (value: string) => {
@@ -763,7 +814,7 @@ export function HybridJsonMediaEditor({
       successRedirect: routingReference?.items[0]?.path ?? "/confirmado",
     });
 
-    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+    onBlocksTextChange(serializeComposerBlocks(nextBlocks as ComposerBlock[]));
   };
 
   const selectedBlockDefinition =
@@ -1055,7 +1106,7 @@ export function HybridJsonMediaEditor({
             </div>
 
             {editorContext ? (
-                <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 shadow-sm backdrop-blur">
+              <div className="sticky top-4 z-10 rounded-[1.5rem] border border-amber-500/20 bg-amber-500/10 shadow-sm backdrop-blur">
                 <div className="flex w-full items-center justify-start px-4 py-3 text-left">
                   <span className="mr-3 shrink-0 text-base leading-none text-amber-300">
                     ⚠️
@@ -1072,7 +1123,7 @@ export function HybridJsonMediaEditor({
                 <div className="flex flex-col gap-5">
                   <div className="max-w-2xl space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">
-                      Lienzo en blanco
+                      Este paso aún no tiene bloques
                     </p>
                     <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                       Arranca este paso con una estructura segura
@@ -1477,6 +1528,20 @@ export function HybridJsonMediaEditor({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
+              {onHardDeleteAssetsChange ? (
+                <label className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-700 dark:text-red-300">
+                  <input
+                    type="checkbox"
+                    checked={hardDeleteAssets}
+                    onChange={(event) =>
+                      onHardDeleteAssetsChange(event.target.checked)
+                    }
+                    disabled={uploadingRowIndex !== null}
+                    className="h-4 w-4 rounded border-red-500/30 text-red-600"
+                  />
+                  Eliminar archivo físico de MinIO
+                </label>
+              ) : null}
               <div className="text-xs leading-6 text-slate-500 dark:text-slate-400">
                 El media dictionary acepta URLs absolutas del CDN de
                 Leadflow/MinIO y mantiene compatibilidad con{" "}

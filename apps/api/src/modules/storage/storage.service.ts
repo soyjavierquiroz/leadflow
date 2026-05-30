@@ -5,7 +5,11 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export type PresignedUploadUrlResult = {
@@ -170,5 +174,97 @@ export class StorageService {
         objectKey,
       }),
     };
+  }
+
+  async deletePublicObject(publicUrl: string): Promise<void> {
+    if (!this.client || !this.publicBaseUrl) {
+      throw new ServiceUnavailableException({
+        code: 'STORAGE_NOT_CONFIGURED',
+        message:
+          'Storage service is not configured. Provide MinIO credentials and public URL before deleting assets.',
+      });
+    }
+
+    const { bucket, objectKey } = this.parsePublicObjectUrl(publicUrl);
+
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: objectKey,
+      }),
+    );
+  }
+
+  isManagedPublicUrl(publicUrl: string): boolean {
+    const normalizedPublicUrl = sanitizeNullableText(publicUrl);
+
+    if (!normalizedPublicUrl || !this.publicBaseUrl) {
+      return false;
+    }
+
+    try {
+      const parsedObjectUrl = new URL(normalizedPublicUrl);
+      const configuredBaseUrl = new URL(this.publicBaseUrl);
+      return this.hasManagedPublicHost(parsedObjectUrl, configuredBaseUrl);
+    } catch {
+      return false;
+    }
+  }
+
+  private hasManagedPublicHost(parsedObjectUrl: URL, configuredBaseUrl: URL) {
+    return (
+      parsedObjectUrl.hostname === configuredBaseUrl.hostname &&
+      parsedObjectUrl.port === configuredBaseUrl.port
+    );
+  }
+
+  private parsePublicObjectUrl(publicUrl: string): {
+    bucket: string;
+    objectKey: string;
+  } {
+    const normalizedPublicUrl = sanitizeNullableText(publicUrl);
+
+    if (!normalizedPublicUrl) {
+      throw new BadRequestException({
+        code: 'STORAGE_PUBLIC_URL_INVALID',
+        message: 'Asset URL is required to delete a stored object.',
+      });
+    }
+
+    let parsedObjectUrl: URL;
+
+    try {
+      parsedObjectUrl = new URL(normalizedPublicUrl);
+    } catch {
+      throw new BadRequestException({
+        code: 'STORAGE_PUBLIC_URL_INVALID',
+        message: 'Asset URL must be a valid absolute URL.',
+      });
+    }
+
+    const configuredBaseUrl = new URL(this.publicBaseUrl!);
+
+    if (!this.hasManagedPublicHost(parsedObjectUrl, configuredBaseUrl)) {
+      throw new BadRequestException({
+        code: 'STORAGE_PUBLIC_URL_INVALID_ORIGIN',
+        message: 'Asset URL must point to the configured Leadflow CDN origin.',
+      });
+    }
+
+    const pathParts = parsedObjectUrl.pathname
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment));
+    const [bucket, ...objectKeyParts] = pathParts;
+    const objectKey = objectKeyParts.join('/');
+
+    if (!bucket || !objectKey) {
+      throw new BadRequestException({
+        code: 'STORAGE_PUBLIC_URL_INVALID_PATH',
+        message: 'Asset URL must contain both bucket and object key.',
+      });
+    }
+
+    return { bucket, objectKey };
   }
 }

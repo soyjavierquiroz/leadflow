@@ -7,6 +7,7 @@ import type {
   SystemFunnelTemplateRecord,
   SystemTemplateDeploymentResponse,
   SystemTemplateRecord,
+  SystemUnifiedFunnelLibraryRecord,
   SystemTenantDetailRecord,
   SystemTenantDomainRecord,
   SystemTenantFunnelDetailRecord,
@@ -28,6 +29,7 @@ export type {
   SystemFunnelTemplateRecord,
   SystemTemplateDeploymentResponse,
   SystemTemplateRecord,
+  SystemUnifiedFunnelLibraryRecord,
   SystemTenantDetailRecord,
   SystemTenantDomainRecord,
   SystemTenantFunnelDetailRecord,
@@ -257,18 +259,20 @@ export const getSystemFunnelTemplates = async () => {
   noStore();
 
   try {
-    const response = await apiFetchWithSession("/system/funnels/templates");
+    const response = await apiFetchWithSession("/system/funnels/library");
 
     await assertOkResponse(
       response,
-      `No pudimos cargar los templates globales (${response.status}).`,
+      `No pudimos cargar la librería unificada de funnels (${response.status}).`,
       "getSystemFunnelTemplates",
     );
 
-    return (await ensureArrayPayload(
+    const payload = (await ensureObjectPayload(
       response,
-      "system/funnels/templates",
-    )) as SystemFunnelTemplateRecord[];
+      "system/funnels/library",
+    )) as SystemUnifiedFunnelLibraryRecord;
+
+    return payload.legacyTemplates ?? [];
   } catch (error) {
     logCriticalSsrError(error, {
       operation: "getSystemFunnelTemplates",

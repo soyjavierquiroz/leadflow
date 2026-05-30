@@ -8,6 +8,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
+import { OwnershipContextUpsertService } from '../runtime-context/ownership-context-upsert.service';
+import { generateOwnershipKey } from '../runtime-context/ownership-context-key.util';
 import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
 import type { ReassignTeamLeadDto } from './dto/reassign-team-lead.dto';
 
@@ -71,7 +73,7 @@ type TeamLeadInboxRecord = Prisma.LeadGetPayload<{
 }>;
 
 type TeamLeadSupervisionStatus = 'orphaned' | 'stagnant' | 'active' | 'closed';
-type TeamLeadTrafficLayer = 'DIRECT' | 'PAID_WHEEL' | 'ORGANIC';
+type TeamLeadTrafficLayer = 'DIRECT' | 'PAID_WHEEL' | 'PAID_ADS' | 'ORGANIC';
 
 export type TeamLeadInboxItem = {
   id: string;
@@ -116,7 +118,10 @@ const byNewestFirst = (left: string, right: string) =>
 const normalizeTrafficLayer = (
   value: string | null | undefined,
 ): TeamLeadTrafficLayer =>
-  value === 'DIRECT' || value === 'PAID_WHEEL' || value === 'ORGANIC'
+  value === 'DIRECT' ||
+  value === 'PAID_WHEEL' ||
+  value === 'PAID_ADS' ||
+  value === 'ORGANIC'
     ? value
     : 'ORGANIC';
 
@@ -140,6 +145,7 @@ export class TeamLeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly leadDispatcherService: LeadDispatcherService,
+    private readonly ownershipContextUpsertService: OwnershipContextUpsertService,
   ) {}
 
   async list(scope: {
@@ -296,6 +302,7 @@ export class TeamLeadsService {
 
       const assignment = await tx.assignment.create({
         data: {
+          ownershipKey: generateOwnershipKey(),
           workspaceId: lead.workspaceId,
           leadId: lead.id,
           sponsorId: targetSponsor.id,
@@ -369,6 +376,11 @@ export class TeamLeadsService {
     let automationTriggered = false;
 
     try {
+      void this.ownershipContextUpsertService.upsertForAssignment({
+        assignmentId,
+        sourceUrl: null,
+      });
+
       automationTriggered = Boolean(
         await this.leadDispatcherService.dispatchLeadContextUpsert({
           assignmentId,

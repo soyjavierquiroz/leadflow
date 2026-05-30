@@ -187,19 +187,13 @@ const toDateInputValue = (value: string) => value.slice(0, 10);
 const toIsoDateStart = (value: string) => `${value}T00:00:00.000Z`;
 const canEditWheelSchedule = (wheel: TeamAdWheelRecord) =>
   wheel.status === "DRAFT" || Date.now() < new Date(wheel.startDate).getTime();
-const normalizePublicationPath = (pathPrefix: string) =>
-  pathPrefix === "/" ? "/" : pathPrefix;
 const buildCampaignUrl = (wheel: TeamAdWheelRecord) => {
   if (!wheel.publication) {
     return null;
   }
 
-  const baseUrl = `https://${wheel.publication.domainHost}${normalizePublicationPath(
-    wheel.publication.pathPrefix,
-  )}`;
-  const separator = baseUrl.includes("?") ? "&" : "?";
-
-  return `${baseUrl}${separator}awid=${encodeURIComponent(wheel.id)}`;
+  const baseUrl = `https://${wheel.publication.domainHost}`;
+  return `${baseUrl}/promo/${encodeURIComponent(wheel.id)}`;
 };
 const toWheelPublication = (publication: PublicationView | undefined) =>
   publication

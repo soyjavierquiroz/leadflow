@@ -131,7 +131,7 @@ export class HybridFunnelPublicationsService {
       include: {
         funnelInstance: {
           include: {
-            legacyFunnel: {
+            funnel: {
               select: {
                 config: true,
               },
@@ -280,13 +280,13 @@ export class HybridFunnelPublicationsService {
         normalized.pathPrefix,
       );
 
-      const legacyFunnel = await tx.funnel.create({
+      const funnel = await tx.funnel.create({
         data: {
           workspaceId: scope.workspaceId,
           name: normalized.name,
           code,
           config: toInputJson(
-            this.buildLegacyFunnelConfig(
+            this.buildFunnelConfig(
               null,
               template.id,
               template.code,
@@ -312,7 +312,7 @@ export class HybridFunnelPublicationsService {
           workspaceId: scope.workspaceId,
           teamId: scope.teamId,
           templateId: template.id,
-          legacyFunnelId: legacyFunnel.id,
+          funnelId: funnel.id,
           name: normalized.name,
           code,
           status: 'active',
@@ -486,7 +486,7 @@ export class HybridFunnelPublicationsService {
       include: {
         funnelInstance: {
           include: {
-            legacyFunnel: {
+            funnel: {
               select: {
                 config: true,
               },
@@ -580,12 +580,12 @@ export class HybridFunnelPublicationsService {
 
     const detail = await this.prisma.$transaction(async (tx) => {
       await tx.funnel.updateMany({
-        where: { id: existing.funnelInstance.legacyFunnelId ?? '__missing__' },
+        where: { id: existing.funnelInstance.funnelId ?? '__missing__' },
         data: {
           name: normalized.name,
           config: toInputJson(
-            this.buildLegacyFunnelConfig(
-              asJsonRecord(existing.funnelInstance.legacyFunnel?.config as JsonValue),
+            this.buildFunnelConfig(
+              asJsonRecord(existing.funnelInstance.funnel?.config as JsonValue),
               template.id,
               template.code,
               normalized.theme,
@@ -1136,7 +1136,7 @@ export class HybridFunnelPublicationsService {
     };
   }
 
-  private buildLegacyFunnelConfig(
+  private buildFunnelConfig(
     existingConfig: Record<string, JsonValue> | null,
     templateId: string,
     templateCode: string,

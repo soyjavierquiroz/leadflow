@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { mapFunnelRecord, mapFunnelTemplateRecord } from '../../prisma/prisma.mappers';
+import { StorageService } from '../storage/storage.service';
 import type { JsonValue } from '../shared/domain.types';
 import { assertSupportedFunnelBlocksJson } from '../shared/funnel-block-validation';
 import type { DeployTemplateDto } from './dto/deploy-template.dto';
@@ -22,14 +24,17 @@ const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
 
 type FunnelCodeLookupClient =
-  | Pick<PrismaService, 'funnel'>
+  | Pick<PrismaService, 'funnel' | 'funnelInstance'>
   | Prisma.TransactionClient;
 
 @Injectable()
 export class TemplateService {
   private readonly logger = new Logger(TemplateService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {}
 
   async getStepDefaults(input: {
     workspaceId: string;
@@ -148,6 +153,14 @@ export class TemplateService {
         ? (existing.mediaMap as JsonValue)
         : this.assertMediaMap(dto.mediaMap);
 
+    if (dto.mediaMap !== undefined && dto.hardDeleteAssets === true) {
+      await this.deleteRemovedMediaAssets(
+        existing.mediaMap as JsonValue,
+        mediaMap,
+        existing.id,
+      );
+    }
+
     const record = await this.prisma.funnelTemplate.update({
       where: { id: existing.id },
       data: {
@@ -162,7 +175,12 @@ export class TemplateService {
   }
 
   async deploy(templateId: string, dto: DeployTemplateDto) {
+    return this.deployTemplate(templateId, dto);
+  }
+
+  async deployTemplate(templateId: string, dto: DeployTemplateDto) {
     const teamId = this.sanitizeRequiredText(dto.teamId, 'teamId');
+    const cloneName = this.sanitizeRequiredText(dto.cloneName, 'cloneName');
     const template = await this.findTemplateRecord(templateId);
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },
@@ -181,17 +199,18 @@ export class TemplateService {
       });
     }
 
-    const record = await this.prisma.$transaction(async (tx) => {
+    const deployment = await this.prisma.$transaction(async (tx) => {
       const code = await this.createUniqueFunnelCode(
         tx,
         team.workspaceId,
-        template.code,
+        team.id,
+        cloneName,
       );
 
-      return tx.funnel.create({
+      const funnel = await tx.funnel.create({
         data: {
           workspaceId: team.workspaceId,
-          name: template.name,
+          name: cloneName,
           description: template.description,
           code,
           thumbnailUrl: null,
@@ -216,10 +235,47 @@ export class TemplateService {
           defaultRotationPoolId: null,
         },
       });
+
+      const funnelInstance = await tx.funnelInstance.create({
+        data: {
+          workspaceId: team.workspaceId,
+          teamId: team.id,
+          templateId: template.id,
+          funnelId: funnel.id,
+          name: cloneName,
+          code,
+          thumbnailUrl: null,
+          status: 'active',
+          rotationPoolId: null,
+          trackingProfileId: null,
+          handoffStrategyId: template.defaultHandoffStrategyId ?? null,
+          settingsJson: toInputJson(
+            this.buildInstanceSettings(template, cloneName),
+          ),
+          mediaMap: toInputJson(template.mediaMap as JsonValue),
+        },
+      });
+
+      await tx.funnelStep.createMany({
+        data: this.buildDeploymentSteps({
+          template,
+          funnelName: cloneName,
+          workspaceId: team.workspaceId,
+          teamId: team.id,
+          funnelInstanceId: funnelInstance.id,
+        }),
+      });
+
+      return { funnel, funnelInstance };
     });
 
+    const builderUrl = `/admin/tenants/${team.id}/funnels/${deployment.funnel.id}/builder`;
+
     return {
-      funnel: mapFunnelRecord(record),
+      funnel: mapFunnelRecord(deployment.funnel),
+      funnelInstanceId: deployment.funnelInstance.id,
+      newFunnelId: deployment.funnel.id,
+      builderUrl,
       template: this.mapTemplateResponse(template),
       team: {
         id: team.id,
@@ -228,6 +284,51 @@ export class TemplateService {
         code: team.code,
       },
     };
+  }
+
+  private buildDeploymentSteps(input: {
+    template: PrismaFunnelTemplate;
+    funnelName: string;
+    workspaceId: string;
+    teamId: string;
+    funnelInstanceId: string;
+  }): Prisma.FunnelStepCreateManyInput[] {
+    const { template, funnelName, workspaceId, teamId, funnelInstanceId } = input;
+
+    return [
+      {
+        workspaceId,
+        teamId,
+        funnelInstanceId,
+        stepType: FunnelStepType.landing,
+        slug: 'captura',
+        position: 1,
+        isEntryStep: true,
+        isConversionStep: true,
+        blocksJson: toInputJson(
+          this.cloneJsonValue(template.blocksJson as JsonValue),
+        ),
+        mediaMap: toInputJson(this.cloneJsonValue(template.mediaMap as JsonValue)),
+        settingsJson: toInputJson(
+          this.buildLandingStepSettings(template, funnelName),
+        ),
+      },
+      {
+        workspaceId,
+        teamId,
+        funnelInstanceId,
+        stepType: FunnelStepType.confirmation,
+        slug: 'confirmado',
+        position: 2,
+        isEntryStep: false,
+        isConversionStep: false,
+        blocksJson: toInputJson(this.buildConfirmationStepBlocks(funnelName)),
+        mediaMap: toInputJson(this.cloneJsonValue(template.mediaMap as JsonValue)),
+        settingsJson: toInputJson(
+          this.buildConfirmationStepSettings(template, funnelName),
+        ),
+      },
+    ];
   }
 
   private mapTemplateResponse(record: PrismaFunnelTemplate) {
@@ -239,6 +340,108 @@ export class TemplateService {
       blocks: template.blocksJson,
       mediaMap: template.mediaMap,
     };
+  }
+
+  private buildInstanceSettings(
+    template: PrismaFunnelTemplate,
+    funnelName: string,
+  ): JsonValue {
+    const current = this.asRecord(template.settingsJson as JsonValue);
+
+    return {
+      ...current,
+      theme: template.code,
+      locale: this.readString(current.locale) ?? 'es',
+      structureId: this.readString(current.structureId) ?? template.code,
+      hybridEditor: {
+        ...this.asRecord(current.hybridEditor),
+        mode: 'data-driven-assembly',
+        templateId: template.id,
+        structureId: this.readString(current.structureId) ?? template.code,
+        blocksJson: template.blocksJson as JsonValue,
+      },
+      seo: {
+        ...this.asRecord(current.seo),
+        title: funnelName,
+        metaDescription:
+          this.readString(this.asRecord(current.seo).metaDescription) ??
+          `Publicación base de ${funnelName} desplegada desde el catálogo moderno.`,
+      },
+    };
+  }
+
+  private buildLandingStepSettings(
+    template: PrismaFunnelTemplate,
+    funnelName: string,
+  ): JsonValue {
+    const current = this.asRecord(template.settingsJson as JsonValue);
+    const structureId = this.readString(current.structureId) ?? template.code;
+
+    return {
+      ...current,
+      editorSource: 'system-template-deploy',
+      isBoilerplate: true,
+      templateId: template.id,
+      templateCode: template.code,
+      structureId,
+      hybridRenderer: 'jakawi-bridge',
+      blocksJson: template.blocksJson as JsonValue,
+      seo: {
+        ...this.asRecord(current.seo),
+        title: funnelName,
+        metaDescription:
+          this.readString(this.asRecord(current.seo).metaDescription) ??
+          `Landing principal de ${funnelName}.`,
+      },
+    };
+  }
+
+  private buildConfirmationStepSettings(
+    template: PrismaFunnelTemplate,
+    funnelName: string,
+  ): JsonValue {
+    const current = this.asRecord(template.settingsJson as JsonValue);
+    const structureId = this.readString(current.structureId) ?? template.code;
+
+    return {
+      ...current,
+      editorSource: 'system-template-deploy',
+      isBoilerplate: true,
+      templateId: template.id,
+      templateCode: template.code,
+      structureId,
+      hybridRenderer: 'jakawi-bridge',
+      blocksJson: this.buildConfirmationStepBlocks(funnelName),
+      seo: {
+        ...this.asRecord(current.seo),
+        title: `${funnelName} - Confirmación`,
+        metaDescription: `Paso de confirmación de ${funnelName}.`,
+      },
+    };
+  }
+
+  private buildConfirmationStepBlocks(funnelName: string): JsonValue {
+    return [
+      {
+        type: 'hero',
+        key: 'confirmacion-principal',
+        eyebrow: 'Confirmación',
+        title: 'Tu registro fue recibido',
+        description: `El funnel ${funnelName} quedó operativo sobre el catálogo moderno.`,
+      },
+    ];
+  }
+
+  private asRecord(value: JsonValue | null | undefined): Record<string, JsonValue> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+
+    return value as Record<string, JsonValue>;
+  }
+
+  private readString(value: JsonValue | undefined): string | null {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
   }
 
   private buildStepDefaults(
@@ -329,6 +532,7 @@ export class TemplateService {
   private async createUniqueFunnelCode(
     tx: FunnelCodeLookupClient,
     workspaceId: string,
+    teamId: string,
     sourceCode: string,
   ) {
     const baseCode = this.normalizeCode(sourceCode);
@@ -343,7 +547,19 @@ export class TemplateService {
         select: { id: true },
       });
 
-      if (!existing) {
+      if (existing) {
+        continue;
+      }
+
+      const existingInstance = await tx.funnelInstance.findFirst({
+        where: {
+          teamId,
+          code,
+        },
+        select: { id: true },
+      });
+
+      if (!existingInstance) {
         return code;
       }
     }
@@ -409,6 +625,102 @@ export class TemplateService {
     return value;
   }
 
+  private async deleteRemovedMediaAssets(
+    existingMediaMap: JsonValue,
+    nextMediaMap: JsonValue,
+    templateId: string,
+  ) {
+    const previousUrls = this.collectStorageUrls(existingMediaMap);
+    const nextUrls = this.collectStorageUrls(nextMediaMap);
+    const removedUrls = [...previousUrls].filter((url) => !nextUrls.has(url));
+
+    for (const removedUrl of removedUrls) {
+      try {
+        console.log(
+          '[TemplateService] Deleting removed media asset from storage',
+          {
+            templateId,
+            key: this.extractStorageObjectKey(removedUrl),
+            url: removedUrl,
+          },
+        );
+        await this.storageService.deletePublicObject(removedUrl);
+      } catch (error) {
+        this.logger.error(
+          `Failed to delete media asset "${removedUrl}" for template ${templateId}.`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new InternalServerErrorException({
+          code: 'TEMPLATE_MEDIA_DELETE_FAILED',
+          message:
+            'The selected media file could not be deleted from storage, so the Media Dictionary entry was not removed.',
+          assetUrl: removedUrl,
+        });
+      }
+    }
+  }
+
+  private extractStorageObjectKey(publicUrl: string): string | null {
+    try {
+      const pathParts = new URL(publicUrl).pathname
+        .split('/')
+        .filter(Boolean)
+        .map((segment) => decodeURIComponent(segment));
+      return pathParts.slice(1).join('/') || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private collectStorageUrls(value: JsonValue): Set<string> {
+    const urls = new Set<string>();
+    this.walkJsonValue(value, urls);
+    return urls;
+  }
+
+  private walkJsonValue(value: JsonValue, urls: Set<string>) {
+    if (typeof value === 'string') {
+      const normalizedUrl = this.normalizeStorageUrl(value);
+
+      if (normalizedUrl) {
+        urls.add(normalizedUrl);
+      }
+
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        this.walkJsonValue(item, urls);
+      }
+
+      return;
+    }
+
+    if (value && typeof value === 'object') {
+      for (const nestedValue of Object.values(value)) {
+        this.walkJsonValue(nestedValue, urls);
+      }
+    }
+  }
+
+  private normalizeStorageUrl(value: string): string | null {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return null;
+    }
+
+    try {
+      const normalizedUrl = new URL(trimmed).toString();
+      return this.storageService.isManagedPublicUrl(normalizedUrl)
+        ? normalizedUrl
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   private normalizeCode(value: string) {
     const normalized = value
       .trim()
@@ -424,5 +736,13 @@ export class TemplateService {
     }
 
     return normalized;
+  }
+
+  private cloneJsonValue(value: JsonValue): JsonValue {
+    if (value === null || typeof value !== 'object') {
+      return value;
+    }
+
+    return JSON.parse(JSON.stringify(value)) as JsonValue;
   }
 }

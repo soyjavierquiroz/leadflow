@@ -66,6 +66,7 @@ export function PublicLeadCaptureModalHost({
         runtime={runtime}
         sourceChannel={normalizedLeadCaptureFormBlock?.settings.sourceChannel}
         tags={normalizedLeadCaptureFormBlock?.settings.tags}
+        blockOutcome={normalizedLeadCaptureFormBlock?.outcome ?? "submit_success"}
         renderTrigger={false}
         open={isOpen}
         onOpenChange={(nextOpen) => {

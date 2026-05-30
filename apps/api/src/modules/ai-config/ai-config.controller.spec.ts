@@ -21,6 +21,10 @@ describe('AiConfigController', () => {
 
     aiConfigService.resolveRuntimeContext.mockResolvedValue({
       version: 'leadflow.ai-runtime-context.v1',
+      config_version:
+        'leadflow.ai-runtime-context.v1|tenant:tenant-config-1:2026-05-20T00:00:00.000Z|member:member-config-1:2026-05-20T00:00:00.000Z',
+      basePrompt: 'Prompt final',
+      base_prompt: 'Prompt final',
       routing: {
         provider: 'evolution',
         channel: 'whatsapp',
@@ -31,6 +35,9 @@ describe('AiConfigController', () => {
         id: 'team-1',
         name: 'Freddy Team',
         code: 'immunotec',
+        vertical_key: 'multinivel',
+        brand_key: 'immunotec',
+        business_model_type: 'multinivel',
       },
       member: {
         id: 'sponsor-1',
@@ -52,6 +59,7 @@ describe('AiConfigController', () => {
         reason: null,
       },
       ai_agent: {
+        basePrompt: 'Prompt final',
         base_prompt: 'Prompt final',
         route_contexts: {
           risk: {
@@ -77,13 +85,16 @@ describe('AiConfigController', () => {
     await expect(
       controller.resolveFull({
         instance_name: 'drenvexman',
+        tenant_id: 'team-1',
       }),
     ).resolves.toEqual({
       tenant_id: 'team-1',
       app_key: 'leadflow_api',
-      platform_key: 'kurukin',
+      platform_key: 'leadflow',
       product_key: 'leadflow',
-      vertical_key: 'immunotec',
+      vertical_key: 'multinivel',
+      brand_key: 'immunotec',
+      business_model_type: 'multinivel',
       service_owner_key: 'lead-handler',
       wallet_subject: {
         type: 'sponsor',
@@ -93,13 +104,21 @@ describe('AiConfigController', () => {
         status: 'resolved',
         reason: null,
       },
+      basePrompt: 'Prompt final',
+      base_prompt: 'Prompt final',
       runtime_config: expect.objectContaining({
+        basePrompt: 'Prompt final',
+        base_prompt: 'Prompt final',
         tenant: {
           id: 'team-1',
           name: 'Freddy Team',
           code: 'immunotec',
+          vertical_key: 'multinivel',
+          brand_key: 'immunotec',
+          business_model_type: 'multinivel',
         },
         ai_agent: {
+          basePrompt: 'Prompt final',
           base_prompt: 'Prompt final',
           route_contexts: {
             risk: {
@@ -116,12 +135,14 @@ describe('AiConfigController', () => {
           },
         },
       }),
-      config_version: 'leadflow.ai-runtime-context.v1',
+      config_version:
+        'leadflow.ai-runtime-context.v1|tenant:tenant-config-1:2026-05-20T00:00:00.000Z|member:member-config-1:2026-05-20T00:00:00.000Z',
       status: 'active',
     });
-    expect(aiConfigService.resolveRuntimeContext).toHaveBeenCalledWith(
-      'drenvexman',
-    );
+    expect(aiConfigService.resolveRuntimeContext).toHaveBeenCalledWith({
+      instanceName: 'drenvexman',
+      tenantId: 'team-1',
+    });
   });
 
   it('rejects requests without instance_name', async () => {
@@ -181,20 +202,19 @@ describe('AiConfigController', () => {
       },
     });
 
-    expect(aiConfigService.initOrchestrationSessionForUser).toHaveBeenCalledWith(
-      user,
-      {
-        instanceName: 'drenvexman',
-        teamId: 'team-1',
-        funnelId: 'funnel-1',
-        funnelContext: {
-          blocks: [],
-        },
-        metadata: {
-          source: 'unit-test',
-        },
+    expect(
+      aiConfigService.initOrchestrationSessionForUser,
+    ).toHaveBeenCalledWith(user, {
+      instanceName: 'drenvexman',
+      teamId: 'team-1',
+      funnelId: 'funnel-1',
+      funnelContext: {
+        blocks: [],
       },
-    );
+      metadata: {
+        source: 'unit-test',
+      },
+    });
   });
 
   it('forwards execute requests with sessionId and prompt only', async () => {
@@ -292,13 +312,12 @@ describe('AiConfigController', () => {
       },
     });
 
-    expect(aiConfigService.closeOrchestrationSessionForUser).toHaveBeenCalledWith(
-      user,
-      {
-        instanceName: 'drenvexman',
-        teamId: 'team-1',
-        sessionId: 'drenvexman-funnel-1',
-      },
-    );
+    expect(
+      aiConfigService.closeOrchestrationSessionForUser,
+    ).toHaveBeenCalledWith(user, {
+      instanceName: 'drenvexman',
+      teamId: 'team-1',
+      sessionId: 'drenvexman-funnel-1',
+    });
   });
 });

@@ -2,6 +2,8 @@ import { PublicBlockAdapter } from "@/components/public-funnel/adapters/public-b
 import { LeadCaptureModal } from "@/components/public-funnel/lead-capture-modal";
 import { PublicAnnouncementBanner } from "@/components/public-funnel/public-announcement-banner";
 import {
+  asBoolean,
+  asNumber,
   asRecord,
   asString,
   normalizeLeadCaptureFormBlock,
@@ -119,6 +121,57 @@ export function PublicLeadCaptureConfigBridge({
             block.success_redirect,
             asString(modalConfigRecord.success_redirect),
           ),
+          handoffEnabled: asBoolean(
+            block.handoffEnabled ??
+              block.handoff_enabled ??
+              modalConfigRecord.handoffEnabled ??
+              modalConfigRecord.handoff_enabled,
+            true,
+          ),
+          handoffDuration: Math.max(
+            0,
+            asNumber(
+              block.handoffDuration ??
+                block.handoff_duration ??
+                modalConfigRecord.handoffDuration ??
+                modalConfigRecord.handoff_duration,
+              1500,
+            ),
+          ),
+          handoffTitle:
+            asString(
+              block.handoffTitle,
+              asString(
+                block.handoff_title,
+                asString(modalConfigRecord.handoffTitle),
+              ),
+            ) ||
+            asString(modalConfigRecord.handoff_title, "¡Registro exitoso!"),
+          handoffSubtitle:
+            asString(
+              block.handoffSubtitle,
+              asString(
+                block.handoff_subtitle,
+                asString(modalConfigRecord.handoffSubtitle),
+              ),
+            ) ||
+            asString(
+              modalConfigRecord.handoff_subtitle,
+              "Asignando tu asesor experto...",
+            ),
+          loaderType: (() => {
+            const rawLoaderType =
+              asString(
+                block.loaderType,
+                asString(
+                  block.loader_type,
+                  asString(modalConfigRecord.loaderType),
+                ),
+              ) || asString(modalConfigRecord.loader_type, "pulse");
+            return (rawLoaderType === "spinner" || rawLoaderType === "progress"
+              ? rawLoaderType
+              : "pulse") as "progress" | "spinner" | "pulse";
+          })(),
         }
       : null;
   const leadCaptureFormBlock =
@@ -144,6 +197,7 @@ export function PublicLeadCaptureConfigBridge({
       runtime={runtime}
       sourceChannel={normalizedLeadCaptureFormBlock?.settings.sourceChannel}
       tags={normalizedLeadCaptureFormBlock?.settings.tags}
+      blockOutcome={normalizedLeadCaptureFormBlock?.outcome ?? "submit_success"}
       renderTrigger={false}
     />
   );

@@ -21,7 +21,7 @@ import type {
 } from './ai-config.types';
 
 const APP_KEY = 'leadflow_api' as const;
-const PLATFORM_KEY = 'kurukin' as const;
+const PLATFORM_KEY = 'leadflow' as const;
 const PRODUCT_KEY = 'leadflow' as const;
 const RUNTIME_STATUS = 'active' as const;
 
@@ -36,9 +36,14 @@ export class AiConfigController {
     @Body()
     body?: {
       instance_name?: string | null;
+      instance_id?: string | null;
+      tenant_id?: string | null;
     },
   ): Promise<ResolveFullRuntimeResponse> {
-    const instanceName = sanitizeNullableText(body?.instance_name);
+    const instanceName =
+      sanitizeNullableText(body?.instance_name) ??
+      sanitizeNullableText(body?.instance_id);
+    const tenantId = sanitizeNullableText(body?.tenant_id);
 
     if (!instanceName) {
       throw new BadRequestException({
@@ -47,15 +52,19 @@ export class AiConfigController {
       });
     }
 
-    const runtimeContext =
-      await this.aiConfigService.resolveRuntimeContext(instanceName);
+    const runtimeContext = await this.aiConfigService.resolveRuntimeContext({
+      instanceName,
+      tenantId,
+    });
 
     return {
       tenant_id: runtimeContext.tenant.id,
       app_key: APP_KEY,
       platform_key: PLATFORM_KEY,
       product_key: PRODUCT_KEY,
-      vertical_key: runtimeContext.tenant.code,
+      vertical_key: runtimeContext.tenant.vertical_key,
+      brand_key: runtimeContext.tenant.brand_key,
+      business_model_type: runtimeContext.tenant.business_model_type,
       service_owner_key: runtimeContext.routing.service_owner_key,
       wallet_subject: {
         type: 'sponsor',
@@ -65,8 +74,10 @@ export class AiConfigController {
         status: runtimeContext.wallet.status,
         reason: runtimeContext.wallet.reason,
       },
+      basePrompt: runtimeContext.basePrompt,
+      base_prompt: runtimeContext.base_prompt,
       runtime_config: runtimeContext,
-      config_version: runtimeContext.version,
+      config_version: runtimeContext.config_version,
       status: RUNTIME_STATUS,
     };
   }

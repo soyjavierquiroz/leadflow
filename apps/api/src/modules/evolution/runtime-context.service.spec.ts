@@ -50,6 +50,8 @@ describe('RuntimeContextService', () => {
           status: 'active',
           source_system: 'leadflow',
           vertical_key: 'mlm',
+          brand_key: 'leadflow',
+          business_model_type: 'multinivel',
         }),
       },
     );
@@ -89,11 +91,11 @@ describe('RuntimeContextService', () => {
       .mockResolvedValue(buildResponse(204, null));
     const service = new RuntimeContextService();
 
-    await expect(
-      service.deleteBinding('lf-dxn-freddy'),
-    ).resolves.toStrictEqual({
-      success: true,
-    });
+    await expect(service.deleteBinding('lf-dxn-freddy')).resolves.toStrictEqual(
+      {
+        success: true,
+      },
+    );
 
     expect(fetchSpy).toHaveBeenCalledWith(
       'http://runtime-context.example/v1/admin/channel-bindings/lf-dxn-freddy',
@@ -178,9 +180,7 @@ describe('RuntimeContextService', () => {
     jest.spyOn(global, 'fetch').mockRejectedValue(new Error('socket hang up'));
     const service = new RuntimeContextService();
 
-    await expect(
-      service.deleteBinding('lf-dxn-freddy'),
-    ).rejects.toMatchObject({
+    await expect(service.deleteBinding('lf-dxn-freddy')).rejects.toMatchObject({
       response: expect.objectContaining({
         code: 'RUNTIME_CONTEXT_UNREACHABLE',
       }),

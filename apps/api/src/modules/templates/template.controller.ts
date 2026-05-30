@@ -38,6 +38,6 @@ export class TemplateController {
     @Param('templateId') templateId: string,
     @Body() dto: DeployTemplateDto,
   ) {
-    return this.templateService.deploy(templateId, dto);
+    return this.templateService.deployTemplate(templateId, dto);
   }
 }

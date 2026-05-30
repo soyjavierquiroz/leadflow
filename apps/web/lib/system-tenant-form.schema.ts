@@ -37,6 +37,7 @@ export const editSystemTenantSchema = z.object({
       "Usa 1 a 63 caracteres: letras, números o guiones, sin guion al inicio o final.",
     ),
   provisioningStatus: z.enum(tenantProvisioningStatuses),
+  emailNotificationsEnabled: z.boolean(),
 });
 
 export type CreateSystemTenantFormValues = z.infer<

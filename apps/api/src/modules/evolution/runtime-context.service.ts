@@ -5,15 +5,19 @@ import {
   InternalServerErrorException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { normalizeBaseUrl, sanitizeNullableText } from '../shared/url.utils';
 import {
-  normalizeBaseUrl,
-  sanitizeNullableText,
-} from '../shared/url.utils';
+  DEFAULT_AI_BUSINESS_MODEL_TYPE,
+  DEFAULT_AI_VERTICAL_KEY,
+  resolveAiRuntimeRoutingMetadata,
+} from '../ai-config/ai-config.defaults';
 
 type RegisterBindingInput = {
   instanceName: string;
   tenantId: string;
   verticalKey: string;
+  brandKey?: string | null;
+  businessModelType?: string | null;
 };
 
 type RuntimeContextUpsertPayload = {
@@ -25,6 +29,8 @@ type RuntimeContextUpsertPayload = {
   status: 'active';
   source_system: 'leadflow';
   vertical_key: string;
+  brand_key: string;
+  business_model_type: string;
 };
 
 type RuntimeContextResponse = {
@@ -83,7 +89,9 @@ export class RuntimeContextService {
     DEFAULT_TIMEOUT_MS,
   );
 
-  async registerBinding(input: RegisterBindingInput): Promise<{ success: true }> {
+  async registerBinding(
+    input: RegisterBindingInput,
+  ): Promise<{ success: true }> {
     const payload = this.buildPayload(input);
     await this.request({
       method: 'POST',
@@ -95,7 +103,10 @@ export class RuntimeContextService {
   }
 
   async deleteBinding(instanceName: string): Promise<{ success: true }> {
-    const normalizedInstanceName = this.requireText(instanceName, 'instanceName');
+    const normalizedInstanceName = this.requireText(
+      instanceName,
+      'instanceName',
+    );
     await this.request({
       method: 'DELETE',
       path: `${ADMIN_BINDINGS_PATH}/${encodeURIComponent(normalizedInstanceName)}`,
@@ -104,7 +115,18 @@ export class RuntimeContextService {
     return { success: true };
   }
 
-  private buildPayload(input: RegisterBindingInput): RuntimeContextUpsertPayload {
+  private buildPayload(
+    input: RegisterBindingInput,
+  ): RuntimeContextUpsertPayload {
+    const metadata = resolveAiRuntimeRoutingMetadata({
+      brandKey: input.brandKey,
+      aiPolicy: {
+        vertical_key: input.verticalKey,
+        brand_key: input.brandKey,
+        business_model_type: input.businessModelType,
+      },
+    });
+
     return {
       provider: 'evolution',
       channel: 'whatsapp',
@@ -113,11 +135,16 @@ export class RuntimeContextService {
       service_owner_key: 'lead-handler',
       status: 'active',
       source_system: 'leadflow',
-      vertical_key: this.requireText(input.verticalKey, 'verticalKey'),
+      vertical_key: metadata.vertical_key || DEFAULT_AI_VERTICAL_KEY,
+      brand_key: metadata.brand_key,
+      business_model_type:
+        metadata.business_model_type || DEFAULT_AI_BUSINESS_MODEL_TYPE,
     };
   }
 
-  private validateUpsertPayload(payload: RuntimeContextUpsertPayload | undefined) {
+  private validateUpsertPayload(
+    payload: RuntimeContextUpsertPayload | undefined,
+  ) {
     if (payload === undefined) {
       throw new InternalServerErrorException({
         code: 'RUNTIME_CONTEXT_UPSERT_PAYLOAD_REQUIRED',
@@ -130,6 +157,9 @@ export class RuntimeContextService {
     this.requireText(payload.instance_name, 'instance_name');
     this.requireText(payload.tenant_id, 'tenant_id');
     this.requireText(payload.service_owner_key, 'service_owner_key');
+    this.requireText(payload.vertical_key, 'vertical_key');
+    this.requireText(payload.brand_key, 'brand_key');
+    this.requireText(payload.business_model_type, 'business_model_type');
   }
 
   private async request(
@@ -207,7 +237,8 @@ export class RuntimeContextService {
       throw new BadGatewayException({
         code: 'RUNTIME_CONTEXT_UNREACHABLE',
         message: 'Runtime Context admin API request failed.',
-        details: error instanceof Error ? error.message : 'Unknown upstream error.',
+        details:
+          error instanceof Error ? error.message : 'Unknown upstream error.',
       });
     } finally {
       clearTimeout(timeoutId);
