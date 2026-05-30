@@ -382,6 +382,77 @@ export class PublicIdentityLinkService {
     };
   }
 
+  async revokeTrackedLinksForLead(leadId: string, reason?: string) {
+    const trackedLinks = await this.prisma.trackedLink.findMany({
+      where: {
+        leadId,
+        status: 'active',
+      },
+      select: {
+        id: true,
+        metadataJson: true,
+      },
+    });
+
+    if (trackedLinks.length === 0) {
+      return {
+        revoked: 0,
+      };
+    }
+
+    const revokedAt = new Date().toISOString();
+    const revokedReason = reason?.trim() || null;
+    const updates = trackedLinks.map((trackedLink) =>
+      this.prisma.trackedLink.update({
+        where: {
+          id: trackedLink.id,
+        },
+        data: {
+          status: 'revoked',
+          metadataJson: this.buildRevokedTrackedLinkMetadata(
+            trackedLink.metadataJson,
+            revokedAt,
+            revokedReason,
+          ),
+        },
+      }),
+    );
+
+    await this.prisma.$transaction(updates);
+
+    return {
+      revoked: trackedLinks.length,
+    };
+  }
+
+  private buildRevokedTrackedLinkMetadata(
+    metadataJson: JsonValue | null | undefined,
+    revokedAt: string,
+    revokedReason: string | null,
+  ): Prisma.InputJsonValue {
+    const metadata = asRecord(metadataJson);
+    if (metadata) {
+      return {
+        ...metadata,
+        revokedAt,
+        revokedReason,
+      };
+    }
+
+    if (metadataJson === null || metadataJson === undefined) {
+      return {
+        revokedAt,
+        revokedReason,
+      };
+    }
+
+    return {
+      previousMetadata: metadataJson,
+      revokedAt,
+      revokedReason,
+    };
+  }
+
   private async validateTrackedLinkForHydration(ctx: string) {
     const now = new Date();
     const ctxTokenHash = this.identityTokenService.hashToken(ctx);

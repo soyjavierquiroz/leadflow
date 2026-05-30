@@ -110,11 +110,25 @@ const buildHydrateTrackedLink = (
   ...overrides,
 });
 
+const buildRevocableTrackedLink = (
+  overrides?: Partial<{
+    id: string;
+    metadataJson: Record<string, unknown> | null;
+  }>,
+) => ({
+  id: 'tracked-link-1',
+  metadataJson: {
+    targetStepPath: '/presentacion',
+  },
+  ...overrides,
+});
+
 const buildService = (input?: {
   lead?: ReturnType<typeof buildLead>;
   existingTrackedLink?: ReturnType<typeof buildTrackedLinkRecord> | null;
   createdTrackedLink?: ReturnType<typeof buildTrackedLinkRecord>;
   hydrateTrackedLink?: ReturnType<typeof buildHydrateTrackedLink> | null;
+  revocableTrackedLinks?: ReturnType<typeof buildRevocableTrackedLink>[];
   shortenResult?: {
     shortUrl: string | null;
     resolvedUrl: string;
@@ -126,11 +140,17 @@ const buildService = (input?: {
   const createdTrackedLink =
     input?.createdTrackedLink ?? buildTrackedLinkRecord();
   const prisma = {
+    $transaction: jest.fn(async (operations: Array<Promise<unknown>>) =>
+      Promise.all(operations),
+    ),
     lead: {
       findUnique: jest.fn().mockResolvedValue(input?.lead ?? buildLead()),
     },
     trackedLink: {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(input?.revocableTrackedLinks ?? []),
       findUnique: jest
         .fn()
         .mockResolvedValue(input?.hydrateTrackedLink ?? null),
@@ -471,5 +491,108 @@ describe('PublicIdentityLinkService', () => {
     expect(result.targetStepPath).toBe('/presentacion');
     expect(result.submissionContext.assignment?.id).toBe('assignment-1');
     expect(prisma.trackedLink.update).not.toHaveBeenCalled();
+  });
+
+  it('revokeTrackedLinksForLead revokes active links and returns count', async () => {
+    const { service, prisma } = buildService({
+      revocableTrackedLinks: [
+        buildRevocableTrackedLink({
+          id: 'tracked-link-1',
+        }),
+        buildRevocableTrackedLink({
+          id: 'tracked-link-2',
+          metadataJson: null,
+        }),
+      ],
+    });
+
+    const result = await service.revokeTrackedLinksForLead(
+      'lead-1',
+      'spam lead',
+    );
+
+    expect(result).toEqual({
+      revoked: 2,
+    });
+    expect(prisma.trackedLink.findMany).toHaveBeenCalledWith({
+      where: {
+        leadId: 'lead-1',
+        status: 'active',
+      },
+      select: {
+        id: true,
+        metadataJson: true,
+      },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.trackedLink.update).toHaveBeenCalledTimes(2);
+    expect(prisma.trackedLink.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tracked-link-1',
+      },
+      data: expect.objectContaining({
+        status: 'revoked',
+        metadataJson: expect.objectContaining({
+          revokedAt: expect.any(String),
+          revokedReason: 'spam lead',
+        }),
+      }),
+    });
+    expect(prisma.trackedLink.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tracked-link-2',
+      },
+      data: expect.objectContaining({
+        status: 'revoked',
+        metadataJson: expect.objectContaining({
+          revokedAt: expect.any(String),
+          revokedReason: 'spam lead',
+        }),
+      }),
+    });
+  });
+
+  it('revokeTrackedLinksForLead preserves previous metadata', async () => {
+    const { service, prisma } = buildService({
+      revocableTrackedLinks: [
+        buildRevocableTrackedLink({
+          metadataJson: {
+            targetStepPath: '/presentacion',
+            generatedBy: 'generate-tracked-link',
+          },
+        }),
+      ],
+    });
+
+    await service.revokeTrackedLinksForLead('lead-1', 'deleted');
+
+    expect(prisma.trackedLink.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tracked-link-1',
+      },
+      data: {
+        status: 'revoked',
+        metadataJson: expect.objectContaining({
+          targetStepPath: '/presentacion',
+          generatedBy: 'generate-tracked-link',
+          revokedAt: expect.any(String),
+          revokedReason: 'deleted',
+        }),
+      },
+    });
+  });
+
+  it('revokeTrackedLinksForLead returns 0 when no active links exist', async () => {
+    const { service, prisma } = buildService({
+      revocableTrackedLinks: [],
+    });
+
+    const result = await service.revokeTrackedLinksForLead('lead-1');
+
+    expect(result).toEqual({
+      revoked: 0,
+    });
+    expect(prisma.trackedLink.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

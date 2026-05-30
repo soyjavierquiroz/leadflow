@@ -4,9 +4,9 @@ Fecha: 2026-05-30 (UTC)
 
 ## Objetivo
 
-Documentar el runtime actual de enlaces identificados antes de iniciar la fase TrackedLink / ActionLink.
+Documentar el runtime actual de enlaces identificados con persistencia `TrackedLink` como base para TrackedLink / ActionLink.
 
-Esta fase ya permite construir un enlace publico hacia un paso del funnel con contexto firmado (`ctx`) y rehidratar el lead asignado para que el CTA `assigned_whatsapp` abra WhatsApp con el asesor correcto.
+Esta fase permite construir un enlace publico hacia un paso del funnel con contexto firmado (`ctx`), persistir el link enviado a n8n, reutilizar short links, validar revocacion/expiracion en `hydrate` y rehidratar el lead asignado para que el CTA `assigned_whatsapp` abra WhatsApp con el asesor correcto.
 
 ## Flujo implementado
 
@@ -16,11 +16,59 @@ Esta fase ya permite construir un enlace publico hacia un paso del funnel con co
 4. El mensaje de WhatsApp agrega un Ref corto automatico derivado de `ownershipKey`.
 5. El contexto del assignment puede enviarse a n8n y a Runtime Context Ownership Upsert si el feature flag esta activo.
 6. n8n llama `POST /v1/automation/generate-tracked-link` con `leadId` y `stepKey`.
-7. La API firma un `ctx` con `IDENTITY_TOKEN_SECRET` y devuelve una URL como `/presentacion?ctx=...`.
-8. La web carga el paso publico y el cliente llama `POST /v1/public/funnel-runtime/hydrate`.
-9. `hydrate` valida el token, reconstruye `submissionContext` y lo guarda en la sesion publica.
-10. El bloque `hero_vsl_delayed_cta` con `behavior.cta_mode = assigned_whatsapp` usa el handoff hidratado.
-11. El CTA abre WhatsApp del asesor asignado. No abre modal de captura.
+7. La API busca un `TrackedLink` activo para el mismo lead, assignment, step y purpose.
+8. Si existe y no expiro, devuelve el link guardado con `cached: true`.
+9. Si no existe, firma un `ctx` con `IDENTITY_TOKEN_SECRET`, guarda `TrackedLink`, cachea `shortUrl` si YOURLS responde y devuelve una URL como `/presentacion?ctx=...` con `cached: false`.
+10. La web carga el paso publico y el cliente llama `POST /v1/public/funnel-runtime/hydrate`.
+11. `hydrate` valida el token, busca `TrackedLink` por `ctxTokenHash`, bloquea links revocados/expirados/deleted y registra llegada al runtime.
+12. `hydrate` reconstruye `submissionContext` y lo guarda en la sesion publica.
+13. El bloque `hero_vsl_delayed_cta` con `behavior.cta_mode = assigned_whatsapp` usa el handoff hidratado.
+14. El CTA abre WhatsApp del asesor asignado. No abre modal de captura.
+
+## TrackedLink persistence
+
+`TrackedLink` persiste cada link operativo entregado a n8n sin guardar el token plano. El campo `ctxTokenHash` guarda SHA-256 del token exacto y permite validar la llegada en `/hydrate`.
+
+Campos principales:
+
+- `workspaceId`
+- `leadId`
+- `assignmentId`
+- `ownershipKey`
+- `funnelPublicationId`
+- `funnelInstanceId`
+- `funnelStepId`
+- `stepKey`
+- `appKey`: default `leadflow`
+- `action`: default `open_vsl`
+- `purpose`: default `vsl_followup`
+- `longUrl`
+- `shortUrl`
+- `shortCode`
+- `shortLinkProvider`
+- `ctxTokenHash`
+- `status`: `active`, `revoked`, `expired`, `deleted`
+- `expiresAt`
+- `clickCount`
+- `lastClickedAt`
+- `createdBy`
+- `metadataJson`
+
+La idempotencia activa se define por:
+
+- `leadId`
+- `assignmentId`
+- `funnelStepId`
+- `purpose`
+- `status = active`
+
+Antes de crear un link nuevo, la API marca como `expired` los links activos vencidos para esa misma combinacion. Si encuentra un link activo vigente, lo reutiliza.
+
+### Respuesta cached
+
+Cuando `cached = false`, el link se acaba de crear y la respuesta incluye `token`.
+
+Cuando `cached = true`, la API devuelve `longUrl`, `shortUrl` y `url` guardados, y `token` viene como `null`. Esto evita persistir el token plano y mantiene estable el short link ya entregado.
 
 ## Endpoints
 
@@ -52,11 +100,15 @@ Respuesta relevante:
   "targetStep": {
     "path": "/presentacion"
   },
+  "token": "signed-token",
   "longUrl": "https://example.com/presentacion?ctx=...",
   "shortUrl": null,
   "url": "https://example.com/presentacion?ctx=...",
   "shortened": false,
   "shortLinkProvider": "fallback_long_url",
+  "cached": false,
+  "trackedLinkId": "tracked-link-id",
+  "shortCode": null,
   "whatsappUrl": "https://wa.me/..."
 }
 ```
@@ -90,6 +142,49 @@ Respuesta relevante:
   }
 }
 ```
+
+Si `ctxTokenHash` corresponde a un `TrackedLink` no disponible, `hydrate` responde `410`:
+
+```json
+{
+  "code": "TRACKED_LINK_UNAVAILABLE",
+  "message": "This tracked link is no longer available."
+}
+```
+
+Condiciones bloqueadas:
+
+- `status = revoked`
+- `status = expired`
+- `status = deleted`
+- `status = active` con `expiresAt` vencido
+
+Si el `ctx` es legacy y no existe `TrackedLink`, la compatibilidad temporal permite hidratar como antes. Ese link legacy no incrementa contador y no puede ser revocado via `TrackedLink`.
+
+## Revocacion y cleanup futuro
+
+La API expone internamente `revokeTrackedLinksForLead(leadId, reason)` para preparar limpieza futura de leads basura.
+
+Flujo previsto:
+
+1. Un lead se marca como spam, basura o deleted.
+2. El proceso interno llama `revokeTrackedLinksForLead(leadId, reason)`.
+3. Los `TrackedLink` activos del lead pasan a `revoked`.
+4. `metadataJson` conserva metadata previa y agrega `revokedAt` y `revokedReason`.
+5. Cualquier `hydrate` posterior con esos links responde `410 TRACKED_LINK_UNAVAILABLE`.
+6. No se borra el link ni se toca todavia `Lead`, `Assignment`, Kloser, n8n ni Runtime Context externo.
+
+## Eventos futuros pendientes
+
+Eventos propuestos para una fase posterior:
+
+- `tracked_link_created`
+- `tracked_link_reused`
+- `tracked_link_hydrated`
+- `tracked_link_revoked`
+- `tracked_link_unavailable`
+
+Por ahora la trazabilidad persistente queda en `TrackedLink` (`clickCount`, `lastClickedAt`, `status`, `metadataJson`) y no se emiten `DomainEvent` nuevos.
 
 ## Variables de entorno
 
