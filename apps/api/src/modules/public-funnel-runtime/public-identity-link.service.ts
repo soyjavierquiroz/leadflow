@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildPublicationStepPath, normalizePath } from './public-funnel-runtime.utils';
 import {
@@ -14,7 +15,12 @@ import {
 import { IdentityTokenService } from './identity-token.service';
 import { ShortLinkProvider } from './short-link.provider';
 
-type JsonValue = import('@prisma/client').Prisma.JsonValue;
+type JsonValue = Prisma.JsonValue;
+
+const TRACKED_LINK_APP_KEY = 'leadflow';
+const TRACKED_LINK_ACTION = 'open_vsl';
+const TRACKED_LINK_PURPOSE = 'vsl_followup';
+const TRACKED_LINK_CREATED_BY = 'n8n';
 
 const asRecord = (value: JsonValue | null | undefined) =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -88,18 +94,22 @@ export class PublicIdentityLinkService {
       targetStep.slug,
       targetStep.isEntryStep,
     );
-    const token = this.identityTokenService.issueToken({
+    const now = new Date();
+    const assignmentId = lead.currentAssignment?.id ?? null;
+    await this.expireActiveTrackedLinks({
+      now,
       leadId: lead.id,
-      publicationId: publication.id,
-      targetStepPath,
+      assignmentId,
+      funnelStepId: targetStep.id,
+      purpose: TRACKED_LINK_PURPOSE,
     });
-    const publicBaseUrl = this.buildPublicBaseUrl(
-      publication.domain.canonicalHost ?? publication.domain.host,
-    );
-    const longUrl = new URL(targetStepPath, publicBaseUrl);
-    longUrl.searchParams.set('ctx', token);
-
-    const shortened = await this.shortLinkProvider.shortenUrl(longUrl.toString());
+    const existingTrackedLink = await this.findActiveTrackedLink({
+      now,
+      leadId: lead.id,
+      assignmentId,
+      funnelStepId: targetStep.id,
+      purpose: TRACKED_LINK_PURPOSE,
+    });
     const handoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
     const handoffConfig = resolvePublicHandoffConfig(handoffStrategy);
@@ -119,17 +129,87 @@ export class PublicIdentityLinkService {
       publicationPath: targetStepPath,
       ownershipKey: lead.currentAssignment?.ownershipKey,
     });
+    const targetStepResponse = {
+      id: targetStep.id,
+      slug: targetStep.slug,
+      path: targetStepPath,
+      stepType: targetStep.stepType,
+    };
+
+    if (existingTrackedLink) {
+      return {
+        leadId: lead.id,
+        publicationId: publication.id,
+        stepKey: input.stepKey,
+        targetStep: targetStepResponse,
+        token: null,
+        longUrl: existingTrackedLink.longUrl,
+        shortUrl: existingTrackedLink.shortUrl,
+        url: existingTrackedLink.shortUrl ?? existingTrackedLink.longUrl,
+        shortened: Boolean(existingTrackedLink.shortUrl),
+        shortLinkProvider: existingTrackedLink.shortLinkProvider,
+        whatsappUrl: whatsappHandoff.whatsappUrl,
+        cached: true,
+        trackedLinkId: existingTrackedLink.id,
+        shortCode: existingTrackedLink.shortCode,
+      };
+    }
+
+    const token = this.identityTokenService.issueToken({
+      leadId: lead.id,
+      publicationId: publication.id,
+      targetStepPath,
+    });
+    const ctxTokenHash = this.identityTokenService.hashToken(token);
+    const expiresAt = this.identityTokenService.getDefaultExpiresAt();
+    const publicBaseUrl = this.buildPublicBaseUrl(
+      publication.domain.canonicalHost ?? publication.domain.host,
+    );
+    const longUrl = new URL(targetStepPath, publicBaseUrl);
+    longUrl.searchParams.set('ctx', token);
+
+    const shortened = await this.shortLinkProvider.shortenUrl(longUrl.toString());
+    const shortCode = this.shortLinkProvider.extractShortCode(
+      shortened.shortUrl,
+    );
+    const trackedLink = await this.createTrackedLinkOrReuseExisting({
+      now,
+      lead,
+      publication,
+      targetStep,
+      assignmentId,
+      targetStepPath,
+      ctxTokenHash,
+      expiresAt,
+      longUrl: longUrl.toString(),
+      shortened,
+      shortCode,
+    });
+
+    if (trackedLink.cached) {
+      return {
+        leadId: lead.id,
+        publicationId: publication.id,
+        stepKey: input.stepKey,
+        targetStep: targetStepResponse,
+        token: null,
+        longUrl: trackedLink.record.longUrl,
+        shortUrl: trackedLink.record.shortUrl,
+        url: trackedLink.record.shortUrl ?? trackedLink.record.longUrl,
+        shortened: Boolean(trackedLink.record.shortUrl),
+        shortLinkProvider: trackedLink.record.shortLinkProvider,
+        whatsappUrl: whatsappHandoff.whatsappUrl,
+        cached: true,
+        trackedLinkId: trackedLink.record.id,
+        shortCode: trackedLink.record.shortCode,
+      };
+    }
 
     return {
       leadId: lead.id,
       publicationId: publication.id,
       stepKey: input.stepKey,
-      targetStep: {
-        id: targetStep.id,
-        slug: targetStep.slug,
-        path: targetStepPath,
-        stepType: targetStep.stepType,
-      },
+      targetStep: targetStepResponse,
       token,
       longUrl: longUrl.toString(),
       shortUrl: shortened.shortUrl,
@@ -137,6 +217,9 @@ export class PublicIdentityLinkService {
       shortened: shortened.shortened,
       shortLinkProvider: shortened.provider,
       whatsappUrl: whatsappHandoff.whatsappUrl,
+      cached: false,
+      trackedLinkId: trackedLink.record.id,
+      shortCode,
     };
   }
 
@@ -289,6 +372,169 @@ export class PublicIdentityLinkService {
         capturedAt: lead.updatedAt.toISOString(),
       },
     };
+  }
+
+  private async expireActiveTrackedLinks(input: {
+    now: Date;
+    leadId: string;
+    assignmentId: string | null;
+    funnelStepId: string;
+    purpose: string;
+  }) {
+    await this.prisma.trackedLink.updateMany({
+      where: {
+        leadId: input.leadId,
+        assignmentId: input.assignmentId,
+        funnelStepId: input.funnelStepId,
+        purpose: input.purpose,
+        status: 'active',
+        expiresAt: {
+          lt: input.now,
+        },
+      },
+      data: {
+        status: 'expired',
+      },
+    });
+  }
+
+  private findActiveTrackedLink(input: {
+    now: Date;
+    leadId: string;
+    assignmentId: string | null;
+    funnelStepId: string;
+    purpose: string;
+  }) {
+    return this.prisma.trackedLink.findFirst({
+      where: {
+        leadId: input.leadId,
+        assignmentId: input.assignmentId,
+        funnelStepId: input.funnelStepId,
+        purpose: input.purpose,
+        status: 'active',
+        OR: [
+          {
+            expiresAt: null,
+          },
+          {
+            expiresAt: {
+              gt: input.now,
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        longUrl: true,
+        shortUrl: true,
+        shortCode: true,
+        shortLinkProvider: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  private async createTrackedLinkOrReuseExisting(input: {
+    now: Date;
+    lead: {
+      id: string;
+      workspaceId: string;
+      currentAssignment?: {
+        ownershipKey?: string | null;
+      } | null;
+    };
+    publication: {
+      id: string;
+      funnelInstanceId: string;
+      domain: {
+        host: string;
+        canonicalHost?: string | null;
+      };
+    };
+    targetStep: {
+      id: string;
+      slug: string;
+    };
+    assignmentId: string | null;
+    targetStepPath: string;
+    ctxTokenHash: string;
+    expiresAt: Date | null;
+    longUrl: string;
+    shortened: {
+      shortUrl: string | null;
+      provider: string;
+    };
+    shortCode: string | null;
+  }) {
+    try {
+      const record = await this.prisma.trackedLink.create({
+        data: {
+          workspaceId: input.lead.workspaceId,
+          leadId: input.lead.id,
+          assignmentId: input.assignmentId,
+          ownershipKey: input.lead.currentAssignment?.ownershipKey ?? null,
+          funnelPublicationId: input.publication.id,
+          funnelInstanceId: input.publication.funnelInstanceId,
+          funnelStepId: input.targetStep.id,
+          stepKey: input.targetStep.slug,
+          appKey: TRACKED_LINK_APP_KEY,
+          action: TRACKED_LINK_ACTION,
+          purpose: TRACKED_LINK_PURPOSE,
+          longUrl: input.longUrl,
+          shortUrl: input.shortened.shortUrl,
+          shortCode: input.shortCode,
+          shortLinkProvider: input.shortened.provider,
+          ctxTokenHash: input.ctxTokenHash,
+          status: 'active',
+          expiresAt: input.expiresAt,
+          createdBy: TRACKED_LINK_CREATED_BY,
+          metadataJson: {
+            targetStepPath: input.targetStepPath,
+            targetStepSlug: input.targetStep.slug,
+            host:
+              input.publication.domain.canonicalHost ??
+              input.publication.domain.host,
+            generatedBy: 'generate-tracked-link',
+          },
+        },
+        select: {
+          id: true,
+          longUrl: true,
+          shortUrl: true,
+          shortCode: true,
+          shortLinkProvider: true,
+        },
+      });
+
+      return {
+        cached: false,
+        record,
+      };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const record = await this.findActiveTrackedLink({
+          now: input.now,
+          leadId: input.lead.id,
+          assignmentId: input.assignmentId,
+          funnelStepId: input.targetStep.id,
+          purpose: TRACKED_LINK_PURPOSE,
+        });
+
+        if (record) {
+          return {
+            cached: true,
+            record,
+          };
+        }
+      }
+
+      throw error;
+    }
   }
 
   private resolveTargetStep(
