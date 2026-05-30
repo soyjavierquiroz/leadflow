@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { shouldAllowBrowserPixelPolicy } from "@/lib/browser-pixel-policy";
 import { webPublicConfig } from "@/lib/public-env";
 import type { PublicRuntimeEntryContext } from "@/lib/public-funnel-runtime.types";
 
@@ -612,7 +613,10 @@ const toPublicEntryContext = (
     trafficLayer: entryContext.trafficLayer,
     forcedSponsorId: entryContext.forcedSponsorId,
     adWheelId: entryContext.adWheelId,
-    browserPixelsEnabled: entryContext.browserPixelsEnabled,
+    browserPixelsEnabled: shouldAllowBrowserPixelPolicy(
+      entryContext.trafficLayer,
+      entryContext.browserPixelsEnabled,
+    ),
     attributionType: entryContext.attributionType ?? "organic",
     attributionSlug: entryContext.attributionSlug ?? null,
     runtimePathPrefix: entryContext.runtimePathPrefix ?? null,

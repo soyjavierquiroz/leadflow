@@ -1,4 +1,5 @@
 import { resolveFunnelThemeId } from '@/lib/funnel-theme-registry';
+import { shouldAllowBrowserPixelPolicy } from '@/lib/browser-pixel-policy';
 import type {
   JsonValue,
   PublicFunnelRuntimePayload,
@@ -203,6 +204,13 @@ export function normalizePublicFunnelRuntimePayload(
     ? currentStep
     : normalizedSteps[0] ?? currentStep;
   const theme = resolveFunnelThemeId(record.theme);
+  const trafficLayer =
+    entryContextRecord.trafficLayer === 'DIRECT' ||
+    entryContextRecord.trafficLayer === 'PAID_WHEEL' ||
+    entryContextRecord.trafficLayer === 'PAID_ADS' ||
+    entryContextRecord.trafficLayer === 'ORGANIC'
+      ? entryContextRecord.trafficLayer
+      : 'ORGANIC';
 
   return {
     request: {
@@ -237,13 +245,7 @@ export function normalizePublicFunnelRuntimePayload(
         entryContextRecord.entryMode === 'organic_asesor'
           ? 'organic_asesor'
           : 'paid_ads',
-      trafficLayer:
-        entryContextRecord.trafficLayer === 'DIRECT' ||
-        entryContextRecord.trafficLayer === 'PAID_WHEEL' ||
-        entryContextRecord.trafficLayer === 'PAID_ADS' ||
-        entryContextRecord.trafficLayer === 'ORGANIC'
-          ? entryContextRecord.trafficLayer
-          : 'ORGANIC',
+      trafficLayer,
       forcedSponsorId:
         typeof entryContextRecord.forcedSponsorId === 'string'
           ? entryContextRecord.forcedSponsorId
@@ -252,9 +254,9 @@ export function normalizePublicFunnelRuntimePayload(
         typeof entryContextRecord.adWheelId === 'string'
           ? entryContextRecord.adWheelId
           : null,
-      browserPixelsEnabled: asBoolean(
-        entryContextRecord.browserPixelsEnabled,
-        true,
+      browserPixelsEnabled: shouldAllowBrowserPixelPolicy(
+        trafficLayer,
+        asBoolean(entryContextRecord.browserPixelsEnabled, true),
       ),
       attributionType:
         entryContextRecord.attributionType === 'promo' ||

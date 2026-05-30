@@ -4,6 +4,7 @@ import type {
   LeadCaptureSubmissionPayload,
   LeadCaptureSubmissionResponse,
 } from "@/lib/public-funnel-session";
+import { shouldEnableBrowserPixels } from "@/lib/browser-pixel-policy";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 
 type RuntimeLeadConversionContext = {
@@ -44,7 +45,14 @@ export const emitLeadCaptureConversionEvent = ({
 }: EmitLeadCaptureConversionOptions) => {
   if (
     typeof window === "undefined" ||
-    !runtime.entryContext.browserPixelsEnabled ||
+    !shouldEnableBrowserPixels(
+      runtime.entryContext.trafficLayer,
+      {
+        metaPixelId: runtime.publication.metaPixelId,
+        tiktokPixelId: runtime.publication.tiktokPixelId,
+      },
+      runtime.entryContext.browserPixelsEnabled,
+    ) ||
     !runtime.publication.metaPixelId ||
     !isLeadCaptureConversionBlock(block.type)
   ) {
