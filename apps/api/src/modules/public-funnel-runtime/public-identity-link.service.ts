@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -21,6 +23,10 @@ const TRACKED_LINK_APP_KEY = 'leadflow';
 const TRACKED_LINK_ACTION = 'open_vsl';
 const TRACKED_LINK_PURPOSE = 'vsl_followup';
 const TRACKED_LINK_CREATED_BY = 'n8n';
+const TRACKED_LINK_UNAVAILABLE_RESPONSE = {
+  code: 'TRACKED_LINK_UNAVAILABLE',
+  message: 'This tracked link is no longer available.',
+};
 
 const asRecord = (value: JsonValue | null | undefined) =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -231,7 +237,9 @@ export class PublicIdentityLinkService {
       });
     }
 
-    const payload = this.identityTokenService.verifyToken(ctx.trim());
+    const normalizedCtx = ctx.trim();
+    const payload = this.identityTokenService.verifyToken(normalizedCtx);
+    await this.validateTrackedLinkForHydration(normalizedCtx);
     const lead = await this.prisma.lead.findUnique({
       where: {
         id: payload.leadId,
@@ -372,6 +380,60 @@ export class PublicIdentityLinkService {
         capturedAt: lead.updatedAt.toISOString(),
       },
     };
+  }
+
+  private async validateTrackedLinkForHydration(ctx: string) {
+    const now = new Date();
+    const ctxTokenHash = this.identityTokenService.hashToken(ctx);
+    const trackedLink = await this.prisma.trackedLink.findUnique({
+      where: {
+        ctxTokenHash,
+      },
+      select: {
+        id: true,
+        status: true,
+        expiresAt: true,
+      },
+    });
+
+    if (!trackedLink) {
+      return;
+    }
+
+    if (trackedLink.status !== 'active') {
+      this.throwTrackedLinkUnavailable();
+    }
+
+    if (trackedLink.expiresAt && trackedLink.expiresAt < now) {
+      await this.prisma.trackedLink.update({
+        where: {
+          id: trackedLink.id,
+        },
+        data: {
+          status: 'expired',
+        },
+      });
+      this.throwTrackedLinkUnavailable();
+    }
+
+    await this.prisma.trackedLink.update({
+      where: {
+        id: trackedLink.id,
+      },
+      data: {
+        clickCount: {
+          increment: 1,
+        },
+        lastClickedAt: now,
+      },
+    });
+  }
+
+  private throwTrackedLinkUnavailable(): never {
+    throw new HttpException(
+      TRACKED_LINK_UNAVAILABLE_RESPONSE,
+      HttpStatus.GONE,
+    );
   }
 
   private async expireActiveTrackedLinks(input: {

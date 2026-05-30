@@ -9,9 +9,19 @@ const buildLead = (overrides?: Record<string, unknown>) => ({
   fullName: 'Veronica Perez',
   email: 'veronica@example.com',
   phone: null,
+  companyName: null,
+  status: 'assigned',
+  updatedAt: new Date('2026-05-30T12:00:00.000Z'),
+  visitor: {
+    id: 'visitor-1',
+    anonymousId: 'anonymous-1',
+  },
   currentAssignment: {
     id: 'assignment-1',
     ownershipKey: 'lf_own_3af5cca1a045f54d1834defd',
+    status: 'assigned',
+    reason: 'rotation',
+    assignedAt: new Date('2026-05-30T11:00:00.000Z'),
     sponsor: {
       id: 'sponsor-1',
       displayName: 'Freddy Catunta',
@@ -34,6 +44,7 @@ const buildLead = (overrides?: Record<string, unknown>) => ({
     handoffStrategy: null,
     funnelInstance: {
       name: 'DXN',
+      structuralType: 'two_step_conversion',
       handoffStrategy: null,
       steps: [
         {
@@ -86,10 +97,24 @@ const buildTrackedLinkRecord = (
   ...overrides,
 });
 
+const buildHydrateTrackedLink = (
+  overrides?: Partial<{
+    id: string;
+    status: 'active' | 'revoked' | 'expired' | 'deleted';
+    expiresAt: Date | null;
+  }>,
+) => ({
+  id: 'tracked-link-1',
+  status: 'active' as const,
+  expiresAt,
+  ...overrides,
+});
+
 const buildService = (input?: {
   lead?: ReturnType<typeof buildLead>;
   existingTrackedLink?: ReturnType<typeof buildTrackedLinkRecord> | null;
   createdTrackedLink?: ReturnType<typeof buildTrackedLinkRecord>;
+  hydrateTrackedLink?: ReturnType<typeof buildHydrateTrackedLink> | null;
   shortenResult?: {
     shortUrl: string | null;
     resolvedUrl: string;
@@ -106,16 +131,25 @@ const buildService = (input?: {
     },
     trackedLink: {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(input?.hydrateTrackedLink ?? null),
       findFirst: jest
         .fn()
         .mockResolvedValue(input?.existingTrackedLink ?? null),
       create: jest.fn().mockResolvedValue(createdTrackedLink),
+      update: jest.fn().mockResolvedValue({}),
     },
   };
   const identityTokenService = {
     issueToken: jest.fn().mockReturnValue('ctx-token'),
     hashToken: jest.fn().mockReturnValue('ctx-token-hash'),
     getDefaultExpiresAt: jest.fn().mockReturnValue(expiresAt),
+    verifyToken: jest.fn().mockReturnValue({
+      leadId: 'lead-1',
+      publicationId: 'publication-1',
+      targetStepPath: '/presentacion',
+    }),
   };
   const shortenResult =
     input?.shortenResult ??
@@ -331,5 +365,111 @@ describe('PublicIdentityLinkService', () => {
     expect(result.trackedLinkId).toBe('tracked-link-race');
     expect(result.token).toBeNull();
     expect(result.longUrl).toBe('https://example.com/presentacion?ctx=race-token');
+  });
+
+  it('hydrate with active TrackedLink increments clickCount and lastClickedAt', async () => {
+    const { service, prisma, identityTokenService } = buildService({
+      hydrateTrackedLink: buildHydrateTrackedLink(),
+    });
+
+    const result = await service.hydrateIdentityContext('ctx-token');
+
+    expect(identityTokenService.hashToken).toHaveBeenCalledWith('ctx-token');
+    expect(prisma.trackedLink.findUnique).toHaveBeenCalledWith({
+      where: {
+        ctxTokenHash: 'ctx-token-hash',
+      },
+      select: {
+        id: true,
+        status: true,
+        expiresAt: true,
+      },
+    });
+    expect(prisma.trackedLink.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tracked-link-1',
+      },
+      data: {
+        clickCount: {
+          increment: 1,
+        },
+        lastClickedAt: expect.any(Date),
+      },
+    });
+    expect(result.submissionContext.leadId).toBe('lead-1');
+    expect(result.submissionContext.handoff.whatsappUrl).toContain(
+      'https://wa.me/',
+    );
+  });
+
+  it('hydrate with revoked TrackedLink returns unavailable 410', async () => {
+    const { service, prisma } = buildService({
+      hydrateTrackedLink: buildHydrateTrackedLink({
+        status: 'revoked',
+      }),
+    });
+
+    await expect(service.hydrateIdentityContext('ctx-token')).rejects.toMatchObject({
+      response: {
+        code: 'TRACKED_LINK_UNAVAILABLE',
+        message: 'This tracked link is no longer available.',
+      },
+      status: 410,
+    });
+    expect(prisma.trackedLink.update).not.toHaveBeenCalled();
+  });
+
+  it('hydrate with expired status TrackedLink returns unavailable 410', async () => {
+    const { service, prisma } = buildService({
+      hydrateTrackedLink: buildHydrateTrackedLink({
+        status: 'expired',
+      }),
+    });
+
+    await expect(service.hydrateIdentityContext('ctx-token')).rejects.toMatchObject({
+      response: {
+        code: 'TRACKED_LINK_UNAVAILABLE',
+        message: 'This tracked link is no longer available.',
+      },
+      status: 410,
+    });
+    expect(prisma.trackedLink.update).not.toHaveBeenCalled();
+  });
+
+  it('hydrate with active expired TrackedLink marks expired and returns unavailable 410', async () => {
+    const { service, prisma } = buildService({
+      hydrateTrackedLink: buildHydrateTrackedLink({
+        expiresAt: new Date('2020-01-01T00:00:00.000Z'),
+      }),
+    });
+
+    await expect(service.hydrateIdentityContext('ctx-token')).rejects.toMatchObject({
+      response: {
+        code: 'TRACKED_LINK_UNAVAILABLE',
+        message: 'This tracked link is no longer available.',
+      },
+      status: 410,
+    });
+    expect(prisma.trackedLink.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tracked-link-1',
+      },
+      data: {
+        status: 'expired',
+      },
+    });
+  });
+
+  it('hydrate with legacy ctx without TrackedLink still works', async () => {
+    const { service, prisma } = buildService({
+      hydrateTrackedLink: null,
+    });
+
+    const result = await service.hydrateIdentityContext('ctx-token');
+
+    expect(result.publicationId).toBe('publication-1');
+    expect(result.targetStepPath).toBe('/presentacion');
+    expect(result.submissionContext.assignment?.id).toBe('assignment-1');
+    expect(prisma.trackedLink.update).not.toHaveBeenCalled();
   });
 });
