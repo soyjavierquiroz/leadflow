@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { KurukinPlayer } from "kurukin-video-player-pkg";
 import "kurukin-video-player-pkg/style.css";
 
@@ -24,6 +24,10 @@ import {
   useSubmissionContext,
   type StoredSubmissionContext,
 } from "@/lib/public-funnel-session";
+import {
+  emitPublicVslEvent,
+  getOrCreateRuntimeSessionId,
+} from "@/lib/public-runtime-tracking";
 import { resolvePublicFunnelHandoffState } from "@/lib/public-funnel-assigned-sponsor";
 import type {
   JsonValue,
@@ -40,15 +44,23 @@ type HeroVslDelayedCtaBlockProps = {
 
 const MEDIA_REFERENCE_PREFIX = "media:";
 const REVEAL_TIMEOUT_BUFFER_MS = 1250;
+const VSL_PROGRESS_MILESTONES = [25, 50, 75] as const;
 
 const resolveVideoProvider = (value: string, videoUrl: string) => {
   const normalized = value.trim().toLowerCase();
-  if (normalized === "youtube" || normalized === "html5" || normalized === "bunnynet") {
+  if (
+    normalized === "youtube" ||
+    normalized === "html5" ||
+    normalized === "bunnynet"
+  ) {
     return normalized;
   }
 
   const normalizedUrl = videoUrl.toLowerCase();
-  if (normalizedUrl.includes("youtube.com") || normalizedUrl.includes("youtu.be")) {
+  if (
+    normalizedUrl.includes("youtube.com") ||
+    normalizedUrl.includes("youtu.be")
+  ) {
     return "youtube";
   }
 
@@ -123,6 +135,29 @@ const isRealAssignmentId = (value: string | null | undefined) => {
   return Boolean(normalized) && !normalized?.startsWith("runtime-");
 };
 
+const asPositiveNumber = (...values: Array<JsonValue | undefined>) => {
+  for (const value of values) {
+    const parsedValue =
+      typeof value === "number"
+        ? value
+        : typeof value === "string"
+          ? Number(value.trim())
+          : Number.NaN;
+
+    if (Number.isFinite(parsedValue) && parsedValue > 0) {
+      return parsedValue;
+    }
+  }
+
+  return null;
+};
+
+const resolveMediaId = (value: string) => {
+  return value.startsWith(MEDIA_REFERENCE_PREFIX)
+    ? value.slice(MEDIA_REFERENCE_PREFIX.length).trim() || null
+    : null;
+};
+
 const mergeRuntimeWithSubmissionContext = (
   runtime: PublicFunnelRuntimePayload,
   submissionContext: StoredSubmissionContext | null,
@@ -167,7 +202,10 @@ export function HeroVslDelayedCtaBlock({
 }: HeroVslDelayedCtaBlockProps) {
   const content = asRecord(block.content) ?? {};
   const behavior = asRecord(block.behavior) ?? {};
-  const submissionContext = useSubmissionContext(runtime.publication.id, runtime);
+  const submissionContext = useSubmissionContext(
+    runtime.publication.id,
+    runtime,
+  );
   const variableRuntime = useMemo(
     () => mergeRuntimeWithSubmissionContext(runtime, submissionContext),
     [runtime, submissionContext],
@@ -188,7 +226,10 @@ export function HeroVslDelayedCtaBlock({
     asString(content.headline, asString(block.headline)),
     variableRuntime,
   );
-  const highlight = resolveRuntimeVariables(asString(content.highlight), variableRuntime);
+  const highlight = resolveRuntimeVariables(
+    asString(content.highlight),
+    variableRuntime,
+  );
   const subheadline = resolveRuntimeVariables(
     asString(content.subheadline, asString(block.subheadline)),
     variableRuntime,
@@ -210,7 +251,10 @@ export function HeroVslDelayedCtaBlock({
     variableRuntime,
   );
   const posterDescription = resolveRuntimeVariables(
-    asString(content.poster_description, subheadline || "Haz clic para ver el video."),
+    asString(
+      content.poster_description,
+      subheadline || "Haz clic para ver el video.",
+    ),
     variableRuntime,
   );
   const posterButtonText = resolveRuntimeVariables(
@@ -219,7 +263,10 @@ export function HeroVslDelayedCtaBlock({
   );
   const revealAfterSeconds = Math.max(
     0,
-    asNumber(behavior.reveal_after_seconds, asNumber(block.reveal_after_seconds, 10)),
+    asNumber(
+      behavior.reveal_after_seconds,
+      asNumber(block.reveal_after_seconds, 10),
+    ),
   );
   const showStickyCta = asBoolean(
     behavior.show_sticky_cta ?? block.show_sticky_cta,
@@ -242,12 +289,26 @@ export function HeroVslDelayedCtaBlock({
   );
   const progressBarColor = asString(
     behavior.vsl_progress_bar_color,
-    asString(block.vsl_progress_bar_color, "var(--theme-section-video-progress-bar, var(--theme-button-primary-rest-bg))"),
+    asString(
+      block.vsl_progress_bar_color,
+      "var(--theme-section-video-progress-bar, var(--theme-button-primary-rest-bg))",
+    ),
+  );
+  const rawVideoReference = asString(content.video_url ?? block.video_url);
+  const configuredDurationSeconds = asPositiveNumber(
+    content.duration_seconds,
+    content.durationSeconds,
+    content.video_duration_seconds,
+    content.videoDurationSeconds,
+    block.duration_seconds,
+    block.durationSeconds,
+    block.video_duration_seconds,
+    block.videoDurationSeconds,
   );
   const videoUrl = resolveMediaReference({
     runtime,
     block,
-    value: content.video_url ?? block.video_url,
+    value: rawVideoReference,
     fallbackAlt: posterTitle,
   });
   const posterImageUrl = resolveMediaReference({
@@ -269,27 +330,160 @@ export function HeroVslDelayedCtaBlock({
       (candidate) =>
         normalizeRuntimeBlockType(candidate.type) === "lead_capture_config",
     ) ?? null;
-  const hasModalConfig = Boolean(resolveLeadCaptureModalConfig(leadCaptureConfigBlock));
+  const hasModalConfig = Boolean(
+    resolveLeadCaptureModalConfig(leadCaptureConfigBlock),
+  );
   const ctaAction = isAssignedWhatsappMode
     ? "assigned_whatsapp"
     : ctaMode === "modal" || ctaMode === "drawer"
       ? "open_lead_capture_modal"
       : null;
   const ctaHref = isAssignedWhatsappMode
-    ? handoffState.whatsappUrl ?? "#"
+    ? (handoffState.whatsappUrl ?? "#")
     : ctaAction === "open_lead_capture_modal" && hasModalConfig
       ? "#lead-capture-modal"
       : asString(block.href, "#public-capture-form");
   const [hasRevealed, setHasRevealed] = useState(false);
   const hasCtaRevealed = revealAfterSeconds <= 0 || hasRevealed;
+  const trackedStartedRef = useRef(false);
+  const trackedMilestonesRef = useRef<Set<number>>(new Set());
+  const trackedCompletedRef = useRef(false);
+  const trackedCtaRevealedRef = useRef(false);
+  const revealSourceRef = useRef<"time_update" | "fallback_timeout" | null>(
+    revealAfterSeconds <= 0 ? "time_update" : null,
+  );
+
+  useEffect(() => {
+    trackedStartedRef.current = false;
+    trackedMilestonesRef.current = new Set();
+    trackedCompletedRef.current = false;
+    trackedCtaRevealedRef.current = false;
+    revealSourceRef.current = revealAfterSeconds <= 0 ? "time_update" : null;
+  }, [
+    block.key,
+    rawVideoReference,
+    revealAfterSeconds,
+    runtime.currentStep.id,
+  ]);
+
+  const emitVslEvent = useCallback(
+    (
+      eventName: Parameters<typeof emitPublicVslEvent>[0]["eventName"],
+      details?: {
+        progressPercent?: number | null;
+        currentTimeSeconds?: number | null;
+        revealSource?: "time_update" | "fallback_timeout" | null;
+        ctaLabel?: string | null;
+        ctaHref?: string | null;
+        ctaAction?: string | null;
+      },
+    ) => {
+      const assignmentId =
+        submissionContext?.assignment?.id ??
+        submissionContext?.lastAssignment?.id ??
+        runtime.assignment?.id ??
+        null;
+
+      void emitPublicVslEvent({
+        eventName,
+        publicationId: runtime.publication.id,
+        stepId: runtime.currentStep.id,
+        visitorId: submissionContext?.visitorId ?? null,
+        leadId: submissionContext?.leadId ?? runtime.leadId ?? null,
+        assignmentId,
+        anonymousId: submissionContext?.anonymousId ?? null,
+        sessionId: getOrCreateRuntimeSessionId(),
+        trafficLayer: runtime.entryContext.trafficLayer,
+        currentPath: runtime.request.path,
+        blockId: asString(block.key) || null,
+        blockType: "hero_vsl_delayed_cta",
+        stepKey: runtime.currentStep.slug,
+        stepSlug: runtime.currentStep.slug,
+        videoId: rawVideoReference || videoUrl || null,
+        mediaId: resolveMediaId(rawVideoReference),
+        progressPercent: details?.progressPercent ?? null,
+        currentTimeSeconds: details?.currentTimeSeconds ?? null,
+        durationSeconds: configuredDurationSeconds,
+        ctaMode,
+        revealAfterSeconds,
+        revealSource: details?.revealSource ?? null,
+        ctaLabel: details?.ctaLabel ?? null,
+        ctaHref: details?.ctaHref ?? null,
+        ctaAction: details?.ctaAction ?? null,
+        metadata: {
+          provider,
+        },
+      });
+    },
+    [
+      block.key,
+      configuredDurationSeconds,
+      ctaMode,
+      provider,
+      rawVideoReference,
+      revealAfterSeconds,
+      runtime.assignment?.id,
+      runtime.currentStep.id,
+      runtime.currentStep.slug,
+      runtime.entryContext.trafficLayer,
+      runtime.leadId,
+      runtime.publication.id,
+      runtime.request.path,
+      submissionContext?.anonymousId,
+      submissionContext?.assignment?.id,
+      submissionContext?.lastAssignment?.id,
+      submissionContext?.leadId,
+      submissionContext?.visitorId,
+      videoUrl,
+    ],
+  );
 
   const handleTimeUpdate = useCallback(
     (currentTime: number) => {
+      if (currentTime > 0 && !trackedStartedRef.current) {
+        trackedStartedRef.current = true;
+        emitVslEvent("vsl_started", {
+          progressPercent: configuredDurationSeconds
+            ? Math.min(100, (currentTime / configuredDurationSeconds) * 100)
+            : null,
+          currentTimeSeconds: currentTime,
+        });
+      }
+
+      if (configuredDurationSeconds) {
+        const progressPercent = Math.min(
+          100,
+          (currentTime / configuredDurationSeconds) * 100,
+        );
+
+        for (const milestone of VSL_PROGRESS_MILESTONES) {
+          if (
+            progressPercent >= milestone &&
+            !trackedMilestonesRef.current.has(milestone)
+          ) {
+            trackedMilestonesRef.current.add(milestone);
+            emitVslEvent(`vsl_progress_${milestone}` as const, {
+              progressPercent: milestone,
+              currentTimeSeconds: currentTime,
+            });
+          }
+        }
+
+        if (progressPercent >= 95 && !trackedCompletedRef.current) {
+          trackedCompletedRef.current = true;
+          emitVslEvent("vsl_completed", {
+            progressPercent,
+            currentTimeSeconds: currentTime,
+          });
+        }
+      }
+
       if (currentTime >= revealAfterSeconds) {
+        revealSourceRef.current = "time_update";
         setHasRevealed((current) => (current ? current : true));
       }
     },
-    [revealAfterSeconds],
+    [configuredDurationSeconds, emitVslEvent, revealAfterSeconds],
   );
 
   useEffect(() => {
@@ -297,12 +491,37 @@ export function HeroVslDelayedCtaBlock({
       return;
     }
 
-    const timeout = window.setTimeout(() => {
-      setHasRevealed(true);
-    }, revealAfterSeconds * 1000 + REVEAL_TIMEOUT_BUFFER_MS);
+    const timeout = window.setTimeout(
+      () => {
+        revealSourceRef.current = "fallback_timeout";
+        setHasRevealed(true);
+      },
+      revealAfterSeconds * 1000 + REVEAL_TIMEOUT_BUFFER_MS,
+    );
 
     return () => window.clearTimeout(timeout);
   }, [hasCtaRevealed, revealAfterSeconds]);
+
+  useEffect(() => {
+    if (!hasCtaRevealed || !showStickyCta || trackedCtaRevealedRef.current) {
+      return;
+    }
+
+    trackedCtaRevealedRef.current = true;
+    emitVslEvent("vsl_cta_revealed", {
+      revealSource:
+        revealSourceRef.current ??
+        (revealAfterSeconds <= 0 ? "time_update" : "fallback_timeout"),
+    });
+  }, [emitVslEvent, hasCtaRevealed, revealAfterSeconds, showStickyCta]);
+
+  const handleTrackedCtaClickCapture = useCallback(() => {
+    emitVslEvent("vsl_cta_clicked", {
+      ctaLabel: ctaText,
+      ctaHref,
+      ctaAction,
+    });
+  }, [ctaAction, ctaHref, ctaText, emitVslEvent]);
 
   useEffect(() => {
     if (
@@ -434,15 +653,17 @@ export function HeroVslDelayedCtaBlock({
                 <FunnelButtonContent text="WhatsApp no disponible" />
               </button>
             ) : (
-              <TrackedCta
-                publicationId={runtime.publication.id}
-                currentStepId={runtime.currentStep.id}
-                currentPath={runtime.request.path}
-                href={ctaHref}
-                label={ctaText}
-                className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 px-8 py-3 text-center text-base font-bold uppercase tracking-[0.08em] text-slate-950 shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform hover:scale-[1.03] active:scale-95 md:w-[340px] lg:w-[380px] [&>span>span:first-child]:whitespace-nowrap"
-                action={ctaAction}
-              />
+              <div onClickCapture={handleTrackedCtaClickCapture}>
+                <TrackedCta
+                  publicationId={runtime.publication.id}
+                  currentStepId={runtime.currentStep.id}
+                  currentPath={runtime.request.path}
+                  href={ctaHref}
+                  label={ctaText}
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 px-8 py-3 text-center text-base font-bold uppercase tracking-[0.08em] text-slate-950 shadow-[0_16px_32px_rgba(0,0,0,0.5)] transition-transform hover:scale-[1.03] active:scale-95 md:w-[340px] lg:w-[380px] [&>span>span:first-child]:whitespace-nowrap"
+                  action={ctaAction}
+                />
+              </div>
             )}
           </div>
         </div>
