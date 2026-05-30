@@ -84,14 +84,6 @@ export async function fetchPublicFunnelRuntime(params: {
   }
 
   const data = await response.json();
-  console.log(
-    'Fired Data:',
-    JSON.stringify(
-      Array.isArray(data?.currentStep?.blocksJson)
-        ? data.currentStep.blocksJson[1]
-        : data?.blocks?.[1] ?? null,
-    ),
-  );
 
   return normalizePublicFunnelRuntimePayload(data, {
     host: params.host,

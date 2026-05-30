@@ -130,6 +130,6 @@ describe("resolvePublicFunnelHandoffState", () => {
 
     expect(resolved.advisor?.name).toBe("Freddy");
     expect(resolved.advisor?.sponsorId).toBe("sponsor-freddy");
-    expect(resolved.whatsappPhone).toBe("+573005551111");
+    expect(resolved.whatsappPhone).toBe("573005551111");
   });
 });
