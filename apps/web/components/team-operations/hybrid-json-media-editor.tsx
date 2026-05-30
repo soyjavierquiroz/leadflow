@@ -363,6 +363,22 @@ const mergeJsonObjectPatch = (
   return merged;
 };
 
+const normalizeComposerBlockSingleSourceFields = (
+  block: ComposerBlock,
+): ComposerBlock => {
+  if (block.type !== "hero_vsl_delayed_cta") {
+    return block;
+  }
+
+  const { action: _action, cta_mode: _ctaMode, ...rest } = block;
+  return rest;
+};
+
+const serializeComposerBlocks = (blocks: ComposerBlock[]) =>
+  SmartWiringService.serialize(
+    blocks.map(normalizeComposerBlockSingleSourceFields),
+  );
+
 export const isAbsoluteHttpUrl = (value: string) =>
   /^https?:\/\//i.test(value.trim());
 
@@ -621,7 +637,7 @@ export function HybridJsonMediaEditor({
           })
         : blocks;
 
-    onBlocksTextChange(SmartWiringService.serialize(syncedBlocks));
+    onBlocksTextChange(serializeComposerBlocks(syncedBlocks as ComposerBlock[]));
   };
 
   const buildComposerDestinations = useCallback((blocks: ComposerBlock[]) => {
@@ -650,11 +666,6 @@ export function HybridJsonMediaEditor({
       {
         value: "open_lead_capture_modal",
         label: "Abrir: Modal de Captura",
-        kind: "action",
-      },
-      {
-        value: "assigned_whatsapp",
-        label: "Contactar por WhatsApp al asesor asignado",
         kind: "action",
       },
       {
@@ -772,7 +783,7 @@ export function HybridJsonMediaEditor({
       successRedirect: routingReference?.items[0]?.path ?? null,
     });
 
-    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+    onBlocksTextChange(serializeComposerBlocks(nextBlocks as ComposerBlock[]));
   };
 
   const handleApplyReadyMadeRecipe = (recipe: SmartWiringRecipe) => {
@@ -785,7 +796,7 @@ export function HybridJsonMediaEditor({
       replace: isBlankCanvas,
     });
 
-    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+    onBlocksTextChange(serializeComposerBlocks(nextBlocks as ComposerBlock[]));
   };
 
   const handleSyncSuccessRedirect = (successRedirect: string) => {
@@ -794,7 +805,7 @@ export function HybridJsonMediaEditor({
       successRedirect,
     });
 
-    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+    onBlocksTextChange(serializeComposerBlocks(nextBlocks as ComposerBlock[]));
   };
 
   const handleInjectScaffold = (value: string) => {
@@ -803,7 +814,7 @@ export function HybridJsonMediaEditor({
       successRedirect: routingReference?.items[0]?.path ?? "/confirmado",
     });
 
-    onBlocksTextChange(SmartWiringService.serialize(nextBlocks));
+    onBlocksTextChange(serializeComposerBlocks(nextBlocks as ComposerBlock[]));
   };
 
   const selectedBlockDefinition =

@@ -225,7 +225,7 @@ export function HeroVslDelayedCtaBlock({
     behavior.show_sticky_cta ?? block.show_sticky_cta,
     true,
   );
-  const ctaMode = asString(behavior.cta_mode, asString(block.cta_mode, "modal"));
+  const ctaMode = asString(behavior.cta_mode, "modal");
   const isAssignedWhatsappMode = ctaMode === "assigned_whatsapp";
   const realAssignmentId =
     submissionContext?.assignment?.id ??
@@ -274,7 +274,7 @@ export function HeroVslDelayedCtaBlock({
     ? "assigned_whatsapp"
     : ctaMode === "modal" || ctaMode === "drawer"
       ? "open_lead_capture_modal"
-      : asString(block.action) || null;
+      : null;
   const ctaHref = isAssignedWhatsappMode
     ? handoffState.whatsappUrl ?? "#"
     : ctaAction === "open_lead_capture_modal" && hasModalConfig

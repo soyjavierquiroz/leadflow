@@ -154,6 +154,23 @@ const omittedRootKeys = new Set(["type", "block_id", "is_boxed"]);
 const omittedHookAndPromisePaths = new Set(
   hookAndPromiseContentFields.map((field) => field.path.join(".")),
 );
+const heroVslDelayedCtaSkipPaths = new Set(["action"]);
+const heroVslCtaModeOptions = [
+  {
+    value: "modal",
+    label: "Abrir Modal de Captura",
+  },
+  {
+    value: "assigned_whatsapp",
+    label: "Contactar por WhatsApp al asesor asignado",
+  },
+];
+
+const isHeroVslCtaModeField = (block: BlockRecord, path: string[]) =>
+  block.type === "hero_vsl_delayed_cta" &&
+  path.length === 2 &&
+  path[0] === "behavior" &&
+  path[1] === "cta_mode";
 
 const getValueAtPath = (value: unknown, path: string[]) => {
   let current: unknown = value;
@@ -314,12 +331,17 @@ export function BlockCard({
   };
   const definitionSchema = definition?.schema;
   const definitionExample = definition?.example;
+  const skipPaths =
+    block.type === "hook_and_promise"
+      ? omittedHookAndPromisePaths
+      : block.type === "hero_vsl_delayed_cta"
+        ? heroVslDelayedCtaSkipPaths
+        : undefined;
   const genericEditableFields = buildEditableFields({
     schemaValue: definitionSchema,
     exampleValue: definitionExample,
     currentValue: block,
-    skipPaths:
-      block.type === "hook_and_promise" ? omittedHookAndPromisePaths : undefined,
+    skipPaths,
   });
   const nestedEditableEntries =
     block.type === "hook_and_promise" ? hookAndPromiseContentFields : [];
@@ -437,6 +459,43 @@ export function BlockCard({
 
           const key = field.path[field.path.length - 1] ?? "";
           const value = field.value;
+
+          if (isHeroVslCtaModeField(block, field.path)) {
+            const currentValue =
+              typeof value === "string" && value.trim() ? value : "modal";
+            const hasCurrentOption = heroVslCtaModeOptions.some(
+              (option) => option.value === currentValue,
+            );
+
+            return (
+              <label key={field.path.join(".")} className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {field.label}
+                </span>
+                <select
+                  value={currentValue}
+                  onChange={(event) =>
+                    onPatch({
+                      ...setValueAtPath({}, field.path, event.target.value),
+                      action: undefined,
+                    })
+                  }
+                  className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100"
+                >
+                  {!hasCurrentOption ? (
+                    <option value={currentValue}>
+                      Valor actual: {currentValue}
+                    </option>
+                  ) : null}
+                  {heroVslCtaModeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            );
+          }
 
           if (isSmartDestinationField(key)) {
             const currentValue =
