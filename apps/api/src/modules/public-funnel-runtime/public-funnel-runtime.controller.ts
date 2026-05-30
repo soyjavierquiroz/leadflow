@@ -13,8 +13,10 @@ import type { HydratePublicContextDto } from './dto/hydrate-public-context.dto';
 import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto';
 import type { SubmitPublicLeadCaptureDto } from './dto/submit-public-lead-capture.dto';
 import type { TrackPublicRuntimeEventDto } from './dto/track-public-runtime-event.dto';
+import type { TrackPublicVslEventDto } from './dto/track-public-vsl-event.dto';
 import { TrackingEventsService } from '../events/tracking-events.service';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
+import { PublicFunnelVslEventsService } from './public-funnel-vsl-events.service';
 import { PublicIdentityLinkService } from './public-identity-link.service';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
 
@@ -25,6 +27,7 @@ export class PublicFunnelRuntimeController {
     private readonly leadCaptureAssignmentService: LeadCaptureAssignmentService,
     private readonly trackingEventsService: TrackingEventsService,
     private readonly publicIdentityLinkService: PublicIdentityLinkService,
+    private readonly publicFunnelVslEventsService: PublicFunnelVslEventsService,
   ) {}
 
   @Get('resolve')
@@ -77,6 +80,11 @@ export class PublicFunnelRuntimeController {
   @Post('events')
   trackRuntimeEvent(@Body() dto: TrackPublicRuntimeEventDto) {
     return this.trackingEventsService.trackPublicRuntimeEvent(dto);
+  }
+
+  @Post('vsl-events')
+  trackVslEvent(@Body() dto: TrackPublicVslEventDto) {
+    return this.publicFunnelVslEventsService.trackVslEvent(dto);
   }
 
   @Post('hydrate')

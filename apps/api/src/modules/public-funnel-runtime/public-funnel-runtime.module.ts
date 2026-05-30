@@ -8,6 +8,7 @@ import { CapiManagerService } from './capi-manager.service';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
 import { IdentityTokenService } from './identity-token.service';
 import { PublicIdentityLinkService } from './public-identity-link.service';
+import { PublicFunnelVslEventsService } from './public-funnel-vsl-events.service';
 import { PublicTrackedLinksController } from './public-tracked-links.controller';
 import { PublicFunnelRuntimeController } from './public-funnel-runtime.controller';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
@@ -35,6 +36,7 @@ import { ShortLinkProvider } from './short-link.provider';
     IdentityTokenService,
     ShortLinkProvider,
     PublicIdentityLinkService,
+    PublicFunnelVslEventsService,
     SystemApiGuard,
   ],
   exports: [
