@@ -6,6 +6,7 @@ const expiresAt = new Date('2026-06-01T12:00:00.000Z');
 const buildLead = (overrides?: Record<string, unknown>) => ({
   id: 'lead-1',
   workspaceId: 'workspace-1',
+  trafficLayer: 'PAID_ADS',
   fullName: 'Veronica Perez',
   email: 'veronica@example.com',
   phone: null,
@@ -19,6 +20,7 @@ const buildLead = (overrides?: Record<string, unknown>) => ({
   currentAssignment: {
     id: 'assignment-1',
     ownershipKey: 'lf_own_3af5cca1a045f54d1834defd',
+    trafficLayer: 'DIRECT',
     status: 'assigned',
     reason: 'rotation',
     assignedAt: new Date('2026-05-30T11:00:00.000Z'),
@@ -32,6 +34,8 @@ const buildLead = (overrides?: Record<string, unknown>) => ({
   },
   funnelPublication: {
     id: 'publication-1',
+    teamId: 'team-1',
+    domainId: 'domain-1',
     funnelInstanceId: 'instance-1',
     pathPrefix: '/',
     domain: {
@@ -43,6 +47,7 @@ const buildLead = (overrides?: Record<string, unknown>) => ({
     },
     handoffStrategy: null,
     funnelInstance: {
+      teamId: 'team-1',
       name: 'DXN',
       structuralType: 'two_step_conversion',
       handoffStrategy: null,
@@ -107,6 +112,27 @@ const buildHydrateTrackedLink = (
   id: 'tracked-link-1',
   status: 'active' as const,
   expiresAt,
+  workspaceId: 'workspace-1',
+  leadId: 'lead-1',
+  assignmentId: 'assignment-1',
+  funnelPublicationId: 'publication-1',
+  funnelInstanceId: 'instance-1',
+  funnelStepId: 'step-2',
+  purpose: 'vsl_followup',
+  lead: {
+    trafficLayer: 'PAID_ADS',
+  },
+  assignment: {
+    teamId: 'team-1',
+    trafficLayer: 'DIRECT',
+  },
+  funnelPublication: {
+    teamId: 'team-1',
+    domainId: 'domain-1',
+  },
+  funnelInstance: {
+    teamId: 'team-1',
+  },
   ...overrides,
 });
 
@@ -119,6 +145,27 @@ const buildRevocableTrackedLink = (
   id: 'tracked-link-1',
   metadataJson: {
     targetStepPath: '/presentacion',
+  },
+  workspaceId: 'workspace-1',
+  leadId: 'lead-1',
+  assignmentId: 'assignment-1',
+  funnelPublicationId: 'publication-1',
+  funnelInstanceId: 'instance-1',
+  funnelStepId: 'step-2',
+  purpose: 'vsl_followup',
+  lead: {
+    trafficLayer: 'PAID_ADS',
+  },
+  assignment: {
+    teamId: 'team-1',
+    trafficLayer: 'DIRECT',
+  },
+  funnelPublication: {
+    teamId: 'team-1',
+    domainId: 'domain-1',
+  },
+  funnelInstance: {
+    teamId: 'team-1',
   },
   ...overrides,
 });
@@ -136,6 +183,7 @@ const buildService = (input?: {
     provider: 'yourls' | 'fallback_long_url';
   };
   shortCode?: string | null;
+  funnelEventsRecordEvent?: jest.Mock;
 }) => {
   const createdTrackedLink =
     input?.createdTrackedLink ?? buildTrackedLinkRecord();
@@ -148,9 +196,7 @@ const buildService = (input?: {
     },
     trackedLink: {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-      findMany: jest
-        .fn()
-        .mockResolvedValue(input?.revocableTrackedLinks ?? []),
+      findMany: jest.fn().mockResolvedValue(input?.revocableTrackedLinks ?? []),
       findUnique: jest
         .fn()
         .mockResolvedValue(input?.hydrateTrackedLink ?? null),
@@ -183,10 +229,15 @@ const buildService = (input?: {
     shortenUrl: jest.fn().mockResolvedValue(shortenResult),
     extractShortCode: jest.fn().mockReturnValue(input?.shortCode ?? null),
   };
+  const funnelEventsService = {
+    recordEvent:
+      input?.funnelEventsRecordEvent ?? jest.fn().mockResolvedValue({}),
+  };
   const service = new PublicIdentityLinkService(
     prisma as any,
     identityTokenService as any,
     shortLinkProvider as any,
+    funnelEventsService as any,
   );
 
   return {
@@ -194,12 +245,14 @@ const buildService = (input?: {
     prisma,
     identityTokenService,
     shortLinkProvider,
+    funnelEventsService,
   };
 };
 
 describe('PublicIdentityLinkService', () => {
   it('creates a TrackedLink with cached false on first generate', async () => {
-    const { service, prisma, identityTokenService } = buildService();
+    const { service, prisma, identityTokenService, funnelEventsService } =
+      buildService();
 
     const result = await service.generateTrackedLink({
       leadId: 'lead-1',
@@ -244,6 +297,31 @@ describe('PublicIdentityLinkService', () => {
         }),
       }),
     );
+    expect(funnelEventsService.recordEvent).toHaveBeenCalledWith({
+      eventName: 'tracked_link_created',
+      eventFamily: 'action_link',
+      source: 'public_identity_link',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      domainId: 'domain-1',
+      funnelPublicationId: 'publication-1',
+      funnelInstanceId: 'instance-1',
+      funnelStepId: 'step-2',
+      leadId: 'lead-1',
+      assignmentId: 'assignment-1',
+      trackedLinkId: 'tracked-link-1',
+      actionLinkKey: 'leadflow.open_vsl',
+      trafficLayer: 'PAID_ADS',
+      dedupeKey: 'tracked_link_created:tracked-link-1',
+      payloadJson: {
+        stepKey: 'presentacion',
+        targetStepPath: '/presentacion',
+        shortLinkProvider: 'fallback_long_url',
+        shortened: false,
+        cached: false,
+        purpose: 'vsl_followup',
+      },
+    });
   });
 
   it('reuses an active TrackedLink with cached true', async () => {
@@ -253,7 +331,12 @@ describe('PublicIdentityLinkService', () => {
       shortCode: 'abc123',
       shortLinkProvider: 'yourls',
     });
-    const { service, identityTokenService, shortLinkProvider } = buildService({
+    const {
+      service,
+      identityTokenService,
+      shortLinkProvider,
+      funnelEventsService,
+    } = buildService({
       existingTrackedLink,
     });
 
@@ -265,16 +348,47 @@ describe('PublicIdentityLinkService', () => {
     expect(result.cached).toBe(true);
     expect(result.trackedLinkId).toBe('tracked-link-1');
     expect(result.token).toBeNull();
-    expect(result.longUrl).toBe('https://example.com/presentacion?ctx=old-token');
+    expect(result.longUrl).toBe(
+      'https://example.com/presentacion?ctx=old-token',
+    );
     expect(result.shortUrl).toBe('https://kuruk.in/abc123');
     expect(result.url).toBe('https://kuruk.in/abc123');
     expect(result.shortCode).toBe('abc123');
     expect(identityTokenService.issueToken).not.toHaveBeenCalled();
     expect(shortLinkProvider.shortenUrl).not.toHaveBeenCalled();
+    expect(funnelEventsService.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'tracked_link_reused',
+        eventFamily: 'action_link',
+        source: 'public_identity_link',
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        domainId: 'domain-1',
+        funnelPublicationId: 'publication-1',
+        funnelInstanceId: 'instance-1',
+        funnelStepId: 'step-2',
+        leadId: 'lead-1',
+        assignmentId: 'assignment-1',
+        trackedLinkId: 'tracked-link-1',
+        actionLinkKey: 'leadflow.open_vsl',
+        trafficLayer: 'PAID_ADS',
+        payloadJson: {
+          stepKey: 'presentacion',
+          targetStepPath: '/presentacion',
+          shortLinkProvider: 'yourls',
+          shortened: true,
+          cached: true,
+          purpose: 'vsl_followup',
+        },
+      }),
+    );
+    expect(
+      funnelEventsService.recordEvent.mock.calls[0]?.[0],
+    ).not.toHaveProperty('dedupeKey');
   });
 
   it('stores fallback_long_url when YOURLS is not available', async () => {
-    const { service, prisma } = buildService();
+    const { service, prisma, funnelEventsService } = buildService();
 
     const result = await service.generateTrackedLink({
       leadId: 'lead-1',
@@ -335,7 +449,7 @@ describe('PublicIdentityLinkService', () => {
   });
 
   it('marks expired active links before creating a new TrackedLink', async () => {
-    const { service, prisma } = buildService();
+    const { service, prisma, funnelEventsService } = buildService();
 
     await service.generateTrackedLink({
       leadId: 'lead-1',
@@ -365,7 +479,7 @@ describe('PublicIdentityLinkService', () => {
       id: 'tracked-link-race',
       longUrl: 'https://example.com/presentacion?ctx=race-token',
     });
-    const { service, prisma } = buildService();
+    const { service, prisma, funnelEventsService } = buildService();
     prisma.trackedLink.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(raceTrackedLink);
@@ -384,13 +498,25 @@ describe('PublicIdentityLinkService', () => {
     expect(result.cached).toBe(true);
     expect(result.trackedLinkId).toBe('tracked-link-race');
     expect(result.token).toBeNull();
-    expect(result.longUrl).toBe('https://example.com/presentacion?ctx=race-token');
+    expect(result.longUrl).toBe(
+      'https://example.com/presentacion?ctx=race-token',
+    );
+    expect(funnelEventsService.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'tracked_link_reused',
+        trackedLinkId: 'tracked-link-race',
+        payloadJson: expect.objectContaining({
+          cached: true,
+        }),
+      }),
+    );
   });
 
   it('hydrate with active TrackedLink increments clickCount and lastClickedAt', async () => {
-    const { service, prisma, identityTokenService } = buildService({
-      hydrateTrackedLink: buildHydrateTrackedLink(),
-    });
+    const { service, prisma, identityTokenService, funnelEventsService } =
+      buildService({
+        hydrateTrackedLink: buildHydrateTrackedLink(),
+      });
 
     const result = await service.hydrateIdentityContext('ctx-token');
 
@@ -403,6 +529,35 @@ describe('PublicIdentityLinkService', () => {
         id: true,
         status: true,
         expiresAt: true,
+        workspaceId: true,
+        leadId: true,
+        assignmentId: true,
+        funnelPublicationId: true,
+        funnelInstanceId: true,
+        funnelStepId: true,
+        purpose: true,
+        lead: {
+          select: {
+            trafficLayer: true,
+          },
+        },
+        assignment: {
+          select: {
+            teamId: true,
+            trafficLayer: true,
+          },
+        },
+        funnelPublication: {
+          select: {
+            teamId: true,
+            domainId: true,
+          },
+        },
+        funnelInstance: {
+          select: {
+            teamId: true,
+          },
+        },
       },
     });
     expect(prisma.trackedLink.update).toHaveBeenCalledWith({
@@ -420,6 +575,28 @@ describe('PublicIdentityLinkService', () => {
     expect(result.submissionContext.handoff.whatsappUrl).toContain(
       'https://wa.me/',
     );
+    expect(funnelEventsService.recordEvent).toHaveBeenCalledWith({
+      eventName: 'tracked_link_opened',
+      eventFamily: 'action_link',
+      source: 'public_identity_link',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      domainId: 'domain-1',
+      funnelPublicationId: 'publication-1',
+      funnelInstanceId: 'instance-1',
+      funnelStepId: 'step-2',
+      leadId: 'lead-1',
+      assignmentId: 'assignment-1',
+      trackedLinkId: 'tracked-link-1',
+      actionLinkKey: 'leadflow.open_vsl',
+      trafficLayer: 'PAID_ADS',
+      payloadJson: {
+        status: 'active',
+        openedAt: expect.any(String),
+        purpose: 'vsl_followup',
+        clickCountIncremented: true,
+      },
+    });
   });
 
   it('hydrate with revoked TrackedLink returns unavailable 410', async () => {
@@ -429,7 +606,9 @@ describe('PublicIdentityLinkService', () => {
       }),
     });
 
-    await expect(service.hydrateIdentityContext('ctx-token')).rejects.toMatchObject({
+    await expect(
+      service.hydrateIdentityContext('ctx-token'),
+    ).rejects.toMatchObject({
       response: {
         code: 'TRACKED_LINK_UNAVAILABLE',
         message: 'This tracked link is no longer available.',
@@ -446,7 +625,9 @@ describe('PublicIdentityLinkService', () => {
       }),
     });
 
-    await expect(service.hydrateIdentityContext('ctx-token')).rejects.toMatchObject({
+    await expect(
+      service.hydrateIdentityContext('ctx-token'),
+    ).rejects.toMatchObject({
       response: {
         code: 'TRACKED_LINK_UNAVAILABLE',
         message: 'This tracked link is no longer available.',
@@ -463,7 +644,9 @@ describe('PublicIdentityLinkService', () => {
       }),
     });
 
-    await expect(service.hydrateIdentityContext('ctx-token')).rejects.toMatchObject({
+    await expect(
+      service.hydrateIdentityContext('ctx-token'),
+    ).rejects.toMatchObject({
       response: {
         code: 'TRACKED_LINK_UNAVAILABLE',
         message: 'This tracked link is no longer available.',
@@ -494,7 +677,7 @@ describe('PublicIdentityLinkService', () => {
   });
 
   it('revokeTrackedLinksForLead revokes active links and returns count', async () => {
-    const { service, prisma } = buildService({
+    const { service, prisma, funnelEventsService } = buildService({
       revocableTrackedLinks: [
         buildRevocableTrackedLink({
           id: 'tracked-link-1',
@@ -522,6 +705,35 @@ describe('PublicIdentityLinkService', () => {
       select: {
         id: true,
         metadataJson: true,
+        workspaceId: true,
+        leadId: true,
+        assignmentId: true,
+        funnelPublicationId: true,
+        funnelInstanceId: true,
+        funnelStepId: true,
+        purpose: true,
+        lead: {
+          select: {
+            trafficLayer: true,
+          },
+        },
+        assignment: {
+          select: {
+            teamId: true,
+            trafficLayer: true,
+          },
+        },
+        funnelPublication: {
+          select: {
+            teamId: true,
+            domainId: true,
+          },
+        },
+        funnelInstance: {
+          select: {
+            teamId: true,
+          },
+        },
       },
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -549,6 +761,29 @@ describe('PublicIdentityLinkService', () => {
           revokedReason: 'spam lead',
         }),
       }),
+    });
+    expect(funnelEventsService.recordEvent).toHaveBeenCalledTimes(2);
+    expect(funnelEventsService.recordEvent).toHaveBeenCalledWith({
+      eventName: 'tracked_link_revoked',
+      eventFamily: 'action_link',
+      source: 'public_identity_link',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      domainId: 'domain-1',
+      funnelPublicationId: 'publication-1',
+      funnelInstanceId: 'instance-1',
+      funnelStepId: 'step-2',
+      leadId: 'lead-1',
+      assignmentId: 'assignment-1',
+      trackedLinkId: 'tracked-link-1',
+      actionLinkKey: 'leadflow.open_vsl',
+      trafficLayer: 'PAID_ADS',
+      dedupeKey: 'tracked_link_revoked:tracked-link-1',
+      payloadJson: {
+        reason: 'spam lead',
+        revokedAt: expect.any(String),
+        previousStatus: 'active',
+      },
     });
   });
 
@@ -594,5 +829,80 @@ describe('PublicIdentityLinkService', () => {
     });
     expect(prisma.trackedLink.update).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not break generate when FunnelEventsService fails', async () => {
+    const recordEvent = jest.fn().mockRejectedValue(new Error('ledger down'));
+    const { service } = buildService({
+      funnelEventsRecordEvent: recordEvent,
+    });
+
+    const result = await service.generateTrackedLink({
+      leadId: 'lead-1',
+      stepKey: 'presentacion',
+    });
+
+    expect(result.cached).toBe(false);
+    expect(result.trackedLinkId).toBe('tracked-link-1');
+    expect(recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'tracked_link_created',
+      }),
+    );
+  });
+
+  it('does not break hydrate when FunnelEventsService fails', async () => {
+    const recordEvent = jest.fn().mockRejectedValue(new Error('ledger down'));
+    const { service, prisma } = buildService({
+      hydrateTrackedLink: buildHydrateTrackedLink(),
+      funnelEventsRecordEvent: recordEvent,
+    });
+
+    const result = await service.hydrateIdentityContext('ctx-token');
+
+    expect(result.submissionContext.leadId).toBe('lead-1');
+    expect(prisma.trackedLink.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tracked-link-1',
+      },
+      data: {
+        clickCount: {
+          increment: 1,
+        },
+        lastClickedAt: expect.any(Date),
+      },
+    });
+    expect(recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'tracked_link_opened',
+      }),
+    );
+  });
+
+  it('does not break revoke when FunnelEventsService fails', async () => {
+    const recordEvent = jest.fn().mockRejectedValue(new Error('ledger down'));
+    const { service, prisma } = buildService({
+      revocableTrackedLinks: [buildRevocableTrackedLink()],
+      funnelEventsRecordEvent: recordEvent,
+    });
+
+    const result = await service.revokeTrackedLinksForLead('lead-1', 'spam');
+
+    expect(result).toEqual({
+      revoked: 1,
+    });
+    expect(prisma.trackedLink.update).toHaveBeenCalledWith({
+      where: {
+        id: 'tracked-link-1',
+      },
+      data: expect.objectContaining({
+        status: 'revoked',
+      }),
+    });
+    expect(recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'tracked_link_revoked',
+      }),
+    );
   });
 });
