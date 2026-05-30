@@ -384,6 +384,7 @@ model Workspace {
   leads                     Lead[]
   assignments               Assignment[]
   events                    DomainEvent[]
+  funnelEvents              FunnelEvent[]
   users                     User[]
   messagingConnections      MessagingConnection[]
   automationDispatches      AutomationDispatch[]
@@ -426,6 +427,7 @@ model Team {
   aiAgentConfigs        AiAgentConfig[]
   channelInstances      ChannelInstance[]
   automationDispatches  AutomationDispatch[]
+  funnelEvents          FunnelEvent[]
   leadNotes             LeadNote[]
   knowledgeAudits       KnowledgeAudit[]
   crmLeadAssignments    CrmLeadAssignment[]
@@ -710,6 +712,7 @@ model Domain {
   team                       Team                     @relation(fields: [teamId], references: [id], onDelete: Cascade)
   linkedFunnel               Funnel?                  @relation("DomainLinkedFunnel", fields: [linkedFunnelId], references: [id], onDelete: SetNull)
   funnelPublications         FunnelPublication[]
+  funnelEvents               FunnelEvent[]
 
   @@index([teamId, isPrimary])
   @@index([teamId, onboardingStatus])
@@ -782,6 +785,7 @@ model FunnelInstance {
   assignments          Assignment[]
   automationDispatches AutomationDispatch[]
   trackedLinks         TrackedLink[]
+  funnelEvents         FunnelEvent[]
 
   @@unique([teamId, code])
   @@index([teamId, structuralType])
@@ -807,6 +811,7 @@ model FunnelStep {
   funnelInstance   FunnelInstance      @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
   history          FunnelStepHistory[]
   trackedLinks     TrackedLink[]
+  funnelEvents     FunnelEvent[]
 
   @@unique([funnelInstanceId, position])
   @@unique([funnelInstanceId, slug])
@@ -859,6 +864,7 @@ model FunnelPublication {
   automationDispatches AutomationDispatch[]
   adWheels             AdWheel[]
   trackedLinks         TrackedLink[]
+  funnelEvents         FunnelEvent[]
 
   @@unique([domainId, pathPrefix])
   @@index([domainId, status, pathPrefix])
@@ -971,6 +977,7 @@ model Visitor {
   workspace     Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   lead          Lead?
   events        DomainEvent[]
+  funnelEvents  FunnelEvent[]
 
   @@unique([workspaceId, anonymousId])
 }
@@ -1012,6 +1019,7 @@ model Lead {
   automationDispatches AutomationDispatch[]
   notes                LeadNote[]
   trackedLinks         TrackedLink[]
+  funnelEvents         FunnelEvent[]
   crmLeadAssignments   CrmLeadAssignment[]
   crmAssignmentEvents  CrmAssignmentEvent[]
   crmOutreachQueue     CrmOutreachQueue[]
@@ -1050,6 +1058,7 @@ model Assignment {
   events               DomainEvent[]
   automationDispatches AutomationDispatch[]
   trackedLinks         TrackedLink[]
+  funnelEvents         FunnelEvent[]
 }
 
 model TrackedLink {
@@ -1084,6 +1093,7 @@ model TrackedLink {
   funnelPublication   FunnelPublication @relation(fields: [funnelPublicationId], references: [id], onDelete: Cascade)
   funnelInstance      FunnelInstance    @relation(fields: [funnelInstanceId], references: [id], onDelete: Cascade)
   funnelStep          FunnelStep        @relation(fields: [funnelStepId], references: [id], onDelete: Cascade)
+  funnelEvents        FunnelEvent[]
 
   @@index([leadId, status])
   @@index([assignmentId, status])
@@ -1091,6 +1101,53 @@ model TrackedLink {
   @@index([shortCode])
   @@index([funnelPublicationId, funnelStepId, status])
   @@index([workspaceId, status, createdAt])
+}
+
+model FunnelEvent {
+  id                  String   @id @default(uuid())
+  eventId             String   @unique
+  eventName           String
+  eventVersion        String   @default("1.0")
+  eventFamily         String
+  source              String
+  workspaceId         String
+  teamId              String
+  domainId            String?
+  funnelPublicationId String?
+  funnelInstanceId    String?
+  funnelStepId        String?
+  leadId              String?
+  visitorId           String?
+  assignmentId        String?
+  trackedLinkId       String?
+  actionLinkKey       String?
+  trafficLayer        String
+  attributionJson     Json?
+  payloadJson         Json
+  occurredAt          DateTime
+  receivedAt          DateTime @default(now())
+  correlationId       String?
+  dedupeKey           String?  @unique
+  createdAt           DateTime @default(now())
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  domain              Domain?            @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  funnelPublication   FunnelPublication? @relation(fields: [funnelPublicationId], references: [id], onDelete: SetNull)
+  funnelInstance      FunnelInstance?    @relation(fields: [funnelInstanceId], references: [id], onDelete: SetNull)
+  funnelStep          FunnelStep?        @relation(fields: [funnelStepId], references: [id], onDelete: SetNull)
+  lead                Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  visitor             Visitor?           @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  assignment          Assignment?        @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  trackedLink         TrackedLink?       @relation(fields: [trackedLinkId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, teamId, occurredAt])
+  @@index([funnelPublicationId, eventName, occurredAt])
+  @@index([leadId, occurredAt])
+  @@index([visitorId, occurredAt])
+  @@index([assignmentId, occurredAt])
+  @@index([trackedLinkId, occurredAt])
+  @@index([trafficLayer, eventName, receivedAt])
+  @@index([eventFamily, eventName, occurredAt])
 }
 
 model AutomationDispatch {
