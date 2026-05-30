@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { shouldEnableBrowserPixels } from './browser-pixel-policy';
 import type {
   PublicRuntimeEntryContext,
   PublicRuntimePayload,
@@ -534,7 +535,7 @@ export class PublicFunnelRuntimeService {
       trafficLayer: 'ORGANIC',
       forcedSponsorId: null,
       adWheelId: null,
-      browserPixelsEnabled: true,
+      browserPixelsEnabled: false,
       attributionType: 'organic',
       attributionSlug: null,
       runtimePathPrefix: null,
@@ -571,7 +572,7 @@ export class PublicFunnelRuntimeService {
         trafficLayer: 'ORGANIC',
         forcedSponsorId: null,
         adWheelId: null,
-        browserPixelsEnabled: true,
+        browserPixelsEnabled: false,
         attributionType: 'organic',
         attributionSlug: null,
         runtimePathPrefix: null,
@@ -653,6 +654,15 @@ export class PublicFunnelRuntimeService {
       publication.trackingProfile ?? publication.funnelInstance.trackingProfile;
     const effectiveHandoffStrategy =
       publication.handoffStrategy ?? publication.funnelInstance.handoffStrategy;
+    const publicationTrackingConfig = {
+      metaPixelId: readNullableString(publication, 'metaPixelId'),
+      tiktokPixelId: readNullableString(publication, 'tiktokPixelId'),
+    };
+    const browserPixelsEnabled = shouldEnableBrowserPixels(
+      entryContext.trafficLayer,
+      publicationTrackingConfig,
+      entryContext.browserPixelsEnabled,
+    );
     const baseHandoff = resolvePublicHandoffConfig(effectiveHandoffStrategy);
     const assignedWhatsappMessageTemplate = resolveAssignedWhatsappMessageTemplate(
       currentStep.blocksJson as Prisma.JsonValue,
@@ -706,7 +716,7 @@ export class PublicFunnelRuntimeService {
         trafficLayer: entryContext.trafficLayer,
         forcedSponsorId: entryContext.forcedSponsorId,
         adWheelId: entryContext.adWheelId,
-        browserPixelsEnabled: entryContext.browserPixelsEnabled,
+        browserPixelsEnabled,
         attributionType: entryContext.attributionType,
         attributionSlug: entryContext.attributionSlug,
         runtimePathPrefix: entryContext.runtimePathPrefix,
@@ -718,8 +728,8 @@ export class PublicFunnelRuntimeService {
         isPrimary: publication.isPrimary,
         trackingProfileId: publication.trackingProfileId,
         handoffStrategyId: publication.handoffStrategyId,
-        metaPixelId: readNullableString(publication, 'metaPixelId'),
-        tiktokPixelId: readNullableString(publication, 'tiktokPixelId'),
+        metaPixelId: publicationTrackingConfig.metaPixelId,
+        tiktokPixelId: publicationTrackingConfig.tiktokPixelId,
         seoTitle: readNullableString(publication, 'seoTitle'),
         seoDescription: readNullableString(publication, 'seoDescription'),
         ogImageUrl: readNullableString(publication, 'ogImageUrl'),

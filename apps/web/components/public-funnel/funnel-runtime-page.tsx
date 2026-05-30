@@ -24,6 +24,7 @@ import {
   toStepLabel,
 } from "@/components/public-funnel/runtime-block-utils";
 import { SplitMediaFocusLayout } from "@/components/structures/SplitMediaFocusLayout";
+import { shouldEnableBrowserPixels } from "@/lib/browser-pixel-policy";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 
 type FunnelRuntimePageProps = {
@@ -343,7 +344,14 @@ export function FunnelRuntimePage({
   return (
     <LeadCaptureProvider>
       <FunnelThemeProvider runtime={runtime}>
-        {runtime.entryContext.browserPixelsEnabled ? (
+        {shouldEnableBrowserPixels(
+          runtime.entryContext.trafficLayer,
+          {
+            metaPixelId: runtime.publication.metaPixelId,
+            tiktokPixelId: runtime.publication.tiktokPixelId,
+          },
+          runtime.entryContext.browserPixelsEnabled,
+        ) ? (
           <PublicRuntimePixelScripts
             metaPixelId={runtime.publication.metaPixelId}
             tiktokPixelId={runtime.publication.tiktokPixelId}

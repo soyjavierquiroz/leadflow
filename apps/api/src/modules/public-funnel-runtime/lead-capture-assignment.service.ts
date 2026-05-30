@@ -31,6 +31,7 @@ import {
   buildPublicationStepPath,
   normalizePath,
 } from './public-funnel-runtime.utils';
+import { shouldAllowBrowserPixelPolicy } from './browser-pixel-policy';
 import { CapiManagerService } from './capi-manager.service';
 import { pickNextRotationMember } from './lead-capture-assignment.utils';
 import { PublicFunnelRuntimeService } from './public-funnel-runtime.service';
@@ -1788,7 +1789,10 @@ export class LeadCaptureAssignmentService {
           trafficLayer: submittedEntryContext.trafficLayer,
           forcedSponsorId: submittedEntryContext.forcedSponsorId,
           adWheelId: submittedEntryContext.adWheelId,
-          browserPixelsEnabled: submittedEntryContext.browserPixelsEnabled,
+          browserPixelsEnabled: shouldAllowBrowserPixelPolicy(
+            submittedEntryContext.trafficLayer,
+            submittedEntryContext.browserPixelsEnabled,
+          ),
           attributionType: submittedEntryContext.attributionType ?? 'organic',
           attributionSlug: submittedEntryContext.attributionSlug ?? null,
           runtimePathPrefix:
@@ -2017,6 +2021,7 @@ export class LeadCaptureAssignmentService {
       trafficLayer: 'ORGANIC' as const,
       forcedSponsorId: null,
       adWheelId: null,
+      browserPixelsEnabled: false,
       attributionType: 'organic' as const,
       attributionSlug: null,
     };
@@ -2244,6 +2249,7 @@ export class LeadCaptureAssignmentService {
       trafficLayer: 'DIRECT' as const,
       forcedSponsorId: null,
       adWheelId: null,
+      browserPixelsEnabled: false,
     };
   }
 
