@@ -4,6 +4,8 @@ import { MailModule } from '../mail/mail.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { RuntimeContextModule } from '../runtime-context/runtime-context.module';
 import { SystemApiGuard } from '../webhooks/system-api.guard';
+import { ActionLinksController } from './action-links.controller';
+import { ActionLinkResolverService } from './action-link-resolver.service';
 import { CapiManagerService } from './capi-manager.service';
 import { LeadCaptureAssignmentService } from './lead-capture-assignment.service';
 import { IdentityTokenService } from './identity-token.service';
@@ -27,6 +29,7 @@ import { ShortLinkProvider } from './short-link.provider';
     PublicFunnelRuntimeController,
     PublicRuntimeController,
     PublicTrackedLinksController,
+    ActionLinksController,
   ],
   providers: [
     CapiManagerService,
@@ -36,6 +39,7 @@ import { ShortLinkProvider } from './short-link.provider';
     IdentityTokenService,
     ShortLinkProvider,
     PublicIdentityLinkService,
+    ActionLinkResolverService,
     PublicFunnelVslEventsService,
     SystemApiGuard,
   ],
@@ -46,6 +50,7 @@ import { ShortLinkProvider } from './short-link.provider';
     CapiManagerService,
     IdentityTokenService,
     PublicIdentityLinkService,
+    ActionLinkResolverService,
   ],
 })
 export class PublicFunnelRuntimeModule {}
