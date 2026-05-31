@@ -119,6 +119,10 @@ export class PublicIdentityLinkService {
   ) {}
 
   async generateTrackedLink(input: { leadId: string; stepKey: string }) {
+    return this.generateTrackedIdentityLink(input);
+  }
+
+  async generateTrackedIdentityLink(input: { leadId: string; stepKey: string }) {
     const lead = await this.prisma.lead.findUnique({
       where: {
         id: input.leadId,

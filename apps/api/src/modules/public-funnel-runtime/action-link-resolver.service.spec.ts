@@ -63,7 +63,7 @@ const buildService = (input?: {
     },
   };
   const publicIdentityLinkService = {
-    generateTrackedLink: jest
+    generateTrackedIdentityLink: jest
       .fn()
       .mockResolvedValue(input?.legacyResult ?? buildLegacyResult()),
   };
@@ -88,7 +88,7 @@ const resolveInput = (
 });
 
 describe('ActionLinkResolverService', () => {
-  it('resolves leadflow.open_vsl by delegating to PublicIdentityLinkService.generateTrackedLink', async () => {
+  it('resolves leadflow.open_vsl by delegating to the tracked identity link core', async () => {
     const { service, publicIdentityLinkService } = buildService();
 
     const result = await service.resolve(
@@ -99,7 +99,9 @@ describe('ActionLinkResolverService', () => {
       }),
     );
 
-    expect(publicIdentityLinkService.generateTrackedLink).toHaveBeenCalledWith({
+    expect(
+      publicIdentityLinkService.generateTrackedIdentityLink,
+    ).toHaveBeenCalledWith({
       leadId: 'lead-1',
       stepKey: 'custom-step',
     });
@@ -133,7 +135,9 @@ describe('ActionLinkResolverService', () => {
 
     const result = await service.resolve(resolveInput());
 
-    expect(publicIdentityLinkService.generateTrackedLink).toHaveBeenCalledWith({
+    expect(
+      publicIdentityLinkService.generateTrackedIdentityLink,
+    ).toHaveBeenCalledWith({
       leadId: 'lead-1',
       stepKey: 'presentacion',
     });
@@ -213,7 +217,9 @@ describe('ActionLinkResolverService', () => {
         code: 'ACTION_LINK_UNSUPPORTED_ACTION',
       },
     });
-    expect(publicIdentityLinkService.generateTrackedLink).not.toHaveBeenCalled();
+    expect(
+      publicIdentityLinkService.generateTrackedIdentityLink,
+    ).not.toHaveBeenCalled();
   });
 
   it('rejects unsupported appKey', async () => {
@@ -230,7 +236,9 @@ describe('ActionLinkResolverService', () => {
         code: 'ACTION_LINK_UNSUPPORTED_APP',
       },
     });
-    expect(publicIdentityLinkService.generateTrackedLink).not.toHaveBeenCalled();
+    expect(
+      publicIdentityLinkService.generateTrackedIdentityLink,
+    ).not.toHaveBeenCalled();
   });
 
   it('validates assignmentId mismatch before delegating', async () => {
@@ -256,7 +264,9 @@ describe('ActionLinkResolverService', () => {
         code: 'ACTION_LINK_ASSIGNMENT_MISMATCH',
       },
     });
-    expect(publicIdentityLinkService.generateTrackedLink).not.toHaveBeenCalled();
+    expect(
+      publicIdentityLinkService.generateTrackedIdentityLink,
+    ).not.toHaveBeenCalled();
   });
 
   it('allows matching assignmentId and delegates', async () => {
@@ -279,7 +289,9 @@ describe('ActionLinkResolverService', () => {
         currentAssignmentId: true,
       },
     });
-    expect(publicIdentityLinkService.generateTrackedLink).toHaveBeenCalledWith({
+    expect(
+      publicIdentityLinkService.generateTrackedIdentityLink,
+    ).toHaveBeenCalledWith({
       leadId: 'lead-1',
       stepKey: 'presentacion',
     });
@@ -290,8 +302,8 @@ describe('ActionLinkResolverService', () => {
 
     await service.resolve(resolveInput());
 
-    expect(publicIdentityLinkService.generateTrackedLink).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(
+      publicIdentityLinkService.generateTrackedIdentityLink,
+    ).toHaveBeenCalledTimes(1);
   });
 });
