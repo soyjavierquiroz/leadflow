@@ -16,7 +16,7 @@ export type ResolveActionLinkInput = {
   leadId: string;
   assignmentId?: string | null;
   appKey?: string;
-  actionKey: typeof ACTION_LINK_OPEN_VSL;
+  actionKey: string;
   purpose?: string;
   channel?: string;
   params?: {
