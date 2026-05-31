@@ -51,7 +51,7 @@ export type ResolveActionLinkOutput = {
 };
 
 type LegacyTrackedLinkResult = Awaited<
-  ReturnType<PublicIdentityLinkService['generateTrackedLink']>
+  ReturnType<PublicIdentityLinkService['generateTrackedIdentityLink']>
 >;
 
 @Injectable()
@@ -90,7 +90,7 @@ export class ActionLinkResolverService {
       ACTION_LINK_DEFAULT_VSL_STEP_KEY;
 
     const legacyResult =
-      await this.publicIdentityLinkService.generateTrackedLink({
+      await this.publicIdentityLinkService.generateTrackedIdentityLink({
         leadId: input.leadId,
         stepKey,
       });
