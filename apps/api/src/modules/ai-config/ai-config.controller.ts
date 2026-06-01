@@ -102,6 +102,13 @@ export class AiConfigController {
       source?: string | null;
       service_owner_key?: string | null;
       runtime_config_version?: string | null;
+      channel_binding?: {
+        provider?: string | null;
+        channel?: string | null;
+        instance_name?: string | null;
+        number_id?: string | null;
+        metadata?: Record<string, unknown> | null;
+      } | null;
     },
   ) {
     return this.inboundWhatsappLeadContextService.ensureLeadContext(body ?? {});

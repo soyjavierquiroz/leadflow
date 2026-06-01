@@ -68,6 +68,15 @@ describe('InboundWhatsappLeadContextService', () => {
     },
   });
 
+  const buildSponsor = (overrides: Record<string, unknown> = {}) => ({
+    id: 'sponsor-1',
+    workspaceId: 'workspace-1',
+    teamId: 'team-1',
+    status: 'active',
+    isActive: true,
+    ...overrides,
+  });
+
   const buildOwnerConnection = () => ({
     id: 'connection-1',
     teamId: 'team-1',
@@ -96,6 +105,9 @@ describe('InboundWhatsappLeadContextService', () => {
     },
     channelInstance: {
       findFirst: jest.fn(),
+    },
+    sponsor: {
+      findUnique: jest.fn(),
     },
     funnelPublication: {
       findFirst: jest.fn(),
@@ -151,6 +163,7 @@ describe('InboundWhatsappLeadContextService', () => {
     await expect(
       service.ensureLeadContext({
         ...baseInput,
+        instance_name: undefined,
         user_message:
           'Hola Freddy Catunta, soy Margarita DEMO. Ya completé mi registro.\n\nRef: 3AF5CCA1',
       }),
@@ -172,6 +185,9 @@ describe('InboundWhatsappLeadContextService', () => {
 
     expect(tx.lead.create).not.toHaveBeenCalled();
     expect(tx.assignment.create).not.toHaveBeenCalled();
+    expect(tx.sponsor.findUnique).not.toHaveBeenCalled();
+    expect(tx.messagingConnection.findFirst).not.toHaveBeenCalled();
+    expect(tx.channelInstance.findFirst).not.toHaveBeenCalled();
     expect(actionContextSyncService.upsertForRemoteJid).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 'team-1',
@@ -257,6 +273,9 @@ describe('InboundWhatsappLeadContextService', () => {
 
     expect(tx.lead.create).not.toHaveBeenCalled();
     expect(tx.assignment.create).not.toHaveBeenCalled();
+    expect(tx.sponsor.findUnique).not.toHaveBeenCalled();
+    expect(tx.messagingConnection.findFirst).not.toHaveBeenCalled();
+    expect(tx.channelInstance.findFirst).not.toHaveBeenCalled();
   });
 
   it('creates an inbound lead and assignment when no ref or phone lead exists', async () => {
@@ -310,6 +329,247 @@ describe('InboundWhatsappLeadContextService', () => {
       }),
     );
     expect(tx.assignment.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates an inbound lead and assignment from channel_binding.metadata.sponsor_id without local instance ownership', async () => {
+    const tx = buildTx();
+    const createdLead = buildLead({
+      id: 'lead-new',
+      status: 'captured',
+      currentAssignmentId: null,
+    });
+    const updatedLead = buildLead({
+      id: 'lead-new',
+      status: 'assigned',
+      currentAssignmentId: 'assignment-new',
+    });
+    const createdAssignment = buildAssignment({
+      id: 'assignment-new',
+      leadId: 'lead-new',
+      lead: updatedLead,
+    });
+    const { service, actionContextSyncService } = buildService(tx);
+
+    tx.$queryRaw.mockResolvedValue([]);
+    tx.sponsor.findUnique.mockResolvedValue(buildSponsor());
+    tx.funnelPublication.findFirst.mockResolvedValue(buildPublication());
+    tx.lead.create.mockResolvedValue(createdLead);
+    tx.assignment.create.mockResolvedValue(createdAssignment);
+    tx.lead.update.mockResolvedValue(updatedLead);
+
+    await expect(
+      service.ensureLeadContext({
+        ...baseInput,
+        instance_name: undefined,
+        user_message: 'Hola, quiero información.',
+        channel_binding: {
+          provider: 'evolution',
+          channel: 'whatsapp',
+          instance_name: 'runtime-instance',
+          number_id: null,
+          metadata: {
+            sponsor_id: 'sponsor-1',
+          },
+        },
+      }),
+    ).resolves.toMatchObject({
+      match_source: 'inbound_bootstrap',
+      created: true,
+      matched_existing: false,
+      lead_id: 'lead-new',
+      assignment_id: 'assignment-new',
+    });
+
+    expect(tx.messagingConnection.findFirst).not.toHaveBeenCalled();
+    expect(tx.channelInstance.findFirst).not.toHaveBeenCalled();
+    expect(tx.lead.create).toHaveBeenCalledTimes(1);
+    expect(tx.assignment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sponsorId: 'sponsor-1',
+          teamId: 'team-1',
+        }),
+      }),
+    );
+    expect(actionContextSyncService.upsertForRemoteJid).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          match_source: 'inbound_bootstrap',
+          owner_resolution_source: 'channel_binding_metadata',
+          channel_binding_instance_name: 'runtime-instance',
+          channel_binding_provider: 'evolution',
+          channel_binding_number_id: null,
+          inbound_source: 'n8n_inbound_whatsapp',
+        }),
+      }),
+    );
+  });
+
+  it('assigns an existing phone lead without duplicating it when channel_binding.metadata.sponsor_id is valid', async () => {
+    const tx = buildTx();
+    const existingLead = buildLead({
+      status: 'captured',
+      currentAssignmentId: null,
+    });
+    const updatedLead = buildLead({
+      status: 'assigned',
+      currentAssignmentId: 'assignment-new',
+    });
+    const createdAssignment = buildAssignment({
+      id: 'assignment-new',
+      lead: updatedLead,
+    });
+    const { service } = buildService(tx);
+
+    tx.$queryRaw.mockResolvedValue([{ id: 'lead-1' }]);
+    tx.lead.findUnique.mockResolvedValue(existingLead);
+    tx.assignment.findFirst.mockResolvedValue(null);
+    tx.sponsor.findUnique.mockResolvedValue(buildSponsor());
+    tx.assignment.create.mockResolvedValue(createdAssignment);
+    tx.lead.update.mockResolvedValue(updatedLead);
+
+    await expect(
+      service.ensureLeadContext({
+        ...baseInput,
+        user_message: 'Hola, quiero información.',
+        channel_binding: {
+          channel: 'whatsapp',
+          metadata: {
+            sponsor_id: 'sponsor-1',
+          },
+        },
+      }),
+    ).resolves.toMatchObject({
+      match_source: 'phone',
+      created: false,
+      matched_existing: true,
+      lead_id: 'lead-1',
+      assignment_id: 'assignment-new',
+    });
+
+    expect(tx.lead.create).not.toHaveBeenCalled();
+    expect(tx.assignment.create).toHaveBeenCalledTimes(1);
+    expect(tx.messagingConnection.findFirst).not.toHaveBeenCalled();
+    expect(tx.channelInstance.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('returns a controlled owner_not_found error when channel_binding.metadata.sponsor_id does not exist', async () => {
+    const tx = buildTx();
+    const { service } = buildService(tx);
+
+    tx.$queryRaw.mockResolvedValue([]);
+    tx.sponsor.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.ensureLeadContext({
+        ...baseInput,
+        user_message: 'Hola, quiero información.',
+        channel_binding: {
+          channel: 'whatsapp',
+          metadata: {
+            sponsor_id: 'missing-sponsor',
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        reason: 'owner_not_found',
+      }),
+    });
+
+    expect(tx.lead.create).not.toHaveBeenCalled();
+    expect(tx.assignment.create).not.toHaveBeenCalled();
+  });
+
+  it('returns a controlled error when channel_binding.metadata.sponsor_id belongs to another tenant', async () => {
+    const tx = buildTx();
+    const { service } = buildService(tx);
+
+    tx.$queryRaw.mockResolvedValue([]);
+    tx.sponsor.findUnique.mockResolvedValue(
+      buildSponsor({
+        teamId: 'team-2',
+      }),
+    );
+
+    await expect(
+      service.ensureLeadContext({
+        ...baseInput,
+        user_message: 'Hola, quiero información.',
+        channel_binding: {
+          channel: 'whatsapp',
+          metadata: {
+            sponsor_id: 'sponsor-foreign',
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        reason: 'owner_not_found',
+      }),
+    });
+
+    expect(tx.lead.create).not.toHaveBeenCalled();
+    expect(tx.assignment.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps the ChannelInstance fallback when no channel_binding owner metadata is available', async () => {
+    const tx = buildTx();
+    const createdLead = buildLead({
+      id: 'lead-new',
+      status: 'captured',
+      currentAssignmentId: null,
+    });
+    const updatedLead = buildLead({
+      id: 'lead-new',
+      status: 'assigned',
+      currentAssignmentId: 'assignment-new',
+    });
+    const createdAssignment = buildAssignment({
+      id: 'assignment-new',
+      leadId: 'lead-new',
+      lead: updatedLead,
+    });
+    const { service, actionContextSyncService } = buildService(tx);
+
+    tx.$queryRaw.mockResolvedValue([]);
+    tx.messagingConnection.findFirst.mockResolvedValue(null);
+    tx.channelInstance.findFirst.mockResolvedValue({
+      id: 'channel-instance-1',
+      tenantId: 'team-1',
+      instanceName: 'lf-freddycatuntadxn-freddy',
+      member: {
+        id: 'sponsor-1',
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+      },
+    });
+    tx.funnelPublication.findFirst.mockResolvedValue(buildPublication());
+    tx.lead.create.mockResolvedValue(createdLead);
+    tx.assignment.create.mockResolvedValue(createdAssignment);
+    tx.lead.update.mockResolvedValue(updatedLead);
+
+    await expect(
+      service.ensureLeadContext({
+        ...baseInput,
+        user_message: 'Hola, quiero información.',
+      }),
+    ).resolves.toMatchObject({
+      match_source: 'inbound_bootstrap',
+      created: true,
+      lead_id: 'lead-new',
+    });
+
+    expect(tx.sponsor.findUnique).not.toHaveBeenCalled();
+    expect(tx.messagingConnection.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.channelInstance.findFirst).toHaveBeenCalledTimes(1);
+    expect(actionContextSyncService.upsertForRemoteJid).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          owner_resolution_source: 'channel_instance',
+        }),
+      }),
+    );
   });
 
   it('does not duplicate lead or assignment when the same remote_jid is repeated', async () => {

@@ -16,6 +16,34 @@ const INBOUND_ACTION_CONTEXT_SOURCE = 'inbound_whatsapp_ensure_lead_context';
 
 type TransactionClient = Prisma.TransactionClient;
 type MatchSource = 'ownership_ref' | 'phone' | 'inbound_bootstrap';
+type OwnerResolutionSource =
+  | 'channel_binding_metadata'
+  | 'messaging_connection'
+  | 'channel_instance';
+
+type ChannelBindingInput = {
+  provider?: string | null;
+  channel?: string | null;
+  instance_name?: string | null;
+  number_id?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+type NormalizedChannelBinding = {
+  provider: string | null;
+  channel: string | null;
+  instanceName: string | null;
+  numberId: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+type OperationalTrace = {
+  ownerResolutionSource: OwnerResolutionSource | null;
+  channelBindingInstanceName: string | null;
+  channelBindingProvider: string | null;
+  channelBindingNumberId: string | null;
+  inboundSource: string | null;
+};
 
 type EnsureInboundWhatsappLeadContextInput = {
   tenant_id?: string | null;
@@ -28,6 +56,7 @@ type EnsureInboundWhatsappLeadContextInput = {
   source?: string | null;
   service_owner_key?: string | null;
   runtime_config_version?: string | null;
+  channel_binding?: ChannelBindingInput | null;
 };
 
 type EnsuredLeadContext = {
@@ -55,6 +84,7 @@ type OwnerSponsor = {
   id: string;
   workspaceId: string;
   teamId: string;
+  resolutionSource: OwnerResolutionSource;
 };
 
 type AssignmentContext = {
@@ -72,6 +102,7 @@ type AssignmentContext = {
   createdLead: boolean;
   matchedExisting: boolean;
   matchSource: MatchSource;
+  trace: OperationalTrace;
 };
 
 const REF_REGEX =
@@ -89,6 +120,60 @@ const extractOwnershipRef = (message: string | null | undefined) => {
   const match = normalized?.match(REF_REGEX);
 
   return match?.[1] ? toShortOwnershipRef(match[1]) : null;
+};
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const normalizeChannelBinding = (
+  value: ChannelBindingInput | null | undefined,
+): NormalizedChannelBinding => ({
+  provider: sanitizeNullableText(value?.provider),
+  channel: sanitizeNullableText(value?.channel),
+  instanceName: sanitizeNullableText(value?.instance_name),
+  numberId: sanitizeNullableText(value?.number_id),
+  metadata: isPlainRecord(value?.metadata) ? value.metadata : null,
+});
+
+const readMetadataText = (
+  metadata: Record<string, unknown> | null,
+  key: string,
+) => {
+  const value = metadata?.[key];
+
+  return typeof value === 'string' ? sanitizeNullableText(value) : null;
+};
+
+const getChannelBindingSponsorCandidate = (
+  metadata: Record<string, unknown> | null,
+):
+  | {
+      sponsorId: string;
+      key: 'sponsor_id' | 'sponsorId' | 'owner_sponsor_id' | 'member_id';
+      strict: boolean;
+    }
+  | null => {
+  const sponsorId = readMetadataText(metadata, 'sponsor_id');
+  if (sponsorId) {
+    return { sponsorId, key: 'sponsor_id', strict: true };
+  }
+
+  const camelSponsorId = readMetadataText(metadata, 'sponsorId');
+  if (camelSponsorId) {
+    return { sponsorId: camelSponsorId, key: 'sponsorId', strict: true };
+  }
+
+  const ownerSponsorId = readMetadataText(metadata, 'owner_sponsor_id');
+  if (ownerSponsorId) {
+    return { sponsorId: ownerSponsorId, key: 'owner_sponsor_id', strict: true };
+  }
+
+  const memberId = readMetadataText(metadata, 'member_id');
+  if (memberId) {
+    return { sponsorId: memberId, key: 'member_id', strict: false };
+  }
+
+  return null;
 };
 
 const resolveRemoteJid = (
@@ -121,11 +206,23 @@ export class InboundWhatsappLeadContextService {
   async ensureLeadContext(
     input: EnsureInboundWhatsappLeadContextInput,
   ): Promise<EnsuredLeadContext> {
+    const channelBinding = normalizeChannelBinding(input.channel_binding);
     const tenantId = sanitizeNullableText(input.tenant_id);
-    const channel = sanitizeNullableText(input.channel);
-    const instanceName = sanitizeNullableText(input.instance_name);
+    const channel =
+      sanitizeNullableText(input.channel) ?? channelBinding.channel;
+    const instanceName =
+      sanitizeNullableText(input.instance_name) ?? channelBinding.instanceName;
     const serviceOwnerKey = sanitizeNullableText(input.service_owner_key);
     const remote = resolveRemoteJid(input.remote_jid);
+    const inboundSource =
+      sanitizeNullableText(input.source) ?? INBOUND_ACTION_CONTEXT_SOURCE;
+    const trace: OperationalTrace = {
+      ownerResolutionSource: null,
+      channelBindingInstanceName: channelBinding.instanceName ?? instanceName,
+      channelBindingProvider: channelBinding.provider,
+      channelBindingNumberId: channelBinding.numberId,
+      inboundSource,
+    };
 
     if (!tenantId) {
       throw new BadRequestException({
@@ -138,13 +235,6 @@ export class InboundWhatsappLeadContextService {
       throw new BadRequestException({
         code: 'INBOUND_WHATSAPP_CHANNEL_INVALID',
         message: 'channel must be whatsapp.',
-      });
-    }
-
-    if (!instanceName) {
-      throw new BadRequestException({
-        code: 'INBOUND_WHATSAPP_INSTANCE_REQUIRED',
-        message: 'instance_name is required.',
       });
     }
 
@@ -163,12 +253,15 @@ export class InboundWhatsappLeadContextService {
         ? this.resolveByOwnershipRef(tx, {
             tenantId,
             ownershipRef,
+            trace,
           })
         : this.resolveByPhoneOrBootstrap(tx, {
             tenantId,
             instanceName,
+            channelBinding,
             remote,
             pushName: sanitizeNullableText(input.push_name),
+            trace,
           });
     });
 
@@ -178,7 +271,7 @@ export class InboundWhatsappLeadContextService {
       leadId: context.leadId,
       assignmentId: context.assignmentId,
       publicationId: context.publicationId,
-      source: input.source ?? INBOUND_ACTION_CONTEXT_SOURCE,
+      source: inboundSource,
       metadata: {
         workspace_id: context.workspaceId,
         team_id: tenantId,
@@ -191,6 +284,12 @@ export class InboundWhatsappLeadContextService {
         traffic_layer: context.trafficLayer,
         origin_ad_wheel_id: context.originAdWheelId,
         match_source: context.matchSource,
+        owner_resolution_source: context.trace.ownerResolutionSource,
+        channel_binding_instance_name:
+          context.trace.channelBindingInstanceName,
+        channel_binding_provider: context.trace.channelBindingProvider,
+        channel_binding_number_id: context.trace.channelBindingNumberId,
+        inbound_source: context.trace.inboundSource,
         message_id: sanitizeNullableText(input.message_id) ?? null,
         runtime_config_version:
           sanitizeNullableText(input.runtime_config_version) ?? null,
@@ -229,6 +328,7 @@ export class InboundWhatsappLeadContextService {
     input: {
       tenantId: string;
       ownershipRef: string;
+      trace: OperationalTrace;
     },
   ): Promise<AssignmentContext> {
     const matches = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
@@ -279,6 +379,7 @@ export class InboundWhatsappLeadContextService {
       matchSource: 'ownership_ref',
       createdLead: false,
       matchedExisting: true,
+      trace: input.trace,
     });
   }
 
@@ -286,12 +387,13 @@ export class InboundWhatsappLeadContextService {
     tx: TransactionClient,
     input: {
       tenantId: string;
-      instanceName: string;
+      instanceName: string | null;
+      channelBinding: NormalizedChannelBinding;
       remote: ResolvedRemoteJid;
       pushName: string | null;
+      trace: OperationalTrace;
     },
   ): Promise<AssignmentContext> {
-    const owner = await this.resolveInstanceOwnerOrThrow(tx, input);
     const existingLead = await this.findLeadByPhone(tx, {
       tenantId: input.tenantId,
       phone: input.remote.phone,
@@ -308,23 +410,42 @@ export class InboundWhatsappLeadContextService {
           matchSource: 'phone',
           createdLead: false,
           matchedExisting: true,
+          trace: input.trace,
         });
       }
 
+      const owner = await this.resolveOwnerOrThrow(tx, {
+        tenantId: input.tenantId,
+        instanceName: input.instanceName,
+        channelBinding: input.channelBinding,
+      });
       const assignment = await this.createAssignmentForLead(tx, {
         lead: existingLead,
         owner,
         reason: 'manual',
         source: 'inbound_existing_phone',
+        trace: {
+          ...input.trace,
+          ownerResolutionSource: owner.resolutionSource,
+        },
       });
 
       return this.toAssignmentContext(assignment, {
         matchSource: 'phone',
         createdLead: false,
         matchedExisting: true,
+        trace: {
+          ...input.trace,
+          ownerResolutionSource: owner.resolutionSource,
+        },
       });
     }
 
+    const owner = await this.resolveOwnerOrThrow(tx, {
+      tenantId: input.tenantId,
+      instanceName: input.instanceName,
+      channelBinding: input.channelBinding,
+    });
     const publication = await this.resolveBootstrapPublicationOrThrow(tx, {
       tenantId: input.tenantId,
     });
@@ -355,22 +476,45 @@ export class InboundWhatsappLeadContextService {
       owner,
       reason: 'manual',
       source: 'inbound_bootstrap',
+      trace: {
+        ...input.trace,
+        ownerResolutionSource: owner.resolutionSource,
+      },
     });
 
     return this.toAssignmentContext(assignment, {
       matchSource: 'inbound_bootstrap',
       createdLead: true,
       matchedExisting: false,
+      trace: {
+        ...input.trace,
+        ownerResolutionSource: owner.resolutionSource,
+      },
     });
   }
 
-  private async resolveInstanceOwnerOrThrow(
+  private async resolveOwnerOrThrow(
     tx: TransactionClient,
     input: {
       tenantId: string;
-      instanceName: string;
+      instanceName: string | null;
+      channelBinding: NormalizedChannelBinding;
     },
   ): Promise<OwnerSponsor> {
+    const metadataOwner = await this.resolveChannelBindingOwner(tx, input);
+
+    if (metadataOwner) {
+      return metadataOwner;
+    }
+
+    if (!input.instanceName) {
+      throw new BadRequestException({
+        code: 'INBOUND_WHATSAPP_INSTANCE_REQUIRED',
+        message:
+          'instance_name or channel_binding.instance_name is required when no channel_binding owner metadata is available.',
+      });
+    }
+
     const connection = await tx.messagingConnection.findFirst({
       where: {
         teamId: input.tenantId,
@@ -386,6 +530,7 @@ export class InboundWhatsappLeadContextService {
         id: connection.sponsor.id,
         workspaceId: connection.sponsor.workspaceId,
         teamId: connection.sponsor.teamId,
+        resolutionSource: 'messaging_connection',
       };
     }
 
@@ -404,6 +549,7 @@ export class InboundWhatsappLeadContextService {
         id: channelInstance.member.id,
         workspaceId: channelInstance.member.workspaceId,
         teamId: channelInstance.member.teamId,
+        resolutionSource: 'channel_instance',
       };
     }
 
@@ -412,6 +558,70 @@ export class InboundWhatsappLeadContextService {
       message: `No advisor owner was found for instance ${input.instanceName} in this tenant.`,
       reason: 'instance_owner_not_found',
     });
+  }
+
+  private async resolveChannelBindingOwner(
+    tx: TransactionClient,
+    input: {
+      tenantId: string;
+      channelBinding: NormalizedChannelBinding;
+    },
+  ): Promise<OwnerSponsor | null> {
+    const candidate = getChannelBindingSponsorCandidate(
+      input.channelBinding.metadata,
+    );
+
+    if (!candidate) {
+      return null;
+    }
+
+    const sponsor = await tx.sponsor.findUnique({
+      where: {
+        id: candidate.sponsorId,
+      },
+      select: {
+        id: true,
+        workspaceId: true,
+        teamId: true,
+        status: true,
+        isActive: true,
+      },
+    });
+
+    if (!sponsor) {
+      if (!candidate.strict) {
+        return null;
+      }
+
+      throw new NotFoundException({
+        code: 'INBOUND_WHATSAPP_OWNER_NOT_FOUND',
+        message: `No advisor owner was found for ${candidate.key} ${candidate.sponsorId}.`,
+        reason: 'owner_not_found',
+      });
+    }
+
+    if (sponsor.teamId !== input.tenantId) {
+      throw new NotFoundException({
+        code: 'INBOUND_WHATSAPP_OWNER_NOT_FOUND',
+        message: `Advisor owner ${candidate.sponsorId} does not belong to this tenant.`,
+        reason: 'owner_not_found',
+      });
+    }
+
+    if (!sponsor.isActive || sponsor.status !== 'active') {
+      throw new ConflictException({
+        code: 'INBOUND_WHATSAPP_OWNER_INACTIVE',
+        message: `Advisor owner ${candidate.sponsorId} is not active.`,
+        reason: 'owner_inactive',
+      });
+    }
+
+    return {
+      id: sponsor.id,
+      workspaceId: sponsor.workspaceId,
+      teamId: sponsor.teamId,
+      resolutionSource: 'channel_binding_metadata',
+    };
   }
 
   private async findLeadByPhone(
@@ -525,6 +735,7 @@ export class InboundWhatsappLeadContextService {
       owner: OwnerSponsor;
       reason: 'manual' | 'handoff';
       source: string;
+      trace: OperationalTrace;
     },
   ) {
     const now = new Date();
@@ -575,6 +786,12 @@ export class InboundWhatsappLeadContextService {
           assignmentId: assignment.id,
           sponsorId: input.owner.id,
           assignmentMode: 'inbound_whatsapp',
+          owner_resolution_source: input.trace.ownerResolutionSource,
+          channel_binding_instance_name:
+            input.trace.channelBindingInstanceName,
+          channel_binding_provider: input.trace.channelBindingProvider,
+          channel_binding_number_id: input.trace.channelBindingNumberId,
+          inbound_source: input.trace.inboundSource,
         },
         occurredAt: now,
         funnelInstanceId: input.lead.funnelInstanceId,
@@ -611,6 +828,7 @@ export class InboundWhatsappLeadContextService {
       matchSource: MatchSource;
       createdLead: boolean;
       matchedExisting: boolean;
+      trace: OperationalTrace;
     },
   ): AssignmentContext {
     return {
@@ -628,6 +846,7 @@ export class InboundWhatsappLeadContextService {
       createdLead: input.createdLead,
       matchedExisting: input.matchedExisting,
       matchSource: input.matchSource,
+      trace: input.trace,
     };
   }
 }
