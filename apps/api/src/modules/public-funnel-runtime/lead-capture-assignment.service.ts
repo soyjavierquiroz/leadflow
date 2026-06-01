@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   LeadStatus,
@@ -14,6 +15,7 @@ import {
 import { TrackingEventsService } from '../events/tracking-events.service';
 import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
 import { MessagingAutomationService } from '../messaging-automation/messaging-automation.service';
+import { ActionContextSyncService } from '../runtime-context/action-context-sync.service';
 import { OwnershipContextUpsertService } from '../runtime-context/ownership-context-upsert.service';
 import { generateOwnershipKey } from '../runtime-context/ownership-context-key.util';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -218,6 +220,8 @@ export class LeadCaptureAssignmentService {
     private readonly mailerService: MailerService,
     private readonly capiManagerService: CapiManagerService,
     private readonly ownershipContextUpsertService: OwnershipContextUpsertService,
+    @Optional()
+    private readonly actionContextSyncService?: ActionContextSyncService,
   ) {}
 
   async registerVisitor(dto: RegisterPublicVisitorDto) {
@@ -730,6 +734,11 @@ export class LeadCaptureAssignmentService {
     void this.ownershipContextUpsertService.upsertForAssignment({
       assignmentId: input.assignmentId,
       sourceUrl: input.sourceUrl ?? null,
+    });
+
+    void this.actionContextSyncService?.upsertForAssignment({
+      assignmentId: input.assignmentId,
+      source: 'public_assignment_created',
     });
 
     void this.sendAdvisorAssignmentEmail({
