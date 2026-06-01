@@ -2034,6 +2034,23 @@ function HandoffCtaBlockAdapter({
         settings?.showAdvisorAvatar,
         asBoolean(block.showAdvisorAvatar, true),
       )}
+      eyebrow={asString(settings?.eyebrow, asString(block.eyebrow)) || undefined}
+      subheadline={
+        asString(settings?.subheadline, asString(block.subheadline)).trim() ||
+        undefined
+      }
+      advisorIntro={
+        asString(settings?.advisorIntro, asString(block.advisorIntro)).trim() ||
+        undefined
+      }
+      refLabel={
+        asString(settings?.refLabel, asString(block.refLabel)).trim() ||
+        undefined
+      }
+      trustNote={
+        asString(settings?.trustNote, asString(block.trustNote)).trim() ||
+        undefined
+      }
     />
   );
 }

@@ -2,7 +2,7 @@
 
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HandoffCta } from "@/components/public-funnel/handoff-cta";
 import {
   resolvePublicFunnelHandoffState,
@@ -58,6 +58,10 @@ const buildRuntime = (advisorName: string) =>
 describe("resolvePublicFunnelHandoffState", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("prioriza el sponsor asignado por captura sobre el sponsor estatico del runtime", () => {
@@ -245,6 +249,76 @@ describe("resolvePublicFunnelHandoffState", () => {
       "Hola Freddy Catunta, soy Javier Sueldo. Ref: 3AF5CCA1",
     );
     expect(decodedHref).not.toContain("{{ownership.ref}}");
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("muestra y actualiza el countdown cuando autoRedirectSeconds es mayor a cero", async () => {
+    vi.useFakeTimers();
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        createElement(HandoffCta, {
+          advisor: {
+            sponsorId: "sponsor-freddy",
+            name: "Freddy Catunta",
+            role: null,
+            phone: "+591 70554048",
+            photoUrl: "https://cdn.example.com/freddy.png",
+            bio: null,
+            whatsappUrl: null,
+          },
+          leadName: "Javier Sueldo",
+          handoff: {
+            leadId: "lead-1",
+            assignmentId: "assignment-current",
+            ownershipKey: "lf_own_3af5cca1a045f54d1834defd",
+            ownershipRef: null,
+            trackingRef: null,
+            whatsappPhone: "+591 70554048",
+            whatsappMessage: null,
+            whatsappUrl: null,
+          },
+          headline: "Tu registro está completo",
+          buttonPrefix: "Continuar con {{advisorName}} por WhatsApp",
+          redirectText:
+            "Te llevaremos a WhatsApp con {{advisorName}} en {{seconds}} segundos.",
+          whatsappText:
+            "Hola {{advisorName}}, soy {{leadName}}. Ref: {{ownership.ref}}",
+          autoRedirectSeconds: 8,
+        }),
+      );
+    });
+
+    const avatar = container.querySelector(
+      'img[alt="Foto de Freddy Catunta"]',
+    ) as HTMLImageElement | null;
+    const link = container.querySelector("a") as HTMLAnchorElement | null;
+    const decodedHref = decodeURIComponent(link?.href ?? "");
+
+    expect(avatar?.getAttribute("src")).toBe(
+      "https://cdn.example.com/freddy.png",
+    );
+    expect(container.textContent).toContain(
+      "Te llevaremos a WhatsApp con Freddy Catunta en 8 segundos.",
+    );
+    expect(decodedHref).toContain("Ref: 3AF5CCA1");
+    expect(decodedHref).not.toContain("{{ownership.ref}}");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(container.textContent).toContain(
+      "Te llevaremos a WhatsApp con Freddy Catunta en 7 segundos.",
+    );
 
     await act(async () => {
       root.unmount();

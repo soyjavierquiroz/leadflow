@@ -38,6 +38,11 @@ type HandoffCtaProps = {
   autoRedirectSeconds?: number;
   buttonColor?: string;
   showAdvisorAvatar?: boolean;
+  eyebrow?: string;
+  subheadline?: string;
+  advisorIntro?: string;
+  refLabel?: string;
+  trustNote?: string;
 };
 
 const DEFAULT_HEADLINE = "Continuar por WhatsApp";
@@ -45,6 +50,14 @@ const DEFAULT_BUTTON_PREFIX = "Continuar con {{advisorName}}";
 const DEFAULT_REDIRECT_TEXT =
   "{{advisorName}} te está esperando. Redirigiendo en {{seconds}}";
 const DEFAULT_WHATSAPP_TEXT = "Hola soy {{leadName}}, deseo más información";
+const DEFAULT_EYEBROW = "ASESOR ASIGNADO";
+const DEFAULT_SUBHEADLINE =
+  "{{advisorName}} ya recibió tu solicitud y te ayudará a dar el siguiente paso por WhatsApp.";
+const DEFAULT_ADVISOR_INTRO = "Tu asesor asignado";
+const DEFAULT_REF_LABEL = "Código de seguimiento";
+const DEFAULT_TRUST_NOTE =
+  "Usa este código para que tu asesor identifique tu registro rápido.";
+const MANUAL_SUPPORT_TEXT = "Toca el botón para continuar por WhatsApp.";
 
 const VISIBLE_REF_REGEX = /\bref\s*:/i;
 
@@ -54,7 +67,11 @@ const normalizeWhatsappPhone = (value: string | null | undefined) => {
 };
 
 const appendTrackingRef = (message: string, trackingRef: string | null) => {
-  if (!trackingRef || message.includes(trackingRef) || VISIBLE_REF_REGEX.test(message)) {
+  if (
+    !trackingRef ||
+    message.includes(trackingRef) ||
+    VISIBLE_REF_REGEX.test(message)
+  ) {
     return message;
   }
 
@@ -63,7 +80,10 @@ const appendTrackingRef = (message: string, trackingRef: string | null) => {
 
 const getAdvisorInitials = (name: string | null | undefined) => {
   const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
-  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
+  const initials = parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 
   return initials || "?";
 };
@@ -82,9 +102,9 @@ function AdvisorAvatar({
   }, [photoUrl]);
 
   return (
-    <div className="relative flex h-24 w-24 items-center justify-center md:h-28 md:w-28">
+    <div className="relative flex h-32 w-32 items-center justify-center md:h-36 md:w-36">
       <span className="absolute inset-0 rounded-full bg-emerald-400/20 blur-xl" />
-      <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-white/80 bg-emerald-50 text-2xl font-black text-emerald-800 shadow-[0_18px_44px_rgba(16,185,129,0.22)] ring-4 ring-emerald-400/25">
+      <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-white/80 bg-emerald-50 text-4xl font-black text-emerald-800 shadow-[0_18px_44px_rgba(16,185,129,0.22)] ring-4 ring-emerald-400/25">
         {shouldShowImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -115,6 +135,11 @@ export function HandoffCta({
   autoRedirectSeconds = 5,
   buttonColor,
   showAdvisorAvatar = true,
+  eyebrow,
+  subheadline,
+  advisorIntro,
+  refLabel,
+  trustNote,
 }: HandoffCtaProps) {
   const redirectStartedRef = useRef(false);
   const [countdown, setCountdown] = useState(
@@ -198,6 +223,25 @@ export function HandoffCta({
     leadName,
     whatsappText,
   ]);
+  const trackingRef = useMemo(
+    () =>
+      resolvePublicHandoffTrackingRef({
+        ownershipKey: handoff.ownershipKey,
+        ownershipRef: handoff.ownershipRef,
+        trackingRef: handoff.trackingRef,
+        fallbackMessage: handoff.whatsappMessage,
+      }),
+    [
+      handoff.ownershipKey,
+      handoff.ownershipRef,
+      handoff.trackingRef,
+      handoff.whatsappMessage,
+    ],
+  );
+  const shouldShowCountdown = autoRedirectSeconds > 0;
+  const countdownText = renderText(redirectText || DEFAULT_REDIRECT_TEXT);
+  const supportText = shouldShowCountdown ? countdownText : MANUAL_SUPPORT_TEXT;
+  const resolvedAdvisorName = advisor?.name?.trim() || "";
 
   useEffect(() => {
     redirectStartedRef.current = false;
@@ -228,12 +272,41 @@ export function HandoffCta({
   return (
     <PublicSectionSurface isBoxed={isBoxed} tone="success">
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 text-center">
+        <span className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-700 shadow-sm">
+          {renderText(eyebrow || DEFAULT_EYEBROW)}
+        </span>
         {showAdvisorAvatar && advisor ? <AdvisorAvatar advisor={advisor} /> : null}
-        <div>
+        {advisor ? (
+          <div className="space-y-1">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+              {renderText(advisorIntro || DEFAULT_ADVISOR_INTRO)}
+            </p>
+            <p className="text-2xl font-black leading-tight text-slate-950 md:text-3xl">
+              {resolvedAdvisorName || "Tu asesor"}
+            </p>
+          </div>
+        ) : null}
+        <div className="space-y-4">
           <h2 className="font-headline text-4xl font-black leading-[0.95] tracking-tighter [color:var(--theme-text-strong)] [font-family:var(--font-header)] md:text-5xl">
             <RichHeadline text={renderText(headline || DEFAULT_HEADLINE)} />
           </h2>
+          <p className="mx-auto max-w-xl text-base font-medium leading-7 text-slate-700 [font-family:var(--font-body)] md:text-lg">
+            {renderText(subheadline || DEFAULT_SUBHEADLINE)}
+          </p>
         </div>
+        {trackingRef ? (
+          <div className="w-full max-w-md rounded-2xl border border-emerald-200 bg-emerald-50/80 px-5 py-4 shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">
+              {renderText(refLabel || DEFAULT_REF_LABEL)}
+            </p>
+            <p className="mt-1 font-mono text-2xl font-black tracking-[0.12em] text-slate-950">
+              {trackingRef}
+            </p>
+            <p className="mt-2 text-xs font-medium leading-5 text-slate-600">
+              {renderText(trustNote || DEFAULT_TRUST_NOTE)}
+            </p>
+          </div>
+        ) : null}
         <div className="w-full max-w-xl">
           <a
             href={dynamicWhatsappUrl || "#"}
@@ -247,9 +320,18 @@ export function HandoffCta({
           >
             {renderText(buttonPrefix || DEFAULT_BUTTON_PREFIX)}
           </a>
-          <p className="mt-3 text-sm font-medium [color:var(--theme-text-muted)] [font-family:var(--font-body)]">
-            {renderText(redirectText || DEFAULT_REDIRECT_TEXT)}
-          </p>
+          {shouldShowCountdown ? (
+            <div
+              aria-live="polite"
+              className="mt-4 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-base font-black text-emerald-800 shadow-sm [font-family:var(--font-body)]"
+            >
+              {supportText}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm font-semibold text-slate-600 [font-family:var(--font-body)]">
+              {supportText}
+            </p>
+          )}
         </div>
       </div>
     </PublicSectionSurface>
