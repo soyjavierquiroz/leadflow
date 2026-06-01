@@ -1585,6 +1585,7 @@ export const builderBlockDefinitionsByKey: Record<
         whatsappText: "string",
         autoRedirectSeconds: "number",
         buttonColor: "string",
+        showAdvisorAvatar: "boolean",
       },
     },
     example: {
@@ -1594,9 +1595,11 @@ export const builderBlockDefinitionsByKey: Record<
         headline: "Continua ahora por WhatsApp",
         buttonPrefix: "Continuar con {{advisorName}}",
         redirectText: "{{advisorName}} te está esperando. Redirigiendo en {{seconds}}",
-        whatsappText: "Hola soy {{leadName}}, deseo más información",
+        whatsappText:
+          "Hola {{advisorName}}, soy {{leadName}}. Ya completé mi registro y quiero continuar.\n\nRef: {{ownership.ref}}",
         autoRedirectSeconds: 5,
         buttonColor: "#25D366",
+        showAdvisorAvatar: true,
       },
     },
   }),
