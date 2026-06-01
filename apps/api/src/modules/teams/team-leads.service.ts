@@ -4,10 +4,12 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LeadDispatcherService } from '../messaging-automation/lead-dispatcher.service';
+import { ActionContextSyncService } from '../runtime-context/action-context-sync.service';
 import { OwnershipContextUpsertService } from '../runtime-context/ownership-context-upsert.service';
 import { generateOwnershipKey } from '../runtime-context/ownership-context-key.util';
 import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
@@ -146,6 +148,8 @@ export class TeamLeadsService {
     private readonly prisma: PrismaService,
     private readonly leadDispatcherService: LeadDispatcherService,
     private readonly ownershipContextUpsertService: OwnershipContextUpsertService,
+    @Optional()
+    private readonly actionContextSyncService?: ActionContextSyncService,
   ) {}
 
   async list(scope: {
@@ -379,6 +383,11 @@ export class TeamLeadsService {
       void this.ownershipContextUpsertService.upsertForAssignment({
         assignmentId,
         sourceUrl: null,
+      });
+
+      void this.actionContextSyncService?.upsertForAssignment({
+        assignmentId,
+        source: 'team_lead_reassigned',
       });
 
       automationTriggered = Boolean(
