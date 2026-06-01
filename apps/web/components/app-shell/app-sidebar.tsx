@@ -26,12 +26,32 @@ import type {
 } from "@/lib/app-shell/types";
 
 type AppSidebarProps = {
+  id?: string;
   areaLabel: string;
   nav: ShellNavItem[];
   navSections?: ShellNavSection[];
   statusBadge?: SidebarStatusBadge;
+  collapsed?: boolean;
   className?: string;
   onNavigate?: () => void;
+};
+
+const iconMap: Record<string, typeof Bot> = {
+  "bar-chart-3": BarChart3,
+  bot: Bot,
+  "briefcase-business": BriefcaseBusiness,
+  "building-2": Building2,
+  inbox: Inbox,
+  "layers-3": Layers3,
+  "layout-dashboard": LayoutDashboard,
+  "layout-template": LayoutTemplate,
+  "link-2": Link2,
+  network: Network,
+  orbit: Orbit,
+  "radio-tower": RadioTower,
+  settings: Settings,
+  "user-round": UserRound,
+  users: Users,
 };
 
 const normalizePathname = (value: string) =>
@@ -41,30 +61,15 @@ const isTopLevelRoute = (value: string) =>
   normalizePathname(value).split("/").filter(Boolean).length === 1;
 
 export function AppSidebar({
+  id,
   areaLabel,
   nav,
   navSections,
   statusBadge,
+  collapsed = false,
   className,
   onNavigate,
 }: AppSidebarProps) {
-  const iconMap: Record<string, typeof Bot> = {
-    "bar-chart-3": BarChart3,
-    bot: Bot,
-    "briefcase-business": BriefcaseBusiness,
-    "building-2": Building2,
-    inbox: Inbox,
-    "layers-3": Layers3,
-    "layout-dashboard": LayoutDashboard,
-    "layout-template": LayoutTemplate,
-    "link-2": Link2,
-    network: Network,
-    orbit: Orbit,
-    "radio-tower": RadioTower,
-    settings: Settings,
-    "user-round": UserRound,
-    users: Users,
-  };
   const pathname = usePathname();
   const sections =
     navSections && navSections.length > 0
@@ -91,15 +96,29 @@ export function AppSidebar({
         key={item.href}
         href={item.href}
         aria-current={isActive ? "page" : undefined}
+        aria-label={collapsed ? item.label : undefined}
+        title={collapsed ? item.label : undefined}
         onClick={onNavigate}
-        className={`block rounded-[1.25rem] border px-4 py-3 transition ${
+        className={`relative flex rounded-[1.25rem] border transition ${
+          collapsed
+            ? "h-12 items-center justify-center px-0 py-0"
+            : "block px-4 py-3"
+        } ${
           isActive
             ? "border-app-accent bg-app-accent-soft text-app-shell-text shadow-[var(--ai-card-shadow)]"
             : "border-app-shell-border bg-app-shell-surface text-app-shell-text hover:border-app-shell-muted hover:bg-[color:color-mix(in_srgb,var(--app-shell-text)_10%,transparent)]"
         }`}
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div
+          className={`flex w-full items-center ${
+            collapsed ? "justify-center" : "justify-between gap-3"
+          }`}
+        >
+          <div
+            className={`flex items-center ${
+              collapsed ? "justify-center" : "gap-3"
+            }`}
+          >
             <span
               className={`flex size-9 items-center justify-center rounded-2xl border ${
                 isActive
@@ -109,10 +128,18 @@ export function AppSidebar({
             >
               {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
             </span>
-            <p className="text-sm font-semibold">{item.label}</p>
+            <span className={collapsed ? "sr-only" : "text-sm font-semibold"}>
+              {item.label}
+            </span>
           </div>
           {isActive ? (
-            <span className="h-2.5 w-2.5 rounded-full bg-app-accent" />
+            <span
+              className={
+                collapsed
+                  ? "absolute right-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-app-accent"
+                  : "h-2.5 w-2.5 rounded-full bg-app-accent"
+              }
+            />
           ) : null}
         </div>
       </Link>
@@ -128,18 +155,39 @@ export function AppSidebar({
 
   return (
     <aside
-      className={`border-r border-app-shell-border bg-[linear-gradient(180deg,var(--app-shell-bg)_0%,var(--app-shell-bg-strong)_100%)] px-4 py-5 text-app-shell-text ${className ?? ""}`}
+      id={id}
+      aria-label={`${areaLabel} navegación`}
+      className={`border-r border-app-shell-border bg-[linear-gradient(180deg,var(--app-shell-bg)_0%,var(--app-shell-bg-strong)_100%)] py-5 text-app-shell-text ${
+        collapsed ? "px-3" : "px-4"
+      } ${className ?? ""}`}
     >
       <div className="flex min-h-full w-full flex-col">
-        <div className="rounded-[1.75rem] border border-app-shell-border bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_42%),linear-gradient(180deg,var(--app-shell-surface)_0%,var(--app-shell-bg-strong)_100%)] p-4 shadow-[var(--ai-panel-shadow)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-app-accent">
-            Leadflow OS
-          </p>
-          <h2 className="mt-3 text-xl font-semibold tracking-tight text-app-shell-text">
-            {areaLabel}
-          </h2>
+        <div
+          className={`rounded-[1.75rem] border border-app-shell-border bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_42%),linear-gradient(180deg,var(--app-shell-surface)_0%,var(--app-shell-bg-strong)_100%)] shadow-[var(--ai-panel-shadow)] ${
+            collapsed
+              ? "flex aspect-square items-center justify-center p-0"
+              : "p-4"
+          }`}
+          title={collapsed ? `${areaLabel} - Leadflow OS` : undefined}
+        >
+          <div
+            className={`flex items-center justify-center rounded-2xl border border-app-accent bg-app-accent text-app-accent-contrast ${
+              collapsed ? "size-10" : "hidden"
+            }`}
+            aria-hidden="true"
+          >
+            <LayoutDashboard className="h-5 w-5" />
+          </div>
+          <div className={collapsed ? "sr-only" : undefined}>
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-app-accent">
+              Leadflow OS
+            </p>
+            <h2 className="mt-3 text-xl font-semibold tracking-tight text-app-shell-text">
+              {areaLabel}
+            </h2>
+          </div>
 
-          {statusBadge ? (
+          {statusBadge && !collapsed ? (
             <div
               className={`mt-4 inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] ${statusBadgeClassName}`}
             >
@@ -156,10 +204,16 @@ export function AppSidebar({
                 index === 0 ? undefined : "border-t border-app-shell-border pt-5"
               }
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-app-shell-muted">
+              <p
+                className={
+                  collapsed
+                    ? "sr-only"
+                    : "text-xs font-semibold uppercase tracking-[0.3em] text-app-shell-muted"
+                }
+              >
                 {section.title}
               </p>
-              <nav className="mt-3 space-y-2">
+              <nav className={`${collapsed ? "mt-0" : "mt-3"} space-y-2`}>
                 {section.items.map((item) => renderNavItem(item))}
               </nav>
             </section>

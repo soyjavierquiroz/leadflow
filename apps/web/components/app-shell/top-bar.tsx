@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, User } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen, User } from "lucide-react";
 import Link from "next/link";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { ThemeToggle } from "@/components/app-shell/theme-toggle";
@@ -24,6 +24,11 @@ type TopBarProps = {
   currentUser: AuthenticatedAppUser | null;
   workspaceSwitcher?: WorkspaceSwitcherProps;
   onMenuClick?: () => void;
+  onSidebarToggle?: () => void;
+  isMobileNavOpen?: boolean;
+  isSidebarCollapsed?: boolean;
+  mobileSidebarId?: string;
+  sidebarId?: string;
 };
 
 const getCompactUserName = (fullName: string | null | undefined) => {
@@ -47,8 +52,16 @@ export function TopBar({
   currentUser,
   workspaceSwitcher,
   onMenuClick,
+  onSidebarToggle,
+  isMobileNavOpen = false,
+  isSidebarCollapsed = false,
+  mobileSidebarId,
+  sidebarId,
 }: TopBarProps) {
   const compactUserName = getCompactUserName(currentUser?.fullName);
+  const DesktopSidebarIcon = isSidebarCollapsed
+    ? PanelLeftOpen
+    : PanelLeftClose;
 
   return (
     <header className="sticky top-0 z-20 border-b border-app-border bg-app-surface px-4 py-3 shadow-[0_8px_30px_rgba(15,23,42,0.05)] backdrop-blur md:px-6 lg:px-8">
@@ -60,8 +73,31 @@ export function TopBar({
               onClick={onMenuClick}
               className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface text-app-text transition hover:bg-app-surface-muted md:hidden"
               aria-label="Abrir navegación"
+              aria-expanded={isMobileNavOpen}
+              aria-controls={mobileSidebarId}
             >
               <Menu className="h-5 w-5" />
+            </button>
+          ) : null}
+          {onSidebarToggle ? (
+            <button
+              type="button"
+              onClick={onSidebarToggle}
+              className="hidden size-10 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface text-app-text transition hover:bg-app-surface-muted md:flex"
+              aria-label={
+                isSidebarCollapsed
+                  ? "Expandir navegación"
+                  : "Colapsar navegación"
+              }
+              aria-expanded={!isSidebarCollapsed}
+              aria-controls={sidebarId}
+              title={
+                isSidebarCollapsed
+                  ? "Expandir navegación"
+                  : "Colapsar navegación"
+              }
+            >
+              <DesktopSidebarIcon className="h-5 w-5" />
             </button>
           ) : null}
           <div className="min-w-0">

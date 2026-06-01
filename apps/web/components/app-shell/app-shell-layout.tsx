@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { TopBar } from "@/components/app-shell/top-bar";
 import type { AuthenticatedAppUser } from "@/lib/auth.types";
@@ -48,7 +49,41 @@ export function AppShellLayout({
   workspaceSwitcher,
   children,
 }: AppShellLayoutProps) {
+  const pathname = usePathname();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
+    useState(false);
+  const [hasLoadedSidebarPreference, setHasLoadedSidebarPreference] =
+    useState(false);
+  const sidebarId = "leadflow-app-sidebar";
+  const mobileSidebarId = "leadflow-mobile-sidebar";
+
+  useEffect(() => {
+    try {
+      setIsDesktopSidebarCollapsed(
+        window.localStorage.getItem("leadflow:sidebar-collapsed") === "true",
+      );
+    } catch {
+      setIsDesktopSidebarCollapsed(false);
+    } finally {
+      setHasLoadedSidebarPreference(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedSidebarPreference) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        "leadflow:sidebar-collapsed",
+        String(isDesktopSidebarCollapsed),
+      );
+    } catch {
+      // localStorage can be unavailable in private or restricted contexts.
+    }
+  }, [hasLoadedSidebarPreference, isDesktopSidebarCollapsed]);
 
   useEffect(() => {
     if (!isMobileNavOpen) {
@@ -70,14 +105,26 @@ export function AppShellLayout({
     };
   }, [isMobileNavOpen]);
 
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname]);
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,var(--app-accent-soft),transparent_28%),linear-gradient(180deg,var(--app-bg-elevated)_0%,var(--app-bg)_100%)]">
-      <div className="md:grid md:min-h-screen md:grid-cols-[248px_minmax(0,1fr)] lg:grid-cols-[264px_minmax(0,1fr)]">
+      <div
+        className={`md:grid md:min-h-screen ${
+          isDesktopSidebarCollapsed
+            ? "md:grid-cols-[88px_minmax(0,1fr)]"
+            : "md:grid-cols-[248px_minmax(0,1fr)] lg:grid-cols-[264px_minmax(0,1fr)]"
+        }`}
+      >
         <AppSidebar
+          id={sidebarId}
           areaLabel={areaLabel}
           nav={nav}
           navSections={navSections}
           statusBadge={sidebarStatusBadge}
+          collapsed={isDesktopSidebarCollapsed}
           className="hidden md:flex"
         />
         <div className="min-w-0">
@@ -89,6 +136,13 @@ export function AppShellLayout({
             currentUser={currentUser}
             workspaceSwitcher={workspaceSwitcher}
             onMenuClick={() => setIsMobileNavOpen(true)}
+            onSidebarToggle={() =>
+              setIsDesktopSidebarCollapsed((collapsed) => !collapsed)
+            }
+            isMobileNavOpen={isMobileNavOpen}
+            isSidebarCollapsed={isDesktopSidebarCollapsed}
+            mobileSidebarId={mobileSidebarId}
+            sidebarId={sidebarId}
           />
           <main className="flex w-full flex-col items-start p-4 text-left md:p-6 lg:p-8">
             {children}
@@ -106,6 +160,7 @@ export function AppShellLayout({
 
       {isMobileNavOpen ? (
         <div
+          id={mobileSidebarId}
           className="fixed inset-y-0 left-0 z-50 w-[86vw] max-w-[320px] md:hidden"
           role="dialog"
           aria-modal="true"
