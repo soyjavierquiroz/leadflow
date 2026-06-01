@@ -160,6 +160,73 @@ export class ActionContextSyncService {
     }
   }
 
+  async upsertForRemoteJid(input: {
+    tenantId: string;
+    remoteJid: string;
+    leadId: string;
+    assignmentId: string | null;
+    publicationId: string | null;
+    status?: ActionContextStatus;
+    source?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ dispatched: boolean; reason?: string }> {
+    if (!this.baseUrl || !this.apiKey) {
+      this.logStructured('ACTION_CONTEXT_SYNC_NOOP', {
+        reason: this.baseUrl ? 'api_key_missing' : 'base_url_missing',
+        tenantId: input.tenantId,
+        remoteJid: input.remoteJid,
+        leadId: input.leadId,
+        assignmentId: input.assignmentId,
+      });
+
+      return {
+        dispatched: false,
+        reason: this.baseUrl ? 'api_key_missing' : 'base_url_missing',
+      };
+    }
+
+    try {
+      const payload = buildActionContextUpsertPayload({
+        tenantId: input.tenantId,
+        remoteJid: input.remoteJid,
+        leadId: input.leadId,
+        assignmentId: input.assignmentId,
+        publicationId: input.publicationId,
+        status: input.status ?? 'active',
+        metadata: {
+          ...(input.metadata ?? {}),
+          synced_by: RUNTIME_CONTEXT_SERVICE_KEY,
+          synced_at: new Date().toISOString(),
+          sync_source: input.source ?? 'leadflow_remote_jid',
+        },
+      });
+
+      await this.request(payload);
+      this.logStructured('ACTION_CONTEXT_SYNC_DISPATCHED', {
+        tenantId: payload.tenant_id,
+        remoteJid: payload.remote_jid,
+        leadId: payload.lead_id,
+        assignmentId: payload.assignment_id,
+        publicationId: payload.publication_id,
+      });
+
+      return {
+        dispatched: true,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Runtime Context action_context sync failed for remote_jid ${input.remoteJid}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+
+      return {
+        dispatched: false,
+        reason: 'request_failed',
+      };
+    }
+  }
+
   private buildPayload(input: {
     assignment: ActionContextAssignmentRecord;
     source: string | null;

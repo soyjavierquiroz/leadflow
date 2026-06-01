@@ -13,6 +13,7 @@ import { RequireRoles } from '../auth/roles.decorator';
 import { sanitizeNullableText } from '../shared/url.utils';
 import { AiConfigInternalApiGuard } from './ai-config-internal-api.guard';
 import { AiConfigService } from './ai-config.service';
+import { InboundWhatsappLeadContextService } from './inbound-whatsapp-lead-context.service';
 import type {
   CloseOrchestrationSessionResponse,
   ExecuteOrchestrationResponse,
@@ -27,7 +28,10 @@ const RUNTIME_STATUS = 'active' as const;
 
 @Controller('runtime')
 export class AiConfigController {
-  constructor(private readonly aiConfigService: AiConfigService) {}
+  constructor(
+    private readonly aiConfigService: AiConfigService,
+    private readonly inboundWhatsappLeadContextService: InboundWhatsappLeadContextService,
+  ) {}
 
   @Post('resolve-full')
   @HttpCode(200)
@@ -80,6 +84,27 @@ export class AiConfigController {
       config_version: runtimeContext.config_version,
       status: RUNTIME_STATUS,
     };
+  }
+
+  @Post('inbound-whatsapp/ensure-lead-context')
+  @HttpCode(200)
+  @UseGuards(AiConfigInternalApiGuard)
+  async ensureInboundWhatsappLeadContext(
+    @Body()
+    body?: {
+      tenant_id?: string | null;
+      channel?: string | null;
+      instance_name?: string | null;
+      remote_jid?: string | null;
+      push_name?: string | null;
+      user_message?: string | null;
+      message_id?: string | null;
+      source?: string | null;
+      service_owner_key?: string | null;
+      runtime_config_version?: string | null;
+    },
+  ) {
+    return this.inboundWhatsappLeadContextService.ensureLeadContext(body ?? {});
   }
 
   @Post('execute-orchestration')

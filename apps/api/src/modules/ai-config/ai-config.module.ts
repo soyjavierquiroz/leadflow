@@ -5,6 +5,7 @@ import { AiConfigController } from './ai-config.controller';
 import { AiConfigInternalApiGuard } from './ai-config-internal-api.guard';
 import { AiConfigMemberController } from './ai-config-member.controller';
 import { AiConfigService } from './ai-config.service';
+import { InboundWhatsappLeadContextService } from './inbound-whatsapp-lead-context.service';
 import { TenantConfigCacheService } from './tenant-config-cache.service';
 
 @Module({
@@ -13,6 +14,7 @@ import { TenantConfigCacheService } from './tenant-config-cache.service';
   providers: [
     AiConfigService,
     AiConfigInternalApiGuard,
+    InboundWhatsappLeadContextService,
     TenantConfigCacheService,
   ],
   exports: [AiConfigService],
