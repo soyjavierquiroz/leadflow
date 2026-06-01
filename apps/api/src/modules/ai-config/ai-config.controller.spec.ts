@@ -9,10 +9,17 @@ describe('AiConfigController', () => {
       executeOrchestrationForUser: jest.fn(),
       closeOrchestrationSessionForUser: jest.fn(),
     };
+    const inboundWhatsappLeadContextService = {
+      ensureLeadContext: jest.fn(),
+    };
 
     return {
       aiConfigService,
-      controller: new AiConfigController(aiConfigService as never),
+      inboundWhatsappLeadContextService,
+      controller: new AiConfigController(
+        aiConfigService as never,
+        inboundWhatsappLeadContextService as never,
+      ),
     };
   };
 
