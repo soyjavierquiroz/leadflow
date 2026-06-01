@@ -1999,17 +1999,58 @@ function HandoffCtaBlockAdapter({
         hasHydrated
           ? handoffState
           : {
+              leadId: null,
+              assignmentId: null,
+              ownershipKey: null,
+              ownershipRef: null,
+              trackingRef: null,
               whatsappPhone: null,
               whatsappMessage: null,
               whatsappUrl: null,
             }
       }
-      headline={asString(settings?.headline).trim() || undefined}
-      buttonPrefix={asString(settings?.buttonPrefix).trim() || undefined}
-      redirectText={asString(settings?.redirectText).trim() || undefined}
-      whatsappText={asString(settings?.whatsappText).trim() || undefined}
-      autoRedirectSeconds={asNumber(settings?.autoRedirectSeconds, 5) || 5}
-      buttonColor={asString(settings?.buttonColor) || undefined}
+      headline={
+        asString(settings?.headline, asString(block.headline)).trim() ||
+        undefined
+      }
+      buttonPrefix={
+        asString(settings?.buttonPrefix, asString(block.buttonPrefix)).trim() ||
+        undefined
+      }
+      redirectText={
+        asString(settings?.redirectText, asString(block.redirectText)).trim() ||
+        undefined
+      }
+      whatsappText={
+        asString(settings?.whatsappText, asString(block.whatsappText)).trim() ||
+        undefined
+      }
+      autoRedirectSeconds={asNumber(
+        settings?.autoRedirectSeconds,
+        asNumber(block.autoRedirectSeconds, 5),
+      )}
+      buttonColor={asString(settings?.buttonColor, asString(block.buttonColor)) || undefined}
+      showAdvisorAvatar={asBoolean(
+        settings?.showAdvisorAvatar,
+        asBoolean(block.showAdvisorAvatar, true),
+      )}
+      eyebrow={asString(settings?.eyebrow, asString(block.eyebrow)) || undefined}
+      subheadline={
+        asString(settings?.subheadline, asString(block.subheadline)).trim() ||
+        undefined
+      }
+      advisorIntro={
+        asString(settings?.advisorIntro, asString(block.advisorIntro)).trim() ||
+        undefined
+      }
+      refLabel={
+        asString(settings?.refLabel, asString(block.refLabel)).trim() ||
+        undefined
+      }
+      trustNote={
+        asString(settings?.trustNote, asString(block.trustNote)).trim() ||
+        undefined
+      }
     />
   );
 }

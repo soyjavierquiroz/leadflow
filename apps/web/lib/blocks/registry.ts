@@ -1585,6 +1585,12 @@ export const builderBlockDefinitionsByKey: Record<
         whatsappText: "string",
         autoRedirectSeconds: "number",
         buttonColor: "string",
+        showAdvisorAvatar: "boolean",
+        eyebrow: "string",
+        subheadline: "string",
+        advisorIntro: "string",
+        refLabel: "string",
+        trustNote: "string",
       },
     },
     example: {
@@ -1594,9 +1600,18 @@ export const builderBlockDefinitionsByKey: Record<
         headline: "Continua ahora por WhatsApp",
         buttonPrefix: "Continuar con {{advisorName}}",
         redirectText: "{{advisorName}} te está esperando. Redirigiendo en {{seconds}}",
-        whatsappText: "Hola soy {{leadName}}, deseo más información",
+        whatsappText:
+          "Hola {{advisorName}}, soy {{leadName}}. Ya completé mi registro y quiero continuar.\n\nRef: {{ownership.ref}}",
         autoRedirectSeconds: 5,
         buttonColor: "#25D366",
+        showAdvisorAvatar: true,
+        eyebrow: "ASESOR ASIGNADO",
+        subheadline:
+          "{{advisorName}} ya recibió tu solicitud y te ayudará a dar el siguiente paso por WhatsApp.",
+        advisorIntro: "Tu asesor asignado",
+        refLabel: "Código de seguimiento",
+        trustNote:
+          "Usa este código para que tu asesor identifique tu registro rápido.",
       },
     },
   }),

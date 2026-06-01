@@ -250,7 +250,7 @@ const confirmationScaffoldSeed = JSON.stringify(
           "Usa esta tarjeta centrada para validar la acción tomada y preparar el siguiente movimiento.",
         cta_text: "Abrir WhatsApp",
         whatsapp_message:
-          "Hola, ya completé mi registro y quiero continuar con el siguiente paso.",
+          "Hola {{advisorName}}, soy {{leadName}}. Ya completé mi registro y quiero continuar.\n\nRef: {{ownership.ref}}",
         redirect_delay: 0,
         fallback_advisor: {
           name: "Asesor asignado",
@@ -263,7 +263,20 @@ const confirmationScaffoldSeed = JSON.stringify(
     {
       type: "whatsapp_handoff_cta",
       key: "whatsapp-handoff-base",
-      headline: "Continúa ahora por WhatsApp",
+      settings: {
+        headline: "Continúa ahora por WhatsApp",
+        whatsappText:
+          "Hola {{advisorName}}, soy {{leadName}}. Ya completé mi registro y quiero continuar.\n\nRef: {{ownership.ref}}",
+        autoRedirectSeconds: 0,
+        showAdvisorAvatar: true,
+        eyebrow: "ASESOR ASIGNADO",
+        subheadline:
+          "{{advisorName}} ya recibió tu solicitud y te ayudará a dar el siguiente paso por WhatsApp.",
+        advisorIntro: "Tu asesor asignado",
+        refLabel: "Código de seguimiento",
+        trustNote:
+          "Usa este código para que tu asesor identifique tu registro rápido.",
+      },
       subheadline:
         "Actualiza este copy para describir qué va a pasar al abrir la conversación.",
       button_text: "Abrir WhatsApp",

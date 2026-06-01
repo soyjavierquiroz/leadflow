@@ -7,7 +7,12 @@ import {
   type StoredSubmissionContext,
   useSubmissionContext,
 } from "@/lib/public-funnel-session";
-import { buildWhatsappUrl, normalizeWhatsappPhone } from "@/lib/public-handoff";
+import {
+  buildWhatsappUrl,
+  extractVisibleRef,
+  formatOwnershipRef,
+  normalizeWhatsappPhone,
+} from "@/lib/public-handoff";
 
 export type ResolvedPublicFunnelAdvisor = {
   sponsorId: string | null;
@@ -22,6 +27,11 @@ export type ResolvedPublicFunnelAdvisor = {
 export type ResolvedPublicFunnelHandoffState = {
   advisor: ResolvedPublicFunnelAdvisor | null;
   leadName: string | null;
+  leadId: string | null;
+  assignmentId: string | null;
+  ownershipKey: string | null;
+  ownershipRef: string | null;
+  trackingRef: string | null;
   whatsappPhone: string | null;
   whatsappMessage: string | null;
   whatsappUrl: string | null;
@@ -80,6 +90,25 @@ const getRuntimeAdvisorLabel = (runtime: PublicFunnelRuntimePayload) =>
 const hasAuthoritativeRuntimeAdvisor = (runtime: PublicFunnelRuntimePayload) =>
   Boolean(runtime.advisor ?? getRuntimeSponsor(runtime));
 
+const readNullableString = (
+  value: unknown,
+  ...keys: string[]
+): string | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  for (const key of keys) {
+    const candidate = record[key];
+    if (typeof candidate === "string") {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
 export const resolvePublicFunnelHandoffState = ({
   context,
   runtime,
@@ -89,6 +118,8 @@ export const resolvePublicFunnelHandoffState = ({
 }): ResolvedPublicFunnelHandoffState => {
   const runtimeSponsor = getRuntimeSponsor(runtime);
   const contextSponsor = getContextSponsor(context);
+  const assignment =
+    context?.assignment ?? context?.lastAssignment ?? runtime.assignment ?? null;
   const advisor =
     (contextSponsor
       ? normalizeSponsorRecord(contextSponsor)
@@ -104,6 +135,17 @@ export const resolvePublicFunnelHandoffState = ({
   const runtimeIsAuthoritative =
     !contextAssignmentIsAuthoritative && hasAuthoritativeRuntimeAdvisor(runtime);
   const leadName = context?.leadSnapshot?.fullName?.trim() || null;
+  const leadId =
+    context?.leadId ??
+    readNullableString(context, "lead_id") ??
+    runtime.leadId ??
+    null;
+  const assignmentId = readNullableString(assignment, "id");
+  const ownershipKey = readNullableString(
+    assignment,
+    "ownershipKey",
+    "ownership_key",
+  );
   const whatsappMessage = runtimeIsAuthoritative
     ? runtime.handoff.whatsappMessage ??
       runtime.handoff.messageTemplate ??
@@ -131,10 +173,17 @@ export const resolvePublicFunnelHandoffState = ({
       advisor?.whatsappUrl ??
       runtime.handoff.whatsappUrl ??
       buildWhatsappUrl(whatsappPhone, whatsappMessage);
+  const ownershipRef =
+    formatOwnershipRef(ownershipKey) ?? extractVisibleRef(whatsappMessage);
 
   return {
     advisor,
     leadName,
+    leadId,
+    assignmentId,
+    ownershipKey,
+    ownershipRef,
+    trackingRef: ownershipRef,
     whatsappPhone,
     whatsappMessage,
     whatsappUrl,
@@ -186,6 +235,11 @@ export const useResolvedPublicFunnelHandoffState = (
     return {
       advisor: null,
       leadName: null,
+      leadId: null,
+      assignmentId: null,
+      ownershipKey: null,
+      ownershipRef: null,
+      trackingRef: null,
       whatsappPhone: null,
       whatsappMessage: null,
       whatsappUrl: null,
