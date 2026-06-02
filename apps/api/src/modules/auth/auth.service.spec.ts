@@ -6,11 +6,16 @@ import { hashPassword } from './password-hash.util';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
-  const buildService = () => {
+  const buildService = (vanityShortLinksService?: {
+    deleteSponsorVanityShortLinkIfSlugChanged: jest.Mock;
+  }) => {
     const prisma = {
       user: {
         findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      sponsor: {
+        findFirst: jest.fn(),
       },
       authSession: {
         create: jest.fn(),
@@ -27,7 +32,11 @@ describe('AuthService', () => {
     return {
       prisma,
       walletEngineService,
-      service: new AuthService(prisma, walletEngineService),
+      service: new AuthService(
+        prisma,
+        walletEngineService,
+        vanityShortLinksService as never,
+      ),
     };
   };
 
@@ -246,6 +255,90 @@ describe('AuthService', () => {
     expect(walletEngineService.creditInitialKredits).toHaveBeenCalledWith(
       'account-kredit-1',
       'sponsor-repaired-1',
+    );
+  });
+
+  it('deletes an old vanity shortlink only after profile update succeeds', async () => {
+    const vanityShortLinksService = {
+      deleteSponsorVanityShortLinkIfSlugChanged: jest.fn().mockResolvedValue({
+        ok: true,
+        deleted: true,
+      }),
+    };
+    const { prisma, service } = buildService(vanityShortLinksService);
+    const now = new Date('2026-06-02T12:00:00.000Z');
+    const existingUser = {
+      ...activeMemberUser,
+      fullName: 'Advisor Uno',
+      phone: null,
+      updatedAt: now,
+      sponsor: {
+        ...activeMemberUser.sponsor,
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        phone: null,
+        publicSlug: 'advisor-uno',
+      },
+    };
+    const updatedSponsor = {
+      ...existingUser.sponsor,
+      publicSlug: 'advisor-dos',
+      displayName: 'Advisor Uno',
+    };
+    const updatedUser = {
+      ...existingUser,
+      sponsor: updatedSponsor,
+      updatedAt: now,
+    };
+    const tx = {
+      user: {
+        update: jest.fn().mockResolvedValue({
+          ...updatedUser,
+          sponsor: existingUser.sponsor,
+        }),
+      },
+      sponsor: {
+        update: jest.fn().mockResolvedValue(updatedSponsor),
+      },
+    };
+    const transactionMock = jest
+      .fn()
+      .mockImplementation((callback: (client: typeof tx) => Promise<unknown>) =>
+        callback(tx),
+      );
+
+    prisma.user.findUnique = jest.fn().mockResolvedValue(existingUser);
+    prisma.sponsor.findFirst = jest.fn().mockResolvedValue(null);
+    prisma.$transaction = transactionMock as never;
+
+    const result = await service.updateMyProfile(existingUser.id, {
+      publicSlug: 'advisor-dos',
+    });
+
+    expect(result.sponsorPublicSlug).toBe('advisor-dos');
+    expect(tx.user.update).toHaveBeenCalled();
+    expect(tx.sponsor.update).toHaveBeenCalledWith({
+      where: {
+        id: existingUser.sponsorId,
+      },
+      data: {
+        displayName: 'Advisor Uno',
+        publicSlug: 'advisor-dos',
+        phone: null,
+      },
+    });
+    expect(
+      vanityShortLinksService.deleteSponsorVanityShortLinkIfSlugChanged,
+    ).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      sponsorId: 'sponsor-2',
+      previousSlug: 'advisor-uno',
+      nextSlug: 'advisor-dos',
+    });
+    expect(transactionMock.mock.invocationCallOrder[0]).toBeLessThan(
+      vanityShortLinksService.deleteSponsorVanityShortLinkIfSlugChanged.mock
+        .invocationCallOrder[0],
     );
   });
 

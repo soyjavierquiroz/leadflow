@@ -33,6 +33,7 @@ import type {
   Sponsor,
   SponsorRepository,
 } from './interfaces/sponsor.interface';
+import { SponsorVanityShortLinksService } from './sponsor-vanity-short-links.service';
 
 const memberDashboardAssignmentInclude = {
   lead: {
@@ -163,6 +164,16 @@ export type MemberLinkGallery = {
     publicSlug: string | null;
     requiresPublicSlug: boolean;
   };
+  vanityShortLink: {
+    slug: string | null;
+    targetUrl: string | null;
+    shortLink: {
+      shortUrl: string;
+      shortCode: string;
+      provider: string;
+      createdAt: string;
+    } | null;
+  };
   links: Array<{
     id: string;
     url: string;
@@ -186,6 +197,8 @@ export class SponsorsService {
     @Optional()
     @Inject(SPONSOR_REPOSITORY)
     private readonly repository?: SponsorRepository,
+    @Optional()
+    private readonly vanityShortLinksService?: SponsorVanityShortLinksService,
   ) {}
 
   createDraft(dto: CreateSponsorDto): Sponsor {
@@ -513,6 +526,11 @@ export class SponsorsService {
           publicSlug: null,
           requiresPublicSlug: true,
         },
+        vanityShortLink: {
+          slug: null,
+          targetUrl: null,
+          shortLink: null,
+        },
         links: [],
       };
     }
@@ -546,12 +564,24 @@ export class SponsorsService {
       orderBy: [{ isPrimary: 'desc' }, { pathPrefix: 'asc' }],
     });
 
+    const vanityShortLink =
+      await this.vanityShortLinksService?.getSponsorVanityShortLink(scope);
+
     return {
       advisor: {
         sponsorId: sponsor.id,
         displayName: sponsor.displayName,
         publicSlug,
         requiresPublicSlug: false,
+      },
+      vanityShortLink: vanityShortLink ?? {
+        slug: publicSlug,
+        targetUrl: buildAdvisorReferralUrl({
+          host: 'ingresos.retodetransformacion.com',
+          pathPrefix: '/',
+          publicSlug,
+        }),
+        shortLink: null,
       },
       links: publications.map((publication) => ({
         id: publication.id,
@@ -700,13 +730,14 @@ export class SponsorsService {
       sponsor.id,
     );
     const nextAvatarUrl = this.normalizeSponsorAvatarUrl(dto.avatarUrl);
+    const resolvedPublicSlug =
+      nextPublicSlug !== undefined ? nextPublicSlug : sponsor.publicSlug;
 
     const record = await this.prisma.sponsor.update({
       where: { id: sponsor.id },
       data: {
         displayName,
-        publicSlug:
-          nextPublicSlug !== undefined ? nextPublicSlug : sponsor.publicSlug,
+        publicSlug: resolvedPublicSlug,
         avatarUrl:
           nextAvatarUrl !== undefined ? nextAvatarUrl : sponsor.avatarUrl,
         email: nextEmail !== undefined ? nextEmail : sponsor.email,
@@ -715,6 +746,16 @@ export class SponsorsService {
           dto.availabilityStatus ?? sponsor.availabilityStatus,
       },
     });
+
+    if (this.vanityShortLinksService && record.publicSlug !== sponsor.publicSlug) {
+      await this.vanityShortLinksService.deleteSponsorVanityShortLinkIfSlugChanged({
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        sponsorId: sponsor.id,
+        previousSlug: sponsor.publicSlug,
+        nextSlug: record.publicSlug,
+      });
+    }
 
     return mapSponsorRecord(record);
   }

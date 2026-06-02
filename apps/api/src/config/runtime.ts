@@ -20,6 +20,7 @@ export type ApiRuntimeConfig = {
   identityTokenTtlHours: number;
   yourlsApiUrl: string | null;
   yourlsSignature: string | null;
+  publicRefBaseUrl: string;
   walletEngineInternalUrl: string | null;
 };
 
@@ -120,6 +121,9 @@ export const getApiRuntimeConfig = (
   const yourlsApiUrl =
     normalizeUrl(env.YOURLS_API_URL, 'YOURLS_API_URL') ?? null;
   const yourlsSignature = sanitizeEnv(env.YOURLS_SIGNATURE) ?? null;
+  const publicRefBaseUrl =
+    normalizeUrl(env.PUBLIC_REF_BASE_URL, 'PUBLIC_REF_BASE_URL') ??
+    'https://ingresos.retodetransformacion.com/ref';
   const walletEngineInternalUrl =
     normalizeUrl(env.WALLET_ENGINE_BASE_URL, 'WALLET_ENGINE_BASE_URL') ??
     normalizeUrl(
@@ -153,6 +157,7 @@ export const getApiRuntimeConfig = (
     identityTokenTtlHours,
     yourlsApiUrl,
     yourlsSignature,
+    publicRefBaseUrl,
     walletEngineInternalUrl,
   };
 };

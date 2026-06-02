@@ -7,6 +7,16 @@ export type MemberLinkGallery = {
     publicSlug: string | null;
     requiresPublicSlug: boolean;
   };
+  vanityShortLink: {
+    slug: string | null;
+    targetUrl: string | null;
+    shortLink: {
+      shortUrl: string;
+      shortCode: string;
+      provider: string;
+      createdAt: string;
+    } | null;
+  };
   links: Array<{
     id: string;
     url: string;

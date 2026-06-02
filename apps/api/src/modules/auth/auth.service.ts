@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import type { FastifyReply } from 'fastify';
 import { getApiRuntimeConfig } from '../../config/runtime';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WalletEngineService } from '../finance/wallet-engine.service';
+import { SponsorVanityShortLinksService } from '../sponsors/sponsor-vanity-short-links.service';
 import { hashPassword, verifyPassword } from './password-hash.util';
 import type { AuthRequest, AuthenticatedUser } from './auth.types';
 
@@ -54,6 +56,8 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly walletEngineService: WalletEngineService,
+    @Optional()
+    private readonly vanityShortLinksService?: SponsorVanityShortLinksService,
   ) {}
 
   async authenticate(input: {
@@ -319,6 +323,7 @@ export class AuthService {
             input.publicSlug,
             existing.sponsorId,
           );
+    const resolvedPublicSlug = publicSlug ?? null;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.update({
@@ -336,7 +341,7 @@ export class AuthService {
           },
           data: {
             displayName: fullName,
-            publicSlug,
+            publicSlug: resolvedPublicSlug,
             phone,
           },
         });
@@ -346,6 +351,22 @@ export class AuthService {
 
       return user;
     });
+
+    if (
+      this.vanityShortLinksService &&
+      existing.sponsor &&
+      updated.sponsor?.publicSlug !== existing.sponsor.publicSlug
+    ) {
+      await this.vanityShortLinksService.deleteSponsorVanityShortLinkIfSlugChanged(
+        {
+          workspaceId: existing.sponsor.workspaceId,
+          teamId: existing.sponsor.teamId,
+          sponsorId: existing.sponsor.id,
+          previousSlug: existing.sponsor.publicSlug,
+          nextSlug: updated.sponsor?.publicSlug ?? null,
+        },
+      );
+    }
 
     return this.toMyProfileSnapshot(updated);
   }

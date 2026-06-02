@@ -389,6 +389,7 @@ model Workspace {
   messagingConnections      MessagingConnection[]
   automationDispatches      AutomationDispatch[]
   trackedLinks              TrackedLink[]
+  sponsorVanityShortLinks   SponsorVanityShortLink[]
   leadNotes                 LeadNote[]
   crmLeadAssignments        CrmLeadAssignment[]
   crmAssignmentEvents       CrmAssignmentEvent[]
@@ -433,6 +434,7 @@ model Team {
   crmLeadAssignments    CrmLeadAssignment[]
   crmAssignmentEvents   CrmAssignmentEvent[]
   crmOutreachQueue      CrmOutreachQueue[]
+  vanityShortLinks      SponsorVanityShortLink[]
 
   @@unique([workspaceId, code])
 }
@@ -471,6 +473,28 @@ model Sponsor {
   conversationOwnerCrmAssignments CrmLeadAssignment[]  @relation("CrmAssignmentConversationOwnerSponsor")
   actorCrmAssignmentEvents        CrmAssignmentEvent[]
   crmOutreachQueue                CrmOutreachQueue[]
+  vanityShortLink                 SponsorVanityShortLink?
+}
+
+model SponsorVanityShortLink {
+  id               String    @id @default(uuid())
+  workspaceId      String
+  teamId           String
+  sponsorId        String    @unique
+  slug             String
+  targetUrl        String
+  shortCode        String    @unique
+  shortUrl         String
+  provider         String
+  providerMetadata Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team             Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sponsor          Sponsor   @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, teamId])
+  @@index([teamId, shortCode])
 }
 
 model AdWheel {

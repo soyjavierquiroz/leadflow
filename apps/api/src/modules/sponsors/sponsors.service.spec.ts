@@ -88,10 +88,12 @@ describe('SponsorsService', () => {
       $transaction: jest.fn(
         async (callback: (tx: unknown) => Promise<unknown>) =>
           callback({
+            $queryRaw: jest.fn().mockResolvedValue([{ id: 'lead-1' }]),
             assignment: {
               update: assignmentUpdate,
             },
             lead: {
+              findFirst: jest.fn().mockResolvedValue(lead),
               update: leadUpdate,
             },
           }),
@@ -219,7 +221,57 @@ describe('SponsorsService', () => {
           },
         }),
       },
-      $transaction: jest.fn(),
+      $transaction: jest.fn(
+        async (callback: (tx: unknown) => Promise<unknown>) =>
+          callback({
+            $queryRaw: jest.fn().mockResolvedValue([{ id: 'lead-1' }]),
+            assignment: {
+              update: jest.fn(),
+            },
+            lead: {
+              findFirst: jest.fn().mockResolvedValue({
+                id: 'lead-1',
+                workspaceId: 'workspace-1',
+                status: 'nurturing',
+                sourceChannel: 'form',
+                fullName: 'Jane Prospect',
+                email: 'jane@example.com',
+                phone: '+52 55 5000 1111',
+                companyName: 'Acme Health',
+                qualificationGrade: null,
+                summaryText: null,
+                nextActionLabel: 'Continuar seguimiento.',
+                followUpAt: null,
+                tags: [],
+                funnelInstance: null,
+                funnelPublication: null,
+                currentAssignment: {
+                  id: 'assignment-1',
+                  sponsorId: 'sponsor-1',
+                  teamId: 'team-1',
+                  status: 'accepted',
+                  reason: 'handoff',
+                  assignedAt: new Date('2026-03-31T19:55:00.000Z'),
+                  acceptedAt: new Date('2026-03-31T19:58:00.000Z'),
+                  updatedAt: new Date('2026-03-31T19:58:00.000Z'),
+                  sponsor: {
+                    id: 'sponsor-1',
+                    displayName: 'Ana Sponsor',
+                    email: 'ana@example.com',
+                    phone: '+52 55 2222 3333',
+                    messagingConnection: null,
+                  },
+                  team: {
+                    id: 'team-1',
+                    name: 'Rescates',
+                    code: 'rescates',
+                  },
+                },
+              }),
+              update: jest.fn(),
+            },
+          }),
+      ),
     };
     const configService = {
       get: jest.fn(),
@@ -250,7 +302,88 @@ describe('SponsorsService', () => {
 
     expect(result.assignmentStatus).toBe('accepted');
     expect(result.alreadyAccepted).toBe(true);
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
     expect(n8nAutomationClient.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('does not generate a vanity shortlink when a member updates their public slug', async () => {
+    const now = new Date('2026-06-02T12:00:00.000Z');
+    const sponsor = {
+      id: 'sponsor-1',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      displayName: 'Javier Quiroz',
+      publicSlug: 'javier-quiroz',
+      status: 'active',
+      isActive: true,
+      avatarUrl: null,
+      email: 'javier@example.com',
+      phone: null,
+      availabilityStatus: 'available',
+      routingWeight: 1,
+      memberPortalEnabled: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const updatedSponsor = {
+      ...sponsor,
+      publicSlug: 'javier-q',
+      updatedAt: now,
+    };
+    const prisma = {
+      sponsor: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(sponsor)
+          .mockResolvedValueOnce(null),
+        update: jest.fn().mockResolvedValue(updatedSponsor),
+      },
+    };
+    const vanityShortLinksService = {
+      deleteSponsorVanityShortLinkIfSlugChanged: jest.fn().mockResolvedValue({
+        ok: true,
+        deleted: true,
+      }),
+      generateSponsorVanityShortLink: jest.fn(),
+    };
+
+    const service = new SponsorsService(
+      prisma as never,
+      { get: jest.fn() } as never,
+      { upsertSponsorAccount: jest.fn(), getSponsorKredits: jest.fn() } as never,
+      { dispatch: jest.fn() } as never,
+      undefined,
+      vanityShortLinksService as never,
+    );
+
+    await service.updateForMember(
+      {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        sponsorId: 'sponsor-1',
+      },
+      {
+        publicSlug: 'javier-q',
+      },
+    );
+
+    expect(
+      vanityShortLinksService.deleteSponsorVanityShortLinkIfSlugChanged,
+    ).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      sponsorId: 'sponsor-1',
+      previousSlug: 'javier-quiroz',
+      nextSlug: 'javier-q',
+    });
+    expect(
+      vanityShortLinksService.generateSponsorVanityShortLink,
+    ).not.toHaveBeenCalled();
+    expect(
+      prisma.sponsor.update.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vanityShortLinksService.deleteSponsorVanityShortLinkIfSlugChanged.mock
+        .invocationCallOrder[0],
+    );
   });
 });

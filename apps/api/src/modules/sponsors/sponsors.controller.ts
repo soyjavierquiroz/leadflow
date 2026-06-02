@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
@@ -23,6 +24,7 @@ import { LeadsService } from '../leads/leads.service';
 import type { UpdateMemberLeadDto } from '../leads/dto/update-member-lead.dto';
 import { AdvisorCrmInboxService } from '../crm/advisor-crm-inbox.service';
 import type { AdvisorCrmInboxQuery } from '../crm/advisor-crm.types';
+import { SponsorVanityShortLinksService } from './sponsor-vanity-short-links.service';
 
 @Controller('sponsors')
 export class SponsorsController {
@@ -30,6 +32,7 @@ export class SponsorsController {
     private readonly sponsorsService: SponsorsService,
     private readonly leadsService: LeadsService,
     private readonly advisorCrmInboxService: AdvisorCrmInboxService,
+    private readonly vanityShortLinksService: SponsorVanityShortLinksService,
   ) {}
 
   @Get()
@@ -77,6 +80,36 @@ export class SponsorsController {
   @RequireOperationalMemberAccess()
   getMemberLinkGallery(@CurrentAuthUser() user: AuthenticatedUser) {
     return this.sponsorsService.getLinkGalleryForMember({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+      sponsorId: user.sponsorId!,
+    });
+  }
+
+  @Get('me/vanity-shortlink')
+  @RequireOperationalMemberAccess()
+  getMyVanityShortLink(@CurrentAuthUser() user: AuthenticatedUser) {
+    return this.vanityShortLinksService.getSponsorVanityShortLink({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+      sponsorId: user.sponsorId!,
+    });
+  }
+
+  @Post('me/vanity-shortlink/generate')
+  @RequireOperationalMemberAccess()
+  generateMyVanityShortLink(@CurrentAuthUser() user: AuthenticatedUser) {
+    return this.vanityShortLinksService.generateSponsorVanityShortLink({
+      workspaceId: user.workspaceId!,
+      teamId: user.teamId!,
+      sponsorId: user.sponsorId!,
+    });
+  }
+
+  @Delete('me/vanity-shortlink')
+  @RequireOperationalMemberAccess()
+  deleteMyVanityShortLink(@CurrentAuthUser() user: AuthenticatedUser) {
+    return this.vanityShortLinksService.deleteSponsorVanityShortLink({
       workspaceId: user.workspaceId!,
       teamId: user.teamId!,
       sponsorId: user.sponsorId!,
