@@ -16,15 +16,19 @@ import { SectionHeader } from "@/components/app-shell/section-header";
 import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import type {
+  CreateSystemIndividualAccountResponse,
   CreateSystemTenantResponse,
   SystemTenantRecord,
 } from "@/lib/system-tenants.types";
 import {
+  createSystemIndividualAccountSchema,
   createSystemTenantSchema,
   editSystemTenantSchema,
   tenantProvisioningStatuses,
+  type CreateSystemIndividualAccountFormValues,
   type EditSystemTenantFormValues,
 } from "@/lib/system-tenant-form.schema";
+import { createSystemIndividualAccount } from "@/lib/system-individual-accounts";
 import { formatCompactNumber, formatDateTime } from "@/lib/app-shell/utils";
 import { authenticatedOperationRequest } from "@/lib/team-operations";
 
@@ -37,6 +41,17 @@ type TenantProvisionFormState = {
   adminEmail: string;
 };
 
+type IndividualAccountFormState = {
+  name: string;
+  email: string;
+  phone: string;
+  businessName: string;
+  niche: string;
+  country: string;
+  temporaryPassword: string;
+  sendInviteEmail: boolean;
+};
+
 type TenantStatusFilter =
   | "all"
   | "active"
@@ -46,6 +61,9 @@ type TenantStatusFilter =
 type CreatedAtFilter = "all" | "7d" | "30d" | "90d";
 type TenantFormErrors = Partial<
   Record<keyof EditSystemTenantFormValues, string>
+>;
+type IndividualAccountFormErrors = Partial<
+  Record<keyof CreateSystemIndividualAccountFormValues, string>
 >;
 
 type ToastState = {
@@ -68,6 +86,18 @@ const buildInitialFormState = (): TenantProvisionFormState => ({
   tenantName: "",
   adminEmail: "",
 });
+
+const buildInitialIndividualAccountFormState =
+  (): IndividualAccountFormState => ({
+    name: "",
+    email: "",
+    phone: "",
+    businessName: "",
+    niche: "",
+    country: "",
+    temporaryPassword: "",
+    sendInviteEmail: false,
+  });
 
 const buildEditFormState = (
   row: SystemTenantRecord,
@@ -123,8 +153,8 @@ const createdAtFilterLabel: Record<CreatedAtFilter, string> = {
 
 const mapZodErrors = (
   issues: Array<{ path: PropertyKey[]; message: string }>,
-): TenantFormErrors =>
-  issues.reduce<TenantFormErrors>((errors, issue) => {
+): Record<string, string> =>
+  issues.reduce<Record<string, string>>((errors, issue) => {
     const [field] = issue.path;
 
     if (typeof field === "string") {
@@ -171,6 +201,7 @@ export function SystemTenantsClient({
   const [statusFilter, setStatusFilter] = useState<TenantStatusFilter>("all");
   const [createdAtFilter, setCreatedAtFilter] = useState<CreatedAtFilter>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isIndividualCreateOpen, setIsIndividualCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -179,6 +210,13 @@ export function SystemTenantsClient({
   } | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [formState, setFormState] = useState(buildInitialFormState);
+  const [individualFormState, setIndividualFormState] = useState(
+    buildInitialIndividualAccountFormState,
+  );
+  const [individualFormErrors, setIndividualFormErrors] =
+    useState<IndividualAccountFormErrors>({});
+  const [createdIndividualAccount, setCreatedIndividualAccount] =
+    useState<CreateSystemIndividualAccountResponse | null>(null);
   const [editFormState, setEditFormState] =
     useState<EditSystemTenantFormValues | null>(null);
   const [editFormErrors, setEditFormErrors] = useState<TenantFormErrors>({});
@@ -256,6 +294,13 @@ export function SystemTenantsClient({
     setFormState(buildInitialFormState());
   };
 
+  const closeIndividualCreateModal = () => {
+    setIsIndividualCreateOpen(false);
+    setIndividualFormState(buildInitialIndividualAccountFormState());
+    setIndividualFormErrors({});
+    setCreatedIndividualAccount(null);
+  };
+
   const openEditModal = (row: SystemTenantRecord) => {
     resetMessages();
     setEditingTenantId(row.id);
@@ -312,6 +357,45 @@ export function SystemTenantsClient({
             error instanceof Error
               ? error.message
               : "No pudimos crear la nueva agencia.",
+        });
+      }
+    });
+  };
+
+  const handleIndividualSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    resetMessages();
+    setIndividualFormErrors({});
+    setCreatedIndividualAccount(null);
+
+    const parsed =
+      createSystemIndividualAccountSchema.safeParse(individualFormState);
+
+    if (!parsed.success) {
+      setIndividualFormErrors(mapZodErrors(parsed.error.issues));
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const created = await createSystemIndividualAccount(
+          parsed.data,
+          authenticatedOperationRequest,
+        );
+
+        setCreatedIndividualAccount(created);
+        showToast(
+          "Cuenta individual creada",
+          "El propietario ya puede entrar desde login y continuar en CRM.",
+        );
+        router.refresh();
+      } catch (error) {
+        setFeedback({
+          tone: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "No pudimos crear la cuenta individual.",
         });
       }
     });
@@ -476,16 +560,29 @@ export function SystemTenantsClient({
         title="Tenants y agencias aprovisionadas"
         description="Aquí el super admin puede revisar capacidad instalada por agencia, detectar ocupación inmediata y dar de alta nuevos clientes sin salir del panel."
         actions={
-          <button
-            type="button"
-            onClick={() => {
-              resetMessages();
-              setIsCreateOpen(true);
-            }}
-            className={primaryButtonClassName}
-          >
-            Crear Agencia
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                resetMessages();
+                setCreatedIndividualAccount(null);
+                setIsIndividualCreateOpen(true);
+              }}
+              className={secondaryButtonClassName}
+            >
+              Crear cuenta individual
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetMessages();
+                setIsCreateOpen(true);
+              }}
+              className={primaryButtonClassName}
+            >
+              Crear Agencia
+            </button>
+          </div>
         }
       />
 
@@ -812,6 +909,247 @@ export function SystemTenantsClient({
               </button>
             </div>
           </form>
+        </ModalShell>
+      ) : null}
+
+      {isIndividualCreateOpen ? (
+        <ModalShell
+          eyebrow="Super Admin"
+          title="Crear cuenta individual"
+          description="Para vendedores independientes que empiezan solos y luego pueden crecer a equipo."
+          onClose={closeIndividualCreateModal}
+        >
+          {createdIndividualAccount ? (
+            <div className="flex flex-col gap-5">
+              <div className="rounded-3xl border border-app-success-border bg-app-success-bg px-4 py-4">
+                <p className="text-sm font-semibold text-app-success-text">
+                  Cuenta individual creada
+                </p>
+                <div className="mt-3 grid gap-3 text-sm text-app-text md:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
+                      Email
+                    </p>
+                    <p className="mt-1 font-semibold">
+                      {createdIndividualAccount.email}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-app-text-soft">
+                      Login
+                    </p>
+                    <p className="mt-1 font-semibold">
+                      {createdIndividualAccount.loginUrl}
+                    </p>
+                  </div>
+                </div>
+                {createdIndividualAccount.temporaryPassword ? (
+                  <div className="mt-4 rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-warning-text">
+                      Contraseña temporal
+                    </p>
+                    <p className="mt-2 break-all font-mono text-sm font-semibold text-app-text">
+                      {createdIndividualAccount.temporaryPassword}
+                    </p>
+                    <p className="mt-2 text-sm text-app-text-muted">
+                      Cópiala ahora. No se volverá a mostrar.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeIndividualCreateModal}
+                  className={primaryButtonClassName}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form className="flex flex-col gap-5" onSubmit={handleIndividualSubmit}>
+              <label className="block">
+                <span className="text-sm font-medium text-slate-200">
+                  Nombre del propietario
+                </span>
+                <input
+                  type="text"
+                  value={individualFormState.name}
+                  onChange={(event) =>
+                    setIndividualFormState((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
+                  aria-invalid={Boolean(individualFormErrors.name)}
+                  required
+                />
+                {individualFormErrors.name ? (
+                  <p className="mt-2 text-xs font-semibold text-app-danger-text">
+                    {individualFormErrors.name}
+                  </p>
+                ) : null}
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-slate-200">
+                  Email
+                </span>
+                <input
+                  type="email"
+                  value={individualFormState.email}
+                  onChange={(event) =>
+                    setIndividualFormState((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                  className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
+                  aria-invalid={Boolean(individualFormErrors.email)}
+                  required
+                />
+                {individualFormErrors.email ? (
+                  <p className="mt-2 text-xs font-semibold text-app-danger-text">
+                    {individualFormErrors.email}
+                  </p>
+                ) : null}
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-200">
+                    Teléfono
+                  </span>
+                  <input
+                    type="tel"
+                    value={individualFormState.phone}
+                    onChange={(event) =>
+                      setIndividualFormState((current) => ({
+                        ...current,
+                        phone: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-200">
+                    País
+                  </span>
+                  <input
+                    type="text"
+                    value={individualFormState.country}
+                    onChange={(event) =>
+                      setIndividualFormState((current) => ({
+                        ...current,
+                        country: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="text-sm font-medium text-slate-200">
+                  Nombre del negocio
+                </span>
+                <input
+                  type="text"
+                  value={individualFormState.businessName}
+                  onChange={(event) =>
+                    setIndividualFormState((current) => ({
+                      ...current,
+                      businessName: event.target.value,
+                    }))
+                  }
+                  className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
+                  aria-invalid={Boolean(individualFormErrors.businessName)}
+                  required
+                />
+                {individualFormErrors.businessName ? (
+                  <p className="mt-2 text-xs font-semibold text-app-danger-text">
+                    {individualFormErrors.businessName}
+                  </p>
+                ) : null}
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-slate-200">
+                  Nicho
+                </span>
+                <input
+                  type="text"
+                  value={individualFormState.niche}
+                  onChange={(event) =>
+                    setIndividualFormState((current) => ({
+                      ...current,
+                      niche: event.target.value,
+                    }))
+                  }
+                  className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-slate-200">
+                  Contraseña temporal opcional
+                </span>
+                <input
+                  type="text"
+                  value={individualFormState.temporaryPassword}
+                  onChange={(event) =>
+                    setIndividualFormState((current) => ({
+                      ...current,
+                      temporaryPassword: event.target.value,
+                    }))
+                  }
+                  className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
+                />
+              </label>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-4">
+                <input
+                  type="checkbox"
+                  checked={individualFormState.sendInviteEmail}
+                  onChange={(event) =>
+                    setIndividualFormState((current) => ({
+                      ...current,
+                      sendInviteEmail: event.target.checked,
+                    }))
+                  }
+                  className="mt-1 h-4 w-4 rounded border-app-border bg-app-card text-app-accent focus:ring-app-accent-soft"
+                />
+                <span className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-slate-200">
+                    Enviar invitación por email si existe infraestructura
+                  </span>
+                </span>
+              </label>
+
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeIndividualCreateModal}
+                  disabled={isPending}
+                  className={secondaryButtonClassName}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className={primaryButtonClassName}
+                >
+                  {isPending ? "Creando..." : "Crear cuenta individual"}
+                </button>
+              </div>
+            </form>
+          )}
         </ModalShell>
       ) : null}
 

@@ -1,4 +1,10 @@
-import { AccountProvisioningController } from './account-provisioning.controller';
+import { Reflector } from '@nestjs/core';
+import { UserRole } from '@prisma/client';
+import { ROLES_KEY } from '../auth/roles.decorator';
+import {
+  AccountProvisioningController,
+  SystemIndividualAccountsController,
+} from './account-provisioning.controller';
 import type { AccountProvisioningService } from './account-provisioning.service';
 
 describe('AccountProvisioningController', () => {
@@ -43,5 +49,53 @@ describe('AccountProvisioningController', () => {
       teamType: 'personal',
       redirectTo: '/member/crm',
     });
+  });
+});
+
+describe('SystemIndividualAccountsController', () => {
+  it('delegates individual account creation to the provisioning service', async () => {
+    const accountProvisioningService = {
+      createSystemIndividualAccount: jest.fn().mockResolvedValue({
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        sponsorId: 'sponsor-1',
+        userId: 'user-1',
+        accountType: 'individual',
+        teamType: 'personal',
+        email: 'ana@example.com',
+        temporaryPassword: 'TempPass123',
+        loginUrl: '/login',
+        recommendedRedirect: '/member/crm',
+      }),
+    } as unknown as AccountProvisioningService;
+    const controller = new SystemIndividualAccountsController(
+      accountProvisioningService,
+    );
+
+    await expect(
+      controller.createIndividualAccount({
+        name: 'Ana Owner',
+        email: 'ana@example.com',
+        businessName: 'Ana Studio',
+      }),
+    ).resolves.toMatchObject({
+      userId: 'user-1',
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      sponsorId: 'sponsor-1',
+      email: 'ana@example.com',
+      loginUrl: '/login',
+      recommendedRedirect: '/member/crm',
+    });
+  });
+
+  it('requires SUPER_ADMIN on the system endpoint', () => {
+    const reflector = new Reflector();
+    const roles = reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
+      SystemIndividualAccountsController.prototype.createIndividualAccount,
+      SystemIndividualAccountsController,
+    ]);
+
+    expect(roles).toEqual([UserRole.SUPER_ADMIN]);
   });
 });

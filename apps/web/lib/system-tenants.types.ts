@@ -94,6 +94,19 @@ export type CreateSystemTenantResponse = LooseRecord & {
   adminUserId: string;
 };
 
+export type CreateSystemIndividualAccountResponse = LooseRecord & {
+  userId: string;
+  workspaceId: string;
+  teamId: string;
+  sponsorId: string;
+  email: string;
+  temporaryPassword?: string;
+  loginUrl: string;
+  recommendedRedirect: string;
+  accountType: "individual";
+  teamType: "personal";
+};
+
 export type SystemFunnelTemplateRecord = LooseRecord & {
   id: string;
   workspaceId: string;

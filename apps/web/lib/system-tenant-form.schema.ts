@@ -18,6 +18,33 @@ export const createSystemTenantSchema = z.object({
     .email("Ingresa un correo de administrador válido."),
 });
 
+const optionalTrimmedText = z
+  .string()
+  .trim()
+  .transform((value) => (value ? value : undefined))
+  .optional();
+
+export const createSystemIndividualAccountSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Ingresa el nombre del propietario."),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Ingresa un correo válido."),
+  phone: optionalTrimmedText,
+  businessName: z
+    .string()
+    .trim()
+    .min(2, "Ingresa el nombre del negocio."),
+  niche: optionalTrimmedText,
+  country: optionalTrimmedText,
+  temporaryPassword: optionalTrimmedText,
+  sendInviteEmail: z.boolean(),
+});
+
 export const editSystemTenantSchema = z.object({
   tenantName: z
     .string()
@@ -42,6 +69,10 @@ export const editSystemTenantSchema = z.object({
 
 export type CreateSystemTenantFormValues = z.infer<
   typeof createSystemTenantSchema
+>;
+
+export type CreateSystemIndividualAccountFormValues = z.infer<
+  typeof createSystemIndividualAccountSchema
 >;
 
 export type EditSystemTenantFormValues = z.infer<

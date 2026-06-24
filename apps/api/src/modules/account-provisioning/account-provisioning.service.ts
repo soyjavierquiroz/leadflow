@@ -2,18 +2,25 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import {
   AccountType,
   Prisma,
   TeamType,
   UserRole,
+  UserStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { hashPassword } from '../auth/password-hash.util';
+import { MailService } from '../mail/mail.service';
+import type { CreateSystemIndividualAccountDto } from './dto/create-system-individual-account.dto';
 import type { ProvisionIndividualAccountDto } from './dto/provision-individual-account.dto';
 
 const defaultRotationPoolName = 'Rotación Orgánica Principal';
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const slugify = (value: string) =>
   value
@@ -68,6 +75,14 @@ export type ProvisionIndividualAccountResult = {
   teamType: 'personal';
 };
 
+export type CreateSystemIndividualAccountResult =
+  ProvisionIndividualAccountResult & {
+    email: string;
+    temporaryPassword: string;
+    loginUrl: '/login';
+    recommendedRedirect: '/member/crm';
+  };
+
 type ProvisioningUserRecord = Prisma.UserGetPayload<{
   include: {
     workspace: true;
@@ -80,10 +95,117 @@ type ProvisioningTransaction = Prisma.TransactionClient;
 
 @Injectable()
 export class AccountProvisioningService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(AccountProvisioningService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   async provisionIndividualAccount(
     user: Pick<AuthenticatedUser, 'id'>,
+    payload: ProvisionIndividualAccountDto,
+  ): Promise<ProvisionIndividualAccountResult> {
+    return this.prisma.$transaction(async (tx) => {
+      return this.provisionIndividualAccountForUser(tx, user.id, payload);
+    });
+  }
+
+  async createSystemIndividualAccount(
+    payload: CreateSystemIndividualAccountDto,
+  ): Promise<CreateSystemIndividualAccountResult> {
+    const name = sanitizeRequiredText(payload.name, 'name');
+    const email = this.normalizeEmail(payload.email, 'email');
+    const businessName = sanitizeRequiredText(
+      payload.businessName,
+      'businessName',
+    );
+    const temporaryPassword =
+      sanitizeOptionalText(payload.temporaryPassword) ??
+      this.generateTemporaryPassword();
+
+    let context: ProvisionIndividualAccountResult;
+
+    try {
+      context = await this.prisma.$transaction(async (tx) => {
+        const existingUser = await tx.user.findUnique({
+          where: {
+            email,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (existingUser) {
+          throw new ConflictException({
+            code: 'INDIVIDUAL_ACCOUNT_EMAIL_EXISTS',
+            message: 'A user with this email already exists.',
+          });
+        }
+
+        const user = await tx.user.create({
+          data: {
+            fullName: name,
+            email,
+            passwordHash: hashPassword(temporaryPassword),
+            role: UserRole.TEAM_ADMIN,
+            status: UserStatus.active,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        return this.provisionIndividualAccountForUser(tx, user.id, {
+          businessName,
+          niche: payload.niche,
+          country: payload.country,
+          phone: payload.phone,
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException({
+          code: 'INDIVIDUAL_ACCOUNT_EMAIL_EXISTS',
+          message: 'A user with this email already exists.',
+        });
+      }
+
+      throw error;
+    }
+
+    if (payload.sendInviteEmail === true) {
+      try {
+        await this.mailService.sendWelcomeEmail(
+          email,
+          temporaryPassword,
+          businessName,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Individual account welcome email failed for ${email}: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
+    }
+
+    return {
+      ...context,
+      email,
+      temporaryPassword,
+      loginUrl: '/login',
+      recommendedRedirect: '/member/crm',
+    };
+  }
+
+  private async provisionIndividualAccountForUser(
+    tx: ProvisioningTransaction,
+    userId: string,
     payload: ProvisionIndividualAccountDto,
   ): Promise<ProvisionIndividualAccountResult> {
     const businessName = sanitizeRequiredText(
@@ -92,109 +214,107 @@ export class AccountProvisioningService {
     );
     const phone = sanitizeOptionalText(payload.phone);
 
-    return this.prisma.$transaction(async (tx) => {
-      const existingUser = await tx.user.findUnique({
-        where: {
-          id: user.id,
-        },
-        include: {
-          workspace: true,
-          team: true,
-          sponsor: true,
-        },
+    const existingUser = await tx.user.findUnique({
+      where: {
+        id: userId,
+      },
+      include: {
+        workspace: true,
+        team: true,
+        sponsor: true,
+      },
+    });
+
+    if (!existingUser) {
+      throw new BadRequestException({
+        code: 'USER_NOT_FOUND',
+        message: 'The authenticated user was not found.',
       });
+    }
 
-      if (!existingUser) {
-        throw new BadRequestException({
-          code: 'USER_NOT_FOUND',
-          message: 'The authenticated user was not found.',
-        });
-      }
+    this.assertCanProvisionIndividualAccount(existingUser);
 
-      this.assertCanProvisionIndividualAccount(existingUser);
+    const workspace =
+      existingUser.workspace?.accountType === AccountType.individual
+        ? existingUser.workspace
+        : await this.createIndividualWorkspace(tx, businessName, userId);
 
-      const workspace =
-        existingUser.workspace?.accountType === AccountType.individual
-          ? existingUser.workspace
-          : await this.createIndividualWorkspace(tx, businessName, user.id);
+    const team =
+      existingUser.team?.teamType === TeamType.personal
+        ? existingUser.team
+        : await this.createPersonalTeam(tx, {
+            workspaceId: workspace.id,
+            businessName,
+            userId,
+          });
 
-      const team =
-        existingUser.team?.teamType === TeamType.personal
-          ? existingUser.team
-          : await this.createPersonalTeam(tx, {
-              workspaceId: workspace.id,
-              businessName,
-              userId: user.id,
-            });
-
-      const sponsor =
-        existingUser.sponsor?.teamId === team.id
-          ? await this.normalizeExistingSponsor(tx, {
-              sponsorId: existingUser.sponsor.id,
-              userEmail: existingUser.email,
-              phone,
-            })
-          : await this.findOrCreateOwnerSponsor(tx, {
-              workspaceId: workspace.id,
-              teamId: team.id,
-              userId: existingUser.id,
-              fullName: existingUser.fullName,
-              email: existingUser.email,
-              businessName,
-              phone,
-            });
-
-      const nextRole =
-        existingUser.role === UserRole.SUPER_ADMIN
-          ? UserRole.SUPER_ADMIN
-          : UserRole.TEAM_ADMIN;
-
-      const shouldUpdateUser =
-        existingUser.workspaceId !== workspace.id ||
-        existingUser.teamId !== team.id ||
-        existingUser.sponsorId !== sponsor.id ||
-        existingUser.role !== nextRole;
-
-      if (shouldUpdateUser) {
-        await tx.user.update({
-          where: {
-            id: existingUser.id,
-          },
-          data: {
+    const sponsor =
+      existingUser.sponsor?.teamId === team.id
+        ? await this.normalizeExistingSponsor(tx, {
+            sponsorId: existingUser.sponsor.id,
+            userEmail: existingUser.email,
+            phone,
+          })
+        : await this.findOrCreateOwnerSponsor(tx, {
             workspaceId: workspace.id,
             teamId: team.id,
-            sponsorId: sponsor.id,
-            role: nextRole,
-          },
-        });
-      }
+            userId: existingUser.id,
+            fullName: existingUser.fullName,
+            email: existingUser.email,
+            businessName,
+            phone,
+          });
 
-      if (team.managerUserId !== existingUser.id) {
-        await tx.team.update({
-          where: {
-            id: team.id,
-          },
-          data: {
-            managerUserId: existingUser.id,
-          },
-        });
-      }
+    const nextRole =
+      existingUser.role === UserRole.SUPER_ADMIN
+        ? UserRole.SUPER_ADMIN
+        : UserRole.TEAM_ADMIN;
 
-      await this.ensureDefaultRotationPool(tx, {
-        workspaceId: workspace.id,
-        teamId: team.id,
-        sponsorId: sponsor.id,
+    const shouldUpdateUser =
+      existingUser.workspaceId !== workspace.id ||
+      existingUser.teamId !== team.id ||
+      existingUser.sponsorId !== sponsor.id ||
+      existingUser.role !== nextRole;
+
+    if (shouldUpdateUser) {
+      await tx.user.update({
+        where: {
+          id: existingUser.id,
+        },
+        data: {
+          workspaceId: workspace.id,
+          teamId: team.id,
+          sponsorId: sponsor.id,
+          role: nextRole,
+        },
       });
+    }
 
-      return {
-        workspaceId: workspace.id,
-        teamId: team.id,
-        sponsorId: sponsor.id,
-        userId: existingUser.id,
-        accountType: 'individual',
-        teamType: 'personal',
-      };
+    if (team.managerUserId !== existingUser.id) {
+      await tx.team.update({
+        where: {
+          id: team.id,
+        },
+        data: {
+          managerUserId: existingUser.id,
+        },
+      });
+    }
+
+    await this.ensureDefaultRotationPool(tx, {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: sponsor.id,
     });
+
+    return {
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: sponsor.id,
+      userId: existingUser.id,
+      accountType: 'individual',
+      teamType: 'personal',
+    };
   }
 
   private assertCanProvisionIndividualAccount(user: ProvisioningUserRecord) {
@@ -595,5 +715,31 @@ export class AccountProvisioningService {
     }
 
     return `${defaultRotationPoolName} - Personal ${Date.now().toString(36)}`;
+  }
+
+  private normalizeEmail(value: string | null | undefined, field: string) {
+    const email = sanitizeRequiredText(value, field).toLowerCase();
+
+    if (!emailPattern.test(email)) {
+      throw new BadRequestException({
+        code: 'INVALID_EMAIL',
+        message: `${field} must be a valid email address.`,
+        field,
+      });
+    }
+
+    return email;
+  }
+
+  private generateTemporaryPassword() {
+    const alphabet =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+
+    return Array.from(
+      randomBytes(14),
+      (byte) => alphabet[byte % alphabet.length],
+    )
+      .join('')
+      .slice(0, 14);
   }
 }

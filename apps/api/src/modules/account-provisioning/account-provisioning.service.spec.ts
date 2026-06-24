@@ -10,10 +10,14 @@ describe('AccountProvisioningService', () => {
         callback(tx),
       ),
     } as unknown as PrismaService;
+    const mailService = {
+      sendWelcomeEmail: jest.fn(),
+    };
 
     return {
+      mailService,
       prisma,
-      service: new AccountProvisioningService(prisma),
+      service: new AccountProvisioningService(prisma, mailService as never),
     };
   };
 
@@ -388,5 +392,184 @@ describe('AccountProvisioningService', () => {
         businessName: '   ',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('creates a complete individual account for Super Admin provisioning', async () => {
+    const workspace = {
+      id: 'workspace-1',
+      name: 'Ana Studio',
+      slug: 'ana-studio-user-1',
+      status: 'active',
+      accountType: AccountType.individual,
+      timezone: 'UTC',
+      defaultCurrency: 'USD',
+      primaryLocale: 'es',
+      primaryDomain: null,
+      emailNotificationsEnabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const team = {
+      id: 'team-1',
+      workspaceId: workspace.id,
+      name: 'Ana Studio',
+      code: 'ana-studio-user-1',
+      logoUrl: null,
+      status: 'active',
+      teamType: TeamType.personal,
+      isActive: true,
+      lastAssignedUserId: null,
+      subscriptionExpiresAt: null,
+      description: null,
+      managerUserId: null,
+      maxSeats: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const sponsor = {
+      id: 'sponsor-1',
+      workspaceId: workspace.id,
+      teamId: team.id,
+      displayName: 'Ana Owner',
+      publicSlug: 'ana-owner',
+      status: 'active',
+      isActive: true,
+      avatarUrl: null,
+      email: 'ana@example.com',
+      phone: '+59170000000',
+      availabilityStatus: 'available',
+      routingWeight: 1,
+      memberPortalEnabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const createdUser = {
+      ...baseUser,
+      id: 'user-1',
+      fullName: 'Ana Owner',
+      email: 'ana@example.com',
+      role: UserRole.TEAM_ADMIN,
+    };
+    const tx = {
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(createdUser),
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: createdUser.id }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      workspace: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(workspace),
+      },
+      team: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(team),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      sponsor: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(sponsor),
+      },
+      rotationPool: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'pool-1' }),
+      },
+      rotationMember: {
+        create: jest.fn(),
+      },
+    };
+    const { mailService, service } = buildService(tx);
+
+    const result = await service.createSystemIndividualAccount({
+      name: 'Ana Owner',
+      email: ' ANA@EXAMPLE.COM ',
+      businessName: 'Ana Studio',
+      phone: '+59170000000',
+      temporaryPassword: 'TempPass123',
+      sendInviteEmail: true,
+    });
+
+    expect(tx.user.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        fullName: 'Ana Owner',
+        email: 'ana@example.com',
+        role: UserRole.TEAM_ADMIN,
+        status: UserStatus.active,
+      }),
+      select: {
+        id: true,
+      },
+    });
+    expect(tx.workspace.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        accountType: AccountType.individual,
+        name: 'Ana Studio',
+      }),
+    });
+    expect(tx.team.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        teamType: TeamType.personal,
+        maxSeats: 1,
+      }),
+    });
+    expect(tx.sponsor.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: 'ana@example.com',
+        phone: '+59170000000',
+        status: 'active',
+        isActive: true,
+      }),
+    });
+    expect(mailService.sendWelcomeEmail).toHaveBeenCalledWith(
+      'ana@example.com',
+      'TempPass123',
+      'Ana Studio',
+    );
+    expect(result).toEqual({
+      workspaceId: workspace.id,
+      teamId: team.id,
+      sponsorId: sponsor.id,
+      userId: createdUser.id,
+      accountType: 'individual',
+      teamType: 'personal',
+      email: 'ana@example.com',
+      temporaryPassword: 'TempPass123',
+      loginUrl: '/login',
+      recommendedRedirect: '/member/crm',
+    });
+  });
+
+  it('rejects a duplicate email when Super Admin creates an individual account', async () => {
+    const tx = {
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'existing-user' }),
+        create: jest.fn(),
+      },
+      workspace: {
+        create: jest.fn(),
+      },
+      team: {
+        create: jest.fn(),
+      },
+      sponsor: {
+        create: jest.fn(),
+      },
+    };
+    const { service } = buildService(tx);
+
+    await expect(
+      service.createSystemIndividualAccount({
+        name: 'Ana Owner',
+        email: 'ana@example.com',
+        businessName: 'Ana Studio',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.user.create).not.toHaveBeenCalled();
+    expect(tx.workspace.create).not.toHaveBeenCalled();
+    expect(tx.team.create).not.toHaveBeenCalled();
+    expect(tx.sponsor.create).not.toHaveBeenCalled();
   });
 });
