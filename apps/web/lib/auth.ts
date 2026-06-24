@@ -5,10 +5,16 @@ import { redirect } from "next/navigation";
 import type { AppUserRole, AuthenticatedAppUser } from "@/lib/auth.types";
 import { webPublicConfig } from "@/lib/public-env";
 import {
+  getPostAuthRedirectPath,
+  INDIVIDUAL_ONBOARDING_PATH,
+  needsIndividualOnboarding,
+} from "@/lib/individual-onboarding-routing";
+import {
   getErrorDebugDetails,
   logCriticalSsrError,
 } from "@/lib/ssr-debug";
 export type { AppUserRole, AuthenticatedAppUser } from "@/lib/auth.types";
+export { needsIndividualOnboarding } from "@/lib/individual-onboarding-routing";
 
 type AuthMeResponse = {
   user: AuthenticatedAppUser;
@@ -72,6 +78,7 @@ const authCookieSecure =
 
 export type LoginApiResponse = {
   redirectPath: string;
+  user?: AuthenticatedAppUser;
 };
 
 export type ImpersonationApiResponse = {
@@ -547,9 +554,14 @@ export const loginWithServerSession = async (input: {
       configureLoginSessionCookie(sessionCookie, { rememberMe }),
     );
 
+    const redirectPath = getPostAuthRedirectPath(
+      isAuthenticatedAppUser(payload.user) ? payload.user : null,
+      payload.redirectPath,
+    );
+
     return {
       ok: true as const,
-      redirectUrl: resolveAuthRedirectTarget(payload.redirectPath),
+      redirectUrl: resolveAuthRedirectTarget(redirectPath),
     };
   } catch (error) {
     console.error("\n🔥 CRITICAL LOGIN FRONTEND ERROR:\n", error, "\n");
@@ -731,7 +743,7 @@ export const getSessionUser = async () => {
     }
 
     const payload = (await response.json()) as AuthMeResponse;
-    return payload.user;
+    return isAuthenticatedAppUser(payload.user) ? payload.user : null;
   } catch {
     return null;
   }
@@ -754,6 +766,10 @@ export const requireRole = async (requiredRole: AppUserRole) => {
 
   if (!user) {
     redirect("/login");
+  }
+
+  if (needsIndividualOnboarding(user)) {
+    redirect(INDIVIDUAL_ONBOARDING_PATH);
   }
 
   if (user.role !== requiredRole) {
@@ -780,6 +796,10 @@ export const requireOperationalViewUser = async () => {
 
   if (!user) {
     redirect("/login");
+  }
+
+  if (needsIndividualOnboarding(user)) {
+    redirect(INDIVIDUAL_ONBOARDING_PATH);
   }
 
   if (!canAccessOperationalView(user)) {

@@ -59,6 +59,13 @@ export function LoginForm() {
       </div>
 
       <div className="mt-8 space-y-4">
+        <Link
+          href="/onboarding/individual"
+          className="flex min-h-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-3 text-center text-sm font-semibold text-cyan-100 transition duration-200 hover:border-cyan-200/45 hover:bg-cyan-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#020617]"
+        >
+          Empezar como vendedor independiente
+        </Link>
+
         <label className="block">
           <span className="text-sm font-medium text-slate-200">Email</span>
           <span className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition duration-200 focus-within:border-teal-200/45 focus-within:bg-slate-950/60 focus-within:shadow-[0_0_0_1px_rgba(45,212,191,0.18),0_0_36px_rgba(45,212,191,0.12)]">

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { IndividualOnboardingForm } from "@/components/onboarding/individual-onboarding-form";
 import { getSessionUser } from "@/lib/auth";
+import { needsIndividualOnboarding } from "@/lib/individual-onboarding-routing";
 import { submitIndividualOnboardingAction } from "./actions";
 
 export default async function IndividualOnboardingPage() {
@@ -8,6 +9,10 @@ export default async function IndividualOnboardingPage() {
 
   if (!user) {
     redirect("/login");
+  }
+
+  if (!needsIndividualOnboarding(user)) {
+    redirect(user.homePath);
   }
 
   return (

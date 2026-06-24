@@ -5,6 +5,7 @@ import { FunnelUnderConstruction } from '@/components/public-funnel/funnel-under
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
 import { PublicRuntimeLeadSubmitProvider } from '@/components/public-runtime/public-runtime-lead-submit-provider';
 import { getSessionUser } from '@/lib/auth';
+import { getPostAuthRedirectPath } from '@/lib/individual-onboarding-routing';
 import {
   fetchPublicFunnelRuntime,
   fetchPublicFunnelRuntimeResolution,
@@ -95,7 +96,7 @@ export default async function SiteRuntimePage({
 
   if (!previewHost && isCanonicalAppHomeRequest(host, path)) {
     const user = await getSessionUser();
-    redirect(user?.homePath ?? '/login');
+    redirect(user ? getPostAuthRedirectPath(user, user.homePath) : '/login');
   }
 
   const runtimeResolution = await fetchPublicFunnelRuntimeResolution({

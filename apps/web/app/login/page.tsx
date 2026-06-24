@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/login-form";
+import { getPostAuthRedirectPath } from "@/lib/individual-onboarding-routing";
 import { getSessionUser } from "@/lib/auth";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
 
   if (user) {
-    redirect(user.homePath);
+    redirect(getPostAuthRedirectPath(user, user.homePath));
   }
 
   return (
