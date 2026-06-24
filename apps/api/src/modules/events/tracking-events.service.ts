@@ -127,8 +127,6 @@ export class TrackingEventsService {
             pathPrefix: publication.pathPrefix,
             metaPixelId: publication.metaPixelId ?? null,
             tiktokPixelId: publication.tiktokPixelId ?? null,
-            metaCapiToken: publication.metaCapiToken ?? null,
-            tiktokAccessToken: publication.tiktokAccessToken ?? null,
           },
           funnel: {
             id: publication.funnelInstanceId,

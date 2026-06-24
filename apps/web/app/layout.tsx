@@ -46,11 +46,26 @@ const metadataBase = (() => {
   }
 })();
 
+const metadataAppName = (() => {
+  const appName = webPublicConfig.appName.trim();
+  const normalized = appName.toLowerCase();
+
+  if (
+    !appName ||
+    normalized === 'kurukin ai automation landing page' ||
+    normalized.includes('bolt.new')
+  ) {
+    return 'LeadFlow';
+  }
+
+  return appName;
+})();
+
 export const metadata: Metadata = {
   metadataBase,
   title: {
-    default: webPublicConfig.appName,
-    template: `%s | ${webPublicConfig.appName}`,
+    default: metadataAppName,
+    template: `%s | ${metadataAppName}`,
   },
   description:
     'Leadflow centraliza captacion, asignacion y automatizacion operativa de leads.',

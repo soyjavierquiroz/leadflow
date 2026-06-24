@@ -19,10 +19,12 @@ import { usePublicRuntimeLeadSubmit } from "@/components/public-runtime/public-r
 import { jakawiPremiumClassNames } from "@/styles/templates/jakawi-premium";
 import {
   getOrCreateAnonymousId,
+  persistSubmissionEventId,
   persistSubmissionContext,
   readSubmissionContext,
   submitPublicLeadCapture,
 } from "@/lib/public-funnel-session";
+import { appendConversionEventIdToPath } from "@/lib/public-runtime-conversion-event";
 import { resolveRuntimeNextStepPath } from "@/lib/funnel-runtime-routing";
 import {
   createRuntimeEventId,
@@ -336,7 +338,8 @@ export function PublicCaptureForm({
       }
 
       if (!runtimeLeadSubmit?.submitLeadCapture) {
-        persistSubmissionContext(publicationId, response);
+        persistSubmissionEventId(publicationId, submissionEventId);
+        persistSubmissionContext(publicationId, response, submissionEventId);
       }
 
       setSuccessMessage(
@@ -356,7 +359,10 @@ export function PublicCaptureForm({
           });
 
         if (redirectPath) {
-          router.push(redirectPath);
+          router.push(
+            appendConversionEventIdToPath(redirectPath, submissionEventId) ??
+              redirectPath,
+          );
           return;
         }
       }

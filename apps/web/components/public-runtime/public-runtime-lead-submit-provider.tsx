@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import {
   clearEntryContext,
   persistEntryContext,
+  persistSubmissionEventId,
   persistSubmissionContext,
   submitRuntimeLeadCapture,
   type LeadCaptureSubmissionPayload,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/public-funnel-session";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import { emitLeadCaptureConversionEvent } from "@/lib/public-runtime-conversions";
+import { appendConversionEventIdToPath } from "@/lib/public-runtime-conversion-event";
 import { resolveRuntimeNextStepPath } from "@/lib/funnel-runtime-routing";
 
 export type RuntimeLeadSubmitBlockContext = {
@@ -182,7 +184,12 @@ export function PublicRuntimeLeadSubmitProvider({
             successRedirect: options?.block?.successRedirect,
           });
 
-        persistSubmissionContext(payload.publicationId, response);
+        persistSubmissionEventId(payload.publicationId, payload.submissionEventId);
+        persistSubmissionContext(
+          payload.publicationId,
+          response,
+          payload.submissionEventId,
+        );
 
         if (response.httpStatus === 200 && options?.block) {
           emitLeadCaptureConversionEvent({
@@ -210,7 +217,12 @@ export function PublicRuntimeLeadSubmitProvider({
             });
           }
 
-          router.push(resolvedNextStepPath);
+          router.push(
+            appendConversionEventIdToPath(
+              resolvedNextStepPath,
+              payload.submissionEventId,
+            ) ?? resolvedNextStepPath,
+          );
           setIsTransitioning(false);
           setTransitionConfig(null);
         }

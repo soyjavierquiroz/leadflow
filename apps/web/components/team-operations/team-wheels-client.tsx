@@ -10,6 +10,8 @@ import { ModalShell } from "@/components/team-operations/modal-shell";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import {
   formatAdWheelSeatPrice,
+  getAdWheelDisplayStatus,
+  isAdWheelOperationallyActive,
   type AdWheelRecord,
   type TeamAdWheelParticipantResult,
   type TeamAdWheelRecord,
@@ -159,12 +161,17 @@ function PremiumSelect({
 const sortRows = (rows: TeamAdWheelRecord[]) => {
   const statusOrder = {
     ACTIVE: 0,
-    DRAFT: 1,
-    COMPLETED: 2,
-  } satisfies Record<TeamAdWheelRecord["status"], number>;
+    PROGRAMADA: 1,
+    DRAFT: 2,
+    VENCIDA: 3,
+    COMPLETED: 4,
+  } satisfies Record<ReturnType<typeof getAdWheelDisplayStatus>, number>;
+  const now = new Date();
 
   return [...rows].sort((left, right) => {
-    const statusDelta = statusOrder[left.status] - statusOrder[right.status];
+    const statusDelta =
+      statusOrder[getAdWheelDisplayStatus(left, now)] -
+      statusOrder[getAdWheelDisplayStatus(right, now)];
 
     if (statusDelta !== 0) {
       return statusDelta;
@@ -242,12 +249,18 @@ export function TeamWheelsClient({
   } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const activeCount = rows.filter((item) => item.status === "ACTIVE").length;
+  const operationalRows = rows.filter((item) =>
+    isAdWheelOperationallyActive(item),
+  );
+  const activeCount = operationalRows.length;
   const enrolledSponsors = rows.reduce(
     (total, item) => total + item.participantCount,
     0,
   );
-  const totalSeats = rows.reduce((total, item) => total + item.totalSeatCount, 0);
+  const totalSeats = operationalRows.reduce(
+    (total, item) => total + item.totalSeatCount,
+    0,
+  );
   const editingWheel =
     editorState?.mode === "edit"
       ? rows.find((wheel) => wheel.id === editorState.wheelId) ?? null
@@ -623,7 +636,7 @@ export function TeamWheelsClient({
                 </div>
 
                 <div className="flex flex-col items-end gap-3">
-                  <StatusBadge value={wheel.status} />
+                  <StatusBadge value={getAdWheelDisplayStatus(wheel)} />
                   <div className="flex flex-wrap justify-end gap-2">
                     <button
                       type="button"

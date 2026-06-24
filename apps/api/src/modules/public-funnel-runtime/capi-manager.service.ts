@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
+import { redactSecrets } from '../shared/redact-sensitive-data';
 import type { AttributionDecision } from './public-funnel-runtime.types';
 
 type CapiPublicationContext = {
@@ -42,6 +43,8 @@ type TikTokUserContext = {
   external_id?: string;
 };
 
+const leadCaptureConversionEventName = 'CompleteRegistration';
+
 @Injectable()
 export class CapiManagerService {
   private readonly logger = new Logger(CapiManagerService.name);
@@ -79,12 +82,12 @@ export class CapiManagerService {
       }
 
       const provider = index === 0 ? 'Meta' : 'TikTok';
+      const message =
+        result.reason instanceof Error
+          ? redactSecrets(result.reason.message)
+          : 'unknown error';
       this.logger.error(
-        `[CAPI_ERROR] ${provider} dispatch failed. publicationId=${input.publication.id} leadId=${input.lead.id} message=${
-          result.reason instanceof Error
-            ? result.reason.message
-            : 'unknown error'
-        }`,
+        `[CAPI_ERROR] ${provider} dispatch failed. publicationId=${input.publication.id} leadId=${input.lead.id} message=${message}`,
       );
     });
   }
@@ -126,11 +129,11 @@ export class CapiManagerService {
         body: JSON.stringify({
           data: [
             {
-              event_name: 'Lead',
+              event_name: leadCaptureConversionEventName,
               event_time: Math.floor(occurredAt.getTime() / 1000),
               action_source: 'website',
               event_source_url: this.resolveEventSourceUrl(input),
-              event_id: `${input.eventId}:meta`,
+              event_id: input.eventId,
               user_data: userData,
             },
           ],
@@ -140,7 +143,7 @@ export class CapiManagerService {
 
     if (!response.ok) {
       throw new Error(
-        `Meta CAPI responded with ${response.status}: ${await response.text()}`,
+        `Meta CAPI responded with ${response.status}.`,
       );
     }
 
@@ -194,8 +197,8 @@ export class CapiManagerService {
         event_source_id: pixelId,
         data: [
           {
-            event: 'SubmitForm',
-            event_id: `${input.eventId}:tiktok`,
+            event: leadCaptureConversionEventName,
+            event_id: input.eventId,
             timestamp: Math.floor(occurredAt.getTime() / 1000),
             context: {
               ip: clientIpAddress,
@@ -215,7 +218,7 @@ export class CapiManagerService {
 
     if (!response.ok) {
       throw new Error(
-        `TikTok Events API responded with ${response.status}: ${await response.text()}`,
+        `TikTok Events API responded with ${response.status}.`,
       );
     }
 

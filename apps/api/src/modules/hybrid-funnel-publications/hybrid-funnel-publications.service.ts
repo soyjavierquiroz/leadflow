@@ -57,6 +57,7 @@ type HybridPublicationDetail = {
     tiktokPixelId: string | null;
     metaCapiToken: string | null;
     tiktokAccessToken: string | null;
+    ogImageUrl: string | null;
     status: string;
     isPrimary: boolean;
   };
@@ -82,6 +83,7 @@ type HybridPublicationDetail = {
   seo: {
     title: string;
     metaDescription: string;
+    ogImageUrl: string | null;
   };
 };
 
@@ -176,6 +178,7 @@ export class HybridFunnelPublicationsService {
         tiktokPixelId: publication.tiktokPixelId ?? null,
         metaCapiToken: publication.metaCapiToken ?? null,
         tiktokAccessToken: publication.tiktokAccessToken ?? null,
+        ogImageUrl: publication.ogImageUrl ?? null,
         status: publication.status,
         isPrimary: publication.isPrimary,
       },
@@ -198,10 +201,13 @@ export class HybridFunnelPublicationsService {
         settingsJson: step.settingsJson as JsonValue,
       },
       steps,
-      seo: this.extractSeo(
-        step.settingsJson as JsonValue,
-        publication.funnelInstance.name,
-      ),
+      seo: {
+        ...this.extractSeo(
+          step.settingsJson as JsonValue,
+          publication.funnelInstance.name,
+        ),
+        ogImageUrl: publication.ogImageUrl ?? null,
+      },
     };
   }
 
@@ -271,6 +277,7 @@ export class HybridFunnelPublicationsService {
       this.normalizeOptionalString(dto.metaCapiToken) ?? null;
     const tiktokAccessToken =
       this.normalizeOptionalString(dto.tiktokAccessToken) ?? null;
+    const ogImageUrl = this.normalizeOptionalString(dto.ogImageUrl) ?? null;
 
     const detail = await this.prisma.$transaction(async (tx) => {
       const code = await this.createUniqueCode(
@@ -386,6 +393,7 @@ export class HybridFunnelPublicationsService {
           tiktokPixelId,
           metaCapiToken,
           tiktokAccessToken,
+          ogImageUrl,
           pathPrefix: normalized.pathPrefix,
           status: 'active',
           isActive: true,
@@ -442,6 +450,7 @@ export class HybridFunnelPublicationsService {
         tiktokPixelId: detail.publication.tiktokPixelId,
         metaCapiToken: detail.publication.metaCapiToken,
         tiktokAccessToken: detail.publication.tiktokAccessToken,
+        ogImageUrl: detail.publication.ogImageUrl,
         status: detail.publication.status,
         isPrimary: detail.publication.isPrimary,
       },
@@ -467,6 +476,7 @@ export class HybridFunnelPublicationsService {
       seo: {
         title: normalized.seoTitle,
         metaDescription: normalized.metaDescription,
+        ogImageUrl: detail.publication.ogImageUrl,
       },
     };
   }
@@ -566,6 +576,10 @@ export class HybridFunnelPublicationsService {
       dto.tiktokAccessToken !== undefined
         ? this.normalizeOptionalString(dto.tiktokAccessToken)
         : existing.tiktokAccessToken;
+    const ogImageUrl =
+      dto.ogImageUrl !== undefined
+        ? this.normalizeOptionalString(dto.ogImageUrl)
+        : existing.ogImageUrl;
 
     await this.assertDomain(scope, normalized.domainId);
     const template = await this.assertTemplate(
@@ -765,6 +779,7 @@ export class HybridFunnelPublicationsService {
           tiktokPixelId,
           metaCapiToken,
           tiktokAccessToken,
+          ogImageUrl,
           pathPrefix: normalized.pathPrefix,
           status: 'active',
           isActive: true,
@@ -804,6 +819,7 @@ export class HybridFunnelPublicationsService {
         tiktokPixelId: detail.publication.tiktokPixelId,
         metaCapiToken: detail.publication.metaCapiToken,
         tiktokAccessToken: detail.publication.tiktokAccessToken,
+        ogImageUrl: detail.publication.ogImageUrl,
         status: detail.publication.status,
         isPrimary: detail.publication.isPrimary,
       },
@@ -829,6 +845,7 @@ export class HybridFunnelPublicationsService {
       seo: {
         title: normalized.seoTitle,
         metaDescription: normalized.metaDescription,
+        ogImageUrl: detail.publication.ogImageUrl,
       },
     };
   }

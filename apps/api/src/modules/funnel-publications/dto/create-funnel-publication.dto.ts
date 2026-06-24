@@ -19,6 +19,9 @@ export class CreateFunnelPublicationDto {
   @IsOptional()
   @IsString()
   readonly tiktokAccessToken?: string | null;
+  @IsOptional()
+  @IsString()
+  readonly ogImageUrl?: string | null;
   readonly pathPrefix!: string;
   readonly isActive?: boolean;
   readonly isPrimary?: boolean;

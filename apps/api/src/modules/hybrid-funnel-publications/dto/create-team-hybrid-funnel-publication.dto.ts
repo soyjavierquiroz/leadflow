@@ -21,6 +21,7 @@ export class CreateTeamHybridFunnelPublicationDto {
   readonly theme?: string;
   readonly seoTitle?: string;
   readonly metaDescription?: string;
+  readonly ogImageUrl?: string | null;
   readonly blocksJson!: JsonValue;
   readonly mediaMap!: JsonValue;
   readonly settingsJson?: JsonValue;

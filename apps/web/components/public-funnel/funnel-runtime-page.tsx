@@ -3,6 +3,7 @@ import { KpiCard } from "@/components/app-shell/kpi-card";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { StatusBadge } from "@/components/app-shell/status-badge";
 import { PublicBlockAdapter } from "@/components/public-funnel/adapters/public-block-adapters";
+import { ConfirmationConversionTracker } from "@/components/public-funnel/confirmation-conversion-tracker";
 import {
   PublicPill,
   PublicSectionSurface,
@@ -26,6 +27,7 @@ import {
 import { SplitMediaFocusLayout } from "@/components/structures/SplitMediaFocusLayout";
 import { shouldEnableBrowserPixels } from "@/lib/browser-pixel-policy";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
+import { isConfirmationConversionStep } from "@/lib/public-funnel-steps";
 
 type FunnelRuntimePageProps = {
   runtime: PublicFunnelRuntimePayload;
@@ -67,6 +69,12 @@ export function FunnelRuntimePage({
   const parsedBlocks = parseRuntimeBlocks(currentStep?.blocksJson ?? []);
   const blocks = parsedBlocks.blocks;
   const hasRenderableBlocks = blocks.length > 0;
+  const shouldTrackConfirmationConversion = isConfirmationConversionStep(
+    currentStep?.stepType,
+  );
+  const conversionTracker = shouldTrackConfirmationConversion ? (
+    <ConfirmationConversionTracker runtime={runtime} />
+  ) : null;
   const isCompactHandoffStep = isFullscreenHandoffStep(blocks);
   const stepLayout = resolvePublicStepLayout({
     blocks,
@@ -106,6 +114,7 @@ export function FunnelRuntimePage({
       renderedContent = (
         <main className="min-h-screen bg-white">
           <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
+          {conversionTracker}
           <div
             className={
               isCompactHandoffStep
@@ -133,6 +142,7 @@ export function FunnelRuntimePage({
       renderedContent = (
         <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#ecfdf5_100%)]">
           <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
+          {conversionTracker}
           <div
             className={
               isCompactHandoffStep
@@ -164,6 +174,7 @@ export function FunnelRuntimePage({
       renderedContent = (
         <main className="min-h-screen">
           <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
+          {conversionTracker}
           <PublicAnnouncementBanner blocks={blocks} />
 
           <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen">
@@ -194,6 +205,7 @@ export function FunnelRuntimePage({
     renderedContent = (
       <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.16),_transparent_26%),radial-gradient(circle_at_top_right,_rgba(251,191,36,0.14),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_45%,_#f8fafc_100%)] px-4 py-6 md:px-8 md:py-10">
         <PublicRuntimeTracker runtime={runtime} previewHost={previewHost} />
+        {conversionTracker}
 
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 md:gap-8">
           <section className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur md:p-6">

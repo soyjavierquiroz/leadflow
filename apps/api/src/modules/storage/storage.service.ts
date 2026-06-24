@@ -11,14 +11,27 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import sharp from 'sharp';
 
 export type PresignedUploadUrlResult = {
   uploadUrl: string;
   publicUrl: string;
 };
 
+export type OptimizedOgImageResult = {
+  publicUrl: string;
+  mimeType: 'image/jpeg';
+  width: 1200;
+  height: 630;
+};
+
 const DEFAULT_REGION = 'us-east-1';
 const DEFAULT_URL_EXPIRATION_SECONDS = 15 * 60;
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
+const OG_IMAGE_MIME_TYPE = 'image/jpeg';
+const OG_IMAGE_EXTENSION = '.jpg';
+const OG_IMAGE_QUALITY = 85;
 
 const sanitizeNullableText = (value: string | null | undefined) => {
   if (typeof value !== 'string') {
@@ -66,6 +79,14 @@ const sanitizeFileName = (value: string) => {
   return withoutUnsafeChars || 'file';
 };
 
+const replaceFileExtension = (fileName: string, extension: string) => {
+  const normalizedExtension = extension.startsWith('.')
+    ? extension
+    : `.${extension}`;
+
+  return fileName.replace(/\.[^.]+$/u, '') + normalizedExtension;
+};
+
 const buildPublicObjectUrl = (input: {
   publicBaseUrl: string;
   bucket: string;
@@ -82,6 +103,19 @@ const buildPublicObjectUrl = (input: {
 
   return baseUrl.toString();
 };
+
+export const optimizeOgImageBuffer = async (input: Buffer) =>
+  sharp(input, { failOn: 'error' })
+    .rotate()
+    .resize(OG_IMAGE_WIDTH, OG_IMAGE_HEIGHT, {
+      fit: 'cover',
+      position: 'center',
+    })
+    .jpeg({
+      quality: OG_IMAGE_QUALITY,
+      mozjpeg: true,
+    })
+    .toBuffer();
 
 @Injectable()
 export class StorageService {
@@ -173,6 +207,70 @@ export class StorageService {
         bucket,
         objectKey,
       }),
+    };
+  }
+
+  async uploadOptimizedOgImage(input: {
+    fileName: string;
+    buffer: Buffer;
+    bucketPath: string;
+  }): Promise<OptimizedOgImageResult> {
+    if (!this.client || !this.publicBaseUrl) {
+      throw new ServiceUnavailableException({
+        code: 'STORAGE_NOT_CONFIGURED',
+        message:
+          'Storage service is not configured. Provide MinIO credentials and public URL before uploading assets.',
+      });
+    }
+
+    const normalizedBucketPath = sanitizePathPart(input.bucketPath);
+    const [bucket, ...folderParts] = normalizedBucketPath.split('/');
+
+    if (!bucket) {
+      throw new BadRequestException({
+        code: 'STORAGE_BUCKET_REQUIRED',
+        message:
+          'A bucket path is required. Use the format "bucket" or "bucket/folder".',
+      });
+    }
+
+    let optimizedBuffer: Buffer;
+
+    try {
+      optimizedBuffer = await optimizeOgImageBuffer(input.buffer);
+    } catch {
+      throw new BadRequestException({
+        code: 'STORAGE_OG_IMAGE_INVALID',
+        message:
+          'The Open Graph image could not be processed. Upload a valid JPG, PNG, or WEBP file.',
+      });
+    }
+
+    const safeFileName = sanitizeFileName(input.fileName);
+    const objectName = `${randomUUID()}-${replaceFileExtension(
+      safeFileName,
+      OG_IMAGE_EXTENSION,
+    )}`;
+    const objectKey = [...folderParts, objectName].filter(Boolean).join('/');
+
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        Body: optimizedBuffer,
+        ContentType: OG_IMAGE_MIME_TYPE,
+      }),
+    );
+
+    return {
+      publicUrl: buildPublicObjectUrl({
+        publicBaseUrl: this.publicBaseUrl,
+        bucket,
+        objectKey,
+      }),
+      mimeType: OG_IMAGE_MIME_TYPE,
+      width: OG_IMAGE_WIDTH,
+      height: OG_IMAGE_HEIGHT,
     };
   }
 

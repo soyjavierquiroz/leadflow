@@ -47,6 +47,46 @@ const asJsonValue = (value: unknown, fallback: JsonValue): JsonValue => {
   return fallback;
 };
 
+const publicTrackingSecretKeyFragments = [
+  'secret',
+  'token',
+  'authorization',
+  'cookie',
+  'api-key',
+  'apikey',
+  'access-token',
+  'access_token',
+  'accesstoken',
+  'capi',
+] as const;
+
+const isPublicTrackingSecretKey = (key: string) => {
+  const normalizedKey = key.trim().toLowerCase();
+
+  return publicTrackingSecretKeyFragments.some((fragment) =>
+    normalizedKey.includes(fragment),
+  );
+};
+
+const sanitizePublicTrackingConfig = (value: JsonValue): JsonValue => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizePublicTrackingConfig(entry));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !isPublicTrackingSecretKey(key))
+      .map(([key, entryValue]) => [
+        key,
+        sanitizePublicTrackingConfig(entryValue),
+      ]),
+  ) as JsonValue;
+};
+
 const normalizePath = (value: string, fallback = '/') => {
   const trimmed = value.trim() || fallback;
   if (!trimmed.startsWith('/')) {
@@ -337,7 +377,9 @@ export function normalizePublicFunnelRuntimePayload(
             trackingProfileRecord.deduplicationMode,
             'none',
           ),
-          configJson: asJsonValue(trackingProfileRecord.configJson, {}),
+          configJson: sanitizePublicTrackingConfig(
+            asJsonValue(trackingProfileRecord.configJson, {}),
+          ),
           conversionEventMappings: Array.isArray(
             trackingProfileRecord.conversionEventMappings,
           )

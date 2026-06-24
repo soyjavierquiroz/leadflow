@@ -17,6 +17,9 @@ export class CreateTeamFunnelPublicationDto {
   @IsOptional()
   @IsString()
   readonly tiktokAccessToken?: string | null;
+  @IsOptional()
+  @IsString()
+  readonly ogImageUrl?: string | null;
   readonly pathPrefix!: string;
   readonly isPrimary?: boolean;
 }

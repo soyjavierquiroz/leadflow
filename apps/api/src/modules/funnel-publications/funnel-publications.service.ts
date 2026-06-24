@@ -41,6 +41,7 @@ export class FunnelPublicationsService {
       metaCapiToken: this.normalizeOptionalString(dto.metaCapiToken) ?? null,
       tiktokAccessToken:
         this.normalizeOptionalString(dto.tiktokAccessToken) ?? null,
+      ogImageUrl: this.normalizeOptionalString(dto.ogImageUrl) ?? null,
       pathPrefix: this.normalizePathPrefix(dto.pathPrefix),
       status: dto.isActive ? 'active' : 'draft',
       isActive: dto.isActive ?? false,
@@ -89,6 +90,7 @@ export class FunnelPublicationsService {
       this.normalizeOptionalString(dto.metaCapiToken) ?? null;
     const tiktokAccessToken =
       this.normalizeOptionalString(dto.tiktokAccessToken) ?? null;
+    const ogImageUrl = this.normalizeOptionalString(dto.ogImageUrl) ?? null;
 
     await this.assertPublicationDependencies(scope, {
       domainId: dto.domainId,
@@ -126,6 +128,7 @@ export class FunnelPublicationsService {
           tiktokPixelId,
           metaCapiToken,
           tiktokAccessToken,
+          ogImageUrl,
           pathPrefix,
           status: 'draft',
           isActive: false,
@@ -193,6 +196,10 @@ export class FunnelPublicationsService {
       dto.tiktokAccessToken !== undefined
         ? this.normalizeOptionalString(dto.tiktokAccessToken)
         : existing.tiktokAccessToken;
+    const ogImageUrl =
+      dto.ogImageUrl !== undefined
+        ? this.normalizeOptionalString(dto.ogImageUrl)
+        : existing.ogImageUrl;
 
     await this.assertPublicationDependencies(scope, {
       domainId,
@@ -232,6 +239,7 @@ export class FunnelPublicationsService {
           tiktokPixelId,
           metaCapiToken,
           tiktokAccessToken,
+          ogImageUrl,
           pathPrefix,
           status,
           isActive,

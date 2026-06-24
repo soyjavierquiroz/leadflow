@@ -19,6 +19,7 @@ export interface FunnelPublication
   tiktokPixelId: string | null;
   metaCapiToken: string | null;
   tiktokAccessToken: string | null;
+  ogImageUrl: string | null;
   pathPrefix: string;
   status: FunnelPublicationStatus;
   isActive: boolean;

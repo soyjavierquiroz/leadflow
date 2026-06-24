@@ -29,9 +29,11 @@ import {
 } from "@/lib/funnel-theme-registry";
 import {
   getOrCreateAnonymousId,
+  persistSubmissionEventId,
   persistSubmissionContext,
   submitPublicLeadCapture,
 } from "@/lib/public-funnel-session";
+import { appendConversionEventIdToPath } from "@/lib/public-runtime-conversion-event";
 import { resolveRuntimeNextStepPath } from "@/lib/funnel-runtime-routing";
 import type { PublicFunnelRuntimePayload } from "@/lib/public-funnel-runtime.types";
 import {
@@ -400,7 +402,8 @@ export function LeadCaptureModal({
       }
 
       if (!runtimeLeadSubmit?.submitLeadCapture) {
-        persistSubmissionContext(publicationId, response);
+        persistSubmissionEventId(publicationId, submissionEventId);
+        persistSubmissionContext(publicationId, response, submissionEventId);
       }
 
       setModalOpen(false);
@@ -414,7 +417,10 @@ export function LeadCaptureModal({
           });
 
         if (redirectPath) {
-          window.location.assign(redirectPath);
+          window.location.assign(
+            appendConversionEventIdToPath(redirectPath, submissionEventId) ??
+              redirectPath,
+          );
         }
       }
     } catch (error) {

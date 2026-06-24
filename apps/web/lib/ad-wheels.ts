@@ -1,4 +1,8 @@
 export type AdWheelStatus = "DRAFT" | "ACTIVE" | "COMPLETED";
+export type AdWheelDisplayStatus =
+  | AdWheelStatus
+  | "PROGRAMADA"
+  | "VENCIDA";
 
 export type AdWheelRecord = {
   id: string;
@@ -52,3 +56,30 @@ const adWheelPriceFormatter = new Intl.NumberFormat("en-US", {
 
 export const formatAdWheelSeatPrice = (seatPrice: number) =>
   `${adWheelPriceFormatter.format(seatPrice / 100)} USD`;
+
+export const isAdWheelOperationallyActive = (
+  wheel: Pick<AdWheelRecord, "status" | "startDate" | "endDate">,
+  now = new Date(),
+) =>
+  wheel.status === "ACTIVE" &&
+  new Date(wheel.startDate).getTime() <= now.getTime() &&
+  new Date(wheel.endDate).getTime() > now.getTime();
+
+export const getAdWheelDisplayStatus = (
+  wheel: Pick<AdWheelRecord, "status" | "startDate" | "endDate">,
+  now = new Date(),
+): AdWheelDisplayStatus => {
+  if (wheel.status !== "ACTIVE") {
+    return wheel.status;
+  }
+
+  if (new Date(wheel.endDate).getTime() <= now.getTime()) {
+    return "VENCIDA";
+  }
+
+  if (new Date(wheel.startDate).getTime() > now.getTime()) {
+    return "PROGRAMADA";
+  }
+
+  return "ACTIVE";
+};

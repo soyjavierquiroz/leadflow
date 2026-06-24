@@ -300,6 +300,7 @@ export const mapFunnelPublicationRecord = (
   tiktokPixelId: readNullableString(record, 'tiktokPixelId'),
   metaCapiToken: readNullableString(record, 'metaCapiToken'),
   tiktokAccessToken: readNullableString(record, 'tiktokAccessToken'),
+  ogImageUrl: readNullableString(record, 'ogImageUrl'),
   pathPrefix: record.pathPrefix,
   status: record.status,
   isActive: record.isActive,

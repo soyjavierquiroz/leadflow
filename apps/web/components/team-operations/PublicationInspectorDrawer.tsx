@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ImageUp, X } from "lucide-react";
 
 import {
   PublicationTrackingFields,
@@ -12,8 +12,12 @@ type PublicationInspectorDrawerProps = {
   onClose: () => void;
   seoTitle: string;
   metaDescription: string;
+  ogImageUrl: string;
   onSeoTitleChange: (value: string) => void;
   onMetaDescriptionChange: (value: string) => void;
+  onOgImageUrlChange: (value: string) => void;
+  onOgImageUpload: () => void;
+  isUploadingOgImage: boolean;
   metaPixelId: string;
   tiktokPixelId: string;
   metaCapiToken: string;
@@ -31,8 +35,12 @@ export function PublicationInspectorDrawer({
   onClose,
   seoTitle,
   metaDescription,
+  ogImageUrl,
   onSeoTitleChange,
   onMetaDescriptionChange,
+  onOgImageUrlChange,
+  onOgImageUpload,
+  isUploadingOgImage,
   metaPixelId,
   tiktokPixelId,
   metaCapiToken,
@@ -120,6 +128,35 @@ export function PublicationInspectorDrawer({
                 <span className="text-xs leading-5 text-app-text-soft">
                   Recomendado: 140-160 caracteres orientados al beneficio
                   principal.
+                </span>
+              </label>
+
+              <label className="grid gap-2">
+                <span className={fieldLabelClassName}>
+                  Imagen SEO / Open Graph
+                </span>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    value={ogImageUrl}
+                    onChange={(event) => onOgImageUrlChange(event.target.value)}
+                    placeholder="https://cdn.kuruk.in/leadflow-assets/funnels/cover.jpg"
+                    className={`${inputClassName} min-w-0 flex-1`}
+                    type="url"
+                  />
+                  <button
+                    type="button"
+                    onClick={onOgImageUpload}
+                    disabled={isUploadingOgImage}
+                    className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-app-border bg-app-bg px-4 text-sm font-semibold text-app-text transition hover:border-app-border-strong disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <ImageUp className="h-4 w-4" aria-hidden="true" />
+                    {isUploadingOgImage ? "Subiendo" : "Subir"}
+                  </button>
+                </div>
+                <span className="text-xs leading-5 text-app-text-soft">
+                  Puedes subir JPG, PNG o WEBP. Leadflow generará un JPG
+                  1200x630 optimizado para previews de WhatsApp, Facebook,
+                  LinkedIn y X.
                 </span>
               </label>
             </div>

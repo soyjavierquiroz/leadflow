@@ -112,6 +112,7 @@ export type StoredSubmissionContext = {
   visitorId: string | null;
   anonymousId: string | null;
   leadId: string;
+  submissionEventId?: string | null;
   leadSnapshot?: LeadSnapshot;
   assignment: LeadCaptureSubmissionResponse["assignment"];
   lastAssignment: LeadCaptureSubmissionResponse["assignment"];
@@ -131,13 +132,16 @@ const buildAnonymousIdKey = (publicationId: string) =>
 const buildSubmissionContextKey = (publicationId: string) =>
   `leadflow:publication:${publicationId}:submission-context`;
 
+const buildSubmissionEventIdKey = (publicationId: string) =>
+  `leadflow:publication:${publicationId}:submission-event-id`;
+
 const buildEntryContextKey = (publicationId: string) =>
   `leadflow:publication:${publicationId}:entry-context`;
 
 const submissionContextChangedEvent = "leadflow:submission-context-changed";
 const hydrationStatusChangedEvent = "leadflow:submission-hydration-changed";
 const publicationStorageKeyPattern =
-  /^leadflow:publication:(.+):(anonymous-id|submission-context|entry-context)$/;
+  /^leadflow:publication:(.+):(anonymous-id|submission-context|submission-event-id|entry-context)$/;
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -220,8 +224,9 @@ const clearPublicationStorageByKey = (storageKey: string) => {
   }
 
   const [, publicationId, keyType] = matchedStorageKey;
-  if (keyType === "anonymous-id") {
+  if (keyType === "anonymous-id" || keyType === "submission-event-id") {
     window.localStorage.removeItem(storageKey);
+    window.sessionStorage.removeItem(storageKey);
     return;
   }
 
@@ -242,6 +247,7 @@ const clearPublicationSessionState = (
   }
 
   clearPublicationStorageByKey(buildSubmissionContextKey(publicationId));
+  clearPublicationStorageByKey(buildSubmissionEventIdKey(publicationId));
   clearPublicationStorageByKey(buildEntryContextKey(publicationId));
 
   if (options?.clearAnonymousId) {
@@ -441,17 +447,20 @@ export const getOrCreateAnonymousId = (publicationId: string) => {
 export const persistSubmissionContext = (
   publicationId: string,
   payload: LeadCaptureSubmissionResponse,
+  submissionEventId?: string | null,
 ) => {
   if (!isBrowser()) {
     return;
   }
 
+  persistSubmissionEventId(publicationId, submissionEventId);
   const assignedSponsor = payload.assignment?.sponsor ?? null;
   const context: StoredSubmissionContext = {
     publicationId,
     visitorId: payload.visitor.id,
     anonymousId: payload.visitor.anonymousId,
     leadId: payload.lead.id,
+    submissionEventId: submissionEventId?.trim() || null,
     leadSnapshot: {
       id: payload.lead.id,
       fullName: payload.lead.fullName,
@@ -500,6 +509,38 @@ export const clearSubmissionContext = (publicationId: string) => {
   }
 
   clearPublicationStorageByKey(storageKey);
+};
+
+export const persistSubmissionEventId = (
+  publicationId: string,
+  submissionEventId: string | null | undefined,
+) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  const normalizedEventId = submissionEventId?.trim();
+  if (!normalizedEventId) {
+    return;
+  }
+
+  const storageKey = buildSubmissionEventIdKey(publicationId);
+  window.sessionStorage.setItem(storageKey, normalizedEventId);
+  window.localStorage.setItem(storageKey, normalizedEventId);
+};
+
+export const readSubmissionEventId = (publicationId: string) => {
+  if (!isBrowser()) {
+    return null;
+  }
+
+  const storageKey = buildSubmissionEventIdKey(publicationId);
+  return (
+    window.sessionStorage.getItem(storageKey)?.trim() ||
+    window.localStorage.getItem(storageKey)?.trim() ||
+    readSubmissionContext(publicationId)?.submissionEventId?.trim() ||
+    null
+  );
 };
 
 export const persistEntryContext = (

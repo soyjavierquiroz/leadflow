@@ -47,7 +47,7 @@ import {
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import { webPublicConfig } from "@/lib/public-env";
-import { uploadFileWithPresignedUrl } from "@/lib/storage";
+import { uploadFileWithPresignedUrl, uploadOgImageFile } from "@/lib/storage";
 import type { SystemPublicationRecord } from "@/lib/system-publications.types";
 import { teamOperationRequest } from "@/lib/team-operations";
 import {
@@ -68,6 +68,12 @@ const defaultMediaRows = requiredMediaKeys.map((key) => ({
   key,
   value: "",
 }));
+const SEO_IMAGE_UPLOAD_ACCEPT = "image/jpeg,image/png,image/webp";
+const SEO_IMAGE_ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 const defaultDevelopmentOrchestrationInstanceName = "default-constructor";
 
@@ -135,6 +141,7 @@ type HybridPublicationDetail = {
     tiktokPixelId: string | null;
     metaCapiToken: string | null;
     tiktokAccessToken: string | null;
+    ogImageUrl: string | null;
     status: string;
     isPrimary: boolean;
   };
@@ -160,6 +167,7 @@ type HybridPublicationDetail = {
   seo: {
     title: string;
     metaDescription: string;
+    ogImageUrl: string | null;
   };
 };
 
@@ -785,6 +793,7 @@ export function TeamVslPublicationEditor({
   const [flowGraph, setFlowGraph] = useState<FlowGraphV1 | null>(null);
   const [seoTitle, setSeoTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
+  const [ogImageUrl, setOgImageUrl] = useState("");
   const [blocksText, setBlocksText] = useState(
     initialFunnelCaptureStep
       ? toBlocksText(initialFunnelCaptureStep.blocksJson)
@@ -824,6 +833,8 @@ export function TeamVslPublicationEditor({
   );
   const mediaUploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingMediaUploadIndexRef = useRef<number | null>(null);
+  const seoImageUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingSeoImage, setIsUploadingSeoImage] = useState(false);
   const visibleTemplateOptions = useMemo(
     () => ensureSelectedTemplateOption(templateOptions, selectedTemplateId),
     [selectedTemplateId, templateOptions],
@@ -899,6 +910,7 @@ export function TeamVslPublicationEditor({
       setTiktokPixelId("");
       setMetaCapiToken("");
       setTiktokAccessToken("");
+      setOgImageUrl("");
       return;
     }
 
@@ -921,6 +933,7 @@ export function TeamVslPublicationEditor({
         setTiktokPixelId(payload.publication.tiktokPixelId ?? "");
         setMetaCapiToken(payload.publication.metaCapiToken ?? "");
         setTiktokAccessToken(payload.publication.tiktokAccessToken ?? "");
+        setOgImageUrl(payload.seo.ogImageUrl ?? payload.publication.ogImageUrl ?? "");
         setSelectedTemplateId(payload.funnelInstance.templateId);
         setSelectedThemeId(extractThemeFromSettings(payload.funnelInstance.settingsJson));
         setSeoTitle(payload.seo.title);
@@ -1415,6 +1428,7 @@ export function TeamVslPublicationEditor({
         domainId: selectedDomainId,
         seoTitle,
         metaDescription,
+        ogImageUrl,
       },
       funnel: {
         id: funnelInstanceId,
@@ -1451,6 +1465,7 @@ export function TeamVslPublicationEditor({
     funnelName,
     mediaMap,
     metaDescription,
+    ogImageUrl,
     parsedBlocks.value,
     pathPrefix,
     selectedDomainId,
@@ -1604,6 +1619,51 @@ export function TeamVslPublicationEditor({
     mediaUploadInputRef.current?.click();
   };
 
+  const handleUploadSeoImageClick = () => {
+    seoImageUploadInputRef.current?.click();
+  };
+
+  const handleSeoImageUploadChange = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!SEO_IMAGE_ALLOWED_MIME_TYPES.has(file.type)) {
+      setErrorMessage(
+        "Solo puedes subir JPG, PNG o WEBP para Open Graph.",
+      );
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsUploadingSeoImage(true);
+
+    try {
+      const publicUrl = await uploadOgImageFile(
+        file,
+        {
+          teamId: mode === "system" ? teamId : undefined,
+        },
+      );
+      setOgImageUrl(publicUrl);
+      setSuccessMessage("Imagen SEO / Open Graph subida al CDN.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos subir la imagen SEO al CDN.",
+      );
+    } finally {
+      setIsUploadingSeoImage(false);
+    }
+  };
+
   const handleMediaUploadChange = async (
     event: ChangeEvent<HTMLInputElement>,
   ) => {
@@ -1686,6 +1746,7 @@ export function TeamVslPublicationEditor({
           theme: selectedThemeId,
           seoTitle: seoTitle.trim(),
           metaDescription: metaDescription.trim(),
+          ogImageUrl: ogImageUrl.trim() || null,
           stepId: activeStep?.id,
           stepKey:
             showStepSwitcher && activeStep?.id === captureStep?.id
@@ -1770,6 +1831,7 @@ export function TeamVslPublicationEditor({
                   tiktokPixelId: tiktokPixelId.trim() || null,
                   metaCapiToken: metaCapiToken.trim() || null,
                   tiktokAccessToken: tiktokAccessToken.trim() || null,
+                  ogImageUrl: ogImageUrl.trim() || null,
                 }),
               },
             );
@@ -1810,6 +1872,7 @@ export function TeamVslPublicationEditor({
         setTiktokPixelId(response.publication.tiktokPixelId ?? "");
         setMetaCapiToken(response.publication.metaCapiToken ?? "");
         setTiktokAccessToken(response.publication.tiktokAccessToken ?? "");
+        setOgImageUrl(response.seo.ogImageUrl ?? response.publication.ogImageUrl ?? "");
         const nextStepRecords = normalizeStepRecords(response.steps, response.step);
         setOrchestrationSessionId(null);
         setFunnelInstanceId(response.publication.funnelInstanceId);
@@ -2074,8 +2137,12 @@ export function TeamVslPublicationEditor({
           onClose={() => setIsInspectorOpen(false)}
           seoTitle={seoTitle}
           metaDescription={metaDescription}
+          ogImageUrl={ogImageUrl}
           onSeoTitleChange={setSeoTitle}
           onMetaDescriptionChange={setMetaDescription}
+          onOgImageUrlChange={setOgImageUrl}
+          onOgImageUpload={handleUploadSeoImageClick}
+          isUploadingOgImage={isUploadingSeoImage}
           metaPixelId={metaPixelId}
           tiktokPixelId={tiktokPixelId}
           metaCapiToken={metaCapiToken}
@@ -2084,6 +2151,13 @@ export function TeamVslPublicationEditor({
         />
       }
     >
+      <input
+        ref={seoImageUploadInputRef}
+        type="file"
+        accept={SEO_IMAGE_UPLOAD_ACCEPT}
+        className="hidden"
+        onChange={handleSeoImageUploadChange}
+      />
       <div className="min-h-full w-full bg-slate-50 dark:bg-slate-950 dark:[background-image:var(--bg-glow-conferencia)] dark:bg-cover dark:bg-fixed dark:bg-center">
       <div className="flex min-h-full w-full gap-5 px-4 py-5 text-left text-slate-900 dark:text-slate-100 md:px-6">
         <StepManagerSidebar

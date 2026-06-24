@@ -16,6 +16,7 @@ import { AdWheelSequenceGeneratorService } from './ad-wheel-sequence-generator.s
 import type { CreateTeamAdWheelDto } from './dto/create-team-ad-wheel.dto';
 import type { UpdateTeamAdWheelDto } from './dto/update-team-ad-wheel.dto';
 import type { UpsertTeamAdWheelParticipantDto } from './dto/upsert-team-ad-wheel-participant.dto';
+import { isAdWheelOperationallyActive } from './ad-wheel-operational-status';
 
 type TeamScope = {
   workspaceId: string;
@@ -336,11 +337,16 @@ export class AdWheelsService {
       dto.publicationId,
     );
 
+    const now = new Date();
+
     if (dto.status === 'ACTIVE') {
       const existingActiveWheel = await this.prisma.adWheel.findFirst({
         where: {
           teamId: scope.teamId,
           status: 'ACTIVE',
+          endDate: {
+            gt: now,
+          },
         },
         select: {
           id: true,
@@ -496,10 +502,17 @@ export class AdWheelsService {
   ): Promise<SponsorActiveAdWheelResult> {
     await this.requireActiveSponsor(scope);
 
+    const now = new Date();
     const wheel = await this.prisma.adWheel.findFirst({
       where: {
         teamId: scope.teamId,
         status: 'ACTIVE',
+        startDate: {
+          lte: now,
+        },
+        endDate: {
+          gt: now,
+        },
       },
       include: {
         participants: {
@@ -563,6 +576,13 @@ export class AdWheelsService {
     }
 
     if (wheel.status !== 'ACTIVE') {
+      throw new ConflictException({
+        code: 'AD_WHEEL_NOT_ACTIVE',
+        message: 'Only active ad wheels can accept sponsor buy-ins.',
+      });
+    }
+
+    if (!isAdWheelOperationallyActive(wheel)) {
       throw new ConflictException({
         code: 'AD_WHEEL_NOT_ACTIVE',
         message: 'Only active ad wheels can accept sponsor buy-ins.',

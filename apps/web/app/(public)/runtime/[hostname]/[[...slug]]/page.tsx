@@ -1,7 +1,9 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { FunnelRuntimePage } from '@/components/public-funnel/funnel-runtime-page';
 import { PublicRuntimeLeadSubmitProvider } from '@/components/public-runtime/public-runtime-lead-submit-provider';
 import { fetchPublicFunnelRuntime } from '@/lib/funnel-runtime';
+import { buildPublicFunnelMetadata } from '@/lib/public-funnel-metadata';
 import {
   normalizePublicRuntimePath,
   resolvePublicRuntimePath,
@@ -16,26 +18,39 @@ type PublicRuntimePageProps = {
   }>;
 };
 
+const loadRuntimeSafely = async (host: string, path: string) => {
+  try {
+    return await fetchPublicFunnelRuntime({ host, path });
+  } catch (error) {
+    console.error('[public-runtime] Runtime resolution failed', {
+      hostname: host,
+      path,
+      error,
+    });
+    return null;
+  }
+};
+
+export async function generateMetadata({
+  params,
+}: PublicRuntimePageProps): Promise<Metadata> {
+  const { hostname, slug } = await params;
+  const path = resolvePublicRuntimePath(slug);
+  const runtime = await loadRuntimeSafely(hostname, path);
+
+  if (!runtime) {
+    return {};
+  }
+
+  return buildPublicFunnelMetadata(runtime);
+}
+
 export default async function PublicRuntimePage({
   params,
 }: PublicRuntimePageProps) {
   const { hostname, slug } = await params;
   const path = resolvePublicRuntimePath(slug);
-
-  let runtime = null;
-
-  try {
-    runtime = await fetchPublicFunnelRuntime({
-      host: hostname,
-      path,
-    });
-  } catch (error) {
-    console.error('[public-runtime] Runtime resolution failed', {
-      hostname,
-      path,
-      error,
-    });
-  }
+  const runtime = await loadRuntimeSafely(hostname, path);
 
   if (!runtime) {
     notFound();

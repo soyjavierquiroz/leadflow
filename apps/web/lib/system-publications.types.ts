@@ -15,6 +15,7 @@ export type SystemPublicationRecord = LooseRecord & {
   tiktokPixelId?: string | null;
   metaCapiToken?: string | null;
   tiktokAccessToken?: string | null;
+  ogImageUrl?: string | null;
   path: string;
   pathPrefix: string;
   status: string;

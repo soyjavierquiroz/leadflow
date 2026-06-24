@@ -21,6 +21,7 @@ import { generateOwnershipKey } from '../runtime-context/ownership-context-key.u
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailerService } from '../shared/mailer.service';
 import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
+import { redactSecrets } from '../shared/redact-sensitive-data';
 import type { RegisterPublicVisitorDto } from './dto/register-public-visitor.dto';
 import type { CapturePublicLeadDto } from './dto/capture-public-lead.dto';
 import type { AutoAssignPublicLeadDto } from './dto/auto-assign-public-lead.dto';
@@ -786,10 +787,12 @@ export class LeadCaptureAssignmentService {
         eventId,
       })
       .catch((error: unknown) => {
+        const message =
+          error instanceof Error
+            ? redactSecrets(error.message)
+            : 'unknown error';
         this.logger.error(
-          `[CAPI_ERROR] Lead conversion dispatch failed. leadId=${input.lead.id} publicationId=${input.publication.id} message=${
-            error instanceof Error ? error.message : 'unknown error'
-          }`,
+          `[CAPI_ERROR] Lead conversion dispatch failed. leadId=${input.lead.id} publicationId=${input.publication.id} message=${message}`,
         );
       });
   }
@@ -2070,7 +2073,7 @@ export class LeadCaptureAssignmentService {
           lte: now,
         },
         endDate: {
-          gte: now,
+          gt: now,
         },
       },
       select: {
@@ -2105,7 +2108,7 @@ export class LeadCaptureAssignmentService {
         AND (aw."publicationId" = ${publication.id} OR aw."publicationId" IS NULL)
         AND aw.status = 'ACTIVE'
         AND aw."startDate" <= ${now}
-        AND aw."endDate" >= ${now}
+        AND aw."endDate" > ${now}
       LIMIT 1
       FOR UPDATE
     `);
@@ -2878,10 +2881,17 @@ export class LeadCaptureAssignmentService {
     tx: TransactionClient,
     publication: FlowPublicationRecord,
   ) {
+    const now = new Date();
     const activeWheel = await tx.adWheel.findFirst({
       where: {
         teamId: publication.teamId,
         status: 'ACTIVE',
+        startDate: {
+          lte: now,
+        },
+        endDate: {
+          gt: now,
+        },
       },
       select: {
         id: true,

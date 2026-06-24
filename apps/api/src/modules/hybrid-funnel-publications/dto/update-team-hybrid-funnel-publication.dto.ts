@@ -21,6 +21,7 @@ export class UpdateTeamHybridFunnelPublicationDto {
   readonly theme?: string;
   readonly seoTitle?: string;
   readonly metaDescription?: string;
+  readonly ogImageUrl?: string | null;
   readonly stepId?: string;
   readonly stepKey?: 'captura' | 'confirmado';
   readonly blocksJson?: JsonValue;

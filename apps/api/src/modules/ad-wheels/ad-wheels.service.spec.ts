@@ -56,8 +56,11 @@ describe('AdWheelsService', () => {
 
   it('creates an active wheel using the provided start date and duration', async () => {
     const { prisma, service } = buildService();
+    const now = new Date('2026-04-01T00:00:00.000Z');
     const startDate = new Date('2026-04-10T00:00:00.000Z');
     const endDate = new Date('2026-04-24T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
 
     prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
     prisma.funnelPublication.findFirst = jest
@@ -93,6 +96,18 @@ describe('AdWheelsService', () => {
     );
 
     expect(result.status).toBe('ACTIVE');
+    expect(prisma.adWheel.findFirst).toHaveBeenCalledWith({
+      where: {
+        teamId: 'team-1',
+        status: 'ACTIVE',
+        endDate: {
+          gt: now,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
     expect(prisma.adWheel.create).toHaveBeenCalledWith({
       data: {
         teamId: 'team-1',
@@ -102,6 +117,62 @@ describe('AdWheelsService', () => {
         seatPrice: 5_000,
         startDate,
         endDate,
+      },
+    });
+  });
+
+  it('creates an active wheel when the existing active wheel has already ended', async () => {
+    const { prisma, service } = buildService();
+    const now = new Date('2026-06-22T00:00:00.000Z');
+    const startDate = new Date('2026-06-23T00:00:00.000Z');
+    const endDate = new Date('2026-07-07T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
+    prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
+    prisma.funnelPublication.findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 'publication-1' });
+    prisma.adWheel.findFirst = jest.fn().mockResolvedValue(null);
+    prisma.adWheel.create = jest.fn().mockResolvedValue({
+      id: 'wheel-2',
+      teamId: 'team-1',
+      publicationId: 'publication-1',
+      status: 'ACTIVE',
+      name: 'Junio',
+      seatPrice: 5_000,
+      startDate,
+      endDate,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await service.createForTeam(
+      {
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+      },
+      {
+        status: 'ACTIVE',
+        publicationId: 'publication-1',
+        name: 'Junio',
+        seatPrice: 5_000,
+        startDate: startDate.toISOString(),
+        durationDays: 14,
+      },
+    );
+
+    expect(result.id).toBe('wheel-2');
+    expect(prisma.adWheel.findFirst).toHaveBeenCalledWith({
+      where: {
+        teamId: 'team-1',
+        status: 'ACTIVE',
+        endDate: {
+          gt: now,
+        },
+      },
+      select: {
+        id: true,
       },
     });
   });
@@ -378,6 +449,9 @@ describe('AdWheelsService', () => {
 
   it('returns the active wheel snapshot for the current sponsor', async () => {
     const { prisma, service } = buildService();
+    const now = new Date('2026-04-15T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
 
     prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
@@ -406,10 +480,62 @@ describe('AdWheelsService', () => {
         status: 'ACTIVE',
       },
     });
+    expect(prisma.adWheel.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          teamId: 'team-1',
+          status: 'ACTIVE',
+          startDate: {
+            lte: now,
+          },
+          endDate: {
+            gt: now,
+          },
+        }),
+      }),
+    );
+  });
+
+  it('does not return an expired active wheel snapshot for the current sponsor', async () => {
+    const { prisma, service } = buildService();
+    const now = new Date('2026-06-22T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
+    prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
+    prisma.adWheel.findFirst = jest.fn().mockResolvedValue(null);
+
+    const result = await service.getActiveForSponsor({
+      workspaceId: 'workspace-1',
+      teamId: 'team-1',
+      sponsorId: 'sponsor-1',
+    });
+
+    expect(result).toEqual({
+      wheel: null,
+      isParticipating: false,
+    });
+    expect(prisma.adWheel.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          teamId: 'team-1',
+          status: 'ACTIVE',
+          startDate: {
+            lte: now,
+          },
+          endDate: {
+            gt: now,
+          },
+        }),
+      }),
+    );
   });
 
   it('maps upstream wallet 402 responses to HTTP 402 during sponsor buy-in', async () => {
     const { prisma, walletEngineService, service } = buildService();
+    const now = new Date('2026-04-15T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
 
     prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
@@ -458,6 +584,9 @@ describe('AdWheelsService', () => {
       service,
       adWheelSequenceGeneratorService,
     } = buildService();
+    const now = new Date('2026-04-15T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
 
     prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
@@ -503,6 +632,9 @@ describe('AdWheelsService', () => {
       service,
       adWheelSequenceGeneratorService,
     } = buildService();
+    const now = new Date('2026-04-15T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
 
     prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
     prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
@@ -564,6 +696,39 @@ describe('AdWheelsService', () => {
     expect(
       adWheelSequenceGeneratorService.replaceSequenceInTransaction,
     ).toHaveBeenCalledWith(prisma, 'wheel-1');
+  });
+
+  it('rejects sponsor buy-in when an active wheel is expired', async () => {
+    const { prisma, walletEngineService, service } = buildService();
+    const now = new Date('2026-05-01T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+
+    prisma.sponsor.findFirst = jest.fn().mockResolvedValue({ id: 'sponsor-1' });
+    prisma.adWheel.findFirst = jest.fn().mockResolvedValue({
+      id: 'wheel-1',
+      teamId: 'team-1',
+      status: 'ACTIVE',
+      name: 'Abril',
+      seatPrice: 5_000,
+      startDate: new Date('2026-04-01T00:00:00.000Z'),
+      endDate: new Date('2026-04-30T23:59:59.000Z'),
+      createdAt: new Date('2026-04-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+      participants: [],
+    });
+
+    await expect(
+      service.joinForSponsor(
+        {
+          workspaceId: 'workspace-1',
+          teamId: 'team-1',
+          sponsorId: 'sponsor-1',
+        },
+        'wheel-1',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(walletEngineService.upsertTeamAccount).not.toHaveBeenCalled();
   });
 
   it('regenerates the weighted cycle after a team admin updates participant seats', async () => {
@@ -676,6 +841,9 @@ describe('AdWheelsService', () => {
 
   it('rejects creating a second active wheel for the same team', async () => {
     const { prisma, service } = buildService();
+    const now = new Date('2026-04-01T00:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
 
     prisma.team.findFirst = jest.fn().mockResolvedValue({ id: 'team-1' });
     prisma.funnelPublication.findFirst = jest
@@ -699,5 +867,17 @@ describe('AdWheelsService', () => {
         },
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.adWheel.findFirst).toHaveBeenCalledWith({
+      where: {
+        teamId: 'team-1',
+        status: 'ACTIVE',
+        endDate: {
+          gt: now,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
   });
 });

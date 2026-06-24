@@ -3,10 +3,18 @@
 import { webPublicConfig } from "@/lib/public-env";
 
 export type StorageUploadContext = "avatars" | "funnels" | "branding";
+export type StorageUploadPurpose = "og-image";
 
 type PresignedUploadPayload = {
   uploadUrl: string;
   publicUrl: string;
+};
+
+type ProcessedUploadPayload = {
+  publicUrl: string;
+  mimeType: string;
+  width: number;
+  height: number;
 };
 
 type PresignedUploadScope = {
@@ -81,4 +89,39 @@ export const uploadFileWithPresignedUrl = async (
   }
 
   return publicUrl;
+};
+
+export const uploadOgImageFile = async (
+  file: File,
+  scope?: PresignedUploadScope,
+) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("context", "funnels");
+  formData.append("purpose", "og-image" satisfies StorageUploadPurpose);
+
+  if (scope?.teamId) {
+    formData.append("teamId", scope.teamId);
+  }
+
+  const response = await fetch(`${webPublicConfig.urls.api}/v1/storage/upload`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  const payload = (await response.json().catch(() => null)) as unknown;
+
+  if (!response.ok) {
+    const errorPayload = payload as ErrorPayload;
+    const message =
+      (typeof errorPayload.message === "string"
+        ? errorPayload.message
+        : null) ??
+      (typeof errorPayload.error === "string" ? errorPayload.error : null) ??
+      "No pudimos subir la imagen SEO al CDN.";
+
+    throw new Error(message);
+  }
+
+  return (payload as ProcessedUploadPayload).publicUrl;
 };

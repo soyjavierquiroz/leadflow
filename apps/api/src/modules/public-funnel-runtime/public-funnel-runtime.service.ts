@@ -202,6 +202,48 @@ const readNullableString = (
   return typeof candidate === 'string' ? candidate : null;
 };
 
+const publicTrackingSecretKeyFragments = [
+  'secret',
+  'token',
+  'authorization',
+  'cookie',
+  'api-key',
+  'apikey',
+  'access-token',
+  'access_token',
+  'accesstoken',
+  'capi',
+] as const;
+
+const isPublicTrackingSecretKey = (key: string) => {
+  const normalizedKey = key.trim().toLowerCase();
+
+  return publicTrackingSecretKeyFragments.some((fragment) =>
+    normalizedKey.includes(fragment),
+  );
+};
+
+export const sanitizePublicTrackingConfigJson = (
+  value: Prisma.JsonValue,
+): Prisma.JsonValue => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizePublicTrackingConfigJson(entry));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !isPublicTrackingSecretKey(key))
+      .map(([key, entryValue]) => [
+        key,
+        sanitizePublicTrackingConfigJson(entryValue as Prisma.JsonValue),
+      ]),
+  ) as Prisma.JsonObject;
+};
+
 const normalizePersonalLinkSegment = (value: string | null | undefined) => {
   if (typeof value !== 'string') {
     return null;
@@ -406,7 +448,7 @@ export class PublicFunnelRuntimeService {
           lte: now,
         },
         endDate: {
-          gte: now,
+          gt: now,
         },
       },
       select: {
@@ -460,7 +502,7 @@ export class PublicFunnelRuntimeService {
             lte: now,
           },
           endDate: {
-            gte: now,
+            gt: now,
           },
         },
         select: {
@@ -767,7 +809,9 @@ export class PublicFunnelRuntimeService {
             name: effectiveTrackingProfile.name,
             provider: effectiveTrackingProfile.provider,
             deduplicationMode: effectiveTrackingProfile.deduplicationMode,
-            configJson: effectiveTrackingProfile.configJson,
+            configJson: sanitizePublicTrackingConfigJson(
+              effectiveTrackingProfile.configJson,
+            ),
             conversionEventMappings:
               effectiveTrackingProfile.conversionEventMappings.map(
                 (mapping) => ({
@@ -1165,7 +1209,7 @@ export class PublicFunnelRuntimeService {
         AND (aw."publicationId" = ${input.publication.id} OR aw."publicationId" IS NULL)
         AND aw.status = 'ACTIVE'
         AND aw."startDate" <= ${now}
-        AND aw."endDate" >= ${now}
+        AND aw."endDate" > ${now}
       LIMIT 1
     `);
 

@@ -102,6 +102,10 @@ describe('CapiManagerService', () => {
     const metaBody = JSON.parse(metaCall[1].body as string);
     const tikTokBody = JSON.parse(tikTokCall[1].body as string);
 
+    expect(metaCall[0]).toContain('/meta-pixel-1/events');
+    expect(metaCall[0]).toContain('access_token=meta-token-1');
+    expect(tikTokCall[1].headers['Access-Token']).toBe('tt-token-1');
+    expect(tikTokBody.event_source_id).toBe('tt-pixel-1');
     expect(metaBody.data[0].user_data.em).toEqual([
       sha256('lead@example.com'),
     ]);
@@ -112,6 +116,10 @@ describe('CapiManagerService', () => {
     expect(metaBody.data[0].user_data.client_user_agent).toBe(
       'LeadflowTestAgent/1.0',
     );
+    expect(metaBody.data[0].event_name).toBe('CompleteRegistration');
+    expect(tikTokBody.data[0].event).toBe('CompleteRegistration');
+    expect(metaBody.data[0].event_id).toBe('evt-1');
+    expect(tikTokBody.data[0].event_id).toBe('evt-1');
     expect(tikTokBody.data[0].context.user.email).toBe(
       sha256('lead@example.com'),
     );
@@ -119,5 +127,31 @@ describe('CapiManagerService', () => {
       sha256('573001234567'),
     );
     expect(tikTokBody.data[0].context.ad.callback).toBe('ttclid-456');
+  });
+
+  it('does not include access tokens or provider response bodies in CAPI error logs', async () => {
+    const service = new CapiManagerService();
+    const errorSpy = jest.spyOn((service as any).logger, 'error');
+
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: jest
+        .fn()
+        .mockResolvedValue('provider echoed meta-token-1 and tt-token-1'),
+    });
+
+    await service.dispatchLeadConversion(buildInput());
+
+    const loggedMessages = errorSpy.mock.calls
+      .flat()
+      .map((value) => String(value))
+      .join('\n');
+
+    expect(loggedMessages).toContain('Meta dispatch failed');
+    expect(loggedMessages).toContain('TikTok dispatch failed');
+    expect(loggedMessages).not.toContain('meta-token-1');
+    expect(loggedMessages).not.toContain('tt-token-1');
+    expect(loggedMessages).not.toContain('provider echoed');
   });
 });
