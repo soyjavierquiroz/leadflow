@@ -13,12 +13,25 @@ enum WorkspaceStatus {
   archived
 }
 
+enum AccountType {
+  individual
+  microteam
+  team
+  enterprise
+}
+
 enum TeamStatus {
   draft
   pending
   active
   suspended
   archived
+}
+
+enum TeamType {
+  personal
+  commercial_team
+  department
 }
 
 enum SponsorStatus {
@@ -362,6 +375,7 @@ model Workspace {
   name                      String
   slug                      String                @unique
   status                    WorkspaceStatus
+  accountType               AccountType              @default(team)
   timezone                  String
   defaultCurrency           String
   primaryLocale             String
@@ -403,6 +417,7 @@ model Team {
   code                  String
   logoUrl               String?
   status                TeamStatus
+  teamType              TeamType                 @default(commercial_team)
   isActive              Boolean               @default(true)
   lastAssignedUserId    String?
   subscriptionExpiresAt DateTime?

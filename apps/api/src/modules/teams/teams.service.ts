@@ -221,6 +221,7 @@ export class TeamsService {
       code: dto.code,
       logoUrl: dto.logoUrl ?? null,
       status: 'draft',
+      teamType: 'commercial_team',
       isActive: dto.isActive ?? true,
       subscriptionExpiresAt: dto.subscriptionExpiresAt ?? null,
       description: dto.description ?? null,

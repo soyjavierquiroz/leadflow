@@ -5,11 +5,13 @@ import type {
 } from '../../shared/domain.types';
 
 export type WorkspaceStatus = 'draft' | 'active' | 'archived';
+export type AccountType = 'individual' | 'microteam' | 'team' | 'enterprise';
 
 export interface Workspace extends BaseDomainEntity {
   name: string;
   slug: string;
   status: WorkspaceStatus;
+  accountType: AccountType;
   timezone: string;
   defaultCurrency: string;
   primaryLocale: string;

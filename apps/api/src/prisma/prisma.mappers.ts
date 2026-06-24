@@ -15,10 +15,14 @@ import type { Sponsor } from '../modules/sponsors/interfaces/sponsor.interface';
 import type {
   Team,
   TeamStatus,
+  TeamType,
 } from '../modules/teams/interfaces/team.interface';
 import type { TrackingProfile } from '../modules/tracking-profiles/interfaces/tracking-profile.interface';
 import type { Visitor } from '../modules/visitors/interfaces/visitor.interface';
-import type { Workspace } from '../modules/workspaces/interfaces/workspace.interface';
+import type {
+  AccountType,
+  Workspace,
+} from '../modules/workspaces/interfaces/workspace.interface';
 import type {
   JsonValue,
   LeadSourceChannel,
@@ -125,6 +129,7 @@ export const mapWorkspaceRecord = (record: WorkspaceRecord): Workspace => ({
   name: record.name,
   slug: record.slug,
   status: record.status,
+  accountType: record.accountType as AccountType,
   timezone: record.timezone,
   defaultCurrency: record.defaultCurrency,
   primaryLocale: record.primaryLocale,
@@ -140,6 +145,7 @@ export const mapTeamRecord = (record: TeamRecord): Team => ({
   code: record.code,
   logoUrl: record.logoUrl,
   status: record.status as TeamStatus,
+  teamType: record.teamType as TeamType,
   isActive: record.isActive,
   subscriptionExpiresAt: record.subscriptionExpiresAt
     ? toIso(record.subscriptionExpiresAt)

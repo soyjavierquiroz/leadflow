@@ -71,6 +71,7 @@ export class TeamPrismaRepository implements TeamRepository {
         code: entity.code,
         logoUrl: entity.logoUrl,
         status: entity.status,
+        teamType: entity.teamType,
         isActive: entity.isActive,
         subscriptionExpiresAt: entity.subscriptionExpiresAt
           ? new Date(entity.subscriptionExpiresAt)
@@ -86,6 +87,7 @@ export class TeamPrismaRepository implements TeamRepository {
         code: entity.code,
         logoUrl: entity.logoUrl,
         status: entity.status,
+        teamType: entity.teamType,
         isActive: entity.isActive,
         subscriptionExpiresAt: entity.subscriptionExpiresAt
           ? new Date(entity.subscriptionExpiresAt)

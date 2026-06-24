@@ -18,6 +18,7 @@ export class WorkspacesService {
       name: dto.name,
       slug: dto.slug,
       status: 'draft',
+      accountType: 'team',
       timezone: dto.timezone ?? 'UTC',
       defaultCurrency: dto.defaultCurrency ?? 'USD',
       primaryLocale: dto.primaryLocale ?? 'es',

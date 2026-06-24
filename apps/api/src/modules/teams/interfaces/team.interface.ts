@@ -12,12 +12,14 @@ export type TeamStatus =
   | 'active'
   | 'suspended'
   | 'archived';
+export type TeamType = 'personal' | 'commercial_team' | 'department';
 
 export interface Team extends BaseDomainEntity, WorkspaceScoped {
   name: string;
   code: string;
   logoUrl: string | null;
   status: TeamStatus;
+  teamType: TeamType;
   isActive: boolean;
   subscriptionExpiresAt: string | null;
   description: string | null;
