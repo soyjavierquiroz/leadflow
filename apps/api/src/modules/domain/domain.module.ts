@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdWheelsModule } from '../ad-wheels/ad-wheels.module';
+import { AccountProvisioningModule } from '../account-provisioning/account-provisioning.module';
 import { AiConfigModule } from '../ai-config/ai-config.module';
 import { BlockDefinitionsModule } from '../block-definitions/block-definitions.module';
 import { AssignmentsModule } from '../assignments/assignments.module';
@@ -35,6 +36,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
 @Module({
   imports: [
     AiConfigModule,
+    AccountProvisioningModule,
     AdWheelsModule,
     BlockDefinitionsModule,
     CrmModule,
@@ -69,6 +71,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
   ],
   exports: [
     AiConfigModule,
+    AccountProvisioningModule,
     AdWheelsModule,
     BlockDefinitionsModule,
     CrmModule,
