@@ -3,6 +3,7 @@ import { AdWheelsModule } from '../ad-wheels/ad-wheels.module';
 import { AccountProvisioningModule } from '../account-provisioning/account-provisioning.module';
 import { AiConfigModule } from '../ai-config/ai-config.module';
 import { BlockDefinitionsModule } from '../block-definitions/block-definitions.module';
+import { CommercialProfileModule } from '../commercial-profile/commercial-profile.module';
 import { AssignmentsModule } from '../assignments/assignments.module';
 import { ConversionEventMappingsModule } from '../conversion-event-mappings/conversion-event-mappings.module';
 import { CrmModule } from '../crm/crm.module';
@@ -39,6 +40,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     AccountProvisioningModule,
     AdWheelsModule,
     BlockDefinitionsModule,
+    CommercialProfileModule,
     CrmModule,
     WorkspacesModule,
     TeamsModule,
@@ -74,6 +76,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     AccountProvisioningModule,
     AdWheelsModule,
     BlockDefinitionsModule,
+    CommercialProfileModule,
     CrmModule,
     WorkspacesModule,
     TeamsModule,

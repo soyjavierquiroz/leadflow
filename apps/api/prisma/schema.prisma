@@ -408,6 +408,7 @@ model Workspace {
   crmLeadAssignments        CrmLeadAssignment[]
   crmAssignmentEvents       CrmAssignmentEvent[]
   crmOutreachQueue          CrmOutreachQueue[]
+  commercialProfiles        CommercialProfile[]
 }
 
 model Team {
@@ -450,6 +451,7 @@ model Team {
   crmAssignmentEvents   CrmAssignmentEvent[]
   crmOutreachQueue      CrmOutreachQueue[]
   vanityShortLinks      SponsorVanityShortLink[]
+  commercialProfile     CommercialProfile?
 
   @@unique([workspaceId, code])
 }
@@ -489,6 +491,35 @@ model Sponsor {
   actorCrmAssignmentEvents        CrmAssignmentEvent[]
   crmOutreachQueue                CrmOutreachQueue[]
   vanityShortLink                 SponsorVanityShortLink?
+  commercialProfiles              CommercialProfile[]
+}
+
+model CommercialProfile {
+  id               String    @id @default(uuid())
+  workspaceId      String
+  teamId           String    @unique
+  sponsorId        String?
+  vertical         String
+  industry         String
+  businessModel    String
+  legacyNiche      String?
+  presetVersion    String
+  blueprintKey     String
+  blueprintVersion String
+  businessName     String
+  mainProduct      String?
+  averagePrice     String?
+  salesMotion      String?
+  country          String?
+  phone            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team             Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sponsor          Sponsor?  @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([sponsorId])
 }
 
 model SponsorVanityShortLink {

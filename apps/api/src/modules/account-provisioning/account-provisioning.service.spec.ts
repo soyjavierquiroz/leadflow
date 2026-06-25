@@ -13,11 +13,21 @@ describe('AccountProvisioningService', () => {
     const mailService = {
       sendWelcomeEmail: jest.fn(),
     };
+    const commercialProfileService = {
+      upsertCommercialProfileForIndividualAccount: jest.fn().mockResolvedValue({
+        id: 'commercial-profile-1',
+      }),
+    };
 
     return {
+      commercialProfileService,
       mailService,
       prisma,
-      service: new AccountProvisioningService(prisma, mailService as never),
+      service: new AccountProvisioningService(
+        prisma,
+        mailService as never,
+        commercialProfileService as never,
+      ),
     };
   };
 
@@ -117,7 +127,7 @@ describe('AccountProvisioningService', () => {
         create: jest.fn(),
       },
     };
-    const { service } = buildService(tx);
+    const { commercialProfileService, service } = buildService(tx);
 
     const result = await service.provisionIndividualAccount(
       { id: baseUser.id },
@@ -186,6 +196,22 @@ describe('AccountProvisioningService', () => {
         isFallbackPool: true,
       }),
     });
+    expect(
+      commercialProfileService.upsertCommercialProfileForIndividualAccount,
+    ).toHaveBeenCalledWith(
+      {
+        workspaceId: workspace.id,
+        teamId: team.id,
+        sponsorId: sponsor.id,
+      },
+      {
+        businessName: 'Ana Studio',
+        niche: 'other',
+        country: undefined,
+        phone: '+59170000000',
+      },
+      tx,
+    );
   });
 
   it('returns an existing individual context without duplicating workspace, team or sponsor', async () => {
@@ -272,7 +298,7 @@ describe('AccountProvisioningService', () => {
         create: jest.fn(),
       },
     };
-    const { service } = buildService(tx);
+    const { commercialProfileService, service } = buildService(tx);
 
     const result = await service.provisionIndividualAccount(
       { id: existingUser.id },
@@ -291,6 +317,9 @@ describe('AccountProvisioningService', () => {
     expect(tx.sponsor.create).not.toHaveBeenCalled();
     expect(tx.user.update).not.toHaveBeenCalled();
     expect(tx.rotationPool.create).not.toHaveBeenCalled();
+    expect(
+      commercialProfileService.upsertCommercialProfileForIndividualAccount,
+    ).toHaveBeenCalledTimes(1);
   });
 
   it('does not modify a user that already belongs to a team tenant', async () => {
@@ -491,7 +520,7 @@ describe('AccountProvisioningService', () => {
         create: jest.fn(),
       },
     };
-    const { mailService, service } = buildService(tx);
+    const { commercialProfileService, mailService, service } = buildService(tx);
 
     const result = await service.createSystemIndividualAccount({
       name: 'Ana Owner',
@@ -538,6 +567,22 @@ describe('AccountProvisioningService', () => {
       'ana@example.com',
       'TempPass123',
       'Ana Studio',
+    );
+    expect(
+      commercialProfileService.upsertCommercialProfileForIndividualAccount,
+    ).toHaveBeenCalledWith(
+      {
+        workspaceId: workspace.id,
+        teamId: team.id,
+        sponsorId: sponsor.id,
+      },
+      {
+        businessName: 'Ana Studio',
+        niche: 'beauty',
+        country: undefined,
+        phone: '+59170000000',
+      },
+      tx,
     );
     expect(result).toEqual({
       workspaceId: workspace.id,

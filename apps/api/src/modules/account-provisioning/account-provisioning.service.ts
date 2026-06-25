@@ -22,6 +22,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { hashPassword } from '../auth/password-hash.util';
 import { MailService } from '../mail/mail.service';
+import { CommercialProfileService } from '../commercial-profile/commercial-profile.service';
 import type { CreateSystemIndividualAccountDto } from './dto/create-system-individual-account.dto';
 import type { ProvisionIndividualAccountDto } from './dto/provision-individual-account.dto';
 
@@ -108,6 +109,7 @@ export class AccountProvisioningService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly commercialProfileService: CommercialProfileService,
   ) {}
 
   async provisionIndividualAccount(
@@ -316,6 +318,21 @@ export class AccountProvisioningService {
       teamId: team.id,
       sponsorId: sponsor.id,
     });
+
+    await this.commercialProfileService.upsertCommercialProfileForIndividualAccount(
+      {
+        workspaceId: workspace.id,
+        teamId: team.id,
+        sponsorId: sponsor.id,
+      },
+      {
+        businessName,
+        niche,
+        country: payload.country,
+        phone,
+      },
+      tx,
+    );
 
     return {
       workspaceId: workspace.id,

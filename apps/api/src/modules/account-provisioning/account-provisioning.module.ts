@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CommercialProfileModule } from '../commercial-profile/commercial-profile.module';
 import { MailModule } from '../mail/mail.module';
 import {
   AccountProvisioningController,
@@ -7,7 +8,7 @@ import {
 import { AccountProvisioningService } from './account-provisioning.service';
 
 @Module({
-  imports: [MailModule],
+  imports: [CommercialProfileModule, MailModule],
   controllers: [
     AccountProvisioningController,
     SystemIndividualAccountsController,

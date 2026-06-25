@@ -1,13 +1,14 @@
 "use client";
 
 type OperationBannerProps = {
-  tone: "success" | "error";
+  tone: "success" | "error" | "warning";
   message: string;
 };
 
 const toneClassName = {
   success: "border-app-success-border bg-app-success-bg text-app-success-text",
   error: "border-app-danger-border bg-app-danger-bg text-app-danger-text",
+  warning: "border-amber-200 bg-amber-50 text-amber-800",
 } satisfies Record<OperationBannerProps["tone"], string>;
 
 export function OperationBanner({ tone, message }: OperationBannerProps) {
