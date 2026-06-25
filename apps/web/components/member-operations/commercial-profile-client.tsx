@@ -5,6 +5,7 @@ import {
   commercialVerticals,
   getIndustriesForVertical,
   individualNiches,
+  legacyNicheToCommercialTaxonomy,
 } from "@leadflow/account-model";
 import { Save } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -74,7 +75,7 @@ const getErrorMessage = (error: unknown) =>
 const fieldLabelClassName =
   "flex flex-col gap-2 text-sm font-medium text-app-text";
 const fieldControlClassName =
-  "rounded-lg border border-app-border bg-app-surface-strong px-3 py-2 text-base text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft";
+  "rounded-lg border border-app-border bg-app-card px-3 py-2 text-base text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft [&>option]:bg-app-card [&>option]:text-app-text";
 
 export function CommercialProfileClient({
   initialSnapshot,
@@ -94,11 +95,29 @@ export function CommercialProfileClient({
     () => getIndustriesForVertical(formState.vertical),
     [formState.vertical],
   );
+  const needsBusinessType =
+    !snapshot.profile ||
+    formState.vertical === "other" ||
+    formState.industry === "other" ||
+    formState.businessModel === "other";
 
   const updateField = <Key extends keyof CommercialProfileFormState>(
     key: Key,
     value: CommercialProfileFormState[Key],
   ) => {
+    if (key === "niche") {
+      const taxonomy = legacyNicheToCommercialTaxonomy(String(value));
+
+      setFormState((current) => ({
+        ...current,
+        niche: String(value),
+        vertical: taxonomy.vertical,
+        industry: taxonomy.industry,
+        businessModel: taxonomy.businessModel,
+      }));
+      return;
+    }
+
     setFormState((current) => {
       if (key !== "vertical") {
         return {
@@ -183,6 +202,13 @@ export function CommercialProfileClient({
           message="Completa nombre, vertical, industria y modelo de negocio para dejar listo tu blueprint comercial."
         />
       )}
+
+      {needsBusinessType ? (
+        <OperationBanner
+          tone="warning"
+          message="Completa tu tipo de negocio para recomendarte embudos adecuados."
+        />
+      ) : null}
 
       <form
         className="grid gap-6 rounded-lg border border-app-border bg-app-surface p-6 shadow-sm xl:grid-cols-2"

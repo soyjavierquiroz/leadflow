@@ -124,6 +124,12 @@ enum FunnelTemplateStatus {
   archived
 }
 
+enum FunnelArsenalTemplateStatus {
+  draft
+  active
+  archived
+}
+
 enum FunnelInstanceStatus {
   draft
   active
@@ -821,6 +827,32 @@ model FunnelTemplate {
   workspace                Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   defaultHandoffStrategy   HandoffStrategy?     @relation("TemplateDefaultHandoffStrategy", fields: [defaultHandoffStrategyId], references: [id], onDelete: SetNull)
   funnelInstances          FunnelInstance[]
+}
+
+model FunnelArsenalTemplate {
+  id                     String                      @id @default(uuid())
+  templateKey            String                      @unique
+  blueprintKey           String
+  vertical               String
+  label                  String
+  description            String
+  goal                   String
+  recommendedFor         String
+  cta                    String
+  pathSuggestion         String
+  difficulty             String
+  status                 FunnelArsenalTemplateStatus @default(draft)
+  blocksPresetKey        String?
+  funnelTemplateId       String?
+  sourceFunnelId         String?
+  sourceFunnelInstanceId String?
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+
+  @@index([blueprintKey, status])
+  @@index([vertical, status])
+  @@index([sourceFunnelInstanceId])
+  @@index([sourceFunnelId])
 }
 
 model FunnelInstance {

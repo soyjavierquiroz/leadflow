@@ -20,6 +20,7 @@ vi.mock("@/lib/member-operations", () => ({
 
 const initialSnapshot: FunnelArsenalSnapshot = {
   blueprintKey: "blueprint.beauty_aesthetics.v1",
+  requiresCommercialProfile: false,
   templates: [
     {
       templateKey: "beauty-aesthetics-diagnosis-booking",
@@ -93,7 +94,49 @@ describe("funnel arsenal page", () => {
       "Estos embudos están preparados para tu tipo de negocio.",
     );
     expect(container.textContent).toContain("Reserva diagnóstico de belleza");
+    expect(container.textContent).toContain(
+      "Aún no tienes un embudo habilitado",
+    );
+    expect(container.textContent).toContain("Ver arsenal de embudos");
     expect(container.textContent).toContain("Habilitar");
+  });
+
+  it("renders the correct template for the health wellness blueprint", () => {
+    root = renderClient(container, {
+      blueprintKey: "blueprint.health_wellness.v1",
+      requiresCommercialProfile: false,
+      templates: [
+        {
+          templateKey: "health-wellness-evaluation",
+          blueprintKey: "blueprint.health_wellness.v1",
+          label: "Evaluación de bienestar",
+          description: "Formulario de interés para una evaluación inicial.",
+          goal: "Capturar solicitudes de evaluación inicial.",
+          recommendedFor: "Nutrición, fitness y bienestar.",
+          cta: "Quiero mi evaluación",
+          pathSuggestion: "/evaluacion",
+          difficulty: "basic",
+          enabled: false,
+        },
+      ],
+    });
+
+    expect(container.textContent).toContain("Evaluación de bienestar");
+    expect(container.textContent).not.toContain("Solicita más información");
+  });
+
+  it("shows the commercial profile required state", () => {
+    root = renderClient(container, {
+      blueprintKey: null,
+      requiresCommercialProfile: true,
+      templates: [],
+    });
+
+    expect(container.textContent).toContain("Completa tu perfil comercial");
+    expect(container.textContent).toContain(
+      "Completa tu tipo de negocio para recomendarte embudos adecuados.",
+    );
+    expect(container.textContent).not.toContain("Solicita más información");
   });
 
   it("enables a funnel through the endpoint", async () => {
@@ -118,6 +161,7 @@ describe("funnel arsenal page", () => {
       "https://ana.example.com/diagnostico-belleza",
     );
     expect(container.textContent).toContain("Ver embudo");
+    expect(container.textContent).not.toContain("/ref/");
   });
 
   it("shows the URL for an already enabled template and copies it", async () => {
@@ -139,6 +183,39 @@ describe("funnel arsenal page", () => {
       "https://ana.example.com/diagnostico-belleza",
     );
     expect(container.textContent).toContain("URL copiada");
+  });
+
+  it("does not render referral URLs as enabled funnel links", () => {
+    root = renderClient(container, {
+      ...initialSnapshot,
+      templates: [
+        {
+          ...initialSnapshot.templates[0],
+          enabled: true,
+          publicationId: "publication-ref",
+          publicUrl: "https://leadflow.kuruk.in/ref/margarita-pasos",
+        },
+      ],
+    });
+
+    expect(container.textContent).not.toContain(
+      "https://leadflow.kuruk.in/ref/margarita-pasos",
+    );
+    expect(container.textContent).not.toContain("Habilitado");
+    expect(container.textContent).toContain("Habilitar");
+  });
+
+  it("keeps funnel cards on app dark-theme tokens instead of white surfaces", () => {
+    root = renderClient(container);
+
+    const classNames = Array.from(container.querySelectorAll("*"))
+      .map((element) => element.getAttribute("class") ?? "")
+      .join(" ");
+
+    expect(classNames).not.toContain("bg-white");
+    expect(classNames).not.toContain("bg-slate-50");
+    expect(classNames).toContain("bg-app-surface");
+    expect(classNames).toContain("bg-app-card");
   });
 
   it("shows enable errors", async () => {

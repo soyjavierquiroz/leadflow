@@ -1,6 +1,13 @@
 "use client";
 
-import { CheckCircle2, Copy, ExternalLink, Rocket } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  Rocket,
+} from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { SectionHeader } from "@/components/app-shell/section-header";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
@@ -30,6 +37,18 @@ const difficultyLabel: Record<FunnelArsenalTemplate["difficulty"], string> = {
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "No pudimos habilitar el embudo.";
+
+const isReferralUrl = (url: string | undefined) => {
+  if (!url) {
+    return false;
+  }
+
+  try {
+    return new URL(url).pathname.startsWith("/ref/");
+  } catch {
+    return url.startsWith("/ref/");
+  }
+};
 
 export function FunnelArsenalClient({
   initialSnapshot,
@@ -95,6 +114,13 @@ export function FunnelArsenalClient({
     }
   };
 
+  const hasEnabledPublication = snapshot.templates.some(
+    (template) =>
+      template.enabled &&
+      template.publicUrl &&
+      !isReferralUrl(template.publicUrl),
+  );
+
   return (
     <div className="w-full space-y-8">
       <SectionHeader
@@ -106,25 +132,79 @@ export function FunnelArsenalClient({
         <OperationBanner tone={feedback.tone} message={feedback.message} />
       ) : null}
 
+      {snapshot.requiresCommercialProfile ? (
+        <section className="rounded-lg border border-app-warning-border bg-app-warning-bg p-5 text-app-warning-text">
+          <div className="flex items-start gap-3">
+            <AlertCircle
+              className="mt-0.5 h-5 w-5 shrink-0"
+              aria-hidden="true"
+            />
+            <div>
+              <h2 className="text-base font-semibold">
+                Completa tu perfil comercial
+              </h2>
+              <p className="mt-1 text-sm leading-6">
+                Completa tu tipo de negocio para recomendarte embudos adecuados.
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {!snapshot.requiresCommercialProfile && !hasEnabledPublication ? (
+        <section className="rounded-lg border border-dashed border-app-border bg-app-surface p-5 text-app-text-muted">
+          <h2 className="text-base font-semibold text-app-text">
+            Aún no tienes un embudo habilitado
+          </h2>
+          <p className="mt-1 text-sm leading-6">
+            Elige un embudo del arsenal para obtener una página pública lista
+            para compartir.
+          </p>
+          <Link
+            href="/member/funnels"
+            className="mt-4 inline-flex items-center justify-center rounded-lg border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted"
+          >
+            Ver arsenal de embudos
+          </Link>
+        </section>
+      ) : null}
+
+      {!snapshot.requiresCommercialProfile &&
+      snapshot.templates.length === 0 ? (
+        <section className="rounded-lg border border-app-border bg-app-surface p-5 text-app-text-muted">
+          <h2 className="text-base font-semibold text-app-text">
+            No hay plantillas para este blueprint
+          </h2>
+          <p className="mt-1 text-sm leading-6">
+            Actualiza tu perfil comercial para recibir una recomendación de
+            embudo.
+          </p>
+        </section>
+      ) : null}
+
       <section className="grid w-full gap-4 xl:grid-cols-2">
         {snapshot.templates.map((template) => {
           const isEnabling = enablingTemplateKey === template.templateKey;
           const isCopied = copiedTemplateKey === template.templateKey;
+          const hasFunnelPublicationUrl =
+            template.enabled &&
+            template.publicUrl &&
+            !isReferralUrl(template.publicUrl);
 
           return (
             <article
               key={template.templateKey}
-              className="flex min-h-[320px] flex-col justify-between rounded-lg border border-app-border bg-app-surface p-5 shadow-sm"
+              className="flex min-h-[320px] flex-col justify-between rounded-lg border border-app-border bg-app-surface p-5 shadow-[0_18px_45px_rgba(2,6,23,0.08)]"
             >
               <div className="space-y-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">
+                      <span className="inline-flex items-center rounded-full border border-app-border bg-app-card px-3 py-1 text-xs font-semibold text-app-text-muted">
                         {difficultyLabel[template.difficulty]}
                       </span>
-                      {template.enabled ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      {hasFunnelPublicationUrl ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-app-success-border bg-app-success-bg px-3 py-1 text-xs font-semibold text-app-success-text">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Habilitado
                         </span>
@@ -141,11 +221,11 @@ export function FunnelArsenalClient({
                 </p>
 
                 <dl className="grid gap-3 text-sm text-app-text-muted">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="rounded-lg border border-app-border bg-app-card px-4 py-3">
                     <dt className="font-semibold text-app-text">Objetivo</dt>
                     <dd className="mt-1 leading-6">{template.goal}</dd>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="rounded-lg border border-app-border bg-app-card px-4 py-3">
                     <dt className="font-semibold text-app-text">
                       Recomendado para
                     </dt>
@@ -157,14 +237,14 @@ export function FunnelArsenalClient({
               </div>
 
               <div className="mt-6 space-y-3 border-t border-app-border pt-5">
-                {template.enabled && template.publicUrl ? (
+                {hasFunnelPublicationUrl ? (
                   <>
-                    <p className="break-all rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">
+                    <p className="break-all rounded-lg border border-app-success-border bg-app-success-bg px-3 py-2 text-sm font-medium text-app-success-text">
                       {template.publicUrl}
                     </p>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <a
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-app-accent px-4 py-2.5 text-sm font-semibold text-app-accent-contrast transition hover:opacity-90"
                         href={template.publicUrl}
                         target="_blank"
                         rel="noreferrer"
@@ -173,7 +253,7 @@ export function FunnelArsenalClient({
                         Ver embudo
                       </a>
                       <button
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-app-border bg-app-card px-4 py-2.5 text-sm font-semibold text-app-text transition hover:border-app-border-strong hover:bg-app-surface-muted"
                         type="button"
                         onClick={() =>
                           void handleCopy(
@@ -189,7 +269,7 @@ export function FunnelArsenalClient({
                   </>
                 ) : (
                   <button
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-app-accent px-4 py-2.5 text-sm font-semibold text-app-accent-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     type="button"
                     disabled={isEnabling}
                     onClick={() => void handleEnable(template.templateKey)}

@@ -129,6 +129,66 @@ describe('CommercialProfileService', () => {
     });
   });
 
+  it('maps nutrition and wellness to the health wellness blueprint when form fields are still other', async () => {
+    const prisma = {
+      commercialProfile: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...baseProfile,
+          vertical: 'other',
+          industry: 'other',
+          businessModel: 'other',
+          legacyNiche: 'other',
+          blueprintKey: 'blueprint.other.v1',
+        }),
+        update: jest.fn().mockResolvedValue({
+          ...baseProfile,
+          vertical: 'health_wellness',
+          industry: 'nutrition',
+          businessModel: 'advisor',
+          legacyNiche: 'nutrition_wellness',
+          blueprintKey: 'blueprint.health_wellness.v1',
+        }),
+      },
+    };
+    const service = buildService(prisma);
+
+    await service.updateCommercialProfileForTeam('team-1', {
+      businessName: 'Margarita Wellness',
+      niche: 'nutrition_wellness',
+      vertical: 'other',
+      industry: 'other',
+      businessModel: 'other',
+    });
+
+    expect(prisma.commercialProfile.update).toHaveBeenCalledWith({
+      where: {
+        teamId: 'team-1',
+      },
+      data: expect.objectContaining({
+        vertical: 'health_wellness',
+        industry: 'nutrition',
+        businessModel: 'advisor',
+        legacyNiche: 'nutrition_wellness',
+        blueprintKey: 'blueprint.health_wellness.v1',
+        blueprintVersion: 'v1',
+      }),
+    });
+  });
+
+  it('treats other taxonomy values as incomplete', () => {
+    const service = buildService({});
+
+    expect(
+      service.isCommercialProfileComplete({
+        ...baseProfile,
+        vertical: 'other',
+        industry: 'other',
+        businessModel: 'other',
+        blueprintKey: 'blueprint.other.v1',
+      }),
+    ).toBe(false);
+  });
+
   it('creates a profile on update when the team has no profile yet', async () => {
     const prisma = {
       commercialProfile: {

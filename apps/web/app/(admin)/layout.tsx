@@ -29,6 +29,11 @@ const adminNav = [
     icon: "layout-template",
   },
   {
+    href: "/admin/funnel-arsenal",
+    label: "Funnel Arsenal",
+    icon: "layout-template",
+  },
+  {
     href: "/admin/estructuras",
     label: "Estructuras",
     icon: "network",

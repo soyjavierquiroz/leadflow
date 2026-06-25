@@ -42,6 +42,7 @@ describe('FunnelArsenalController', () => {
     const service = {
       listForCurrentTeam: jest.fn().mockResolvedValue({
         blueprintKey: 'blueprint.beauty_aesthetics.v1',
+        requiresCommercialProfile: false,
         templates: [],
       }),
     } as unknown as FunnelArsenalService;
@@ -49,6 +50,7 @@ describe('FunnelArsenalController', () => {
 
     await expect(controller.listMine(user)).resolves.toEqual({
       blueprintKey: 'blueprint.beauty_aesthetics.v1',
+      requiresCommercialProfile: false,
       templates: [],
     });
     expect(service.listForCurrentTeam).toHaveBeenCalledWith(user);

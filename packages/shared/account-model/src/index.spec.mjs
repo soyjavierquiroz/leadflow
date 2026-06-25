@@ -141,16 +141,13 @@ test('funnel arsenal has one basic template per official blueprint', () => {
   }
 });
 
-test('funnel arsenal lookup resolves known templates and falls back to other', () => {
+test('funnel arsenal lookup resolves known templates without silent fallback', () => {
   assert.equal(
     getFunnelArsenalTemplateByKey('mlm-opportunity-presentation')?.label,
     'Presentación de oportunidad',
   );
   assert.equal(getFunnelArsenalTemplateByKey('missing'), undefined);
-  assert.equal(
-    getFunnelArsenalTemplatesForBlueprint('unknown')[0].blueprintKey,
-    'blueprint.other.v1',
-  );
+  assert.equal(getFunnelArsenalTemplatesForBlueprint('unknown').length, 0);
 });
 
 test('business blueprint resolver uses vertical and fallback', () => {

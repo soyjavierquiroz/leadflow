@@ -10,8 +10,9 @@ const { operationRequest } = vi.hoisted(() => ({
   operationRequest: vi.fn(),
 }));
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("@/lib/member-operations", () => ({
   memberOperationRequest: operationRequest,
@@ -78,6 +79,16 @@ const setInputValue = (input: HTMLInputElement, value: string) => {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 };
 
+const setSelectValue = (select: HTMLSelectElement, value: string) => {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLSelectElement.prototype,
+    "value",
+  )?.set;
+
+  setter?.call(select, value);
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+};
+
 const submitForm = async (container: HTMLElement) => {
   const form = container.querySelector("form");
 
@@ -86,7 +97,9 @@ const submitForm = async (container: HTMLElement) => {
   }
 
   await act(async () => {
-    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    form.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
     await new Promise((resolve) => window.setTimeout(resolve, 0));
   });
 };
@@ -129,9 +142,7 @@ describe("commercial profile page", () => {
     expect(getInputByLabel(container, "Producto principal").value).toBe(
       "Tratamiento facial",
     );
-    expect(container.textContent).toContain(
-      "blueprint.beauty_aesthetics.v1",
-    );
+    expect(container.textContent).toContain("blueprint.beauty_aesthetics.v1");
   });
 
   it("saves profile changes", async () => {
@@ -181,6 +192,53 @@ describe("commercial profile page", () => {
     expect(container.textContent).toContain("Perfil comercial actualizado.");
   });
 
+  it("maps nutrition and wellness to health wellness taxonomy before saving", async () => {
+    operationRequest.mockResolvedValueOnce({
+      isComplete: true,
+      profile: {
+        ...initialSnapshot.profile!,
+        vertical: "health_wellness",
+        industry: "nutrition",
+        businessModel: "advisor",
+        legacyNiche: "nutrition_wellness",
+        blueprintKey: "blueprint.health_wellness.v1",
+      },
+    });
+
+    act(() => {
+      root.render(
+        <CommercialProfileClient
+          fallbackBusinessName="Margarita Wellness"
+          initialSnapshot={{ profile: null, isComplete: false }}
+        />,
+      );
+    });
+
+    act(() => {
+      setSelectValue(
+        getSelectByLabel(container, "Tipo de negocio"),
+        "nutrition_wellness",
+      );
+    });
+
+    expect(getSelectByLabel(container, "Vertical").value).toBe(
+      "health_wellness",
+    );
+    expect(getSelectByLabel(container, "Industria").value).toBe("nutrition");
+    expect(getSelectByLabel(container, "Modelo comercial").value).toBe(
+      "advisor",
+    );
+
+    await submitForm(container);
+
+    expect(JSON.parse(operationRequest.mock.calls[0][1].body)).toMatchObject({
+      niche: "nutrition_wellness",
+      vertical: "health_wellness",
+      industry: "nutrition",
+      businessModel: "advisor",
+    });
+  });
+
   it("shows save errors", async () => {
     operationRequest.mockRejectedValueOnce(
       new Error("No se pudo actualizar el perfil comercial."),
@@ -215,6 +273,27 @@ describe("commercial profile page", () => {
     expect(container.textContent).toContain(
       "Completa nombre, vertical, industria y modelo de negocio",
     );
+    expect(container.textContent).toContain(
+      "Completa tu tipo de negocio para recomendarte embudos adecuados.",
+    );
     expect(getSelectByLabel(container, "Tipo de negocio").value).toBe("other");
+  });
+
+  it("keeps commercial profile controls on app surfaces", () => {
+    act(() => {
+      root.render(
+        <CommercialProfileClient
+          fallbackBusinessName="Ana Studio"
+          initialSnapshot={initialSnapshot}
+        />,
+      );
+    });
+
+    const classNames = Array.from(container.querySelectorAll("*"))
+      .map((element) => element.getAttribute("class") ?? "")
+      .join(" ");
+
+    expect(classNames).not.toContain("bg-white");
+    expect(classNames).toContain("bg-app-card");
   });
 });

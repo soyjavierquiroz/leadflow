@@ -1547,13 +1547,11 @@ export const getFunnelArsenalTemplateByKey = (
 export const getFunnelArsenalTemplatesForBlueprint = (
   blueprintKey: string | null | undefined,
 ): readonly FunnelArsenalTemplate[] => {
-  const fallbackBlueprintKey = businessBlueprintsByVertical.other.blueprintKey;
-  const resolvedBlueprintKey =
-    blueprintKey && funnelArsenalTemplatesByBlueprintKey[blueprintKey]
-      ? blueprintKey
-      : fallbackBlueprintKey;
+  if (!blueprintKey) {
+    return [];
+  }
 
-  return funnelArsenalTemplatesByBlueprintKey[resolvedBlueprintKey] ?? [];
+  return funnelArsenalTemplatesByBlueprintKey[blueprintKey] ?? [];
 };
 
 const blueprintMatchesVertical = (

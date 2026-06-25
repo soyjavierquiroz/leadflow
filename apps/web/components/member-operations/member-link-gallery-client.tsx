@@ -171,8 +171,8 @@ export function MemberLinkGalleryClient({
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Sponsor / Member / Enlaces"
-        title="Tus enlaces de asesor"
-        description="Comparte funnels publicados con tu atribución directa y conserva el handoff hacia tu perfil operativo."
+        title="Tus enlaces personales"
+        description="Aquí viven tus enlaces de referido y enlaces atribuidos. Para campañas usa un embudo habilitado desde el arsenal."
       />
 
       {feedback ? (
@@ -219,11 +219,15 @@ export function MemberLinkGalleryClient({
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
-                Enlace principal
+                Enlace personal de referido
               </p>
               <h2 className="mt-3 text-2xl font-semibold text-app-text">
-                Identidad publica del asesor
+                Tu enlace personal
               </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-app-text-muted">
+                Úsalo solo si necesitas compartir tu perfil o enlace personal.
+                Para campañas usa un embudo habilitado.
+              </p>
             </div>
             <div className="flex flex-wrap gap-3">
               {vanity.shortLink ? (
@@ -268,7 +272,7 @@ export function MemberLinkGalleryClient({
           <dl className="mt-6 grid gap-4 lg:grid-cols-2">
             <div className="min-w-0 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3">
               <dt className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
-                Enlace largo actual
+                URL personal de referido
               </dt>
               <dd className="mt-2 break-all text-sm leading-6 text-app-text-muted">
                 {vanity.targetUrl}
@@ -276,7 +280,7 @@ export function MemberLinkGalleryClient({
             </div>
             <div className="min-w-0 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3">
               <dt className="text-xs font-semibold uppercase tracking-[0.2em] text-app-text-soft">
-                Enlace corto
+                Enlace corto personal
               </dt>
               <dd className="mt-2 break-all text-sm leading-6 text-app-text-muted">
                 {vanity.shortLink
@@ -299,7 +303,7 @@ export function MemberLinkGalleryClient({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-app-text-soft">
-                      {link.domainHost}
+                      Enlace atribuido
                     </p>
                     <h2 className="mt-2 text-xl font-semibold text-app-text">
                       {link.funnelName}
@@ -328,6 +332,9 @@ export function MemberLinkGalleryClient({
                 </dl>
 
                 <div className="mt-5 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm leading-6 text-app-text-muted">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-soft">
+                    URL con atribución personal
+                  </p>
                   {link.url}
                 </div>
 

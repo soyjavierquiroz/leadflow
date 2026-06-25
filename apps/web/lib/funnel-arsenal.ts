@@ -19,7 +19,8 @@ export type FunnelArsenalTemplate = {
 };
 
 export type FunnelArsenalSnapshot = {
-  blueprintKey: string;
+  blueprintKey: string | null;
+  requiresCommercialProfile: boolean;
   templates: FunnelArsenalTemplate[];
 };
 

@@ -56,22 +56,98 @@ const beautyProfile = {
   updatedAt: new Date('2026-06-25T00:00:00.000Z'),
 };
 
-const buildCommercialProfileService = (profile: typeof beautyProfile | null) =>
+const healthWellnessProfile = {
+  ...beautyProfile,
+  id: 'profile-health-1',
+  vertical: 'health_wellness',
+  industry: 'nutrition',
+  businessModel: 'advisor',
+  legacyNiche: 'nutrition_wellness',
+  blueprintKey: 'blueprint.health_wellness.v1',
+  businessName: 'Margarita Wellness',
+};
+
+const mlmProfile = {
+  ...beautyProfile,
+  id: 'profile-mlm-1',
+  vertical: 'mlm',
+  industry: 'nutrition_mlm',
+  businessModel: 'distributor',
+  legacyNiche: 'nutrition_wellness',
+  blueprintKey: 'blueprint.mlm.v1',
+  businessName: 'Margarita Network',
+};
+
+const dbHealthTemplate = {
+  id: 'arsenal-template-db-1',
+  templateKey: 'health-wellness-evaluation',
+  blueprintKey: 'blueprint.health_wellness.v1',
+  vertical: 'health_wellness',
+  label: 'Evaluación DB de bienestar',
+  description: 'Template administrado desde DB.',
+  goal: 'Capturar solicitudes de evaluación desde DB.',
+  recommendedFor: 'Nutrición y bienestar.',
+  cta: 'Quiero evaluación DB',
+  pathSuggestion: '/evaluacion-db',
+  difficulty: 'basic',
+  status: 'active',
+  blocksPresetKey: 'basic-lead-capture',
+  funnelTemplateId: null,
+  sourceFunnelId: null,
+  sourceFunnelInstanceId: null,
+  createdAt: new Date('2026-06-25T00:00:00.000Z'),
+  updatedAt: new Date('2026-06-25T00:00:00.000Z'),
+};
+
+const buildCommercialProfileService = (
+  profile: Record<string, unknown> | null,
+) =>
   ({
     assertCurrentTeamSupportsCommercialProfile: jest
       .fn()
       .mockResolvedValue(undefined),
     getCommercialProfileForTeam: jest.fn().mockResolvedValue(profile),
+    isCommercialProfileComplete: jest
+      .fn()
+      .mockImplementation((current) =>
+        Boolean(
+          current?.businessName &&
+          current.vertical &&
+          current.vertical !== 'other' &&
+          current.industry &&
+          current.industry !== 'other' &&
+          current.businessModel &&
+          current.businessModel !== 'other' &&
+          current.blueprintKey,
+        ),
+      ),
   }) as unknown as CommercialProfileService;
 
 const buildService = (
   prisma: Record<string, unknown>,
   commercialProfileService: CommercialProfileService,
-) =>
-  new FunnelArsenalService(
-    prisma as unknown as PrismaService,
+) => {
+  const defaultFunnelArsenalTemplate = {
+    findMany: jest.fn().mockResolvedValue([]),
+    findFirst: jest.fn().mockResolvedValue(null),
+    findUnique: jest.fn().mockResolvedValue(null),
+    create: jest.fn(),
+    update: jest.fn(),
+    upsert: jest.fn(),
+  };
+  const mergedPrisma = {
+    ...prisma,
+    funnelArsenalTemplate: {
+      ...defaultFunnelArsenalTemplate,
+      ...((prisma.funnelArsenalTemplate as Record<string, unknown>) ?? {}),
+    },
+  };
+
+  return new FunnelArsenalService(
+    mergedPrisma as unknown as PrismaService,
     commercialProfileService,
   );
+};
 
 describe('FunnelArsenalService', () => {
   it('lists the arsenal for the current blueprint and marks enabled templates', async () => {
@@ -95,6 +171,7 @@ describe('FunnelArsenalService', () => {
 
     await expect(service.listForCurrentTeam(user)).resolves.toMatchObject({
       blueprintKey: 'blueprint.beauty_aesthetics.v1',
+      requiresCommercialProfile: false,
       templates: [
         {
           templateKey: 'beauty-aesthetics-diagnosis-booking',
@@ -104,9 +181,103 @@ describe('FunnelArsenalService', () => {
         },
       ],
     });
+    expect(prisma.funnelPublication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          teamId: 'team-1',
+          status: 'active',
+          isActive: true,
+          NOT: {
+            pathPrefix: {
+              startsWith: '/ref/',
+            },
+          },
+        }),
+      }),
+    );
   });
 
-  it('falls back to the other blueprint when there is no commercial profile', async () => {
+  it('lists health and wellness templates for the health wellness blueprint', async () => {
+    const commercialProfileService = buildCommercialProfileService(
+      healthWellnessProfile,
+    );
+    const prisma = {
+      funnelPublication: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(service.listForCurrentTeam(user)).resolves.toMatchObject({
+      blueprintKey: 'blueprint.health_wellness.v1',
+      requiresCommercialProfile: false,
+      templates: [
+        {
+          templateKey: 'health-wellness-evaluation',
+          label: 'Evaluación de bienestar',
+          enabled: false,
+        },
+      ],
+    });
+  });
+
+  it('lists MLM templates for the MLM blueprint', async () => {
+    const commercialProfileService = buildCommercialProfileService(mlmProfile);
+    const prisma = {
+      funnelPublication: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(service.listForCurrentTeam(user)).resolves.toMatchObject({
+      blueprintKey: 'blueprint.mlm.v1',
+      requiresCommercialProfile: false,
+      templates: [
+        {
+          templateKey: 'mlm-opportunity-presentation',
+          label: 'Presentación de oportunidad',
+          enabled: false,
+        },
+      ],
+    });
+  });
+
+  it('uses active DB templates before static fallback', async () => {
+    const commercialProfileService = buildCommercialProfileService(
+      healthWellnessProfile,
+    );
+    const prisma = {
+      funnelArsenalTemplate: {
+        findMany: jest.fn().mockResolvedValue([dbHealthTemplate]),
+      },
+      funnelPublication: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(service.listForCurrentTeam(user)).resolves.toMatchObject({
+      blueprintKey: 'blueprint.health_wellness.v1',
+      templates: [
+        {
+          templateKey: 'health-wellness-evaluation',
+          label: 'Evaluación DB de bienestar',
+          enabled: false,
+        },
+      ],
+    });
+    expect(prisma.funnelArsenalTemplate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          blueprintKey: 'blueprint.health_wellness.v1',
+          status: 'active',
+        },
+      }),
+    );
+  });
+
+  it('requires a commercial profile instead of falling back to other', async () => {
     const commercialProfileService = buildCommercialProfileService(null);
     const prisma = {
       funnelPublication: {
@@ -116,14 +287,11 @@ describe('FunnelArsenalService', () => {
     const service = buildService(prisma, commercialProfileService);
 
     await expect(service.listForCurrentTeam(user)).resolves.toMatchObject({
-      blueprintKey: 'blueprint.other.v1',
-      templates: [
-        {
-          templateKey: 'other-more-information',
-          enabled: false,
-        },
-      ],
+      blueprintKey: null,
+      requiresCommercialProfile: true,
+      templates: [],
     });
+    expect(prisma.funnelPublication.findMany).not.toHaveBeenCalled();
   });
 
   it('creates a publication for an available template without touching CRM, ownership, tracking or automation models', async () => {
@@ -187,6 +355,7 @@ describe('FunnelArsenalService', () => {
       publicationId: 'publication-1',
       publicUrl: 'https://ana.example.com/diagnostico-belleza',
     });
+    expect(result.publicUrl).not.toContain('/ref/');
     expect(tx.funnelPublication.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -215,6 +384,303 @@ describe('FunnelArsenalService', () => {
     expect(prisma.assignment.create).not.toHaveBeenCalled();
     expect(prisma.trackingProfile.create).not.toHaveBeenCalled();
     expect(prisma.automationDispatch.create).not.toHaveBeenCalled();
+  });
+
+  it('enables a DB template when the template key exists in the admin arsenal', async () => {
+    const commercialProfileService = buildCommercialProfileService(
+      healthWellnessProfile,
+    );
+    const tx = {
+      funnelPublication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: 'publication-db-1',
+          pathPrefix: '/evaluacion-db',
+          domain: { host: 'margarita.example.com' },
+        }),
+      },
+      funnelTemplate: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'template-1' }),
+      },
+      funnel: {
+        create: jest.fn().mockResolvedValue({ id: 'funnel-1' }),
+      },
+      funnelInstance: {
+        create: jest.fn().mockResolvedValue({ id: 'instance-1' }),
+      },
+      funnelStep: {
+        create: jest.fn().mockResolvedValue({ id: 'step-1' }),
+      },
+    };
+    const prisma = {
+      funnelArsenalTemplate: {
+        findFirst: jest.fn().mockResolvedValue(dbHealthTemplate),
+      },
+      funnelPublication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      domain: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'domain-1' }),
+      },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    const result = await service.enableForCurrentTeam(
+      user,
+      'health-wellness-evaluation',
+    );
+
+    expect(result).toMatchObject({
+      label: 'Evaluación DB de bienestar',
+      publicUrl: 'https://margarita.example.com/evaluacion-db',
+    });
+    expect(tx.funnel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Evaluación DB de bienestar',
+        }),
+      }),
+    );
+  });
+
+  it('falls back to static templates when no active DB template exists for enable', async () => {
+    const commercialProfileService = buildCommercialProfileService(
+      healthWellnessProfile,
+    );
+    const tx = {
+      funnelPublication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: 'publication-static-1',
+          pathPrefix: '/evaluacion',
+          domain: { host: 'margarita.example.com' },
+        }),
+      },
+      funnelTemplate: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'template-1' }),
+      },
+      funnel: {
+        create: jest.fn().mockResolvedValue({ id: 'funnel-1' }),
+      },
+      funnelInstance: {
+        create: jest.fn().mockResolvedValue({ id: 'instance-1' }),
+      },
+      funnelStep: {
+        create: jest.fn().mockResolvedValue({ id: 'step-1' }),
+      },
+    };
+    const prisma = {
+      funnelArsenalTemplate: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      funnelPublication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      domain: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'domain-1' }),
+      },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(
+      service.enableForCurrentTeam(user, 'health-wellness-evaluation'),
+    ).resolves.toMatchObject({
+      label: 'Evaluación de bienestar',
+      publicUrl: 'https://margarita.example.com/evaluacion',
+    });
+  });
+
+  it('clones the source FunnelInstance when the DB template has a source', async () => {
+    const commercialProfileService = buildCommercialProfileService(
+      healthWellnessProfile,
+    );
+    const sourceTemplate = {
+      ...dbHealthTemplate,
+      sourceFunnelInstanceId: 'source-instance-1',
+    };
+    const tx = {
+      funnelPublication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: 'publication-clone-1',
+          pathPrefix: '/evaluacion-db',
+          domain: { host: 'margarita.example.com' },
+        }),
+      },
+      funnelInstance: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'source-instance-1',
+          workspaceId: 'source-workspace',
+          teamId: 'source-team',
+          templateId: 'source-template-1',
+          funnelId: 'source-funnel-1',
+          name: 'Source funnel',
+          code: 'source-code',
+          thumbnailUrl: 'https://cdn.example.com/thumb.png',
+          status: 'active',
+          structuralType: 'two_step_conversion',
+          conversionContract: { source: 'builder' },
+          settingsJson: { theme: 'source' },
+          mediaMap: { hero: 'image-1' },
+          funnel: {
+            id: 'source-funnel-1',
+            config: { original: true },
+            stages: ['captured', 'qualified'],
+            entrySources: ['form'],
+          },
+          steps: [
+            {
+              stepType: 'landing',
+              slug: 'inicio',
+              position: 1,
+              isEntryStep: true,
+              isConversionStep: false,
+              blocksJson: [{ type: 'hero', title: 'Source' }],
+              mediaMap: { hero: 'image-1' },
+              settingsJson: { layout: 'source' },
+            },
+          ],
+        }),
+        create: jest.fn().mockResolvedValue({ id: 'cloned-instance-1' }),
+      },
+      funnel: {
+        create: jest.fn().mockResolvedValue({ id: 'cloned-funnel-1' }),
+      },
+      funnelStep: {
+        create: jest.fn().mockResolvedValue({ id: 'cloned-step-1' }),
+      },
+    };
+    const prisma = {
+      funnelArsenalTemplate: {
+        findFirst: jest.fn().mockResolvedValue(sourceTemplate),
+      },
+      funnelPublication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      domain: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'domain-1' }),
+      },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await service.enableForCurrentTeam(user, 'health-wellness-evaluation');
+
+    expect(tx.funnelInstance.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'source-instance-1',
+        },
+      }),
+    );
+    expect(tx.funnelInstance.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          templateId: 'source-template-1',
+          code: 'arsenal-health-wellness-evaluation',
+          trackingProfileId: null,
+          handoffStrategyId: null,
+        }),
+      }),
+    );
+    expect(tx.funnelStep.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          slug: 'inicio',
+          blocksJson: [{ type: 'hero', title: 'Source' }],
+        }),
+      }),
+    );
+  });
+
+  it('does not return sponsor referral links when enabling a funnel', async () => {
+    const commercialProfileService = buildCommercialProfileService(
+      healthWellnessProfile,
+    );
+    const tx = {
+      funnelPublication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: 'publication-1',
+          pathPrefix: '/evaluacion',
+          domain: { host: 'margarita.example.com' },
+        }),
+      },
+      funnelTemplate: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'template-1' }),
+      },
+      funnel: {
+        create: jest.fn().mockResolvedValue({ id: 'funnel-1' }),
+      },
+      funnelInstance: {
+        create: jest.fn().mockResolvedValue({ id: 'instance-1' }),
+      },
+      funnelStep: {
+        create: jest.fn().mockResolvedValue({ id: 'step-1' }),
+      },
+    };
+    const prisma = {
+      funnelPublication: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      domain: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'domain-1' }),
+      },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    const result = await service.enableForCurrentTeam(
+      user,
+      'health-wellness-evaluation',
+    );
+
+    expect(prisma.funnelPublication.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          teamId: 'team-1',
+          NOT: {
+            pathPrefix: {
+              startsWith: '/ref/',
+            },
+          },
+        }),
+      }),
+    );
+    expect(result.publicUrl).toBe('https://margarita.example.com/evaluacion');
+    expect(result.publicUrl).not.toContain('/ref/');
+  });
+
+  it('scopes enabled publications to the current user team', async () => {
+    const commercialProfileService = buildCommercialProfileService(
+      healthWellnessProfile,
+    );
+    const prisma = {
+      funnelPublication: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await service.listForCurrentTeam(user);
+
+    expect(prisma.funnelPublication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          teamId: 'team-1',
+        }),
+      }),
+    );
   });
 
   it('returns the existing publication when enable is called again', async () => {
@@ -260,5 +726,70 @@ describe('FunnelArsenalService', () => {
       service.enableForCurrentTeam(user, 'mlm-opportunity-presentation'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('lets the system admin create, list, update and archive templates', async () => {
+    const commercialProfileService = buildCommercialProfileService(null);
+    const created = {
+      ...dbHealthTemplate,
+      templateKey: 'custom-health-check',
+      label: 'Chequeo de salud',
+    };
+    const updated = {
+      ...created,
+      label: 'Chequeo de salud editado',
+    };
+    const archived = {
+      ...updated,
+      status: 'archived',
+    };
+    const prisma = {
+      funnelArsenalTemplate: {
+        findMany: jest.fn().mockResolvedValue([created]),
+        create: jest.fn().mockResolvedValue(created),
+        findUnique: jest.fn().mockResolvedValue(created),
+        update: jest
+          .fn()
+          .mockResolvedValueOnce(updated)
+          .mockResolvedValueOnce(archived),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(service.listSystemTemplates()).resolves.toMatchObject([
+      {
+        templateKey: 'custom-health-check',
+      },
+    ]);
+    await expect(
+      service.createSystemTemplate({
+        templateKey: 'custom-health-check',
+        blueprintKey: 'blueprint.health_wellness.v1',
+        vertical: 'health_wellness',
+        label: 'Chequeo de salud',
+        description: 'Ficha manual',
+        goal: 'Capturar interesados',
+        recommendedFor: 'Nutrición',
+        cta: 'Quiero el chequeo',
+        pathSuggestion: '/chequeo',
+        difficulty: 'basic',
+        status: 'active',
+      }),
+    ).resolves.toMatchObject({
+      templateKey: 'custom-health-check',
+      label: 'Chequeo de salud',
+    });
+    await expect(
+      service.updateSystemTemplate('custom-health-check', {
+        label: 'Chequeo de salud editado',
+      }),
+    ).resolves.toMatchObject({
+      label: 'Chequeo de salud editado',
+    });
+    await expect(
+      service.archiveSystemTemplate('custom-health-check'),
+    ).resolves.toMatchObject({
+      status: 'archived',
+    });
   });
 });

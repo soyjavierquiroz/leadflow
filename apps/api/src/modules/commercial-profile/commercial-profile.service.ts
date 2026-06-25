@@ -62,9 +62,7 @@ const nullableText = (value: string | null | undefined) => {
   return trimmed ? trimmed : null;
 };
 
-type CommercialProfileClient =
-  | PrismaService
-  | Prisma.TransactionClient;
+type CommercialProfileClient = PrismaService | Prisma.TransactionClient;
 
 export type CommercialProfileContext = {
   workspaceId: string;
@@ -241,10 +239,13 @@ export class CommercialProfileService {
   isCommercialProfileComplete(profile: ExistingCommercialProfile | null) {
     return Boolean(
       profile?.businessName &&
-        profile.vertical &&
-        profile.industry &&
-        profile.businessModel &&
-        profile.blueprintKey,
+      profile.vertical &&
+      profile.vertical !== 'other' &&
+      profile.industry &&
+      profile.industry !== 'other' &&
+      profile.businessModel &&
+      profile.businessModel !== 'other' &&
+      profile.blueprintKey,
     );
   }
 
@@ -252,25 +253,43 @@ export class CommercialProfileService {
     payload: CommercialProfilePayload,
     existing: ExistingCommercialProfile | null,
   ) {
-    const base =
-      payload.niche !== undefined || payload.legacyNiche !== undefined
-        ? buildIndividualCommercialProfile(payload.niche ?? payload.legacyNiche)
-        : existing
-          ? {
-              vertical: existing.vertical,
-              industry: existing.industry,
-              businessModel: existing.businessModel,
-              legacyNiche: existing.legacyNiche ?? 'other',
-              presetVersion: existing.presetVersion,
-              blueprintKey: existing.blueprintKey,
-              blueprintVersion: existing.blueprintVersion,
-            }
-          : buildIndividualCommercialProfile(null);
+    const shouldApplyLegacyNicheDefaults =
+      payload.niche !== undefined || payload.legacyNiche !== undefined;
+    const base = shouldApplyLegacyNicheDefaults
+      ? buildIndividualCommercialProfile(payload.niche ?? payload.legacyNiche)
+      : existing
+        ? {
+            vertical: existing.vertical,
+            industry: existing.industry,
+            businessModel: existing.businessModel,
+            legacyNiche: existing.legacyNiche ?? 'other',
+            presetVersion: existing.presetVersion,
+            blueprintKey: existing.blueprintKey,
+            blueprintVersion: existing.blueprintVersion,
+          }
+        : buildIndividualCommercialProfile(null);
 
-    const vertical = optionalText(payload.vertical) ?? base.vertical;
-    const industry = optionalText(payload.industry) ?? base.industry;
+    const requestedVertical = optionalText(payload.vertical);
+    const requestedIndustry = optionalText(payload.industry);
+    const requestedBusinessModel = optionalText(payload.businessModel);
+    const vertical =
+      shouldApplyLegacyNicheDefaults &&
+      base.vertical !== 'other' &&
+      (!requestedVertical || requestedVertical === 'other')
+        ? base.vertical
+        : (requestedVertical ?? base.vertical);
+    const industry =
+      shouldApplyLegacyNicheDefaults &&
+      base.industry !== 'other' &&
+      (!requestedIndustry || requestedIndustry === 'other')
+        ? base.industry
+        : (requestedIndustry ?? base.industry);
     const businessModel =
-      optionalText(payload.businessModel) ?? base.businessModel;
+      shouldApplyLegacyNicheDefaults &&
+      base.businessModel !== 'other' &&
+      (!requestedBusinessModel || requestedBusinessModel === 'other')
+        ? base.businessModel
+        : (requestedBusinessModel ?? base.businessModel);
     const blueprint = resolveBusinessBlueprintForProfile({
       vertical,
       industry,
@@ -310,9 +329,7 @@ export class CommercialProfileService {
           ? existing?.averagePrice
           : nullableText(payload.averagePrice),
       salesMotion:
-        payload.salesMotion === undefined
-          ? existing?.salesMotion
-          : salesMotion,
+        payload.salesMotion === undefined ? existing?.salesMotion : salesMotion,
       country:
         payload.country === undefined
           ? existing?.country

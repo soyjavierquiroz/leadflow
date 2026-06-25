@@ -539,6 +539,11 @@ export class SponsorsService {
         teamId: scope.teamId,
         status: 'active',
         isActive: true,
+        NOT: {
+          pathPrefix: {
+            startsWith: '/ref/',
+          },
+        },
         domain: {
           status: 'active',
         },
