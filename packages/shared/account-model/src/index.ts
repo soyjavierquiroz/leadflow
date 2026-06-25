@@ -273,6 +273,21 @@ export type BusinessBlueprint = {
   playbooks: readonly BusinessBlueprintPlaybook[];
 };
 
+export type FunnelArsenalDifficulty = 'basic' | 'intermediate' | 'advanced';
+
+export type FunnelArsenalTemplate = {
+  templateKey: string;
+  blueprintKey: string;
+  label: string;
+  description: string;
+  goal: string;
+  recommendedFor: string;
+  cta: string;
+  pathSuggestion: string;
+  difficulty: FunnelArsenalDifficulty;
+  blocksPresetKey?: string;
+};
+
 export type BusinessBlueprintResolvableProfile = {
   vertical?: CommercialVerticalKey | string | null;
   industry?: CommercialIndustryKey | string | null;
@@ -1130,6 +1145,171 @@ const businessBlueprintsByKey = new Map<string, BusinessBlueprint>(
   businessBlueprints.map((blueprint) => [blueprint.blueprintKey, blueprint]),
 );
 
+export const funnelArsenalTemplates = [
+  {
+    templateKey: 'mlm-opportunity-presentation',
+    blueprintKey: 'blueprint.mlm.v1',
+    label: 'Presentación de oportunidad',
+    description:
+      'Landing directa para presentar una oportunidad y capturar interesados listos para recibir más contexto.',
+    goal: 'Capturar prospectos interesados en evaluar una oportunidad.',
+    recommendedFor:
+      'Distribuidores y networkers que necesitan un primer filtro simple.',
+    cta: 'Quiero conocer la oportunidad',
+    pathSuggestion: '/presentacion',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'consulting-services-initial-diagnosis',
+    blueprintKey: 'blueprint.consulting_services.v1',
+    label: 'Diagnóstico inicial',
+    description:
+      'Página para abrir una conversación consultiva y pedir datos mínimos antes de una llamada.',
+    goal: 'Generar solicitudes de diagnóstico para servicios profesionales.',
+    recommendedFor: 'Consultores, agencias, coaches y proveedores B2B.',
+    cta: 'Quiero un diagnóstico',
+    pathSuggestion: '/diagnostico',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'education-information-request',
+    blueprintKey: 'blueprint.education.v1',
+    label: 'Solicitud de información',
+    description:
+      'Embudo de interés para programas, cursos o academias con captura de datos de contacto.',
+    goal: 'Capturar interesados que quieren información del programa.',
+    recommendedFor: 'Cursos, academias, mentorías y formación profesional.',
+    cta: 'Quiero información',
+    pathSuggestion: '/programa',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'real-estate-ideal-property',
+    blueprintKey: 'blueprint.real_estate.v1',
+    label: 'Encuentra tu propiedad ideal',
+    description:
+      'Entrada sencilla para captar compradores o arrendatarios y conocer qué propiedad buscan.',
+    goal: 'Recibir solicitudes de personas buscando propiedad.',
+    recommendedFor: 'Agentes, brokers, desarrollos y equipos inmobiliarios.',
+    cta: 'Buscar mi propiedad ideal',
+    pathSuggestion: '/propiedades',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'health-wellness-evaluation',
+    blueprintKey: 'blueprint.health_wellness.v1',
+    label: 'Evaluación de bienestar',
+    description:
+      'Formulario de interés para iniciar una evaluación de salud, nutrición o bienestar.',
+    goal: 'Capturar solicitudes de evaluación inicial.',
+    recommendedFor: 'Nutrición, fitness, terapias y centros de bienestar.',
+    cta: 'Quiero mi evaluación',
+    pathSuggestion: '/evaluacion',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'beauty-aesthetics-diagnosis-booking',
+    blueprintKey: 'blueprint.beauty_aesthetics.v1',
+    label: 'Reserva diagnóstico de belleza',
+    description:
+      'Página para solicitar diagnóstico o valoración antes de reservar un tratamiento.',
+    goal: 'Generar reservas o solicitudes de diagnóstico de belleza.',
+    recommendedFor:
+      'Salones, spas, skincare, maquillaje y clínicas estéticas.',
+    cta: 'Reservar diagnóstico',
+    pathSuggestion: '/diagnostico-belleza',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'local-business-service-request',
+    blueprintKey: 'blueprint.local_business.v1',
+    label: 'Solicita atención',
+    description:
+      'Embudo simple para que clientes locales pidan atención, cotización o contacto.',
+    goal: 'Recibir solicitudes de atención de clientes cercanos.',
+    recommendedFor: 'Restaurantes, talleres, tiendas y servicios locales.',
+    cta: 'Solicitar atención',
+    pathSuggestion: '/atencion',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'ecommerce-featured-offer',
+    blueprintKey: 'blueprint.ecommerce.v1',
+    label: 'Oferta destacada',
+    description:
+      'Landing para presentar una oferta principal y capturar compradores interesados.',
+    goal: 'Capturar intención de compra alrededor de una oferta destacada.',
+    recommendedFor: 'Tiendas online, productos físicos y vendedores DTC.',
+    cta: 'Ver oferta',
+    pathSuggestion: '/oferta',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'insurance-finance-personal-advice',
+    blueprintKey: 'blueprint.insurance_finance.v1',
+    label: 'Asesoría personalizada',
+    description:
+      'Página de captura para iniciar una asesoría financiera, de seguros, crédito o inversión.',
+    goal: 'Generar solicitudes de asesoría personalizada.',
+    recommendedFor: 'Asesores de seguros, crédito, inversión y finanzas.',
+    cta: 'Solicitar asesoría',
+    pathSuggestion: '/asesoria',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'recruiting-hr-initial-application',
+    blueprintKey: 'blueprint.recruiting_hr.v1',
+    label: 'Postulación inicial',
+    description:
+      'Embudo de primera postulación para captar candidatos o talento interesado.',
+    goal: 'Recibir postulaciones iniciales con datos de contacto.',
+    recommendedFor: 'Reclutadores, agencias, bolsas de trabajo y RRHH.',
+    cta: 'Postularme',
+    pathSuggestion: '/postula',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+  {
+    templateKey: 'other-more-information',
+    blueprintKey: 'blueprint.other.v1',
+    label: 'Solicita más información',
+    description:
+      'Embudo genérico para negocios que todavía no tienen una vertical específica configurada.',
+    goal: 'Capturar personas que quieren recibir más información.',
+    recommendedFor:
+      'Negocios en etapa inicial o casos fuera de las verticales oficiales.',
+    cta: 'Solicitar información',
+    pathSuggestion: '/info',
+    difficulty: 'basic',
+    blocksPresetKey: 'basic-lead-capture',
+  },
+] as const satisfies readonly FunnelArsenalTemplate[];
+
+const funnelArsenalTemplatesByKey = new Map<string, FunnelArsenalTemplate>(
+  funnelArsenalTemplates.map((template) => [template.templateKey, template]),
+);
+
+const funnelArsenalTemplatesByBlueprintKey = funnelArsenalTemplates.reduce(
+  (accumulator, template) => {
+    accumulator[template.blueprintKey] = [
+      ...(accumulator[template.blueprintKey] ?? []),
+      template,
+    ];
+
+    return accumulator;
+  },
+  {} as Record<string, FunnelArsenalTemplate[]>,
+);
+
 const individualNicheKeys = new Set<IndividualNicheKey>(
   individualNiches.map((niche) => niche.key),
 );
@@ -1352,6 +1532,28 @@ export const getBusinessBlueprintByKey = (
   }
 
   return businessBlueprintsByKey.get(blueprintKey);
+};
+
+export const getFunnelArsenalTemplateByKey = (
+  templateKey: string | null | undefined,
+): FunnelArsenalTemplate | undefined => {
+  if (!templateKey) {
+    return undefined;
+  }
+
+  return funnelArsenalTemplatesByKey.get(templateKey);
+};
+
+export const getFunnelArsenalTemplatesForBlueprint = (
+  blueprintKey: string | null | undefined,
+): readonly FunnelArsenalTemplate[] => {
+  const fallbackBlueprintKey = businessBlueprintsByVertical.other.blueprintKey;
+  const resolvedBlueprintKey =
+    blueprintKey && funnelArsenalTemplatesByBlueprintKey[blueprintKey]
+      ? blueprintKey
+      : fallbackBlueprintKey;
+
+  return funnelArsenalTemplatesByBlueprintKey[resolvedBlueprintKey] ?? [];
 };
 
 const blueprintMatchesVertical = (

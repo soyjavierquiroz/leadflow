@@ -8,7 +8,10 @@ import {
   businessModels,
   commercialVerticalPresets,
   commercialVerticals,
+  funnelArsenalTemplates,
   getBusinessBlueprintByKey,
+  getFunnelArsenalTemplateByKey,
+  getFunnelArsenalTemplatesForBlueprint,
   industriesByVertical,
   legacyNicheToCommercialTaxonomy,
   resolveBusinessBlueprintForProfile,
@@ -116,6 +119,38 @@ test('business blueprints can be found by key', () => {
     'mlm',
   );
   assert.equal(getBusinessBlueprintByKey('unknown'), undefined);
+});
+
+test('funnel arsenal has one basic template per official blueprint', () => {
+  assert.equal(funnelArsenalTemplates.length, officialVerticals.length);
+
+  for (const vertical of officialVerticals) {
+    const blueprintKey = `blueprint.${vertical}.v1`;
+    const templates = getFunnelArsenalTemplatesForBlueprint(blueprintKey);
+
+    assert.equal(templates.length, 1);
+    assert.equal(templates[0].blueprintKey, blueprintKey);
+    assert.equal(templates[0].difficulty, 'basic');
+    assert.ok(templates[0].templateKey);
+    assert.ok(templates[0].label);
+    assert.ok(templates[0].description);
+    assert.ok(templates[0].goal);
+    assert.ok(templates[0].recommendedFor);
+    assert.ok(templates[0].cta);
+    assert.ok(templates[0].pathSuggestion.startsWith('/'));
+  }
+});
+
+test('funnel arsenal lookup resolves known templates and falls back to other', () => {
+  assert.equal(
+    getFunnelArsenalTemplateByKey('mlm-opportunity-presentation')?.label,
+    'Presentación de oportunidad',
+  );
+  assert.equal(getFunnelArsenalTemplateByKey('missing'), undefined);
+  assert.equal(
+    getFunnelArsenalTemplatesForBlueprint('unknown')[0].blueprintKey,
+    'blueprint.other.v1',
+  );
 });
 
 test('business blueprint resolver uses vertical and fallback', () => {

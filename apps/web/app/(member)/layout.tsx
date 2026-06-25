@@ -28,6 +28,11 @@ const memberNav: ShellNavItem[] = [
     icon: "briefcase-business",
   },
   {
+    href: "/member/funnels",
+    label: "Embudos",
+    icon: "layout-template",
+  },
+  {
     href: "/member/leads",
     label: "Leads",
     icon: "inbox",

@@ -11,6 +11,7 @@ import { DomainsModule } from '../domains/domains.module';
 import { EventsModule } from '../events/events.module';
 import { WalletEngineModule } from '../finance/wallet-engine.module';
 import { FunnelInstancesModule } from '../funnel-instances/funnel-instances.module';
+import { FunnelArsenalModule } from '../funnel-arsenal/funnel-arsenal.module';
 import { FunnelPublicationsModule } from '../funnel-publications/funnel-publications.module';
 import { FunnelStepsModule } from '../funnel-steps/funnel-steps.module';
 import { FunnelTemplatesModule } from '../funnel-templates/funnel-templates.module';
@@ -48,6 +49,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     StorageModule,
     FunnelsModule,
     DomainsModule,
+    FunnelArsenalModule,
     FunnelTemplatesModule,
     FunnelInstancesModule,
     FunnelStepsModule,
@@ -84,6 +86,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     StorageModule,
     FunnelsModule,
     DomainsModule,
+    FunnelArsenalModule,
     FunnelTemplatesModule,
     FunnelInstancesModule,
     FunnelStepsModule,
