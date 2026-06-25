@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -15,10 +14,10 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CommercialProfileService } from '../commercial-profile/commercial-profile.service';
-import { normalizePublicationPathPrefix } from '../shared/publication-resolution.utils';
 import type { JsonValue } from '../shared/domain.types';
 import type { CreateSystemFunnelArsenalTemplateDto } from './dto/create-system-funnel-arsenal-template.dto';
 import type { UpdateSystemFunnelArsenalTemplateDto } from './dto/update-system-funnel-arsenal-template.dto';
+import { FunnelMasterClonerService } from './funnel-master-cloner.service';
 
 const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
@@ -26,6 +25,7 @@ const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
 type EnabledPublication = {
   id: string;
   pathPrefix: string;
+  funnelInstanceId: string;
   domain: {
     host: string;
   };
@@ -34,6 +34,15 @@ type EnabledPublication = {
 type ArsenalTemplateDefinition = FunnelArsenalTemplate & {
   vertical: string;
   status: 'draft' | 'active' | 'archived';
+  industry?: string | null;
+  businessModel?: string | null;
+  funnelType?: string | null;
+  funnelFormat?: string | null;
+  objective?: string | null;
+  stepsCount?: number | null;
+  language?: string | null;
+  country?: string | null;
+  market?: string | null;
   funnelTemplateId?: string | null;
   sourceFunnelId?: string | null;
   sourceFunnelInstanceId?: string | null;
@@ -41,8 +50,12 @@ type ArsenalTemplateDefinition = FunnelArsenalTemplate & {
 
 type ArsenalTemplateView = ArsenalTemplateDefinition & {
   enabled: boolean;
+  source?: 'master_clone' | 'fallback';
+  warning?: string;
+  funnelInstanceId?: string;
   publicationId?: string;
   publicUrl?: string;
+  pathPrefix?: string;
 };
 
 type FunnelArsenalResponse = {
@@ -53,6 +66,7 @@ type FunnelArsenalResponse = {
 
 type SystemFunnelArsenalTemplateView = ArsenalTemplateDefinition & {
   id?: string;
+  sourceFunnelInstanceLabel?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -64,6 +78,7 @@ export class FunnelArsenalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly commercialProfileService: CommercialProfileService,
+    private readonly funnelMasterClonerService: FunnelMasterClonerService,
   ) {}
 
   async listForCurrentTeam(
@@ -150,13 +165,11 @@ export class FunnelArsenalService {
     );
 
     if (existing) {
-      return this.toTemplateView(template, existing);
+      return this.toTemplateView(template, existing, {
+        source: template.sourceFunnelInstanceId ? 'master_clone' : 'fallback',
+      });
     }
 
-    const domain = await this.resolveActiveDomain(
-      user.workspaceId!,
-      user.teamId!,
-    );
     const created = await this.prisma.$transaction(async (tx) => {
       const existingInsideTransaction =
         await this.findEnabledPublicationByInstanceCode(
@@ -169,35 +182,58 @@ export class FunnelArsenalService {
         return existingInsideTransaction;
       }
 
-      const pathPrefix = await this.resolveAvailablePathPrefix(
-        tx,
-        domain.id,
-        template.pathSuggestion,
-      );
       const seo = this.buildSeo(template, profile?.businessName ?? null);
-      const funnelInstance = template.sourceFunnelInstanceId
-        ? await this.cloneSourceFunnelInstance(tx, {
-            sourceFunnelInstanceId: template.sourceFunnelInstanceId,
-            workspaceId: user.workspaceId!,
-            teamId: user.teamId!,
-            instanceCode,
-            template,
-            seo,
-          })
-        : await this.createMinimalFunnelInstance(tx, {
-            workspaceId: user.workspaceId!,
-            teamId: user.teamId!,
-            instanceCode,
-            template,
-            businessName: profile?.businessName,
-            seo,
-          });
+      if (template.sourceFunnelInstanceId) {
+        const cloned =
+          await this.funnelMasterClonerService.cloneMasterFunnelInstanceToTeamInTransaction(
+            tx,
+            {
+              sourceFunnelInstanceId: template.sourceFunnelInstanceId,
+              targetWorkspaceId: user.workspaceId!,
+              targetTeamId: user.teamId!,
+              targetSponsorId: user.sponsorId ?? undefined,
+              requestedPath: template.pathSuggestion,
+              publicationName: seo.title,
+              createdByUserId: user.id,
+              templateKey: template.templateKey,
+              blueprintKey: template.blueprintKey,
+              templateLabel: template.label,
+              templateDescription: template.description,
+              instanceCode,
+            },
+          );
+
+        return {
+          id: cloned.publicationId,
+          pathPrefix: cloned.pathPrefix,
+          funnelInstanceId: cloned.funnelInstanceId,
+          domain: {
+            host: new URL(cloned.publicUrl ?? 'https://leadflow.kuruk.in').host,
+          },
+        };
+      }
+
+      const funnelInstance = await this.createMinimalFunnelInstance(tx, {
+        workspaceId: user.workspaceId!,
+        teamId: user.teamId!,
+        instanceCode,
+        template,
+        businessName: profile?.businessName,
+        seo,
+      });
+      const publicationTarget =
+        await this.funnelMasterClonerService.resolvePublicationTarget(tx, {
+          workspaceId: user.workspaceId!,
+          teamId: user.teamId!,
+          teamSlug: user.team?.code ?? user.team?.name ?? user.teamId!,
+          requestedPath: template.pathSuggestion,
+        });
 
       return tx.funnelPublication.create({
         data: {
           workspaceId: user.workspaceId!,
           teamId: user.teamId!,
-          domainId: domain.id,
+          domainId: publicationTarget.domainId,
           funnelInstanceId: funnelInstance.id,
           trackingProfileId: null,
           handoffStrategyId: null,
@@ -211,7 +247,7 @@ export class FunnelArsenalService {
           tiktokPixelId: null,
           metaCapiToken: null,
           tiktokAccessToken: null,
-          pathPrefix,
+          pathPrefix: publicationTarget.pathPrefix,
           status: 'active',
           isActive: true,
           isPrimary: false,
@@ -219,6 +255,7 @@ export class FunnelArsenalService {
         select: {
           id: true,
           pathPrefix: true,
+          funnelInstanceId: true,
           domain: {
             select: {
               host: true,
@@ -228,18 +265,29 @@ export class FunnelArsenalService {
       });
     });
 
-    return this.toTemplateView(template, created);
+    return this.toTemplateView(template, created, {
+      source: template.sourceFunnelInstanceId ? 'master_clone' : 'fallback',
+    });
   }
 
   async listSystemTemplates(): Promise<SystemFunnelArsenalTemplateView[]> {
     const records = await this.prisma.funnelArsenalTemplate.findMany({
       orderBy: [{ blueprintKey: 'asc' }, { label: 'asc' }],
     });
+    const sourceLabels = await this.resolveSystemSourceFunnelInstanceLabels(
+      records.map((record) => record.sourceFunnelInstanceId),
+    );
 
-    return records.map((record) => this.mapDbTemplate(record));
+    return records.map((record) =>
+      this.mapDbTemplate(record, {
+        sourceFunnelInstanceLabel:
+          sourceLabels.get(record.sourceFunnelInstanceId ?? '') ?? null,
+      }),
+    );
   }
 
   async createSystemTemplate(dto: CreateSystemFunnelArsenalTemplateDto) {
+    await this.assertSourceFunnelInstanceExists(dto.sourceFunnelInstanceId);
     const data = this.buildSystemTemplateData(dto, {
       requireAllFields: true,
     }) as Prisma.FunnelArsenalTemplateUncheckedCreateInput;
@@ -268,6 +316,7 @@ export class FunnelArsenalService {
       });
     }
 
+    await this.assertSourceFunnelInstanceExists(dto.sourceFunnelInstanceId);
     const data = this.buildSystemTemplateData(dto, {
       requireAllFields: false,
     }) as Prisma.FunnelArsenalTemplateUncheckedUpdateInput;
@@ -307,7 +356,17 @@ export class FunnelArsenalService {
         create: {
           templateKey: template.templateKey,
           blueprintKey: template.blueprintKey,
-          vertical: blueprint?.vertical ?? this.resolveVertical(template.blueprintKey),
+          vertical:
+            blueprint?.vertical ?? this.resolveVertical(template.blueprintKey),
+          industry: null,
+          businessModel: null,
+          funnelType: null,
+          funnelFormat: null,
+          objective: template.goal,
+          stepsCount: null,
+          language: 'es',
+          country: null,
+          market: null,
           label: template.label,
           description: template.description,
           goal: template.goal,
@@ -323,7 +382,10 @@ export class FunnelArsenalService {
         },
         update: {
           blueprintKey: template.blueprintKey,
-          vertical: blueprint?.vertical ?? this.resolveVertical(template.blueprintKey),
+          vertical:
+            blueprint?.vertical ?? this.resolveVertical(template.blueprintKey),
+          objective: template.goal,
+          language: 'es',
           label: template.label,
           description: template.description,
           goal: template.goal,
@@ -414,6 +476,15 @@ export class FunnelArsenalService {
     const templateKey = required(dto.templateKey, 'templateKey');
     const blueprintKey = required(dto.blueprintKey, 'blueprintKey');
     const vertical = required(dto.vertical, 'vertical');
+    const industry = this.nullableText(dto.industry);
+    const businessModel = this.nullableText(dto.businessModel);
+    const funnelType = this.nullableText(dto.funnelType);
+    const funnelFormat = this.nullableText(dto.funnelFormat);
+    const objective = this.nullableText(dto.objective);
+    const language = this.nullableText(dto.language);
+    const country = this.nullableText(dto.country);
+    const market = this.nullableText(dto.market);
+    const stepsCount = this.normalizeOptionalPositiveInteger(dto.stepsCount);
     const label = required(dto.label, 'label');
     const description = required(dto.description, 'description');
     const goal = required(dto.goal, 'goal');
@@ -424,6 +495,15 @@ export class FunnelArsenalService {
     if (templateKey) data.templateKey = templateKey;
     if (blueprintKey) data.blueprintKey = blueprintKey;
     if (vertical) data.vertical = vertical;
+    if (industry !== undefined) data.industry = industry;
+    if (businessModel !== undefined) data.businessModel = businessModel;
+    if (funnelType !== undefined) data.funnelType = funnelType;
+    if (funnelFormat !== undefined) data.funnelFormat = funnelFormat;
+    if (objective !== undefined) data.objective = objective;
+    if (stepsCount !== undefined) data.stepsCount = stepsCount;
+    if (language !== undefined) data.language = language ?? 'es';
+    if (country !== undefined) data.country = country;
+    if (market !== undefined) data.market = market;
     if (label) data.label = label;
     if (description) data.description = description;
     if (goal) data.goal = goal;
@@ -459,6 +539,10 @@ export class FunnelArsenalService {
       data.status = FunnelArsenalTemplateStatus.draft;
     }
 
+    if (options.requireAllFields && language === undefined) {
+      data.language = 'es';
+    }
+
     return data;
   }
 
@@ -484,6 +568,30 @@ export class FunnelArsenalService {
     const trimmed = value.trim();
 
     return trimmed ? trimmed : null;
+  }
+
+  private normalizeOptionalPositiveInteger(
+    value: number | string | null | undefined,
+  ) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null || value === '') {
+      return null;
+    }
+
+    const parsed = typeof value === 'number' ? value : Number(value);
+
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new BadRequestException({
+        code: 'INVALID_FUNNEL_ARSENAL_STEPS_COUNT',
+        field: 'stepsCount',
+        message: 'stepsCount must be a positive integer.',
+      });
+    }
+
+    return parsed;
   }
 
   private normalizeDifficulty(value: string | null | undefined) {
@@ -529,6 +637,15 @@ export class FunnelArsenalService {
       ...template,
       vertical: this.resolveVertical(template.blueprintKey),
       status: 'active',
+      industry: null,
+      businessModel: null,
+      funnelType: null,
+      funnelFormat: null,
+      objective: template.goal,
+      stepsCount: null,
+      language: 'es',
+      country: null,
+      market: null,
       funnelTemplateId: null,
       sourceFunnelId: null,
       sourceFunnelInstanceId: null,
@@ -537,12 +654,24 @@ export class FunnelArsenalService {
 
   private mapDbTemplate(
     record: DbFunnelArsenalTemplate,
+    options?: {
+      sourceFunnelInstanceLabel?: string | null;
+    },
   ): SystemFunnelArsenalTemplateView {
     return {
       id: record.id,
       templateKey: record.templateKey,
       blueprintKey: record.blueprintKey,
       vertical: record.vertical,
+      industry: record.industry,
+      businessModel: record.businessModel,
+      funnelType: record.funnelType,
+      funnelFormat: record.funnelFormat,
+      objective: record.objective,
+      stepsCount: record.stepsCount,
+      language: record.language,
+      country: record.country,
+      market: record.market,
       label: record.label,
       description: record.description,
       goal: record.goal,
@@ -555,9 +684,75 @@ export class FunnelArsenalService {
       funnelTemplateId: record.funnelTemplateId,
       sourceFunnelId: record.sourceFunnelId,
       sourceFunnelInstanceId: record.sourceFunnelInstanceId,
+      sourceFunnelInstanceLabel:
+        options?.sourceFunnelInstanceLabel ?? undefined,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
+  }
+
+  private async resolveSystemSourceFunnelInstanceLabels(
+    sourceFunnelInstanceIds: Array<string | null>,
+  ) {
+    const ids = [
+      ...new Set(
+        sourceFunnelInstanceIds.filter(
+          (id): id is string => typeof id === 'string' && id.trim().length > 0,
+        ),
+      ),
+    ];
+
+    if (ids.length === 0) {
+      return new Map<string, string>();
+    }
+
+    const records = await this.prisma.funnelInstance.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+      },
+    });
+
+    return new Map(
+      records.map((record) => [
+        record.id,
+        `${record.name}${record.code ? ` (${record.code})` : ''}`,
+      ]),
+    );
+  }
+
+  private async assertSourceFunnelInstanceExists(
+    sourceFunnelInstanceId: string | null | undefined,
+  ) {
+    const normalized = this.nullableText(sourceFunnelInstanceId);
+
+    if (!normalized) {
+      return;
+    }
+
+    const source = await this.prisma.funnelInstance.findUnique({
+      where: {
+        id: normalized,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!source) {
+      throw new BadRequestException({
+        code: 'FUNNEL_ARSENAL_SOURCE_INSTANCE_NOT_FOUND',
+        field: 'sourceFunnelInstanceId',
+        message:
+          'sourceFunnelInstanceId must point to an existing FunnelInstance.',
+      });
+    }
   }
 
   private resolveVertical(blueprintKey: string) {
@@ -592,6 +787,7 @@ export class FunnelArsenalService {
       select: {
         id: true,
         pathPrefix: true,
+        funnelInstanceId: true,
         domain: {
           select: {
             host: true,
@@ -614,6 +810,7 @@ export class FunnelArsenalService {
         {
           id: publication.id,
           pathPrefix: publication.pathPrefix,
+          funnelInstanceId: publication.funnelInstanceId,
           domain: publication.domain,
         },
       ]),
@@ -642,6 +839,7 @@ export class FunnelArsenalService {
       select: {
         id: true,
         pathPrefix: true,
+        funnelInstanceId: true,
         domain: {
           select: {
             host: true,
@@ -651,62 +849,6 @@ export class FunnelArsenalService {
       orderBy: {
         createdAt: 'asc',
       },
-    });
-  }
-
-  private async resolveActiveDomain(workspaceId: string, teamId: string) {
-    const domain = await this.prisma.domain.findFirst({
-      where: {
-        workspaceId,
-        teamId,
-        status: 'active',
-      },
-      select: {
-        id: true,
-      },
-      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-    });
-
-    if (!domain) {
-      throw new ConflictException({
-        code: 'FUNNEL_ARSENAL_ACTIVE_DOMAIN_REQUIRED',
-        message:
-          'An active domain is required before enabling a funnel from the arsenal.',
-      });
-    }
-
-    return domain;
-  }
-
-  private async resolveAvailablePathPrefix(
-    tx: Prisma.TransactionClient,
-    domainId: string,
-    pathSuggestion: string,
-  ) {
-    const basePath = normalizePublicationPathPrefix(pathSuggestion);
-    const suffixBase = basePath === '/' ? '/info' : basePath;
-
-    for (let attempt = 0; attempt < 50; attempt += 1) {
-      const pathPrefix =
-        attempt === 0 ? basePath : `${suffixBase}-${attempt + 1}`;
-      const conflict = await tx.funnelPublication.findFirst({
-        where: {
-          domainId,
-          pathPrefix,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      if (!conflict) {
-        return pathPrefix;
-      }
-    }
-
-    throw new ConflictException({
-      code: 'FUNNEL_ARSENAL_PATH_CONFLICT',
-      message: 'We could not generate an available publication path.',
     });
   }
 
@@ -818,114 +960,6 @@ export class FunnelArsenalService {
     return funnelInstance;
   }
 
-  private async cloneSourceFunnelInstance(
-    tx: Prisma.TransactionClient,
-    input: {
-      sourceFunnelInstanceId: string;
-      workspaceId: string;
-      teamId: string;
-      instanceCode: string;
-      template: ArsenalTemplateDefinition;
-      seo: { title: string; description: string };
-    },
-  ) {
-    const source = await tx.funnelInstance.findUnique({
-      where: {
-        id: input.sourceFunnelInstanceId,
-      },
-      include: {
-        funnel: true,
-        steps: {
-          orderBy: {
-            position: 'asc',
-          },
-        },
-      },
-    });
-
-    if (!source) {
-      throw new NotFoundException({
-        code: 'FUNNEL_ARSENAL_SOURCE_INSTANCE_NOT_FOUND',
-        message: 'The source funnel instance for this arsenal template was not found.',
-      });
-    }
-
-    const funnel = await tx.funnel.create({
-      data: {
-        workspaceId: input.workspaceId,
-        name: input.template.label,
-        description: input.template.description,
-        code: input.instanceCode,
-        thumbnailUrl: source.thumbnailUrl,
-        config: toInputJson({
-          ...((source.funnel?.config ?? {}) as Record<string, unknown>),
-          source: 'funnel_arsenal',
-          templateKey: input.template.templateKey,
-          blueprintKey: input.template.blueprintKey,
-          clonedFromFunnelId: source.funnelId,
-          clonedFromFunnelInstanceId: source.id,
-          seo: input.seo,
-        }),
-        status: 'active',
-        isTemplate: false,
-        stages: source.funnel?.stages ?? ['captured', 'qualified', 'assigned'],
-        entrySources: source.funnel?.entrySources ?? [
-          'manual',
-          'form',
-          'landing_page',
-          'api',
-        ],
-        defaultTeamId: input.teamId,
-        defaultRotationPoolId: null,
-      },
-    });
-
-    const funnelInstance = await tx.funnelInstance.create({
-      data: {
-        workspaceId: input.workspaceId,
-        teamId: input.teamId,
-        templateId: source.templateId,
-        funnelId: funnel.id,
-        name: input.template.label,
-        code: input.instanceCode,
-        thumbnailUrl: source.thumbnailUrl,
-        status: 'active',
-        structuralType: source.structuralType,
-        conversionContract: toInputJson({
-          ...((source.conversionContract ?? {}) as Record<string, unknown>),
-          source: 'funnel_arsenal',
-          templateKey: input.template.templateKey,
-          clonedFromFunnelInstanceId: source.id,
-        }),
-        rotationPoolId: null,
-        trackingProfileId: null,
-        handoffStrategyId: null,
-        settingsJson: toInputJson(source.settingsJson as JsonValue),
-        mediaMap: toInputJson(source.mediaMap as JsonValue),
-      },
-    });
-
-    for (const step of source.steps) {
-      await tx.funnelStep.create({
-        data: {
-          workspaceId: input.workspaceId,
-          teamId: input.teamId,
-          funnelInstanceId: funnelInstance.id,
-          stepType: step.stepType,
-          slug: step.slug,
-          position: step.position,
-          isEntryStep: step.isEntryStep,
-          isConversionStep: step.isConversionStep,
-          blocksJson: toInputJson(step.blocksJson as JsonValue),
-          mediaMap: toInputJson(step.mediaMap as JsonValue),
-          settingsJson: toInputJson(step.settingsJson as JsonValue),
-        },
-      });
-    }
-
-    return funnelInstance;
-  }
-
   private async findOrCreateTemplate(
     tx: Prisma.TransactionClient,
     template: ArsenalTemplateDefinition,
@@ -966,13 +1000,29 @@ export class FunnelArsenalService {
   private toTemplateView(
     template: ArsenalTemplateDefinition,
     publication?: EnabledPublication | null,
+    options?: {
+      source?: 'master_clone' | 'fallback';
+    },
   ): ArsenalTemplateView {
     return {
       ...template,
       enabled: Boolean(publication),
+      ...(options?.source
+        ? {
+            source: options.source,
+            ...(options.source === 'fallback'
+              ? {
+                  warning:
+                    'Este template aún no tiene funnel maestro asociado.',
+                }
+              : {}),
+          }
+        : {}),
       ...(publication
         ? {
             publicationId: publication.id,
+            funnelInstanceId: publication.funnelInstanceId,
+            pathPrefix: publication.pathPrefix,
             publicUrl: this.toPublicUrl(
               publication.domain.host,
               publication.pathPrefix,

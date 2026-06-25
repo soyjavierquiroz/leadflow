@@ -1,16 +1,22 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { apiFetchWithSession } from "@/lib/auth";
 
-export type SystemFunnelArsenalTemplateStatus =
-  | "draft"
-  | "active"
-  | "archived";
+export type SystemFunnelArsenalTemplateStatus = "draft" | "active" | "archived";
 
 export type SystemFunnelArsenalTemplate = {
   id?: string;
   templateKey: string;
   blueprintKey: string;
   vertical: string;
+  industry?: string | null;
+  businessModel?: string | null;
+  funnelType?: string | null;
+  funnelFormat?: string | null;
+  objective?: string | null;
+  stepsCount?: number | null;
+  language?: string | null;
+  country?: string | null;
+  market?: string | null;
   label: string;
   description: string;
   goal: string;
@@ -23,6 +29,7 @@ export type SystemFunnelArsenalTemplate = {
   funnelTemplateId?: string | null;
   sourceFunnelId?: string | null;
   sourceFunnelInstanceId?: string | null;
+  sourceFunnelInstanceLabel?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -47,5 +54,7 @@ export const getSystemFunnelArsenalTemplates = async (): Promise<
     throw new Error(getErrorMessage(payload));
   }
 
-  return Array.isArray(payload) ? (payload as SystemFunnelArsenalTemplate[]) : [];
+  return Array.isArray(payload)
+    ? (payload as SystemFunnelArsenalTemplate[])
+    : [];
 };

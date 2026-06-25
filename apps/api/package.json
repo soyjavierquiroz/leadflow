@@ -20,6 +20,7 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "node prisma/seed.js",
+    "seed:arsenal-workspace": "ts-node src/scripts/seed-arsenal-workspace.ts",
     "seed:funnel-arsenal": "ts-node src/scripts/seed-funnel-arsenal.ts",
     "seed:funnel-arsenal:prod": "node dist/apps/api/src/scripts/seed-funnel-arsenal.js",
     "funnel:tabula-rasa": "node scripts/tabula-rasa-reset.js",

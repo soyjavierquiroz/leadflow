@@ -1,10 +1,22 @@
-export type FunnelArsenalTemplateDifficulty = 'basic' | 'intermediate' | 'advanced';
+export type FunnelArsenalTemplateDifficulty =
+  | 'basic'
+  | 'intermediate'
+  | 'advanced';
 export type FunnelArsenalTemplateStatus = 'draft' | 'active' | 'archived';
 
 export class CreateSystemFunnelArsenalTemplateDto {
   readonly templateKey?: string;
   readonly blueprintKey?: string;
   readonly vertical?: string;
+  readonly industry?: string | null;
+  readonly businessModel?: string | null;
+  readonly funnelType?: string | null;
+  readonly funnelFormat?: string | null;
+  readonly objective?: string | null;
+  readonly stepsCount?: number | string | null;
+  readonly language?: string | null;
+  readonly country?: string | null;
+  readonly market?: string | null;
   readonly label?: string;
   readonly description?: string;
   readonly goal?: string;

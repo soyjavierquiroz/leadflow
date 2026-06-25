@@ -834,6 +834,15 @@ model FunnelArsenalTemplate {
   templateKey            String                      @unique
   blueprintKey           String
   vertical               String
+  industry               String?
+  businessModel          String?
+  funnelType             String?
+  funnelFormat           String?
+  objective              String?
+  stepsCount             Int?
+  language               String                      @default("es")
+  country                String?
+  market                 String?
   label                  String
   description            String
   goal                   String
@@ -851,6 +860,11 @@ model FunnelArsenalTemplate {
 
   @@index([blueprintKey, status])
   @@index([vertical, status])
+  @@index([industry, status])
+  @@index([funnelType, status])
+  @@index([objective, status])
+  @@index([language, status])
+  @@index([market, status])
   @@index([sourceFunnelInstanceId])
   @@index([sourceFunnelId])
 }

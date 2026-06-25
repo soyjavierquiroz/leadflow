@@ -209,6 +209,13 @@ export function FunnelArsenalClient({
                           Habilitado
                         </span>
                       ) : null}
+                      {template.source ? (
+                        <span className="inline-flex items-center rounded-full border border-app-border bg-app-card px-3 py-1 text-xs font-semibold text-app-text-muted">
+                          {template.source === "master_clone"
+                            ? "Master"
+                            : "Fallback"}
+                        </span>
+                      ) : null}
                     </div>
                     <h2 className="mt-4 text-2xl font-semibold tracking-tight text-app-text">
                       {template.label}
@@ -219,6 +226,11 @@ export function FunnelArsenalClient({
                 <p className="text-sm leading-7 text-app-text-muted">
                   {template.description}
                 </p>
+                {template.warning ? (
+                  <p className="rounded-lg border border-app-warning-border bg-app-warning-bg px-3 py-2 text-sm font-medium text-app-warning-text">
+                    {template.warning}
+                  </p>
+                ) : null}
 
                 <dl className="grid gap-3 text-sm text-app-text-muted">
                   <div className="rounded-lg border border-app-border bg-app-card px-4 py-3">

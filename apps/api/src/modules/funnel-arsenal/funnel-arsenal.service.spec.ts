@@ -126,6 +126,7 @@ const buildCommercialProfileService = (
 const buildService = (
   prisma: Record<string, unknown>,
   commercialProfileService: CommercialProfileService,
+  funnelMasterClonerService: Record<string, unknown> = {},
 ) => {
   const defaultFunnelArsenalTemplate = {
     findMany: jest.fn().mockResolvedValue([]),
@@ -141,11 +142,24 @@ const buildService = (
       ...defaultFunnelArsenalTemplate,
       ...((prisma.funnelArsenalTemplate as Record<string, unknown>) ?? {}),
     },
+    funnelInstance: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue({ id: 'source-instance-1' }),
+      ...((prisma.funnelInstance as Record<string, unknown>) ?? {}),
+    },
   };
 
   return new FunnelArsenalService(
     mergedPrisma as unknown as PrismaService,
     commercialProfileService,
+    {
+      resolvePublicationTarget: jest.fn(async (_tx, input) => ({
+        domainId: 'domain-1',
+        pathPrefix: input.requestedPath,
+      })),
+      cloneMasterFunnelInstanceToTeamInTransaction: jest.fn(),
+      ...funnelMasterClonerService,
+    } as never,
   );
 };
 
@@ -507,55 +521,20 @@ describe('FunnelArsenalService', () => {
     const tx = {
       funnelPublication: {
         findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockResolvedValue({
-          id: 'publication-clone-1',
-          pathPrefix: '/evaluacion-db',
-          domain: { host: 'margarita.example.com' },
-        }),
-      },
-      funnelInstance: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: 'source-instance-1',
-          workspaceId: 'source-workspace',
-          teamId: 'source-team',
-          templateId: 'source-template-1',
-          funnelId: 'source-funnel-1',
-          name: 'Source funnel',
-          code: 'source-code',
-          thumbnailUrl: 'https://cdn.example.com/thumb.png',
-          status: 'active',
-          structuralType: 'two_step_conversion',
-          conversionContract: { source: 'builder' },
-          settingsJson: { theme: 'source' },
-          mediaMap: { hero: 'image-1' },
-          funnel: {
-            id: 'source-funnel-1',
-            config: { original: true },
-            stages: ['captured', 'qualified'],
-            entrySources: ['form'],
-          },
-          steps: [
-            {
-              stepType: 'landing',
-              slug: 'inicio',
-              position: 1,
-              isEntryStep: true,
-              isConversionStep: false,
-              blocksJson: [{ type: 'hero', title: 'Source' }],
-              mediaMap: { hero: 'image-1' },
-              settingsJson: { layout: 'source' },
-            },
-          ],
-        }),
-        create: jest.fn().mockResolvedValue({ id: 'cloned-instance-1' }),
-      },
-      funnel: {
-        create: jest.fn().mockResolvedValue({ id: 'cloned-funnel-1' }),
-      },
-      funnelStep: {
-        create: jest.fn().mockResolvedValue({ id: 'cloned-step-1' }),
       },
     };
+    const cloneMasterFunnelInstanceToTeamInTransaction = jest
+      .fn()
+      .mockResolvedValue({
+        funnelId: 'cloned-funnel-1',
+        funnelInstanceId: 'cloned-instance-1',
+        publicationId: 'publication-clone-1',
+        publicUrl: 'https://margarita.example.com/evaluacion-db',
+        pathPrefix: '/evaluacion-db',
+        stepIdMap: {
+          'source-step-1': 'cloned-step-1',
+        },
+      });
     const prisma = {
       funnelArsenalTemplate: {
         findFirst: jest.fn().mockResolvedValue(sourceTemplate),
@@ -570,35 +549,32 @@ describe('FunnelArsenalService', () => {
         callback(tx),
       ),
     };
-    const service = buildService(prisma, commercialProfileService);
+    const service = buildService(prisma, commercialProfileService, {
+      cloneMasterFunnelInstanceToTeamInTransaction,
+    });
 
-    await service.enableForCurrentTeam(user, 'health-wellness-evaluation');
+    const result = await service.enableForCurrentTeam(
+      user,
+      'health-wellness-evaluation',
+    );
 
-    expect(tx.funnelInstance.findUnique).toHaveBeenCalledWith(
+    expect(cloneMasterFunnelInstanceToTeamInTransaction).toHaveBeenCalledWith(
+      tx,
       expect.objectContaining({
-        where: {
-          id: 'source-instance-1',
-        },
+        sourceFunnelInstanceId: 'source-instance-1',
+        targetWorkspaceId: 'workspace-1',
+        targetTeamId: 'team-1',
+        requestedPath: '/evaluacion-db',
+        instanceCode: 'arsenal-health-wellness-evaluation',
       }),
     );
-    expect(tx.funnelInstance.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          templateId: 'source-template-1',
-          code: 'arsenal-health-wellness-evaluation',
-          trackingProfileId: null,
-          handoffStrategyId: null,
-        }),
-      }),
-    );
-    expect(tx.funnelStep.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          slug: 'inicio',
-          blocksJson: [{ type: 'hero', title: 'Source' }],
-        }),
-      }),
-    );
+    expect(result).toMatchObject({
+      enabled: true,
+      source: 'master_clone',
+      funnelInstanceId: 'cloned-instance-1',
+      publicationId: 'publication-clone-1',
+      pathPrefix: '/evaluacion-db',
+    });
   });
 
   it('does not return sponsor referral links when enabling a funnel', async () => {

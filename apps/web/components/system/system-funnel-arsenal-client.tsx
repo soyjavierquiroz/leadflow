@@ -23,6 +23,15 @@ type FormState = {
   templateKey: string;
   blueprintKey: string;
   vertical: string;
+  industry: string;
+  businessModel: string;
+  funnelType: string;
+  funnelFormat: string;
+  objective: string;
+  stepsCount: string;
+  language: string;
+  country: string;
+  market: string;
   label: string;
   description: string;
   goal: string;
@@ -41,6 +50,15 @@ const emptyFormState: FormState = {
   templateKey: "",
   blueprintKey: "blueprint.health_wellness.v1",
   vertical: "health_wellness",
+  industry: "",
+  businessModel: "",
+  funnelType: "lead_capture",
+  funnelFormat: "multi_step",
+  objective: "lead_generation",
+  stepsCount: "",
+  language: "es",
+  country: "",
+  market: "",
   label: "",
   description: "",
   goal: "",
@@ -66,6 +84,15 @@ const toFormState = (template: SystemFunnelArsenalTemplate): FormState => ({
   templateKey: template.templateKey,
   blueprintKey: template.blueprintKey,
   vertical: template.vertical,
+  industry: template.industry ?? "",
+  businessModel: template.businessModel ?? "",
+  funnelType: template.funnelType ?? "",
+  funnelFormat: template.funnelFormat ?? "",
+  objective: template.objective ?? "",
+  stepsCount: template.stepsCount ? String(template.stepsCount) : "",
+  language: template.language ?? "es",
+  country: template.country ?? "",
+  market: template.market ?? "",
   label: template.label,
   description: template.description,
   goal: template.goal,
@@ -82,6 +109,15 @@ const toFormState = (template: SystemFunnelArsenalTemplate): FormState => ({
 
 const toPayload = (formState: FormState) => ({
   ...formState,
+  industry: formState.industry || null,
+  businessModel: formState.businessModel || null,
+  funnelType: formState.funnelType || null,
+  funnelFormat: formState.funnelFormat || null,
+  objective: formState.objective || null,
+  stepsCount: formState.stepsCount || null,
+  language: formState.language || "es",
+  country: formState.country || null,
+  market: formState.market || null,
   blocksPresetKey: formState.blocksPresetKey || null,
   funnelTemplateId: formState.funnelTemplateId || null,
   sourceFunnelId: formState.sourceFunnelId || null,
@@ -98,7 +134,9 @@ const sortTemplates = (templates: SystemFunnelArsenalTemplate[]) =>
 export function SystemFunnelArsenalClient({
   initialTemplates,
 }: SystemFunnelArsenalClientProps) {
-  const [templates, setTemplates] = useState(() => sortTemplates(initialTemplates));
+  const [templates, setTemplates] = useState(() =>
+    sortTemplates(initialTemplates),
+  );
   const [formState, setFormState] = useState<FormState>(emptyFormState);
   const [editingTemplateKey, setEditingTemplateKey] = useState<string | null>(
     null,
@@ -153,10 +191,13 @@ export function SystemFunnelArsenalClient({
     startTransition(async () => {
       try {
         const saved =
-          await authenticatedOperationRequest<SystemFunnelArsenalTemplate>(path, {
-            method,
-            body: JSON.stringify(toPayload(formState)),
-          });
+          await authenticatedOperationRequest<SystemFunnelArsenalTemplate>(
+            path,
+            {
+              method,
+              body: JSON.stringify(toPayload(formState)),
+            },
+          );
 
         setTemplates((current) =>
           sortTemplates([
@@ -295,10 +336,15 @@ export function SystemFunnelArsenalClient({
           <select
             className={fieldClassName}
             value={formState.blueprintKey}
-            onChange={(event) => updateField("blueprintKey", event.target.value)}
+            onChange={(event) =>
+              updateField("blueprintKey", event.target.value)
+            }
           >
             {businessBlueprints.map((blueprint) => (
-              <option key={blueprint.blueprintKey} value={blueprint.blueprintKey}>
+              <option
+                key={blueprint.blueprintKey}
+                value={blueprint.blueprintKey}
+              >
                 {blueprint.blueprintKey}
               </option>
             ))}
@@ -433,8 +479,106 @@ export function SystemFunnelArsenalClient({
           <input
             className={fieldClassName}
             value={formState.sourceFunnelId}
-            onChange={(event) => updateField("sourceFunnelId", event.target.value)}
+            onChange={(event) =>
+              updateField("sourceFunnelId", event.target.value)
+            }
             placeholder="Opcional"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
+          Industria / nicho
+          <input
+            className={fieldClassName}
+            value={formState.industry}
+            onChange={(event) => updateField("industry", event.target.value)}
+            placeholder="nutrition, salon, real_estate"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
+          Modelo de negocio
+          <input
+            className={fieldClassName}
+            value={formState.businessModel}
+            onChange={(event) =>
+              updateField("businessModel", event.target.value)
+            }
+            placeholder="advisor, service_provider, distributor"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
+          Tipo de funnel
+          <input
+            className={fieldClassName}
+            value={formState.funnelType}
+            onChange={(event) => updateField("funnelType", event.target.value)}
+            placeholder="lead_capture"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
+          Formato
+          <input
+            className={fieldClassName}
+            value={formState.funnelFormat}
+            onChange={(event) =>
+              updateField("funnelFormat", event.target.value)
+            }
+            placeholder="single_page, multi_step, vsl"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
+          Objetivo
+          <input
+            className={fieldClassName}
+            value={formState.objective}
+            onChange={(event) => updateField("objective", event.target.value)}
+            placeholder="lead_generation"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
+          Número de pasos
+          <input
+            className={fieldClassName}
+            min={1}
+            type="number"
+            value={formState.stepsCount}
+            onChange={(event) => updateField("stepsCount", event.target.value)}
+            placeholder="2"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
+          Idioma
+          <input
+            className={fieldClassName}
+            value={formState.language}
+            onChange={(event) => updateField("language", event.target.value)}
+            placeholder="es"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
+          País / mercado
+          <input
+            className={fieldClassName}
+            value={formState.country}
+            onChange={(event) => updateField("country", event.target.value)}
+            placeholder="MX, CO, US"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text xl:col-span-2">
+          Mercado
+          <input
+            className={fieldClassName}
+            value={formState.market}
+            onChange={(event) => updateField("market", event.target.value)}
+            placeholder="latam, hispanic-us"
           />
         </label>
 
@@ -501,7 +645,25 @@ export function SystemFunnelArsenalClient({
               <div className="rounded-xl border border-app-border bg-app-surface px-3 py-2">
                 <dt className="font-semibold text-app-text">Source</dt>
                 <dd className="mt-1 break-all">
-                  {template.sourceFunnelInstanceId ?? "Manual"}
+                  {template.sourceFunnelInstanceLabel ??
+                    template.sourceFunnelInstanceId ??
+                    "Manual / fallback"}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-app-border bg-app-surface px-3 py-2">
+                <dt className="font-semibold text-app-text">Tipo / formato</dt>
+                <dd className="mt-1">
+                  {[template.funnelType, template.funnelFormat]
+                    .filter(Boolean)
+                    .join(" / ") || "Sin clasificar"}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-app-border bg-app-surface px-3 py-2">
+                <dt className="font-semibold text-app-text">Mercado</dt>
+                <dd className="mt-1">
+                  {[template.language, template.country, template.market]
+                    .filter(Boolean)
+                    .join(" · ") || "es"}
                 </dd>
               </div>
             </dl>

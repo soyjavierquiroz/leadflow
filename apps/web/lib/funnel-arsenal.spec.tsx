@@ -143,7 +143,10 @@ describe("funnel arsenal page", () => {
     operationRequest.mockResolvedValueOnce({
       ...initialSnapshot.templates[0],
       enabled: true,
+      source: "master_clone",
       publicationId: "publication-1",
+      funnelInstanceId: "instance-1",
+      pathPrefix: "/u/ana-studio/diagnostico-belleza",
       publicUrl: "https://ana.example.com/diagnostico-belleza",
     });
     root = renderClient(container);
@@ -160,8 +163,27 @@ describe("funnel arsenal page", () => {
     expect(container.textContent).toContain(
       "https://ana.example.com/diagnostico-belleza",
     );
+    expect(container.textContent).toContain("Master");
     expect(container.textContent).toContain("Ver embudo");
     expect(container.textContent).not.toContain("/ref/");
+  });
+
+  it("shows fallback source warnings when a template has no master", () => {
+    root = renderClient(container, {
+      ...initialSnapshot,
+      templates: [
+        {
+          ...initialSnapshot.templates[0],
+          source: "fallback",
+          warning: "Este template aún no tiene funnel maestro asociado.",
+        },
+      ],
+    });
+
+    expect(container.textContent).toContain("Fallback");
+    expect(container.textContent).toContain(
+      "Este template aún no tiene funnel maestro asociado.",
+    );
   });
 
   it("shows the URL for an already enabled template and copies it", async () => {

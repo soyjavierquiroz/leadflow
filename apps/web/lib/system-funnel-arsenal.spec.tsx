@@ -10,8 +10,9 @@ const { request } = vi.hoisted(() => ({
   request: vi.fn(),
 }));
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-  true;
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("@/lib/team-operations", () => ({
   authenticatedOperationRequest: request,
@@ -63,14 +64,16 @@ const submitForm = async (container: HTMLElement) => {
   }
 
   await act(async () => {
-    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    form.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
     await new Promise((resolve) => window.setTimeout(resolve, 0));
   });
 };
 
 const clickButton = async (container: HTMLElement, text: string) => {
-  const button = Array.from(container.querySelectorAll("button")).find(
-    (item) => item.textContent?.includes(text),
+  const button = Array.from(container.querySelectorAll("button")).find((item) =>
+    item.textContent?.includes(text),
   );
 
   if (!button) {
@@ -163,6 +166,43 @@ describe("system funnel arsenal admin", () => {
         body: expect.stringContaining('"label":"Evaluación editada"'),
       },
     );
-    expect(container.textContent).toContain("Template del Arsenal actualizado.");
+    expect(container.textContent).toContain(
+      "Template del Arsenal actualizado.",
+    );
+  });
+
+  it("saves and displays a source FunnelInstance ID", async () => {
+    request.mockResolvedValueOnce({
+      ...template,
+      sourceFunnelInstanceId: "source-instance-1",
+      sourceFunnelInstanceLabel: "Master bienestar (master-health)",
+    });
+    root = createRoot(container);
+
+    act(() => {
+      root.render(<SystemFunnelArsenalClient initialTemplates={[template]} />);
+    });
+
+    await clickButton(container, "Editar");
+    const sourceInput = Array.from(container.querySelectorAll("input")).find(
+      (input) => input.placeholder === "Opcional",
+    );
+
+    act(() => {
+      setValue(sourceInput!, "source-instance-1");
+    });
+
+    await submitForm(container);
+
+    expect(request).toHaveBeenCalledWith(
+      "/system/funnel-arsenal/health-wellness-evaluation",
+      {
+        method: "PATCH",
+        body: expect.stringContaining(
+          '"sourceFunnelInstanceId":"source-instance-1"',
+        ),
+      },
+    );
+    expect(container.textContent).toContain("Master bienestar (master-health)");
   });
 });

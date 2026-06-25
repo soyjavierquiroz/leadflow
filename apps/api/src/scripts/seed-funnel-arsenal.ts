@@ -33,6 +33,8 @@ const main = async () => {
           templateKey: template.templateKey,
           blueprintKey: template.blueprintKey,
           vertical: blueprint?.vertical ?? 'other',
+          objective: template.goal,
+          language: 'es',
           label: template.label,
           description: template.description,
           goal: template.goal,
@@ -49,6 +51,8 @@ const main = async () => {
         update: {
           blueprintKey: template.blueprintKey,
           vertical: blueprint?.vertical ?? 'other',
+          objective: template.goal,
+          language: 'es',
           label: template.label,
           description: template.description,
           goal: template.goal,
@@ -72,8 +76,7 @@ const main = async () => {
   }
 };
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

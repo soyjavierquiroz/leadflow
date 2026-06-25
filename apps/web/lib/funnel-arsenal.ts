@@ -14,8 +14,12 @@ export type FunnelArsenalTemplate = {
   difficulty: FunnelArsenalDifficulty;
   blocksPresetKey?: string;
   enabled: boolean;
+  source?: "master_clone" | "fallback";
+  warning?: string;
+  funnelInstanceId?: string;
   publicationId?: string;
   publicUrl?: string;
+  pathPrefix?: string;
 };
 
 export type FunnelArsenalSnapshot = {

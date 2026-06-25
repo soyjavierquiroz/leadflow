@@ -764,3 +764,129 @@ FunnelInstanceCloneService = clonador seguro
 ```
 
 No crear `MasterFunnel` todavia. Primero resolver bien la clonacion del agregado real. Una vez que el clonador sea confiable, el catalogo puede evolucionar a `MasterFunnel` o versionado sin rehacer la parte mas riesgosa.
+
+## Implementacion Fase 13
+
+Estado implementado:
+
+- `FunnelArsenalTemplate` se mantiene como indice/catalogo global.
+- El contenido real preferido vive en `FunnelArsenalTemplate.sourceFunnelInstanceId`.
+- `FunnelMasterClonerService` clona el agregado real hacia el team destino.
+- `POST /v1/funnel-arsenal/me/:templateKey/enable` usa `master_clone` si existe source y conserva `fallback` minimo si no existe.
+- La respuesta de enable incluye `source`, `funnelInstanceId`, `publicationId`, `publicUrl` y `pathPrefix`.
+- `/system/funnel-arsenal` permite guardar `sourceFunnelInstanceId` manual y devuelve etiqueta si el source existe.
+
+### Modelo auditado
+
+Entidades estructurales clonables:
+
+- `Funnel`: base target nueva con `workspaceId`, `defaultTeamId`, `code`, `name`, `description`, `stages`, `entrySources` y `config` saneado.
+- `FunnelInstance`: instancia target nueva con `workspaceId`, `teamId`, `templateId`, `funnelId`, `code`, `structuralType`, `conversionContract`, `settingsJson` y `mediaMap` saneados.
+- `FunnelStep`: steps target nuevos con ids nuevos, `slug`, `stepType`, `position`, `isEntryStep`, `isConversionStep`, `blocksJson`, `mediaMap` y `settingsJson`.
+- `FunnelPublication`: no se clona; se crea una publicacion nueva del target.
+
+Campos de ownership comercial:
+
+- `workspaceId`, `teamId`, `defaultTeamId`, `rotationPoolId`, `trackingProfileId`, `handoffStrategyId`, `domainId`, `publicationId`.
+- En el clone estos campos se asignan al target o quedan `null` cuando corresponden a configuracion comercial del source.
+
+Campos runtime:
+
+- `FunnelInstance.conversionContract`
+- `FunnelInstance.settingsJson`
+- `FunnelInstance.mediaMap`
+- `FunnelStep.slug`
+- `FunnelStep.blocksJson`
+- `FunnelStep.mediaMap`
+- `FunnelStep.settingsJson`
+- `FunnelPublication.pathPrefix`
+- `FunnelPublication.seoTitle`, `seoDescription`, `ogImageUrl`, `faviconUrl`, `runtimeHealthStatus`.
+
+Campos secrets o sensibles que se resetean/no copian:
+
+- `trackingProfileId`
+- `handoffStrategyId`
+- `metaPixelId`
+- `tiktokPixelId`
+- `metaCapiToken`
+- `tiktokAccessToken`
+- claves JSON con `secret`, `token`, `authorization`, `cookie`, `api-key`, `access-token`, `capi`, `pixel`, `webhook`.
+- URLs firmadas con query params tipo `signature`, `expires`, `policy`, `token`, `x-amz-*`, `x-goog-*`.
+
+Entidades que no se clonan:
+
+- `Domain`
+- publicaciones activas del master
+- `Lead`
+- `Assignment` / `CrmLeadAssignment`
+- `FunnelEvent` / eventos runtime
+- `Visitor` / sesiones runtime
+- `TrackedLink` / shortlinks / ref links
+- WhatsApp / messaging connections
+- CAPI / tracking profiles / conversion mappings secretos
+- automation dispatches
+
+### Reescritura de FlowGraph
+
+El clonador genera `stepIdMap` antes de crear steps:
+
+```text
+sourceStepIdA -> newStepIdA
+sourceStepIdB -> newStepIdB
+```
+
+Luego recorre recursivamente `conversionContract`, `settingsJson`, `blocksJson`, `mediaMap` y `Funnel.config`.
+
+Reglas:
+
+- si una clave es referencia conocida (`stepId`, `sourceStepId`, `targetStepId`, `nextStepId`, `fromStepId`, `toStepId`, `entryStepId`, `conversionStepId`, `fallbackStepId`), el valor se reemplaza con el id nuevo.
+- si cualquier string coincide exactamente con un source step id, tambien se reemplaza.
+- las claves sensibles se eliminan.
+- media publica se conserva por URL; media firmada se nulifica.
+
+### Path y dominio
+
+Si el team destino tiene dominio custom activo (`domainType != system_subdomain`):
+
+```text
+/{pathSuggestion}
+```
+
+Si no tiene dominio custom:
+
+```text
+https://leadflow.kuruk.in/u/{teamSlug}/{pathSuggestion}
+```
+
+La implementacion usa un unico `Domain` plataforma para el host de `PUBLIC_REF_BASE_URL` o `leadflow.kuruk.in` y reserva `pathPrefix` completo. Si hay colision, agrega sufijo:
+
+```text
+/u/margarita-pasos/evaluacion-2
+```
+
+No se usa `/ref/:slug` para funnels.
+
+### Espacio interno Arsenal
+
+Se agrego script idempotente:
+
+```bash
+pnpm --filter @leadflow/api seed:arsenal-workspace
+```
+
+Crea o reutiliza:
+
+- Workspace: `LeadFlow Arsenal` (`leadflow-arsenal`)
+- Team: `LeadFlow Arsenal Masters` (`leadflow-arsenal-masters`)
+
+No se agrego campo `system/internal` nuevo. Por ahora el espacio queda claramente nombrado y documentado como tecnico, no comercial.
+
+### Admin
+
+El minimo viable de Fase 13 queda en `/system/funnel-arsenal`:
+
+- pegar `sourceFunnelInstanceId`
+- guardar metadatos de busqueda (`industry`, `businessModel`, `funnelType`, `funnelFormat`, `objective`, `stepsCount`, `language`, `country`, `market`)
+- ver etiqueta del source si existe
+
+Queda como opcion futura el boton "Guardar en Arsenal" desde builder/admin del FunnelInstance.
