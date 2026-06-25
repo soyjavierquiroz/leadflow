@@ -12,6 +12,7 @@ import {
 import {
   getErrorDebugDetails,
   logCriticalSsrError,
+  readResponseBodyPreview,
 } from "@/lib/ssr-debug";
 export type { AppUserRole, AuthenticatedAppUser } from "@/lib/auth.types";
 export { needsIndividualOnboarding } from "@/lib/individual-onboarding-routing";
@@ -708,11 +709,22 @@ export const apiFetchWithSession = async (path: string, init?: RequestInit) => {
   }
 
   try {
-    return await fetch(requestUrl, {
+    const response = await fetch(requestUrl, {
       ...init,
       headers,
       cache: "no-store",
     });
+
+    if (!response.ok) {
+      console.error("[web-api-fetch] request failed", {
+        path,
+        status: response.status,
+        statusText: response.statusText,
+        bodyPreview: await readResponseBodyPreview(response),
+      });
+    }
+
+    return response;
   } catch (error) {
     logCriticalSsrError(error, {
       operation: "apiFetchWithSession",
