@@ -29,6 +29,7 @@ describe("individual onboarding UI", () => {
     expect(html).toContain("Organiza tus prospectos de WhatsApp");
     expect(html).toContain("Empieza solo y luego invita a tu equipo");
     expect(html).toContain("Nombre del negocio");
+    expect(html).toContain("Tipo de negocio");
     expect(html).toContain("Selecciona el tipo de negocio");
     expect(html).toContain("Nutrición y bienestar");
     expect(html).toContain('value="nutrition_wellness"');

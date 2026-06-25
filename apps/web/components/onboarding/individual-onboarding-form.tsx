@@ -86,7 +86,9 @@ export function IndividualOnboardingForm({
         </label>
 
         <label className="block">
-          <span className="text-sm font-medium text-slate-800">Nicho</span>
+          <span className="text-sm font-medium text-slate-800">
+            Tipo de negocio
+          </span>
           <select
             name="niche"
             defaultValue=""

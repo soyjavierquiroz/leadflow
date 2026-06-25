@@ -111,7 +111,7 @@ const fillRequiredIndividualFields = (container: HTMLElement) => {
       getInputByLabel(container, "Nombre del negocio"),
       "Ana Studio",
     );
-    setSelectValue(getSelectByLabel(container, "Nicho"), "beauty");
+    setSelectValue(getSelectByLabel(container, "Tipo de negocio"), "beauty");
   });
 };
 
@@ -166,7 +166,7 @@ describe("system individual account creation", () => {
     );
     expect(container.textContent).toContain("Nombre del propietario");
     expect(container.textContent).toContain("Nombre del negocio");
-    expect(getSelectByLabel(container, "Nicho")).toBeTruthy();
+    expect(getSelectByLabel(container, "Tipo de negocio")).toBeTruthy();
     expect(container.textContent).toContain("Selecciona el tipo de negocio");
     expect(container.textContent).toContain("Belleza y estética");
   });

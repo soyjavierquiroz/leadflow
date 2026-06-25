@@ -1,4 +1,7 @@
-# Individual niche presets
+# Individual niche presets (legacy)
+
+Este documento describe el contrato v1 legacy. La taxonomia vigente de Fase 8
+esta en `docs/account-model/commercial-taxonomy.md`.
 
 Fase 7 estandariza el nicho de las cuentas individuales y deja preparada una
 configuracion comercial estatica para fases posteriores.
@@ -37,12 +40,24 @@ La configuracion compartida vive en `@leadflow/account-model` y define:
 }
 ```
 
-La version inicial del perfil comercial es:
+La version legacy del perfil comercial era:
 
 ```ts
 commercialProfile: {
   niche,
   presetVersion: "v1"
+}
+```
+
+Desde Fase 8 el backend mantiene `niche` solo por compatibilidad y devuelve:
+
+```ts
+commercialProfile: {
+  vertical,
+  industry,
+  businessModel,
+  legacyNiche,
+  presetVersion: "v2"
 }
 ```
 

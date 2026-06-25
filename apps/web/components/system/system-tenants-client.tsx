@@ -1081,7 +1081,7 @@ export function SystemTenantsClient({
 
               <label className="block">
                 <span className="text-sm font-medium text-slate-200">
-                  Nicho
+                  Tipo de negocio
                 </span>
                 <select
                   value={individualFormState.niche}
