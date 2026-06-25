@@ -12,6 +12,12 @@ import {
   UserRole,
   UserStatus,
 } from '@prisma/client';
+import {
+  buildIndividualCommercialProfile,
+  normalizeIndividualNicheKey,
+  type IndividualCommercialProfile,
+  type IndividualNicheKey,
+} from '@leadflow/account-model';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { hashPassword } from '../auth/password-hash.util';
@@ -71,6 +77,8 @@ export type ProvisionIndividualAccountResult = {
   teamId: string;
   sponsorId: string;
   userId: string;
+  niche: IndividualNicheKey;
+  commercialProfile: IndividualCommercialProfile;
   accountType: 'individual';
   teamType: 'personal';
 };
@@ -212,7 +220,9 @@ export class AccountProvisioningService {
       payload.businessName,
       'businessName',
     );
+    const niche = normalizeIndividualNicheKey(payload.niche);
     const phone = sanitizeOptionalText(payload.phone);
+    const commercialProfile = buildIndividualCommercialProfile(niche);
 
     const existingUser = await tx.user.findUnique({
       where: {
@@ -312,6 +322,8 @@ export class AccountProvisioningService {
       teamId: team.id,
       sponsorId: sponsor.id,
       userId: existingUser.id,
+      niche,
+      commercialProfile,
       accountType: 'individual',
       teamType: 'personal',
     };

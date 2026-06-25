@@ -1,3 +1,8 @@
+import type {
+  IndividualCommercialProfile,
+  IndividualNicheKey,
+} from "@leadflow/account-model";
+
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue =
   | JsonPrimitive
@@ -103,6 +108,8 @@ export type CreateSystemIndividualAccountResponse = LooseRecord & {
   temporaryPassword?: string;
   loginUrl: string;
   recommendedRedirect: string;
+  niche?: IndividualNicheKey;
+  commercialProfile?: IndividualCommercialProfile;
   accountType: "individual";
   teamType: "personal";
 };

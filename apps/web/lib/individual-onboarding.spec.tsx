@@ -29,13 +29,15 @@ describe("individual onboarding UI", () => {
     expect(html).toContain("Organiza tus prospectos de WhatsApp");
     expect(html).toContain("Empieza solo y luego invita a tu equipo");
     expect(html).toContain("Nombre del negocio");
-    expect(html).toContain("Nutrición / Bienestar");
+    expect(html).toContain("Selecciona el tipo de negocio");
+    expect(html).toContain("Nutrición y bienestar");
+    expect(html).toContain('value="nutrition_wellness"');
   });
 
   it("requires a non-empty business name", () => {
     const formData = createFormData({
       businessName: "   ",
-      niche: "Belleza",
+      niche: "beauty",
     });
 
     expect(buildIndividualOnboardingPayload(formData)).toBeNull();
@@ -56,7 +58,7 @@ describe("individual onboarding UI", () => {
     const result = await submitIndividualOnboarding(
       createFormData({
         businessName: "  Ana Studio  ",
-        niche: "Belleza",
+        niche: "beauty",
         country: "México",
         phone: " +5215555555555 ",
       }),
@@ -66,7 +68,7 @@ describe("individual onboarding UI", () => {
     expect(apiFetch).toHaveBeenCalledWith("/onboarding/individual", {
       body: JSON.stringify({
         businessName: "Ana Studio",
-        niche: "Belleza",
+        niche: "beauty",
         country: "México",
         phone: "+5215555555555",
       }),

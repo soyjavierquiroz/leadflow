@@ -132,6 +132,11 @@ describe('AccountProvisioningService', () => {
       teamId: team.id,
       sponsorId: sponsor.id,
       userId: baseUser.id,
+      niche: 'other',
+      commercialProfile: {
+        niche: 'other',
+        presetVersion: 'v1',
+      },
       accountType: 'individual',
       teamType: 'personal',
     });
@@ -487,6 +492,7 @@ describe('AccountProvisioningService', () => {
       name: 'Ana Owner',
       email: ' ANA@EXAMPLE.COM ',
       businessName: 'Ana Studio',
+      niche: 'beauty',
       phone: '+59170000000',
       temporaryPassword: 'TempPass123',
       sendInviteEmail: true,
@@ -533,6 +539,11 @@ describe('AccountProvisioningService', () => {
       teamId: team.id,
       sponsorId: sponsor.id,
       userId: createdUser.id,
+      niche: 'beauty',
+      commercialProfile: {
+        niche: 'beauty',
+        presetVersion: 'v1',
+      },
       accountType: 'individual',
       teamType: 'personal',
       email: 'ana@example.com',

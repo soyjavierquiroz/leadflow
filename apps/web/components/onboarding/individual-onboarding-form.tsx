@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, Building2, Globe2, Phone, Sparkles } from "lucide-react";
+import { individualNiches } from "@leadflow/account-model";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import {
@@ -11,16 +12,6 @@ import {
 const initialState: IndividualOnboardingFormState = {
   errorMessage: null,
 };
-
-const nicheOptions = [
-  "Nutrición / Bienestar",
-  "Belleza",
-  "Cursos / Academias",
-  "Coaching / Consultoría",
-  "Inmobiliaria",
-  "Negocio local",
-  "Otro",
-];
 
 type IndividualOnboardingFormProps = {
   action: (
@@ -101,10 +92,10 @@ export function IndividualOnboardingForm({
             defaultValue=""
             className="mt-2 min-h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition duration-200 focus:border-cyan-400 focus:bg-white focus:ring-2 focus:ring-cyan-100"
           >
-            <option value="">Selecciona una opción</option>
-            {nicheOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
+            <option value="">Selecciona el tipo de negocio</option>
+            {individualNiches.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
               </option>
             ))}
           </select>

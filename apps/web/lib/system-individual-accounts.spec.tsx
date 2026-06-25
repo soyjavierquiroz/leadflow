@@ -33,7 +33,7 @@ const basePayload: CreateSystemIndividualAccountFormValues = {
   email: "ana@example.com",
   phone: "+59170000000",
   businessName: "Ana Studio",
-  niche: "Belleza",
+  niche: "beauty",
   country: "México",
   temporaryPassword: "TempPass123",
   sendInviteEmail: false,
@@ -58,6 +58,20 @@ const getInputByLabel = (container: HTMLElement, text: string) => {
   return input;
 };
 
+const getSelectByLabel = (container: HTMLElement, text: string) => {
+  const label = Array.from(container.querySelectorAll("label")).find(
+    (element) => element.textContent?.includes(text),
+  );
+
+  const select = label?.querySelector("select");
+
+  if (!select) {
+    throw new Error(`Select not found for label ${text}`);
+  }
+
+  return select;
+};
+
 const setInputValue = (input: HTMLInputElement, value: string) => {
   const setter = Object.getOwnPropertyDescriptor(
     HTMLInputElement.prototype,
@@ -66,6 +80,16 @@ const setInputValue = (input: HTMLInputElement, value: string) => {
 
   setter?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
+};
+
+const setSelectValue = (select: HTMLSelectElement, value: string) => {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLSelectElement.prototype,
+    "value",
+  )?.set;
+
+  setter?.call(select, value);
+  select.dispatchEvent(new Event("change", { bubbles: true }));
 };
 
 const openIndividualModal = (container: HTMLElement) => {
@@ -78,9 +102,16 @@ const openIndividualModal = (container: HTMLElement) => {
 
 const fillRequiredIndividualFields = (container: HTMLElement) => {
   act(() => {
-    setInputValue(getInputByLabel(container, "Nombre del propietario"), "Ana Owner");
+    setInputValue(
+      getInputByLabel(container, "Nombre del propietario"),
+      "Ana Owner",
+    );
     setInputValue(getInputByLabel(container, "Email"), "ana@example.com");
-    setInputValue(getInputByLabel(container, "Nombre del negocio"), "Ana Studio");
+    setInputValue(
+      getInputByLabel(container, "Nombre del negocio"),
+      "Ana Studio",
+    );
+    setSelectValue(getSelectByLabel(container, "Nicho"), "beauty");
   });
 };
 
@@ -135,6 +166,9 @@ describe("system individual account creation", () => {
     );
     expect(container.textContent).toContain("Nombre del propietario");
     expect(container.textContent).toContain("Nombre del negocio");
+    expect(getSelectByLabel(container, "Nicho")).toBeTruthy();
+    expect(container.textContent).toContain("Selecciona el tipo de negocio");
+    expect(container.textContent).toContain("Belleza y estética");
   });
 
   it("shows login URL and temporary password after a successful submit", async () => {
@@ -165,6 +199,10 @@ describe("system individual account creation", () => {
         method: "POST",
       }),
     );
+    expect(JSON.parse(operationRequest.mock.calls[0][1].body)).toMatchObject({
+      businessName: "Ana Studio",
+      niche: "beauty",
+    });
     expect(container.textContent).toContain("ana@example.com");
     expect(container.textContent).toContain("/login");
     expect(container.textContent).toContain("TempPass123");
@@ -205,7 +243,7 @@ describe("system individual account creation", () => {
     expect(parsed.data).toMatchObject({
       email: "ana@example.com",
       phone: undefined,
-      niche: "Nutrición",
+      niche: "nutrition_wellness",
       country: "Bolivia",
       temporaryPassword: undefined,
     });

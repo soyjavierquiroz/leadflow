@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { individualNiches } from "@leadflow/account-model";
 import {
   useEffect,
   useMemo,
@@ -1082,8 +1083,7 @@ export function SystemTenantsClient({
                 <span className="text-sm font-medium text-slate-200">
                   Nicho
                 </span>
-                <input
-                  type="text"
+                <select
                   value={individualFormState.niche}
                   onChange={(event) =>
                     setIndividualFormState((current) => ({
@@ -1092,7 +1092,14 @@ export function SystemTenantsClient({
                     }))
                   }
                   className="mt-2 w-full rounded-2xl border border-app-border bg-app-card px-4 py-3 text-sm text-app-text outline-none transition focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft"
-                />
+                >
+                  <option value="">Selecciona el tipo de negocio</option>
+                  {individualNiches.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label className="block">

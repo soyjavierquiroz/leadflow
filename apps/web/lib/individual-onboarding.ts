@@ -1,6 +1,12 @@
+import {
+  normalizeIndividualNicheKey,
+  type IndividualCommercialProfile,
+  type IndividualNicheKey,
+} from "@leadflow/account-model";
+
 export type IndividualOnboardingPayload = {
   businessName: string;
-  niche?: string;
+  niche?: IndividualNicheKey;
   country?: string;
   phone?: string;
 };
@@ -11,6 +17,8 @@ export type IndividualOnboardingResponse = {
   teamId: string;
   sponsorId: string;
   userId: string;
+  niche?: IndividualNicheKey;
+  commercialProfile?: IndividualCommercialProfile;
   accountType: "individual";
   teamType: "personal";
 };
@@ -51,7 +59,10 @@ const readFormString = (formData: FormData, fieldName: string) => {
 
 const addOptionalField = (
   payload: IndividualOnboardingPayload,
-  fieldName: keyof Omit<IndividualOnboardingPayload, "businessName">,
+  fieldName: keyof Omit<
+    IndividualOnboardingPayload,
+    "businessName" | "niche"
+  >,
   value: string,
 ) => {
   if (value) {
@@ -72,7 +83,12 @@ export const buildIndividualOnboardingPayload = (
     businessName,
   };
 
-  addOptionalField(payload, "niche", readFormString(formData, "niche"));
+  const niche = readFormString(formData, "niche");
+
+  if (niche) {
+    payload.niche = normalizeIndividualNicheKey(niche);
+  }
+
   addOptionalField(payload, "country", readFormString(formData, "country"));
   addOptionalField(payload, "phone", readFormString(formData, "phone"));
 

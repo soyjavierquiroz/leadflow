@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeIndividualNicheKey } from "@leadflow/account-model";
 
 export const tenantProvisioningStatuses = [
   "active",
@@ -39,7 +40,13 @@ export const createSystemIndividualAccountSchema = z.object({
     .string()
     .trim()
     .min(2, "Ingresa el nombre del negocio."),
-  niche: optionalTrimmedText,
+  niche: z
+    .string()
+    .trim()
+    .transform((value) =>
+      value ? normalizeIndividualNicheKey(value) : undefined,
+    )
+    .optional(),
   country: optionalTrimmedText,
   temporaryPassword: optionalTrimmedText,
   sendInviteEmail: z.boolean(),
