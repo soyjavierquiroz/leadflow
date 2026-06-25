@@ -71,6 +71,11 @@ const getErrorMessage = (error: unknown) =>
     ? error.message
     : "No pudimos guardar tu perfil comercial.";
 
+const fieldLabelClassName =
+  "flex flex-col gap-2 text-sm font-medium text-app-text";
+const fieldControlClassName =
+  "rounded-lg border border-app-border bg-app-surface-strong px-3 py-2 text-base text-app-text outline-none transition placeholder:text-app-text-soft focus:border-app-accent focus:ring-2 focus:ring-app-accent-soft";
+
 export function CommercialProfileClient({
   initialSnapshot,
   fallbackBusinessName,
@@ -109,7 +114,9 @@ export function CommercialProfileClient({
         vertical: String(value),
         industry:
           nextIndustries.find((industry) => industry.key === current.industry)
-            ?.key ?? nextIndustries[0]?.key ?? "other",
+            ?.key ??
+          nextIndustries[0]?.key ??
+          "other",
       };
     });
   };
@@ -178,13 +185,13 @@ export function CommercialProfileClient({
       )}
 
       <form
-        className="grid gap-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm xl:grid-cols-2"
+        className="grid gap-6 rounded-lg border border-app-border bg-app-surface p-6 shadow-sm xl:grid-cols-2"
         onSubmit={handleSubmit}
       >
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Nombre del negocio
           <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             required
             value={formState.businessName}
             onChange={(event) =>
@@ -193,10 +200,10 @@ export function CommercialProfileClient({
           />
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Tipo de negocio
           <select
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.niche}
             onChange={(event) => updateField("niche", event.target.value)}
           >
@@ -208,10 +215,10 @@ export function CommercialProfileClient({
           </select>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Vertical
           <select
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.vertical}
             onChange={(event) => updateField("vertical", event.target.value)}
           >
@@ -223,10 +230,10 @@ export function CommercialProfileClient({
           </select>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Industria
           <select
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.industry}
             onChange={(event) => updateField("industry", event.target.value)}
           >
@@ -238,10 +245,10 @@ export function CommercialProfileClient({
           </select>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Modelo comercial
           <select
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.businessModel}
             onChange={(event) =>
               updateField("businessModel", event.target.value)
@@ -255,21 +262,19 @@ export function CommercialProfileClient({
           </select>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Producto principal
           <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.mainProduct}
-            onChange={(event) =>
-              updateField("mainProduct", event.target.value)
-            }
+            onChange={(event) => updateField("mainProduct", event.target.value)}
           />
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Precio promedio
           <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.averagePrice}
             onChange={(event) =>
               updateField("averagePrice", event.target.value)
@@ -277,10 +282,10 @@ export function CommercialProfileClient({
           />
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Cómo vendes
           <select
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.salesMotion}
             onChange={(event) =>
               updateField(
@@ -297,30 +302,30 @@ export function CommercialProfileClient({
           </select>
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           País
           <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.country}
             onChange={(event) => updateField("country", event.target.value)}
           />
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+        <label className={fieldLabelClassName}>
           Teléfono
           <input
-            className="rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+            className={fieldControlClassName}
             value={formState.phone}
             onChange={(event) => updateField("phone", event.target.value)}
           />
         </label>
 
-        <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 xl:col-span-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-slate-500">
+        <div className="flex flex-col gap-3 border-t border-app-border pt-5 xl:col-span-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-app-text-muted">
             Blueprint actual: {snapshot.profile?.blueprintKey ?? "pendiente"}
           </p>
           <button
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-app-accent px-4 py-2.5 text-sm font-semibold text-app-accent-contrast transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSaving}
             type="submit"
           >

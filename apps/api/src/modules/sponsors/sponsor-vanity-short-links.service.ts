@@ -36,11 +36,16 @@ const RESERVED_SHORTLINK_SLUGS = new Set([
 ]);
 
 const STRICT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SYSTEM_PUBLIC_REF_BASE_URL = 'https://leadflow.kuruk.in';
 
 type SponsorVanityScope = {
   workspaceId: string;
   teamId: string;
   sponsorId: string;
+};
+
+type SponsorVanityTargetUrlInput = SponsorVanityScope & {
+  slug: string;
 };
 
 type SponsorVanityShortLinkView = {
@@ -71,16 +76,24 @@ export class SponsorVanityShortLinksService {
   ): Promise<SponsorVanityShortLinkSnapshot> {
     const sponsor = await this.requireSponsor(scope);
     const slug = sponsor.publicSlug ?? null;
+    const targetUrl = slug
+      ? await this.buildTargetUrl({
+          ...scope,
+          slug,
+        })
+      : null;
+    const shortLink =
+      sponsor.vanityShortLink &&
+      sponsor.vanityShortLink.slug === slug &&
+      sponsor.vanityShortLink.shortCode === slug &&
+      sponsor.vanityShortLink.targetUrl === targetUrl
+        ? this.mapShortLink(sponsor.vanityShortLink)
+        : null;
 
     return {
       slug,
-      targetUrl: slug ? this.buildTargetUrl(slug) : null,
-      shortLink:
-        sponsor.vanityShortLink &&
-        sponsor.vanityShortLink.slug === slug &&
-        sponsor.vanityShortLink.shortCode === slug
-        ? this.mapShortLink(sponsor.vanityShortLink)
-        : null,
+      targetUrl,
+      shortLink,
     };
   }
 
@@ -89,7 +102,10 @@ export class SponsorVanityShortLinksService {
   ): Promise<SponsorVanityShortLinkSnapshot> {
     const sponsor = await this.requireSponsor(scope);
     const slug = this.validateSponsorSlug(sponsor.publicSlug);
-    const targetUrl = this.buildTargetUrl(slug);
+    const targetUrl = await this.buildTargetUrl({
+      ...scope,
+      slug,
+    });
 
     await this.ensureSponsorSlugIsUnique(slug, sponsor.id);
     await this.ensureShortCodeIsAvailable(slug, sponsor.id);
@@ -97,7 +113,8 @@ export class SponsorVanityShortLinksService {
     if (
       sponsor.vanityShortLink &&
       sponsor.vanityShortLink.slug === slug &&
-      sponsor.vanityShortLink.shortCode === slug
+      sponsor.vanityShortLink.shortCode === slug &&
+      sponsor.vanityShortLink.targetUrl === targetUrl
     ) {
       return {
         slug,
@@ -210,8 +227,139 @@ export class SponsorVanityShortLinksService {
     });
   }
 
-  buildTargetUrl(slug: string) {
-    return `${this.runtimeConfig.publicRefBaseUrl}/${encodeURIComponent(slug)}`;
+  async buildTargetUrl(input: SponsorVanityTargetUrlInput) {
+    this.assertTenantScopedTargetInput(input);
+    const publicBaseUrl = await this.resolvePublicRefBaseUrl(input);
+
+    return this.appendReferralSlug(publicBaseUrl, input.slug);
+  }
+
+  private assertTenantScopedTargetInput(
+    input: Partial<SponsorVanityTargetUrlInput>,
+  ) {
+    if (!input.workspaceId || !input.teamId || !input.sponsorId) {
+      throw new BadRequestException({
+        code: 'SPONSOR_REF_SCOPE_REQUIRED',
+        message:
+          'workspaceId, teamId, and sponsorId are required to build a sponsor referral URL.',
+      });
+    }
+  }
+
+  private async resolvePublicRefBaseUrl(scope: SponsorVanityScope) {
+    const primaryTeamDomain = await this.prisma.domain.findFirst({
+      where: {
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        status: 'active',
+        isPrimary: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        host: true,
+        normalizedHost: true,
+      },
+    });
+
+    if (primaryTeamDomain) {
+      return this.buildPublicOrigin(
+        primaryTeamDomain.normalizedHost ?? primaryTeamDomain.host,
+      );
+    }
+
+    const teamDomain = await this.prisma.domain.findFirst({
+      where: {
+        workspaceId: scope.workspaceId,
+        teamId: scope.teamId,
+        status: 'active',
+      },
+      orderBy: [
+        {
+          isPrimary: 'desc',
+        },
+        {
+          activatedAt: 'desc',
+        },
+        {
+          createdAt: 'asc',
+        },
+      ],
+      select: {
+        host: true,
+        normalizedHost: true,
+      },
+    });
+
+    if (teamDomain) {
+      return this.buildPublicOrigin(
+        teamDomain.normalizedHost ?? teamDomain.host,
+      );
+    }
+
+    return this.resolveSafeSystemRefBaseUrl(scope);
+  }
+
+  private async resolveSafeSystemRefBaseUrl(scope: SponsorVanityScope) {
+    const configuredBaseUrl = this.runtimeConfig.publicRefBaseUrl;
+    const configuredHost = this.getUrlHost(configuredBaseUrl);
+
+    if (!configuredHost) {
+      return SYSTEM_PUBLIC_REF_BASE_URL;
+    }
+
+    const tenantDomain = await this.prisma.domain.findFirst({
+      where: {
+        normalizedHost: configuredHost,
+      },
+      select: {
+        workspaceId: true,
+        teamId: true,
+      },
+    });
+
+    if (
+      tenantDomain &&
+      (tenantDomain.workspaceId !== scope.workspaceId ||
+        tenantDomain.teamId !== scope.teamId)
+    ) {
+      this.logger.warn(
+        `Ignoring PUBLIC_REF_BASE_URL ${configuredHost} because it belongs to another tenant.`,
+      );
+      return SYSTEM_PUBLIC_REF_BASE_URL;
+    }
+
+    return configuredBaseUrl;
+  }
+
+  private buildPublicOrigin(host: string) {
+    const normalizedHost = host.trim().replace(/\/+$/, '');
+    const protocol =
+      normalizedHost.startsWith('localhost') ||
+      normalizedHost.startsWith('127.0.0.1')
+        ? 'http'
+        : 'https';
+
+    return `${protocol}://${normalizedHost}`;
+  }
+
+  private appendReferralSlug(baseUrl: string, slug: string) {
+    const url = new URL(baseUrl);
+    const path = url.pathname.replace(/\/+$/, '');
+    const prefix = path === '/' ? '' : path;
+    const refPrefix = prefix.endsWith('/ref') ? prefix : `${prefix}/ref`;
+
+    url.pathname = `${refPrefix}/${encodeURIComponent(slug)}`;
+    return url.toString();
+  }
+
+  private getUrlHost(value: string) {
+    try {
+      return new URL(value).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
   }
 
   private async requireSponsor(scope: SponsorVanityScope) {
@@ -292,7 +440,10 @@ export class SponsorVanityShortLinksService {
     }
   }
 
-  private async ensureShortCodeIsAvailable(shortCode: string, sponsorId: string) {
+  private async ensureShortCodeIsAvailable(
+    shortCode: string,
+    sponsorId: string,
+  ) {
     const existing = await this.prisma.sponsorVanityShortLink.findFirst({
       where: {
         shortCode,

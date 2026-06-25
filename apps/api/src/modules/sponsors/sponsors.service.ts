@@ -16,9 +16,7 @@ import { WalletEngineService } from '../finance/wallet-engine.service';
 import { buildLeadWorkflow } from '../leads/leads-workflows';
 import { N8nAutomationClient } from '../messaging-automation/n8n-automation.client';
 import { lockLeadRowForUpdate } from '../shared/lead-row-lock.utils';
-import {
-  normalizeMessagingPhone,
-} from '../shared/messaging-channel.utils';
+import { normalizeMessagingPhone } from '../shared/messaging-channel.utils';
 import { sanitizeNullableText } from '../shared/url.utils';
 import type { CreateSponsorDto } from './dto/create-sponsor.dto';
 import {
@@ -576,11 +574,7 @@ export class SponsorsService {
       },
       vanityShortLink: vanityShortLink ?? {
         slug: publicSlug,
-        targetUrl: buildAdvisorReferralUrl({
-          host: 'ingresos.retodetransformacion.com',
-          pathPrefix: '/',
-          publicSlug,
-        }),
+        targetUrl: null,
         shortLink: null,
       },
       links: publications.map((publication) => ({
@@ -747,14 +741,19 @@ export class SponsorsService {
       },
     });
 
-    if (this.vanityShortLinksService && record.publicSlug !== sponsor.publicSlug) {
-      await this.vanityShortLinksService.deleteSponsorVanityShortLinkIfSlugChanged({
-        workspaceId: scope.workspaceId,
-        teamId: scope.teamId,
-        sponsorId: sponsor.id,
-        previousSlug: sponsor.publicSlug,
-        nextSlug: record.publicSlug,
-      });
+    if (
+      this.vanityShortLinksService &&
+      record.publicSlug !== sponsor.publicSlug
+    ) {
+      await this.vanityShortLinksService.deleteSponsorVanityShortLinkIfSlugChanged(
+        {
+          workspaceId: scope.workspaceId,
+          teamId: scope.teamId,
+          sponsorId: sponsor.id,
+          previousSlug: sponsor.publicSlug,
+          nextSlug: record.publicSlug,
+        },
+      );
     }
 
     return mapSponsorRecord(record);

@@ -123,7 +123,14 @@ export const getApiRuntimeConfig = (
   const yourlsSignature = sanitizeEnv(env.YOURLS_SIGNATURE) ?? null;
   const publicRefBaseUrl =
     normalizeUrl(env.PUBLIC_REF_BASE_URL, 'PUBLIC_REF_BASE_URL') ??
-    'https://ingresos.retodetransformacion.com/ref';
+    normalizeUrl(
+      env.NEXT_PUBLIC_PUBLIC_REF_BASE_URL,
+      'NEXT_PUBLIC_PUBLIC_REF_BASE_URL',
+    ) ??
+    normalizeUrl(env.SYSTEM_PUBLIC_BASE_URL, 'SYSTEM_PUBLIC_BASE_URL') ??
+    normalizeUrl(env.NEXT_PUBLIC_APP_URL, 'NEXT_PUBLIC_APP_URL') ??
+    normalizeUrl(env.SITE_URL, 'SITE_URL') ??
+    'https://leadflow.kuruk.in';
   const walletEngineInternalUrl =
     normalizeUrl(env.WALLET_ENGINE_BASE_URL, 'WALLET_ENGINE_BASE_URL') ??
     normalizeUrl(
