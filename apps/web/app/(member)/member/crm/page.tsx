@@ -1,10 +1,10 @@
 import { AdvisorCrmClient } from "@/components/member-crm/advisor-crm-client";
 import {
-  getAdvisorCrmInboxSnapshot,
   type AdvisorCrmInboxSource,
   type AdvisorCrmInboxTab,
   type AdvisorCrmStatusFilter,
 } from "@/lib/member-crm";
+import { getAdvisorCrmInboxSnapshot } from "@/lib/member-crm.server";
 
 type MemberCrmPageProps = {
   searchParams: Promise<{

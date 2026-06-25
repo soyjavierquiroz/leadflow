@@ -205,7 +205,7 @@ export type AdvisorCrmInboxSnapshotParams = {
   cursor?: string;
 };
 
-const getErrorMessage = (payload: unknown, fallback: string) =>
+export const getAdvisorCrmErrorMessage = (payload: unknown, fallback: string) =>
   (typeof payload === "object" &&
   payload !== null &&
   "message" in payload &&
@@ -255,33 +255,6 @@ export const buildAdvisorCrmInboxPath = (
   return `/sponsors/me/crm/inbox${queryString ? `?${queryString}` : ""}`;
 };
 
-/**
- * ✅ FIX PRINCIPAL:
- * Eliminado auth.ts completamente
- * Reemplazado por fetch simple con cookies (credentials)
- */
-export const getAdvisorCrmInboxSnapshot = async (
-  params: AdvisorCrmInboxSnapshotParams = {},
-): Promise<AdvisorCrmInboxResponse> => {
-  const response = await fetch(buildAdvisorCrmInboxPath(params), {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-    },
-  });
-
-  const payload = (await response.json().catch(() => null)) as unknown;
-
-  if (!response.ok) {
-    throw new Error(
-      getErrorMessage(payload, "No pudimos cargar la bandeja CRM del asesor."),
-    );
-  }
-
-  return payload as AdvisorCrmInboxResponse;
-};
-
 export type AcceptedAdvisorCrmAssignment = {
   id: string;
   workspaceId: string;
@@ -317,7 +290,7 @@ export const acceptAssignment = async (
 
   if (!response.ok) {
     throw new Error(
-      getErrorMessage(
+      getAdvisorCrmErrorMessage(
         payload,
         "No pudimos aceptar este lead. Intenta de nuevo.",
       ),
