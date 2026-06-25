@@ -3,206 +3,187 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SystemFunnelArsenalClient } from "@/components/system/system-funnel-arsenal-client";
+import { FunnelMarketplaceClient } from "@/components/funnel-marketplace/funnel-marketplace-client";
 import type { SystemFunnelArsenalTemplate } from "@/lib/system-funnel-arsenal";
 
-const { request } = vi.hoisted(() => ({
-  request: vi.fn(),
+const { operationRequest } = vi.hoisted(() => ({
+  operationRequest: vi.fn(),
+}));
+
+vi.mock("@/lib/team-operations", () => ({
+  authenticatedOperationRequest: operationRequest,
 }));
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("@/lib/team-operations", () => ({
-  authenticatedOperationRequest: request,
-}));
+const templates: SystemFunnelArsenalTemplate[] = [
+  {
+    id: "template-1",
+    templateKey: "health-wellness-evaluation",
+    assetSlug: "health-wellness-evaluation",
+    blueprintKey: "blueprint.health_wellness.v1",
+    vertical: "health_wellness",
+    industry: "Wellness",
+    funnelType: "lead_capture",
+    funnelFormat: "multi_step",
+    objective: "lead_generation",
+    stepsCount: 4,
+    language: "es",
+    market: "LATAM",
+    framework: "evaluation",
+    level: "basic",
+    tags: ["wellness", "evaluacion"],
+    label: "Evaluación de bienestar",
+    headline: "Evaluación de bienestar",
+    description: "Formulario para evaluación.",
+    goal: "Capturar solicitudes de evaluación.",
+    recommendedFor: "Nutrición y bienestar.",
+    cta: "Quiero mi evaluación",
+    pathSuggestion: "/evaluacion",
+    difficulty: "basic",
+    status: "active",
+    version: "1.2.0",
+    cloneCount: 14,
+    activeInstallations: 7,
+    favoriteCount: 5,
+    hasMasterFunnel: true,
+    blocksPresetKey: "basic-lead-capture",
+    sourceFunnelId: null,
+    sourceFunnelInstanceId: null,
+  },
+  {
+    id: "template-2",
+    templateKey: "mlm-quick-start",
+    assetSlug: "mlm-quick-start",
+    blueprintKey: "blueprint.mlm.v1",
+    vertical: "mlm",
+    industry: "Network",
+    funnelType: "qualification",
+    funnelFormat: "vsl",
+    objective: "qualification",
+    stepsCount: 6,
+    language: "es",
+    market: "MX",
+    framework: "vsl",
+    level: "advanced",
+    tags: ["mlm", "vsl"],
+    label: "MLM Quick Start",
+    description: "Embudo de calificación.",
+    goal: "Calificar prospectos.",
+    recommendedFor: "Equipos MLM.",
+    cta: "Comenzar",
+    pathSuggestion: "/quick-start",
+    difficulty: "advanced",
+    status: "draft",
+    version: "0.9.0",
+    cloneCount: 0,
+    activeInstallations: 0,
+    favoriteCount: 0,
+    hasMasterFunnel: false,
+  },
+];
 
-const template: SystemFunnelArsenalTemplate = {
-  id: "template-1",
-  templateKey: "health-wellness-evaluation",
-  blueprintKey: "blueprint.health_wellness.v1",
-  vertical: "health_wellness",
-  label: "Evaluación de bienestar",
-  description: "Formulario para evaluación.",
-  goal: "Capturar solicitudes de evaluación.",
-  recommendedFor: "Nutrición y bienestar.",
-  cta: "Quiero mi evaluación",
-  pathSuggestion: "/evaluacion",
-  difficulty: "basic",
-  status: "active",
-  blocksPresetKey: "basic-lead-capture",
-  sourceFunnelId: null,
-  sourceFunnelInstanceId: null,
-};
+const renderClient = (container: HTMLElement) => {
+  const root = createRoot(container);
 
-const setValue = (
-  element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
-  value: string,
-) => {
-  const prototype =
-    element instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : element instanceof HTMLSelectElement
-        ? HTMLSelectElement.prototype
-        : HTMLInputElement.prototype;
-  const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-
-  setter?.call(element, value);
-  element.dispatchEvent(
-    new Event(element instanceof HTMLSelectElement ? "change" : "input", {
-      bubbles: true,
-    }),
-  );
-};
-
-const submitForm = async (container: HTMLElement) => {
-  const form = container.querySelector("form");
-
-  if (!form) {
-    throw new Error("Form not found");
-  }
-
-  await act(async () => {
-    form.dispatchEvent(
-      new Event("submit", { bubbles: true, cancelable: true }),
+  act(() => {
+    root.render(
+      <FunnelMarketplaceClient
+        assets={templates}
+        mode="admin"
+        title="Funnel Marketplace"
+        description="Explora Master Funnels."
+      />,
     );
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
   });
+
+  return root;
 };
 
-const clickButton = async (container: HTMLElement, text: string) => {
-  const button = Array.from(container.querySelectorAll("button")).find((item) =>
-    item.textContent?.includes(text),
-  );
-
-  if (!button) {
-    throw new Error(`Button not found: ${text}`);
-  }
-
-  await act(async () => {
-    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await new Promise((resolve) => window.setTimeout(resolve, 0));
-  });
-};
-
-describe("system funnel arsenal admin", () => {
+describe("system funnel marketplace admin", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
-    request.mockReset();
+    operationRequest.mockReset();
+    vi.spyOn(window, "open").mockImplementation(() => null);
   });
 
   afterEach(() => {
     act(() => {
       root?.unmount();
     });
+    vi.restoreAllMocks();
     container.remove();
   });
 
-  it("creates a funnel arsenal template", async () => {
-    request.mockResolvedValueOnce({
-      ...template,
-      templateKey: "health-check",
-      label: "Chequeo de salud",
-    });
-    root = createRoot(container);
+  it("renders marketplace cards with admin actions and without ids", () => {
+    root = renderClient(container);
 
-    act(() => {
-      root.render(<SystemFunnelArsenalClient initialTemplates={[]} />);
-    });
-
-    const inputs = container.querySelectorAll("input");
-    const textareas = container.querySelectorAll("textarea");
-    act(() => {
-      setValue(inputs[0]!, "health-check");
-      setValue(inputs[1]!, "Chequeo de salud");
-      setValue(textareas[0]!, "Formulario manual.");
-      setValue(inputs[2]!, "Capturar interesados");
-      setValue(inputs[3]!, "Nutrición");
-      setValue(inputs[4]!, "Quiero el chequeo");
-      setValue(inputs[5]!, "/chequeo");
-    });
-
-    await submitForm(container);
-
-    expect(request).toHaveBeenCalledWith("/system/funnel-arsenal", {
-      method: "POST",
-      body: expect.stringContaining('"templateKey":"health-check"'),
-    });
-    expect(container.textContent).toContain("Template del Arsenal creado.");
-    expect(container.textContent).toContain("Chequeo de salud");
+    expect(container.textContent).toContain("Funnel Marketplace");
+    expect(container.textContent).toContain("Evaluación de bienestar");
+    expect(container.textContent).toContain("Published");
+    expect(container.textContent).toContain("Draft");
+    expect(container.textContent).toContain("Preview");
+    expect(container.textContent).toContain("Versiones");
+    expect(container.textContent).toContain("Master asociado");
+    expect(container.textContent).toContain("Sin Master");
+    expect(container.textContent).not.toContain("sourceFunnelInstanceId");
+    expect(container.textContent).not.toContain("template-1");
   });
 
-  it("edits an existing funnel arsenal template", async () => {
-    request.mockResolvedValueOnce({
-      ...template,
-      label: "Evaluación editada",
+  it("creates a Master Funnel from a marketplace asset without showing ids", async () => {
+    operationRequest.mockResolvedValueOnce({
+      sourceFunnelInstanceId: "source-instance-2",
+      sourceFunnelId: "source-funnel-2",
+      builderUrl: "/admin/tenants/arsenal-team/funnels/source-funnel-2/builder",
+      workspaceId: "arsenal-workspace",
+      teamId: "arsenal-team",
     });
-    root = createRoot(container);
+    root = renderClient(container);
 
-    act(() => {
-      root.render(<SystemFunnelArsenalClient initialTemplates={[template]} />);
-    });
-
-    await clickButton(container, "Editar");
-    const nameInput = Array.from(container.querySelectorAll("input")).find(
-      (input) => input.value === "Evaluación de bienestar",
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (element) => element.textContent?.includes("Crear Master Funnel"),
     );
 
-    act(() => {
-      setValue(nameInput!, "Evaluación editada");
+    expect(button).toBeTruthy();
+
+    await act(async () => {
+      button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
     });
 
-    await submitForm(container);
-
-    expect(request).toHaveBeenCalledWith(
-      "/system/funnel-arsenal/health-wellness-evaluation",
+    expect(operationRequest).toHaveBeenCalledWith(
+      "/system/funnel-marketplace/mlm-quick-start/master-funnel",
       {
-        method: "PATCH",
-        body: expect.stringContaining('"label":"Evaluación editada"'),
+        method: "POST",
+        body: JSON.stringify({}),
       },
     );
-    expect(container.textContent).toContain(
-      "Template del Arsenal actualizado.",
-    );
+    expect(container.textContent).toContain("Master Funnel creado.");
+    expect(container.textContent).toContain("Master asociado");
+    expect(container.textContent).toContain("Editar Master");
+    expect(container.textContent).not.toContain("source-instance-2");
   });
 
-  it("saves and displays a source FunnelInstance ID", async () => {
-    request.mockResolvedValueOnce({
-      ...template,
-      sourceFunnelInstanceId: "source-instance-1",
-      sourceFunnelInstanceLabel: "Master bienestar (master-health)",
-    });
-    root = createRoot(container);
+  it("filters by blueprint and framework", () => {
+    root = renderClient(container);
+    const selects = Array.from(container.querySelectorAll("select"));
+    const blueprintSelect = selects[1]!;
+    const frameworkSelect = selects[6]!;
 
     act(() => {
-      root.render(<SystemFunnelArsenalClient initialTemplates={[template]} />);
+      blueprintSelect.value = "blueprint.mlm.v1";
+      blueprintSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      frameworkSelect.value = "vsl";
+      frameworkSelect.dispatchEvent(new Event("change", { bubbles: true }));
     });
 
-    await clickButton(container, "Editar");
-    const sourceInput = Array.from(container.querySelectorAll("input")).find(
-      (input) => input.placeholder === "Opcional",
-    );
-
-    act(() => {
-      setValue(sourceInput!, "source-instance-1");
-    });
-
-    await submitForm(container);
-
-    expect(request).toHaveBeenCalledWith(
-      "/system/funnel-arsenal/health-wellness-evaluation",
-      {
-        method: "PATCH",
-        body: expect.stringContaining(
-          '"sourceFunnelInstanceId":"source-instance-1"',
-        ),
-      },
-    );
-    expect(container.textContent).toContain("Master bienestar (master-health)");
+    expect(container.textContent).toContain("MLM Quick Start");
+    expect(container.textContent).not.toContain("Evaluación de bienestar");
   });
 });

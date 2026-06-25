@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { FunnelArsenalTemplateStatus, Prisma } from '@prisma/client';
 import {
@@ -15,9 +16,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CommercialProfileService } from '../commercial-profile/commercial-profile.service';
 import type { JsonValue } from '../shared/domain.types';
+import type { CreateMarketplaceMasterFunnelDto } from './dto/create-marketplace-master-funnel.dto';
 import type { CreateSystemFunnelArsenalTemplateDto } from './dto/create-system-funnel-arsenal-template.dto';
 import type { UpdateSystemFunnelArsenalTemplateDto } from './dto/update-system-funnel-arsenal-template.dto';
 import { FunnelMasterClonerService } from './funnel-master-cloner.service';
+import { ensureLeadFlowArsenalWorkspace } from './leadflow-arsenal-workspace';
 
 const toInputJson = (value: JsonValue): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
@@ -32,17 +35,42 @@ type EnabledPublication = {
 };
 
 type ArsenalTemplateDefinition = FunnelArsenalTemplate & {
+  assetSlug: string;
   vertical: string;
   status: 'draft' | 'active' | 'archived';
   industry?: string | null;
+  subindustry?: string | null;
   businessModel?: string | null;
   funnelType?: string | null;
   funnelFormat?: string | null;
+  framework?: string | null;
   objective?: string | null;
   stepsCount?: number | null;
   language?: string | null;
   country?: string | null;
   market?: string | null;
+  level?: string | null;
+  estimatedTimeMinutes?: number | null;
+  tags: string[];
+  coverUrl?: string | null;
+  thumbnailUrl?: string | null;
+  screenshots: JsonValue;
+  videoPreviewUrl?: string | null;
+  headline?: string | null;
+  version: string;
+  authorName?: string | null;
+  publishedAt?: Date | null;
+  problemSolved?: string | null;
+  idealFor?: string | null;
+  flowSummary: JsonValue;
+  compatibleBlueprints: string[];
+  assets: JsonValue;
+  media: JsonValue;
+  history: JsonValue;
+  cloneCount: number;
+  activeInstallations: number;
+  lastActivatedAt?: Date | null;
+  favoriteCount: number;
   funnelTemplateId?: string | null;
   sourceFunnelId?: string | null;
   sourceFunnelInstanceId?: string | null;
@@ -50,6 +78,7 @@ type ArsenalTemplateDefinition = FunnelArsenalTemplate & {
 
 type ArsenalTemplateView = ArsenalTemplateDefinition & {
   enabled: boolean;
+  hasMasterFunnel: boolean;
   source?: 'master_clone' | 'fallback';
   warning?: string;
   funnelInstanceId?: string;
@@ -66,12 +95,42 @@ type FunnelArsenalResponse = {
 
 type SystemFunnelArsenalTemplateView = ArsenalTemplateDefinition & {
   id?: string;
+  hasMasterFunnel: boolean;
   sourceFunnelInstanceLabel?: string | null;
+  builderUrl?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 };
 
 type DbFunnelArsenalTemplate = Prisma.FunnelArsenalTemplateGetPayload<object>;
+
+type SystemSourceFunnelInstanceInfo = {
+  label: string;
+  builderUrl: string | null;
+  funnelId: string | null;
+  teamId: string | null;
+  workspaceId: string | null;
+};
+
+type MarketplaceMasterFunnelResponse = {
+  sourceFunnelInstanceId: string;
+  sourceFunnelId: string;
+  builderUrl: string;
+  workspaceId: string;
+  teamId: string;
+};
+
+const slugifySegment = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const asJsonValue = (value: unknown, fallback: JsonValue): JsonValue =>
+  value === undefined ? fallback : (value as JsonValue);
 
 @Injectable()
 export class FunnelArsenalService {
@@ -265,6 +324,8 @@ export class FunnelArsenalService {
       });
     });
 
+    await this.recordTemplateActivation(template.templateKey);
+
     return this.toTemplateView(template, created, {
       source: template.sourceFunnelInstanceId ? 'master_clone' : 'fallback',
     });
@@ -274,16 +335,211 @@ export class FunnelArsenalService {
     const records = await this.prisma.funnelArsenalTemplate.findMany({
       orderBy: [{ blueprintKey: 'asc' }, { label: 'asc' }],
     });
-    const sourceLabels = await this.resolveSystemSourceFunnelInstanceLabels(
+    const sourceInfo = await this.resolveSystemSourceFunnelInstanceInfo(
       records.map((record) => record.sourceFunnelInstanceId),
     );
 
     return records.map((record) =>
       this.mapDbTemplate(record, {
         sourceFunnelInstanceLabel:
-          sourceLabels.get(record.sourceFunnelInstanceId ?? '') ?? null,
+          sourceInfo.get(record.sourceFunnelInstanceId ?? '')?.label ?? null,
+        builderUrl:
+          sourceInfo.get(record.sourceFunnelInstanceId ?? '')?.builderUrl ??
+          null,
       }),
     );
+  }
+
+  async getSystemTemplate(
+    assetSlug: string,
+  ): Promise<SystemFunnelArsenalTemplateView> {
+    const record = await this.findTemplateRecordBySlug(assetSlug);
+
+    if (!record) {
+      throw new NotFoundException({
+        code: 'FUNNEL_MARKETPLACE_ASSET_NOT_FOUND',
+        message: 'The requested funnel marketplace asset was not found.',
+      });
+    }
+
+    const [sourceInfo] = await Promise.all([
+      this.resolveSystemSourceFunnelInstanceInfo([
+        record.sourceFunnelInstanceId,
+      ]),
+    ]);
+
+    return this.mapDbTemplate(record, {
+      sourceFunnelInstanceLabel:
+        sourceInfo.get(record.sourceFunnelInstanceId ?? '')?.label ?? null,
+      builderUrl:
+        sourceInfo.get(record.sourceFunnelInstanceId ?? '')?.builderUrl ?? null,
+    });
+  }
+
+  async createSystemMarketplaceMasterFunnel(
+    assetSlug: string,
+    dto: CreateMarketplaceMasterFunnelDto = {},
+  ): Promise<MarketplaceMasterFunnelResponse> {
+    const record = await this.findTemplateRecordBySlug(assetSlug);
+
+    if (!record) {
+      throw new NotFoundException({
+        code: 'FUNNEL_MARKETPLACE_ASSET_NOT_FOUND',
+        message: 'The requested funnel marketplace asset was not found.',
+      });
+    }
+
+    if (record.sourceFunnelInstanceId) {
+      return this.resolveExistingMasterFunnelResponse(record);
+    }
+
+    const arsenal = await ensureLeadFlowArsenalWorkspace(this.prisma);
+    const template = this.mapDbTemplate(record);
+    const name = this.optionalText(dto.name) ?? `${template.label} — Master`;
+    const baseTemplateCode = this.optionalText(dto.baseTemplateCode);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const latest = await tx.funnelArsenalTemplate.findUnique({
+        where: { id: record.id },
+      });
+
+      if (!latest) {
+        throw new NotFoundException({
+          code: 'FUNNEL_MARKETPLACE_ASSET_NOT_FOUND',
+          message: 'The requested funnel marketplace asset was not found.',
+        });
+      }
+
+      if (latest.sourceFunnelInstanceId) {
+        const source = await tx.funnelInstance.findUnique({
+          where: { id: latest.sourceFunnelInstanceId },
+          select: {
+            id: true,
+            workspaceId: true,
+            teamId: true,
+            funnelId: true,
+          },
+        });
+
+        if (!source?.funnelId) {
+          throw new NotFoundException({
+            code: 'FUNNEL_MARKETPLACE_MASTER_NOT_FOUND',
+            message:
+              'The existing Master Funnel is missing its builder funnel link.',
+          });
+        }
+
+        return {
+          sourceFunnelInstanceId: source.id,
+          sourceFunnelId: source.funnelId,
+          workspaceId: source.workspaceId,
+          teamId: source.teamId,
+        };
+      }
+
+      const existingMaster = await tx.funnelInstance.findFirst({
+        where: {
+          teamId: arsenal.teamId,
+          code: this.toMasterInstanceCode(template),
+        },
+        select: {
+          id: true,
+          workspaceId: true,
+          teamId: true,
+          funnelId: true,
+        },
+      });
+
+      if (existingMaster?.funnelId) {
+        await tx.funnelArsenalTemplate.update({
+          where: { id: latest.id },
+          data: {
+            sourceFunnelInstanceId: existingMaster.id,
+            sourceFunnelId: existingMaster.funnelId,
+          },
+        });
+
+        return {
+          sourceFunnelInstanceId: existingMaster.id,
+          sourceFunnelId: existingMaster.funnelId,
+          workspaceId: existingMaster.workspaceId,
+          teamId: existingMaster.teamId,
+        };
+      }
+
+      const master = await this.createMasterFunnelInstance(tx, {
+        workspaceId: arsenal.workspaceId,
+        teamId: arsenal.teamId,
+        template,
+        name,
+        baseTemplateCode,
+      });
+
+      await tx.funnelArsenalTemplate.update({
+        where: { id: latest.id },
+        data: {
+          sourceFunnelInstanceId: master.id,
+          sourceFunnelId: master.funnelId,
+        },
+      });
+
+      return {
+        sourceFunnelInstanceId: master.id,
+        sourceFunnelId: master.funnelId,
+        workspaceId: arsenal.workspaceId,
+        teamId: arsenal.teamId,
+      };
+    });
+
+    return {
+      ...created,
+      builderUrl: this.toBuilderUrl(created.teamId, created.sourceFunnelId),
+    };
+  }
+
+  async getTemplateForCurrentTeam(
+    user: AuthenticatedUser,
+    assetSlug: string,
+  ): Promise<ArsenalTemplateView> {
+    const snapshot = await this.listForCurrentTeam(user);
+    const template = snapshot.templates.find(
+      (item) =>
+        item.assetSlug === assetSlug ||
+        item.templateKey === assetSlug ||
+        slugifySegment(item.label) === assetSlug,
+    );
+
+    if (!template) {
+      throw new NotFoundException({
+        code: 'FUNNEL_MARKETPLACE_ASSET_NOT_FOUND',
+        message: 'The requested funnel marketplace asset was not found.',
+      });
+    }
+
+    return template;
+  }
+
+  async getSystemPreviewRuntime(assetSlug: string, stepSlug?: string) {
+    const record = await this.findTemplateRecordBySlug(assetSlug);
+
+    if (!record) {
+      throw new NotFoundException({
+        code: 'FUNNEL_MARKETPLACE_ASSET_NOT_FOUND',
+        message: 'The requested funnel marketplace asset was not found.',
+      });
+    }
+
+    return this.buildPreviewRuntime(this.mapDbTemplate(record), stepSlug);
+  }
+
+  async getPreviewRuntimeForCurrentTeam(
+    user: AuthenticatedUser,
+    assetSlug: string,
+    stepSlug?: string,
+  ) {
+    const template = await this.getTemplateForCurrentTeam(user, assetSlug);
+
+    return this.buildPreviewRuntime(template, stepSlug);
   }
 
   async createSystemTemplate(dto: CreateSystemFunnelArsenalTemplateDto) {
@@ -355,6 +611,7 @@ export class FunnelArsenalService {
         },
         create: {
           templateKey: template.templateKey,
+          assetSlug: slugifySegment(template.templateKey),
           blueprintKey: template.blueprintKey,
           vertical:
             blueprint?.vertical ?? this.resolveVertical(template.blueprintKey),
@@ -365,35 +622,54 @@ export class FunnelArsenalService {
           objective: template.goal,
           stepsCount: null,
           language: 'es',
+          level: template.difficulty,
+          tags: [
+            blueprint?.vertical ?? this.resolveVertical(template.blueprintKey),
+            template.difficulty,
+          ],
           country: null,
           market: null,
           label: template.label,
           description: template.description,
+          headline: template.label,
           goal: template.goal,
           recommendedFor: template.recommendedFor,
           cta: template.cta,
           pathSuggestion: template.pathSuggestion,
           difficulty: template.difficulty,
           status: FunnelArsenalTemplateStatus.active,
+          version: '1.0.0',
+          authorName: 'LeadFlow',
+          problemSolved: template.description,
+          idealFor: template.recommendedFor,
+          compatibleBlueprints: [template.blueprintKey],
+          flowSummaryJson: toInputJson([
+            { label: 'Landing', description: template.description },
+            { label: 'Captura', description: template.cta },
+          ]),
           blocksPresetKey: template.blocksPresetKey ?? null,
           funnelTemplateId: null,
           sourceFunnelId: null,
           sourceFunnelInstanceId: null,
         },
         update: {
+          assetSlug: slugifySegment(template.templateKey),
           blueprintKey: template.blueprintKey,
           vertical:
             blueprint?.vertical ?? this.resolveVertical(template.blueprintKey),
           objective: template.goal,
           language: 'es',
+          level: template.difficulty,
           label: template.label,
           description: template.description,
+          headline: template.label,
           goal: template.goal,
           recommendedFor: template.recommendedFor,
           cta: template.cta,
           pathSuggestion: template.pathSuggestion,
           difficulty: template.difficulty,
           status: FunnelArsenalTemplateStatus.active,
+          compatibleBlueprints: [template.blueprintKey],
           blocksPresetKey: template.blocksPresetKey ?? null,
         },
       });
@@ -474,44 +750,123 @@ export class FunnelArsenalService {
       Prisma.FunnelArsenalTemplateUncheckedUpdateInput = {};
 
     const templateKey = required(dto.templateKey, 'templateKey');
+    const assetSlug = this.nullableText(dto.assetSlug);
     const blueprintKey = required(dto.blueprintKey, 'blueprintKey');
     const vertical = required(dto.vertical, 'vertical');
     const industry = this.nullableText(dto.industry);
+    const subindustry = this.nullableText(dto.subindustry);
     const businessModel = this.nullableText(dto.businessModel);
     const funnelType = this.nullableText(dto.funnelType);
     const funnelFormat = this.nullableText(dto.funnelFormat);
+    const framework = this.nullableText(dto.framework);
     const objective = this.nullableText(dto.objective);
     const language = this.nullableText(dto.language);
     const country = this.nullableText(dto.country);
     const market = this.nullableText(dto.market);
+    const level = this.nullableText(dto.level);
     const stepsCount = this.normalizeOptionalPositiveInteger(dto.stepsCount);
+    const estimatedTimeMinutes = this.normalizeOptionalPositiveInteger(
+      dto.estimatedTimeMinutes,
+    );
     const label = required(dto.label, 'label');
     const description = required(dto.description, 'description');
+    const headline = this.nullableText(dto.headline);
     const goal = required(dto.goal, 'goal');
     const recommendedFor = required(dto.recommendedFor, 'recommendedFor');
     const cta = required(dto.cta, 'cta');
     const pathSuggestion = required(dto.pathSuggestion, 'pathSuggestion');
+    const version = this.nullableText(dto.version);
+    const authorName = this.nullableText(dto.authorName);
+    const publishedAt = this.normalizeOptionalDate(dto.publishedAt);
+    const problemSolved = this.nullableText(dto.problemSolved);
+    const idealFor = this.nullableText(dto.idealFor);
+    const cloneCount = this.normalizeOptionalNonNegativeInteger(dto.cloneCount);
+    const activeInstallations = this.normalizeOptionalNonNegativeInteger(
+      dto.activeInstallations,
+    );
+    const lastActivatedAt = this.normalizeOptionalDate(dto.lastActivatedAt);
+    const favoriteCount = this.normalizeOptionalNonNegativeInteger(
+      dto.favoriteCount,
+    );
 
     if (templateKey) data.templateKey = templateKey;
+    if (assetSlug !== undefined) {
+      data.assetSlug =
+        assetSlug || (templateKey ? slugifySegment(templateKey) : null);
+    } else if (templateKey && options.requireAllFields) {
+      data.assetSlug = slugifySegment(templateKey);
+    }
     if (blueprintKey) data.blueprintKey = blueprintKey;
     if (vertical) data.vertical = vertical;
     if (industry !== undefined) data.industry = industry;
+    if (subindustry !== undefined) data.subindustry = subindustry;
     if (businessModel !== undefined) data.businessModel = businessModel;
     if (funnelType !== undefined) data.funnelType = funnelType;
     if (funnelFormat !== undefined) data.funnelFormat = funnelFormat;
+    if (framework !== undefined) data.framework = framework;
     if (objective !== undefined) data.objective = objective;
     if (stepsCount !== undefined) data.stepsCount = stepsCount;
     if (language !== undefined) data.language = language ?? 'es';
     if (country !== undefined) data.country = country;
     if (market !== undefined) data.market = market;
+    if (level !== undefined) data.level = level;
+    if (estimatedTimeMinutes !== undefined) {
+      data.estimatedTimeMinutes = estimatedTimeMinutes;
+    }
+    if ('tags' in dto) data.tags = this.normalizeStringList(dto.tags);
+    if ('coverUrl' in dto) data.coverUrl = this.nullableText(dto.coverUrl);
+    if ('thumbnailUrl' in dto) {
+      data.thumbnailUrl = this.nullableText(dto.thumbnailUrl);
+    }
+    if ('screenshots' in dto) {
+      data.screenshotsJson = toInputJson(
+        asJsonValue(dto.screenshots, [] as JsonValue),
+      );
+    }
+    if ('videoPreviewUrl' in dto) {
+      data.videoPreviewUrl = this.nullableText(dto.videoPreviewUrl);
+    }
     if (label) data.label = label;
     if (description) data.description = description;
+    if (headline !== undefined) data.headline = headline;
     if (goal) data.goal = goal;
     if (recommendedFor) data.recommendedFor = recommendedFor;
     if (cta) data.cta = cta;
     if (pathSuggestion) data.pathSuggestion = pathSuggestion;
     if (difficulty) data.difficulty = difficulty;
     if (status) data.status = status;
+    if (version !== undefined) data.version = version ?? '1.0.0';
+    if (authorName !== undefined) data.authorName = authorName;
+    if (publishedAt !== undefined) data.publishedAt = publishedAt;
+    if (problemSolved !== undefined) data.problemSolved = problemSolved;
+    if (idealFor !== undefined) data.idealFor = idealFor;
+    if ('flowSummary' in dto) {
+      data.flowSummaryJson = toInputJson(
+        asJsonValue(dto.flowSummary, [] as JsonValue),
+      );
+    }
+    if ('compatibleBlueprints' in dto) {
+      data.compatibleBlueprints = this.normalizeStringList(
+        dto.compatibleBlueprints,
+      );
+    } else if (blueprintKey && options.requireAllFields) {
+      data.compatibleBlueprints = [blueprintKey];
+    }
+    if ('assets' in dto) {
+      data.assetsJson = toInputJson(asJsonValue(dto.assets, {} as JsonValue));
+    }
+    if ('media' in dto) {
+      data.mediaJson = toInputJson(asJsonValue(dto.media, {} as JsonValue));
+    }
+    if ('history' in dto) {
+      data.historyJson = toInputJson(asJsonValue(dto.history, [] as JsonValue));
+    }
+    if (cloneCount !== undefined) data.cloneCount = cloneCount ?? 0;
+    if (activeInstallations !== undefined) {
+      data.activeInstallations = activeInstallations ?? 0;
+    }
+    if (lastActivatedAt !== undefined) data.lastActivatedAt = lastActivatedAt;
+    if (favoriteCount !== undefined) data.favoriteCount = favoriteCount ?? 0;
 
     if ('blocksPresetKey' in dto) {
       data.blocksPresetKey = this.nullableText(dto.blocksPresetKey);
@@ -535,12 +890,20 @@ export class FunnelArsenalService {
       data.difficulty = 'basic';
     }
 
+    if (options.requireAllFields && level === undefined) {
+      data.level = difficulty ?? 'basic';
+    }
+
     if (options.requireAllFields && !status) {
       data.status = FunnelArsenalTemplateStatus.draft;
     }
 
     if (options.requireAllFields && language === undefined) {
       data.language = 'es';
+    }
+
+    if (options.requireAllFields && !version) {
+      data.version = '1.0.0';
     }
 
     return data;
@@ -594,6 +957,64 @@ export class FunnelArsenalService {
     return parsed;
   }
 
+  private normalizeOptionalNonNegativeInteger(
+    value: number | string | null | undefined,
+  ) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null || value === '') {
+      return null;
+    }
+
+    const parsed = typeof value === 'number' ? value : Number(value);
+
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      throw new BadRequestException({
+        code: 'INVALID_FUNNEL_MARKETPLACE_COUNT',
+        message: 'Marketplace counters must be non-negative integers.',
+      });
+    }
+
+    return parsed;
+  }
+
+  private normalizeOptionalDate(value: string | Date | null | undefined) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null || value === '') {
+      return null;
+    }
+
+    const parsed = value instanceof Date ? value : new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException({
+        code: 'INVALID_FUNNEL_MARKETPLACE_DATE',
+        message: 'Marketplace date fields must be valid dates.',
+      });
+    }
+
+    return parsed;
+  }
+
+  private normalizeStringList(value: string[] | string | null | undefined) {
+    if (value === undefined || value === null) {
+      return [];
+    }
+
+    const rawItems = Array.isArray(value) ? value : value.split(',');
+
+    return [
+      ...new Set(
+        rawItems.map((item) => item.trim()).filter((item) => item.length > 0),
+      ),
+    ];
+  }
+
   private normalizeDifficulty(value: string | null | undefined) {
     const normalized = this.optionalText(value);
 
@@ -635,17 +1056,45 @@ export class FunnelArsenalService {
   ): ArsenalTemplateDefinition {
     return {
       ...template,
+      assetSlug: slugifySegment(template.templateKey),
       vertical: this.resolveVertical(template.blueprintKey),
       status: 'active',
       industry: null,
+      subindustry: null,
       businessModel: null,
       funnelType: null,
       funnelFormat: null,
+      framework: null,
       objective: template.goal,
       stepsCount: null,
       language: 'es',
       country: null,
       market: null,
+      level: template.difficulty,
+      estimatedTimeMinutes: null,
+      tags: [this.resolveVertical(template.blueprintKey), template.difficulty],
+      coverUrl: null,
+      thumbnailUrl: null,
+      screenshots: [],
+      videoPreviewUrl: null,
+      headline: template.label,
+      version: '1.0.0',
+      authorName: 'LeadFlow',
+      publishedAt: null,
+      problemSolved: template.description,
+      idealFor: template.recommendedFor,
+      flowSummary: [
+        { label: 'Landing', description: template.description },
+        { label: 'Captura', description: template.cta },
+      ],
+      compatibleBlueprints: [template.blueprintKey],
+      assets: {},
+      media: {},
+      history: [],
+      cloneCount: 0,
+      activeInstallations: 0,
+      lastActivatedAt: null,
+      favoriteCount: 0,
       funnelTemplateId: null,
       sourceFunnelId: null,
       sourceFunnelInstanceId: null,
@@ -656,42 +1105,112 @@ export class FunnelArsenalService {
     record: DbFunnelArsenalTemplate,
     options?: {
       sourceFunnelInstanceLabel?: string | null;
+      builderUrl?: string | null;
     },
   ): SystemFunnelArsenalTemplateView {
     return {
       id: record.id,
+      hasMasterFunnel: Boolean(record.sourceFunnelInstanceId),
       templateKey: record.templateKey,
+      assetSlug: record.assetSlug ?? record.templateKey,
       blueprintKey: record.blueprintKey,
       vertical: record.vertical,
       industry: record.industry,
+      subindustry: record.subindustry,
       businessModel: record.businessModel,
       funnelType: record.funnelType,
       funnelFormat: record.funnelFormat,
+      framework: record.framework,
       objective: record.objective,
       stepsCount: record.stepsCount,
       language: record.language,
       country: record.country,
       market: record.market,
+      level: record.level,
+      estimatedTimeMinutes: record.estimatedTimeMinutes,
+      tags: record.tags,
+      coverUrl: record.coverUrl,
+      thumbnailUrl: record.thumbnailUrl,
+      screenshots: record.screenshotsJson as JsonValue,
+      videoPreviewUrl: record.videoPreviewUrl,
       label: record.label,
       description: record.description,
+      headline: record.headline,
       goal: record.goal,
       recommendedFor: record.recommendedFor,
       cta: record.cta,
       pathSuggestion: record.pathSuggestion,
       difficulty: record.difficulty as FunnelArsenalTemplate['difficulty'],
       status: record.status,
+      version: record.version,
+      authorName: record.authorName,
+      publishedAt: record.publishedAt,
+      problemSolved: record.problemSolved,
+      idealFor: record.idealFor,
+      flowSummary: record.flowSummaryJson as JsonValue,
+      compatibleBlueprints:
+        Array.isArray(record.compatibleBlueprints) &&
+        record.compatibleBlueprints.length > 0
+          ? record.compatibleBlueprints
+          : [record.blueprintKey],
+      assets: (record.assetsJson ?? {}) as JsonValue,
+      media: (record.mediaJson ?? {}) as JsonValue,
+      history: (record.historyJson ?? []) as JsonValue,
+      cloneCount: record.cloneCount ?? 0,
+      activeInstallations: record.activeInstallations ?? 0,
+      lastActivatedAt: record.lastActivatedAt,
+      favoriteCount: record.favoriteCount ?? 0,
       blocksPresetKey: record.blocksPresetKey ?? undefined,
       funnelTemplateId: record.funnelTemplateId,
       sourceFunnelId: record.sourceFunnelId,
       sourceFunnelInstanceId: record.sourceFunnelInstanceId,
       sourceFunnelInstanceLabel:
         options?.sourceFunnelInstanceLabel ?? undefined,
+      builderUrl: options?.builderUrl ?? undefined,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
   }
 
-  private async resolveSystemSourceFunnelInstanceLabels(
+  private async resolveExistingMasterFunnelResponse(
+    record: DbFunnelArsenalTemplate,
+  ): Promise<MarketplaceMasterFunnelResponse> {
+    const source = await this.prisma.funnelInstance.findUnique({
+      where: {
+        id: record.sourceFunnelInstanceId!,
+      },
+      select: {
+        id: true,
+        workspaceId: true,
+        teamId: true,
+        funnelId: true,
+      },
+    });
+
+    if (!source?.funnelId) {
+      throw new NotFoundException({
+        code: 'FUNNEL_MARKETPLACE_MASTER_NOT_FOUND',
+        message: 'The Master Funnel for this marketplace asset was not found.',
+      });
+    }
+
+    if (record.sourceFunnelId !== source.funnelId) {
+      await this.prisma.funnelArsenalTemplate.update({
+        where: { id: record.id },
+        data: { sourceFunnelId: source.funnelId },
+      });
+    }
+
+    return {
+      sourceFunnelInstanceId: source.id,
+      sourceFunnelId: source.funnelId,
+      builderUrl: this.toBuilderUrl(source.teamId, source.funnelId),
+      workspaceId: source.workspaceId,
+      teamId: source.teamId,
+    };
+  }
+
+  private async resolveSystemSourceFunnelInstanceInfo(
     sourceFunnelInstanceIds: Array<string | null>,
   ) {
     const ids = [
@@ -703,7 +1222,7 @@ export class FunnelArsenalService {
     ];
 
     if (ids.length === 0) {
-      return new Map<string, string>();
+      return new Map<string, SystemSourceFunnelInstanceInfo>();
     }
 
     const records = await this.prisma.funnelInstance.findMany({
@@ -716,13 +1235,24 @@ export class FunnelArsenalService {
         id: true,
         name: true,
         code: true,
+        workspaceId: true,
+        teamId: true,
+        funnelId: true,
       },
     });
 
-    return new Map(
-      records.map((record) => [
+    return new Map<string, SystemSourceFunnelInstanceInfo>(
+      records.map((record): [string, SystemSourceFunnelInstanceInfo] => [
         record.id,
-        `${record.name}${record.code ? ` (${record.code})` : ''}`,
+        {
+          label: `${record.name}${record.code ? ` (${record.code})` : ''}`,
+          builderUrl: record.funnelId
+            ? this.toBuilderUrl(record.teamId, record.funnelId)
+            : null,
+          funnelId: record.funnelId,
+          teamId: record.teamId,
+          workspaceId: record.workspaceId,
+        },
       ]),
     );
   }
@@ -753,6 +1283,222 @@ export class FunnelArsenalService {
           'sourceFunnelInstanceId must point to an existing FunnelInstance.',
       });
     }
+  }
+
+  private async findTemplateRecordBySlug(assetSlug: string) {
+    return this.prisma.funnelArsenalTemplate.findFirst({
+      where: {
+        OR: [
+          { assetSlug },
+          { templateKey: assetSlug },
+          { templateKey: decodeURIComponent(assetSlug) },
+        ],
+      },
+    });
+  }
+
+  private async recordTemplateActivation(templateKey: string) {
+    try {
+      await this.prisma.funnelArsenalTemplate.update({
+        where: { templateKey },
+        data: {
+          cloneCount: { increment: 1 },
+          activeInstallations: { increment: 1 },
+          lastActivatedAt: new Date(),
+        },
+      });
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async buildPreviewRuntime(
+    template: ArsenalTemplateDefinition,
+    stepSlug?: string,
+  ) {
+    if (!template.sourceFunnelInstanceId) {
+      throw new UnprocessableEntityException({
+        code: 'MARKETPLACE_MASTER_REQUIRED',
+        message: 'Este funnel aún no tiene un Master Funnel asociado.',
+      });
+    }
+
+    const source = await this.prisma.funnelInstance.findUnique({
+      where: {
+        id: template.sourceFunnelInstanceId,
+      },
+      include: {
+        team: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+          },
+        },
+        template: true,
+        steps: {
+          orderBy: {
+            position: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!source) {
+      throw new NotFoundException({
+        code: 'FUNNEL_MARKETPLACE_MASTER_NOT_FOUND',
+        message: 'The Master Funnel for this marketplace asset was not found.',
+      });
+    }
+
+    const pathPrefix = `/preview/funnels/${template.assetSlug}`;
+    const steps = source.steps.map((step) => ({
+      id: step.id,
+      slug: step.slug,
+      path: step.isEntryStep ? pathPrefix : `${pathPrefix}/${step.slug}`,
+      stepType: step.stepType,
+      position: step.position,
+      isEntryStep: step.isEntryStep,
+      isConversionStep: step.isConversionStep,
+      blocksJson: step.blocksJson,
+      mediaMap: step.mediaMap,
+      settingsJson: step.settingsJson,
+    }));
+    const entryStep = steps.find((step) => step.isEntryStep) ?? steps[0];
+
+    if (!entryStep) {
+      throw new NotFoundException({
+        code: 'FUNNEL_MARKETPLACE_MASTER_EMPTY',
+        message: 'The Master Funnel does not have previewable steps.',
+      });
+    }
+
+    const normalizedStepSlug = stepSlug ? slugifySegment(stepSlug) : '';
+    const currentStep =
+      normalizedStepSlug.length > 0
+        ? (steps.find((step) => step.slug === normalizedStepSlug) ?? entryStep)
+        : entryStep;
+    const currentIndex = steps.findIndex((step) => step.id === currentStep.id);
+    const nextStep = steps[currentIndex + 1]
+      ? this.toAdjacentStep(steps[currentIndex + 1])
+      : null;
+    const previousStep = steps[currentIndex - 1]
+      ? this.toAdjacentStep(steps[currentIndex - 1])
+      : null;
+
+    return {
+      request: {
+        host: 'marketplace-preview.local',
+        path: currentStep.path,
+        publicationPathPrefix: pathPrefix,
+        relativeStepPath: currentStep.isEntryStep ? '/' : currentStep.slug,
+      },
+      domain: {
+        id: 'marketplace-preview-domain',
+        host: 'marketplace-preview.local',
+        normalizedHost: 'marketplace-preview.local',
+        domainType: 'system_subdomain',
+        isPrimary: false,
+        canonicalHost: null,
+        redirectToPrimary: false,
+      },
+      team: {
+        id: source.team.id,
+        name: source.team.name,
+        description: source.team.description,
+      },
+      entryContext: {
+        entryMode: 'organic_asesor',
+        trafficLayer: 'ORGANIC',
+        forcedSponsorId: null,
+        adWheelId: null,
+        browserPixelsEnabled: false,
+        attributionType: 'organic',
+        attributionSlug: null,
+        runtimePathPrefix: pathPrefix,
+        referralQueryParam: null,
+      },
+      publication: {
+        id: `marketplace-preview-${template.assetSlug}`,
+        pathPrefix,
+        isPrimary: false,
+        trackingProfileId: null,
+        handoffStrategyId: null,
+        metaPixelId: null,
+        tiktokPixelId: null,
+        seoTitle: template.headline ?? template.label,
+        seoDescription: template.description,
+        ogImageUrl: template.coverUrl ?? template.thumbnailUrl ?? null,
+        faviconUrl: null,
+        nextStepPath: nextStep?.path ?? null,
+        manifestVersion: 1,
+        runtimeHealthStatus: 'healthy',
+      },
+      theme: null,
+      funnel: {
+        id: source.id,
+        name: source.name,
+        code: source.code,
+        status: source.status,
+        structuralType: source.structuralType,
+        conversionContract: source.conversionContract,
+        settingsJson: source.settingsJson,
+        mediaMap: source.mediaMap,
+        template: {
+          id: source.template.id,
+          code: source.template.code,
+          name: source.template.name,
+          version: source.template.version,
+          funnelType: source.template.funnelType,
+          blocksJson: source.template.blocksJson,
+          mediaMap: source.template.mediaMap,
+          settingsJson: source.template.settingsJson,
+          allowedOverridesJson: source.template.allowedOverridesJson,
+        },
+      },
+      trackingProfile: null,
+      handoffStrategy: null,
+      handoff: {
+        mode: null,
+        channel: null,
+        buttonLabel: null,
+        autoRedirect: false,
+        autoRedirectDelayMs: null,
+        messageTemplate: null,
+        sponsor: null,
+        whatsappPhone: null,
+        whatsappMessage: null,
+        whatsappUrl: null,
+      },
+      leadId: null,
+      assignment: null,
+      advisor: null,
+      assignedSponsor: null,
+      currentStep,
+      nextStep,
+      previousStep,
+      steps,
+    };
+  }
+
+  private toAdjacentStep(
+    step:
+      | {
+          id: string;
+          slug: string;
+          path: string;
+          stepType: string;
+        }
+      | undefined,
+  ) {
+    return step
+      ? {
+          id: step.id,
+          slug: step.slug,
+          path: step.path,
+          stepType: step.stepType,
+        }
+      : null;
   }
 
   private resolveVertical(blueprintKey: string) {
@@ -960,6 +1706,277 @@ export class FunnelArsenalService {
     return funnelInstance;
   }
 
+  private async createMasterFunnelInstance(
+    tx: Prisma.TransactionClient,
+    input: {
+      workspaceId: string;
+      teamId: string;
+      template: ArsenalTemplateDefinition;
+      name: string;
+      baseTemplateCode?: string;
+    },
+  ) {
+    const funnelTemplate = await this.findMasterBaseTemplate(tx, {
+      template: input.template,
+      baseTemplateCode: input.baseTemplateCode,
+    });
+    const instanceCode = this.toMasterInstanceCode(input.template);
+    const includePresentation = this.shouldCreatePresentationStep(
+      input.template,
+    );
+    const seo = {
+      title: input.name,
+      description: input.template.description,
+    };
+    const masterMetadata = this.buildMasterMetadata(input.template, {
+      baseTemplateCode: input.baseTemplateCode ?? null,
+      pathSuggestion: input.template.pathSuggestion,
+    });
+    const funnelSettings = this.buildFunnelSettings(
+      input.template,
+      seo,
+      'single-column',
+    ) as Record<string, JsonValue>;
+    const singleColumnStepSettings = this.buildStepSettings(
+      input.template,
+      seo,
+      'single_column',
+    ) as Record<string, JsonValue>;
+    const presentationStepSettings = this.buildStepSettings(
+      input.template,
+      seo,
+      'presentation',
+    ) as Record<string, JsonValue>;
+
+    const funnel = await tx.funnel.create({
+      data: {
+        workspaceId: input.workspaceId,
+        name: input.name,
+        description: input.template.description,
+        code: instanceCode,
+        thumbnailUrl: input.template.thumbnailUrl ?? null,
+        config: toInputJson({
+          ...masterMetadata,
+          seo,
+        }),
+        status: 'draft',
+        isTemplate: false,
+        stages: ['captured', 'qualified', 'assigned'],
+        entrySources: ['manual', 'form', 'landing_page', 'api'],
+        defaultTeamId: input.teamId,
+        defaultRotationPoolId: null,
+      },
+    });
+
+    const funnelInstance = await tx.funnelInstance.create({
+      data: {
+        workspaceId: input.workspaceId,
+        teamId: input.teamId,
+        templateId: funnelTemplate.id,
+        funnelId: funnel.id,
+        name: input.name,
+        code: instanceCode,
+        thumbnailUrl:
+          input.template.thumbnailUrl ?? input.template.coverUrl ?? null,
+        status: 'draft',
+        structuralType: includePresentation
+          ? 'multi_step_conversion'
+          : 'two_step_conversion',
+        conversionContract: toInputJson({
+          ...masterMetadata,
+          entryStepSlug: 'captura',
+          conversionStepSlug: 'confirmacion',
+        }),
+        rotationPoolId: null,
+        trackingProfileId: null,
+        handoffStrategyId: null,
+        settingsJson: toInputJson({
+          ...funnelSettings,
+          ...masterMetadata,
+          name: input.name,
+        }),
+        mediaMap: toInputJson({
+          coverUrl: input.template.coverUrl ?? null,
+          thumbnailUrl: input.template.thumbnailUrl ?? null,
+          media: input.template.media,
+          assets: input.template.assets,
+        }),
+      },
+    });
+
+    await tx.funnelStep.create({
+      data: {
+        workspaceId: input.workspaceId,
+        teamId: input.teamId,
+        funnelInstanceId: funnelInstance.id,
+        stepType: 'landing',
+        slug: 'captura',
+        position: 1,
+        isEntryStep: true,
+        isConversionStep: false,
+        blocksJson: toInputJson(this.buildBlocks(input.template)),
+        mediaMap: toInputJson({}),
+        settingsJson: toInputJson({
+          ...singleColumnStepSettings,
+          ...masterMetadata,
+          pathSuggestion: input.template.pathSuggestion,
+        }),
+      },
+    });
+
+    if (includePresentation) {
+      await tx.funnelStep.create({
+        data: {
+          workspaceId: input.workspaceId,
+          teamId: input.teamId,
+          funnelInstanceId: funnelInstance.id,
+          stepType: 'presentation',
+          slug: 'presentacion',
+          position: 2,
+          isEntryStep: false,
+          isConversionStep: false,
+          blocksJson: toInputJson(this.buildPresentationBlocks(input.template)),
+          mediaMap: toInputJson({}),
+          settingsJson: toInputJson({
+            ...presentationStepSettings,
+            ...masterMetadata,
+          }),
+        },
+      });
+    }
+
+    await tx.funnelStep.create({
+      data: {
+        workspaceId: input.workspaceId,
+        teamId: input.teamId,
+        funnelInstanceId: funnelInstance.id,
+        stepType: 'thank_you',
+        slug: 'confirmacion',
+        position: includePresentation ? 3 : 2,
+        isEntryStep: false,
+        isConversionStep: true,
+        blocksJson: toInputJson([
+          {
+            type: 'thank_you',
+            title: 'Solicitud recibida',
+            description:
+              'Gracias. Este Master Funnel queda listo para editar en el Builder antes de activarlo para clientes.',
+            primaryCtaLabel: 'Volver',
+            source: 'funnel_marketplace_master',
+          },
+        ]),
+        mediaMap: toInputJson({}),
+        settingsJson: toInputJson({
+          ...singleColumnStepSettings,
+          ...masterMetadata,
+        }),
+      },
+    });
+
+    return {
+      id: funnelInstance.id,
+      funnelId: funnel.id,
+    };
+  }
+
+  private async findMasterBaseTemplate(
+    tx: Prisma.TransactionClient,
+    input: {
+      template: ArsenalTemplateDefinition;
+      baseTemplateCode?: string;
+    },
+  ) {
+    if (input.baseTemplateCode) {
+      const baseTemplate = await tx.funnelTemplate.findUnique({
+        where: {
+          code: input.baseTemplateCode,
+        },
+      });
+
+      if (!baseTemplate) {
+        throw new BadRequestException({
+          code: 'FUNNEL_MARKETPLACE_BASE_TEMPLATE_NOT_FOUND',
+          field: 'baseTemplateCode',
+          message: 'baseTemplateCode must point to an existing FunnelTemplate.',
+        });
+      }
+
+      return baseTemplate;
+    }
+
+    return this.findOrCreateTemplate(tx, input.template);
+  }
+
+  private buildMasterMetadata(
+    template: ArsenalTemplateDefinition,
+    options: {
+      baseTemplateCode: string | null;
+      pathSuggestion: string;
+    },
+  ): Record<string, JsonValue> {
+    return {
+      source: 'funnel_marketplace_master',
+      isMasterFunnel: true,
+      templateKey: template.templateKey,
+      assetSlug: template.assetSlug,
+      blueprintKey: template.blueprintKey,
+      vertical: template.vertical,
+      funnelType: template.funnelType ?? null,
+      funnelFormat: template.funnelFormat ?? null,
+      framework: template.framework ?? null,
+      objective: template.objective ?? template.goal,
+      goal: template.goal,
+      cta: template.cta,
+      pathSuggestion: options.pathSuggestion,
+      baseTemplateCode: options.baseTemplateCode,
+    };
+  }
+
+  private buildPresentationBlocks(
+    template: ArsenalTemplateDefinition,
+  ): JsonValue {
+    return [
+      {
+        type: 'hero',
+        eyebrow: template.framework ?? 'Presentación',
+        title: template.headline ?? template.label,
+        description: template.description,
+        primaryCtaLabel: template.cta,
+        primaryCtaHref: '#public-capture-form',
+        source: 'funnel_marketplace_master',
+      },
+      {
+        type: 'content',
+        title: template.goal,
+        description: template.recommendedFor,
+      },
+    ];
+  }
+
+  private shouldCreatePresentationStep(template: ArsenalTemplateDefinition) {
+    const markers = [
+      template.funnelType,
+      template.funnelFormat,
+      template.framework,
+      template.objective,
+      template.templateKey,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => value.toLowerCase())
+      .join(' ');
+
+    return [
+      'presentation',
+      'presentacion',
+      'vsl',
+      'video',
+      'webinar',
+      'demo',
+      'opportunity',
+      'oportunidad',
+    ].some((marker) => markers.includes(marker));
+  }
+
   private async findOrCreateTemplate(
     tx: Prisma.TransactionClient,
     template: ArsenalTemplateDefinition,
@@ -1007,6 +2024,7 @@ export class FunnelArsenalService {
     return {
       ...template,
       enabled: Boolean(publication),
+      hasMasterFunnel: Boolean(template.sourceFunnelInstanceId),
       ...(options?.source
         ? {
             source: options.source,
@@ -1036,8 +2054,18 @@ export class FunnelArsenalService {
     return `https://${host}${pathPrefix === '/' ? '/' : pathPrefix}`;
   }
 
+  private toBuilderUrl(teamId: string, funnelId: string) {
+    return `/admin/tenants/${encodeURIComponent(teamId)}/funnels/${encodeURIComponent(
+      funnelId,
+    )}/builder`;
+  }
+
   private toInstanceCode(template: ArsenalTemplateDefinition) {
     return `arsenal-${template.templateKey}`;
+  }
+
+  private toMasterInstanceCode(template: ArsenalTemplateDefinition) {
+    return `master-${slugifySegment(template.assetSlug ?? template.templateKey)}`;
   }
 
   private buildSeo(

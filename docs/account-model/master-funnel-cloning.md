@@ -131,9 +131,54 @@ Si existe, devuelve esa publicacion. Si no existe:
 - con `sourceFunnelInstanceId`: clona master y devuelve `source: "master_clone"`.
 - sin `sourceFunnelInstanceId`: crea fallback minimo y devuelve `source: "fallback"` con warning.
 
-## Asociar un FunnelInstance al Arsenal
+## Crear Master Funnel desde Marketplace
 
-Flujo minimo:
+Desde `/admin/funnel-marketplace`, un asset que aparece como `Sin Master` puede crear su Master Funnel real con el boton `Crear Master Funnel`.
+
+El boton llama:
+
+```http
+POST /v1/system/funnel-marketplace/:assetSlug/master-funnel
+```
+
+Body opcional:
+
+```json
+{
+  "baseTemplateCode": "codigo-opcional",
+  "name": "Nombre opcional"
+}
+```
+
+El endpoint:
+
+- requiere `SUPER_ADMIN`;
+- crea o reutiliza el workspace `LeadFlow Arsenal`;
+- crea o reutiliza el team `LeadFlow Arsenal Masters`;
+- crea un `Funnel`, un `FunnelInstance` y pasos minimos editables en el builder actual;
+- usa metadata del asset (`label`, `description`, `goal`, `cta`, `pathSuggestion`, `blueprintKey`, `vertical`);
+- guarda `sourceFunnelInstanceId` y `sourceFunnelId` en `FunnelArsenalTemplate`;
+- devuelve `builderUrl`, por ejemplo `/admin/tenants/:teamId/funnels/:funnelId/builder`.
+
+La estructura inicial contiene:
+
+- `landing` con slug `captura`;
+- `thank_you` con slug `confirmacion`;
+- `presentation` con slug `presentacion` cuando el tipo/formato del asset sugiere VSL, presentacion, video, webinar o demo.
+
+Si el asset ya tiene `sourceFunnelInstanceId`, el endpoint devuelve el Master existente y no crea otro. Si `sourceFunnelId` faltaba pero el `FunnelInstance` tiene puente a `Funnel`, el backend lo normaliza.
+
+## Abrir Builder y asociacion
+
+El admin no copia IDs en el flujo principal. Despues de crear, la UI cambia el asset a `Master asociado` y muestra `Editar Master`. Ese enlace abre el builder existente:
+
+```text
+/admin/tenants/:teamId/funnels/:funnelId/builder
+```
+
+El `teamId` corresponde a `LeadFlow Arsenal Masters` y el `funnelId` es el `Funnel.id` puente del Master. La asociacion al asset queda persistida en `FunnelArsenalTemplate.sourceFunnelInstanceId` y `FunnelArsenalTemplate.sourceFunnelId`.
+
+El flujo manual sigue siendo valido para mantenimiento avanzado:
 
 1. Crear o editar el master con el builder actual dentro del workspace/team interno.
 2. Copiar el id del `FunnelInstance` master.
@@ -143,6 +188,10 @@ Flujo minimo:
 6. Guardar.
 
 El backend valida que `sourceFunnelInstanceId` exista.
+
+## Que no hace la creacion desde Marketplace
+
+No crea dominios ni publicaciones comerciales de cliente. No toca `FunnelPublication` de usuarios, Deep Cloner, runtime publico, CRM, ownership, WhatsApp, IA, n8n, tracking, CAPI, pools, handoff strategies ni automatizaciones.
 
 ## Prueba de punta a punta
 

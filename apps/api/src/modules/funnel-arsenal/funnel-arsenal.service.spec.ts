@@ -1,4 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -767,5 +770,224 @@ describe('FunnelArsenalService', () => {
     ).resolves.toMatchObject({
       status: 'archived',
     });
+  });
+
+  it('creates an internal Master Funnel for a marketplace asset without creating publications or commercial side effects', async () => {
+    const commercialProfileService = buildCommercialProfileService(null);
+    const marketplaceTemplate = {
+      ...dbHealthTemplate,
+      assetSlug: 'health-wellness-evaluation',
+      funnelFormat: 'vsl',
+      sourceFunnelId: null,
+      sourceFunnelInstanceId: null,
+    };
+    const tx = {
+      funnelArsenalTemplate: {
+        findUnique: jest.fn().mockResolvedValue(marketplaceTemplate),
+        update: jest.fn().mockResolvedValue({
+          ...marketplaceTemplate,
+          sourceFunnelId: 'master-funnel-1',
+          sourceFunnelInstanceId: 'master-instance-1',
+        }),
+      },
+      funnelInstance: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'master-instance-1' }),
+      },
+      funnelTemplate: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'base-template-1' }),
+      },
+      funnel: {
+        create: jest.fn().mockResolvedValue({ id: 'master-funnel-1' }),
+      },
+      funnelStep: {
+        create: jest.fn().mockResolvedValue({ id: 'step-1' }),
+      },
+      funnelPublication: {
+        create: jest.fn(),
+      },
+      domain: {
+        create: jest.fn(),
+      },
+    };
+    const prisma = {
+      workspace: {
+        upsert: jest.fn().mockResolvedValue({ id: 'arsenal-workspace-1' }),
+      },
+      team: {
+        upsert: jest.fn().mockResolvedValue({ id: 'arsenal-team-1' }),
+      },
+      funnelArsenalTemplate: {
+        findFirst: jest.fn().mockResolvedValue(marketplaceTemplate),
+      },
+      $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+      crmLeadAssignment: {
+        create: jest.fn(),
+      },
+      assignment: {
+        create: jest.fn(),
+      },
+      trackingProfile: {
+        create: jest.fn(),
+      },
+      automationDispatch: {
+        create: jest.fn(),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    const result = await service.createSystemMarketplaceMasterFunnel(
+      'health-wellness-evaluation',
+    );
+
+    expect(result).toEqual({
+      sourceFunnelInstanceId: 'master-instance-1',
+      sourceFunnelId: 'master-funnel-1',
+      builderUrl:
+        '/admin/tenants/arsenal-team-1/funnels/master-funnel-1/builder',
+      workspaceId: 'arsenal-workspace-1',
+      teamId: 'arsenal-team-1',
+    });
+    expect(tx.funnel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          workspaceId: 'arsenal-workspace-1',
+          defaultTeamId: 'arsenal-team-1',
+          name: 'Evaluación DB de bienestar — Master',
+          code: 'master-health-wellness-evaluation',
+          status: 'draft',
+          config: expect.objectContaining({
+            isMasterFunnel: true,
+            source: 'funnel_marketplace_master',
+            blueprintKey: 'blueprint.health_wellness.v1',
+            vertical: 'health_wellness',
+          }),
+        }),
+      }),
+    );
+    expect(tx.funnelInstance.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          workspaceId: 'arsenal-workspace-1',
+          teamId: 'arsenal-team-1',
+          status: 'draft',
+          code: 'master-health-wellness-evaluation',
+          rotationPoolId: null,
+          trackingProfileId: null,
+          handoffStrategyId: null,
+        }),
+      }),
+    );
+    expect(tx.funnelStep.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stepType: 'landing',
+          slug: 'captura',
+        }),
+      }),
+    );
+    expect(tx.funnelStep.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stepType: 'presentation',
+          slug: 'presentacion',
+        }),
+      }),
+    );
+    expect(tx.funnelStep.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stepType: 'thank_you',
+          slug: 'confirmacion',
+        }),
+      }),
+    );
+    expect(tx.funnelArsenalTemplate.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          sourceFunnelInstanceId: 'master-instance-1',
+          sourceFunnelId: 'master-funnel-1',
+        },
+      }),
+    );
+    expect(tx.funnelPublication.create).not.toHaveBeenCalled();
+    expect(tx.domain.create).not.toHaveBeenCalled();
+    expect(prisma.crmLeadAssignment.create).not.toHaveBeenCalled();
+    expect(prisma.assignment.create).not.toHaveBeenCalled();
+    expect(prisma.trackingProfile.create).not.toHaveBeenCalled();
+    expect(prisma.automationDispatch.create).not.toHaveBeenCalled();
+  });
+
+  it('returns the existing Master Funnel when the marketplace asset is already associated', async () => {
+    const commercialProfileService = buildCommercialProfileService(null);
+    const marketplaceTemplate = {
+      ...dbHealthTemplate,
+      assetSlug: 'health-wellness-evaluation',
+      sourceFunnelId: 'master-funnel-1',
+      sourceFunnelInstanceId: 'master-instance-1',
+    };
+    const prisma = {
+      workspace: {
+        upsert: jest.fn(),
+      },
+      team: {
+        upsert: jest.fn(),
+      },
+      funnelArsenalTemplate: {
+        findFirst: jest.fn().mockResolvedValue(marketplaceTemplate),
+        update: jest.fn(),
+      },
+      funnelInstance: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'master-instance-1',
+          workspaceId: 'arsenal-workspace-1',
+          teamId: 'arsenal-team-1',
+          funnelId: 'master-funnel-1',
+        }),
+      },
+      $transaction: jest.fn(),
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(
+      service.createSystemMarketplaceMasterFunnel('health-wellness-evaluation'),
+    ).resolves.toEqual({
+      sourceFunnelInstanceId: 'master-instance-1',
+      sourceFunnelId: 'master-funnel-1',
+      builderUrl:
+        '/admin/tenants/arsenal-team-1/funnels/master-funnel-1/builder',
+      workspaceId: 'arsenal-workspace-1',
+      teamId: 'arsenal-team-1',
+    });
+    expect(prisma.workspace.upsert).not.toHaveBeenCalled();
+    expect(prisma.team.upsert).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects marketplace preview with a controlled 422 when no Master Funnel is associated', async () => {
+    const commercialProfileService = buildCommercialProfileService(null);
+    const prisma = {
+      funnelArsenalTemplate: {
+        findFirst: jest.fn().mockResolvedValue({
+          ...dbHealthTemplate,
+          assetSlug: 'health-wellness-evaluation',
+          sourceFunnelInstanceId: null,
+        }),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(
+      service.getSystemPreviewRuntime('health-wellness-evaluation'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'MARKETPLACE_MASTER_REQUIRED',
+      }),
+    });
+    await expect(
+      service.getSystemPreviewRuntime('health-wellness-evaluation'),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 });

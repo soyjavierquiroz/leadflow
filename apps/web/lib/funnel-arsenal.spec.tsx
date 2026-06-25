@@ -3,7 +3,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FunnelArsenalClient } from "@/components/member-operations/funnel-arsenal-client";
+import { FunnelMarketplaceClient } from "@/components/funnel-marketplace/funnel-marketplace-client";
 import type { FunnelArsenalSnapshot } from "@/lib/funnel-arsenal";
 
 const { operationRequest } = vi.hoisted(() => ({
@@ -24,15 +24,33 @@ const initialSnapshot: FunnelArsenalSnapshot = {
   templates: [
     {
       templateKey: "beauty-aesthetics-diagnosis-booking",
+      assetSlug: "beauty-aesthetics-diagnosis-booking",
       blueprintKey: "blueprint.beauty_aesthetics.v1",
+      vertical: "beauty_aesthetics",
+      industry: "Belleza",
+      funnelType: "lead_capture",
+      funnelFormat: "multi_step",
+      objective: "lead_generation",
+      stepsCount: 3,
+      language: "es",
+      market: "MX",
+      framework: "diagnosis_booking",
+      level: "basic",
+      tags: ["diagnostico", "reservas"],
       label: "Reserva diagnóstico de belleza",
+      headline: "Reserva diagnóstico de belleza",
       description: "Página para solicitar diagnóstico.",
       goal: "Generar reservas o solicitudes de diagnóstico de belleza.",
       recommendedFor: "Salones, spas y clínicas estéticas.",
       cta: "Reservar diagnóstico",
       pathSuggestion: "/diagnostico-belleza",
       difficulty: "basic",
-      blocksPresetKey: "basic-lead-capture",
+      status: "active",
+      version: "1.0.0",
+      cloneCount: 8,
+      activeInstallations: 3,
+      favoriteCount: 2,
+      hasMasterFunnel: true,
       enabled: false,
     },
   ],
@@ -42,7 +60,16 @@ const renderClient = (container: HTMLElement, snapshot = initialSnapshot) => {
   const root = createRoot(container);
 
   act(() => {
-    root.render(<FunnelArsenalClient initialSnapshot={snapshot} />);
+    root.render(
+      <FunnelMarketplaceClient
+        assets={snapshot.templates}
+        mode="member"
+        title="Marketplace de Funnels"
+        description="Elige un Funnel compatible con tu negocio."
+        blueprintKey={snapshot.blueprintKey}
+        requiresCommercialProfile={snapshot.requiresCommercialProfile}
+      />,
+    );
   });
 
   return root;
@@ -63,7 +90,17 @@ const clickButton = async (container: HTMLElement, text: string) => {
   });
 };
 
-describe("funnel arsenal page", () => {
+const setInputValue = (input: HTMLInputElement, value: string) => {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+
+  setter?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+};
+
+describe("member funnel marketplace", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -71,12 +108,6 @@ describe("funnel arsenal page", () => {
     container = document.createElement("div");
     document.body.appendChild(container);
     operationRequest.mockReset();
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-      },
-    });
   });
 
   afterEach(() => {
@@ -86,43 +117,52 @@ describe("funnel arsenal page", () => {
     container.remove();
   });
 
-  it("renders suggested templates", () => {
+  it("renders a marketplace grid instead of the old arsenal CRUD surface", () => {
     root = renderClient(container);
 
-    expect(container.textContent).toContain("Arsenal de embudos");
-    expect(container.textContent).toContain(
-      "Estos embudos están preparados para tu tipo de negocio.",
-    );
+    expect(container.textContent).toContain("Marketplace de Funnels");
     expect(container.textContent).toContain("Reserva diagnóstico de belleza");
-    expect(container.textContent).toContain(
-      "Aún no tienes un embudo habilitado",
-    );
-    expect(container.textContent).toContain("Ver arsenal de embudos");
-    expect(container.textContent).toContain("Habilitar");
+    expect(container.textContent).toContain("Preview");
+    expect(container.textContent).toContain("Activar Funnel");
+    expect(container.textContent).toContain("Clone Count");
+    expect(container.textContent).not.toContain("sourceFunnelInstanceId");
   });
 
-  it("renders the correct template for the health wellness blueprint", () => {
-    root = renderClient(container, {
-      blueprintKey: "blueprint.health_wellness.v1",
-      requiresCommercialProfile: false,
-      templates: [
-        {
-          templateKey: "health-wellness-evaluation",
-          blueprintKey: "blueprint.health_wellness.v1",
-          label: "Evaluación de bienestar",
-          description: "Formulario de interés para una evaluación inicial.",
-          goal: "Capturar solicitudes de evaluación inicial.",
-          recommendedFor: "Nutrición, fitness y bienestar.",
-          cta: "Quiero mi evaluación",
-          pathSuggestion: "/evaluacion",
-          difficulty: "basic",
-          enabled: false,
-        },
-      ],
+  it("filters by text and keeps cards on dark design tokens", () => {
+    root = renderClient(container);
+    const input = container.querySelector("input");
+
+    act(() => {
+      setInputValue(input!, "wellness");
     });
 
-    expect(container.textContent).toContain("Evaluación de bienestar");
-    expect(container.textContent).not.toContain("Solicita más información");
+    expect(container.textContent).toContain("No hay Funnels con estos filtros");
+
+    const classNames = Array.from(container.querySelectorAll("*"))
+      .map((element) => element.getAttribute("class") ?? "")
+      .join(" ");
+
+    expect(classNames).toContain("bg-app-surface");
+    expect(classNames).toContain("bg-app-card");
+    expect(classNames).not.toContain("bg-white");
+  });
+
+  it("activates a funnel through the existing enable endpoint", async () => {
+    operationRequest.mockResolvedValueOnce({
+      ...initialSnapshot.templates[0],
+      enabled: true,
+      source: "master_clone",
+      publicUrl: "https://ana.example.com/diagnostico-belleza",
+    });
+    root = renderClient(container);
+
+    await clickButton(container, "Activar Funnel");
+
+    expect(operationRequest).toHaveBeenCalledWith(
+      "/funnel-arsenal/me/beauty-aesthetics-diagnosis-booking/enable",
+      { method: "POST" },
+    );
+    expect(container.textContent).toContain("Funnel activado.");
   });
 
   it("shows the commercial profile required state", () => {
@@ -133,123 +173,21 @@ describe("funnel arsenal page", () => {
     });
 
     expect(container.textContent).toContain("Completa tu perfil comercial");
-    expect(container.textContent).toContain(
-      "Completa tu tipo de negocio para recomendarte embudos adecuados.",
-    );
-    expect(container.textContent).not.toContain("Solicita más información");
+    expect(container.textContent).toContain("Funnels compatibles");
   });
 
-  it("enables a funnel through the endpoint", async () => {
-    operationRequest.mockResolvedValueOnce({
-      ...initialSnapshot.templates[0],
-      enabled: true,
-      source: "master_clone",
-      publicationId: "publication-1",
-      funnelInstanceId: "instance-1",
-      pathPrefix: "/u/ana-studio/diagnostico-belleza",
-      publicUrl: "https://ana.example.com/diagnostico-belleza",
-    });
-    root = renderClient(container);
-
-    await clickButton(container, "Habilitar");
-
-    expect(operationRequest).toHaveBeenCalledWith(
-      "/funnel-arsenal/me/beauty-aesthetics-diagnosis-booking/enable",
-      {
-        method: "POST",
-      },
-    );
-    expect(container.textContent).toContain("Embudo habilitado.");
-    expect(container.textContent).toContain(
-      "https://ana.example.com/diagnostico-belleza",
-    );
-    expect(container.textContent).toContain("Master");
-    expect(container.textContent).toContain("Ver embudo");
-    expect(container.textContent).not.toContain("/ref/");
-  });
-
-  it("shows fallback source warnings when a template has no master", () => {
+  it("hides marketplace funnels without a Master Funnel for members", () => {
     root = renderClient(container, {
       ...initialSnapshot,
       templates: [
         {
           ...initialSnapshot.templates[0],
-          source: "fallback",
-          warning: "Este template aún no tiene funnel maestro asociado.",
+          hasMasterFunnel: false,
         },
       ],
     });
 
-    expect(container.textContent).toContain("Fallback");
-    expect(container.textContent).toContain(
-      "Este template aún no tiene funnel maestro asociado.",
-    );
-  });
-
-  it("shows the URL for an already enabled template and copies it", async () => {
-    root = renderClient(container, {
-      ...initialSnapshot,
-      templates: [
-        {
-          ...initialSnapshot.templates[0],
-          enabled: true,
-          publicationId: "publication-1",
-          publicUrl: "https://ana.example.com/diagnostico-belleza",
-        },
-      ],
-    });
-
-    await clickButton(container, "Copiar URL");
-
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      "https://ana.example.com/diagnostico-belleza",
-    );
-    expect(container.textContent).toContain("URL copiada");
-  });
-
-  it("does not render referral URLs as enabled funnel links", () => {
-    root = renderClient(container, {
-      ...initialSnapshot,
-      templates: [
-        {
-          ...initialSnapshot.templates[0],
-          enabled: true,
-          publicationId: "publication-ref",
-          publicUrl: "https://leadflow.kuruk.in/ref/margarita-pasos",
-        },
-      ],
-    });
-
-    expect(container.textContent).not.toContain(
-      "https://leadflow.kuruk.in/ref/margarita-pasos",
-    );
-    expect(container.textContent).not.toContain("Habilitado");
-    expect(container.textContent).toContain("Habilitar");
-  });
-
-  it("keeps funnel cards on app dark-theme tokens instead of white surfaces", () => {
-    root = renderClient(container);
-
-    const classNames = Array.from(container.querySelectorAll("*"))
-      .map((element) => element.getAttribute("class") ?? "")
-      .join(" ");
-
-    expect(classNames).not.toContain("bg-white");
-    expect(classNames).not.toContain("bg-slate-50");
-    expect(classNames).toContain("bg-app-surface");
-    expect(classNames).toContain("bg-app-card");
-  });
-
-  it("shows enable errors", async () => {
-    operationRequest.mockRejectedValueOnce(
-      new Error("No hay dominio activo para publicar."),
-    );
-    root = renderClient(container);
-
-    await clickButton(container, "Habilitar");
-
-    expect(container.textContent).toContain(
-      "No hay dominio activo para publicar.",
-    );
+    expect(container.textContent).not.toContain("Reserva diagnóstico de belleza");
+    expect(container.textContent).toContain("No hay Funnels con estos filtros");
   });
 });

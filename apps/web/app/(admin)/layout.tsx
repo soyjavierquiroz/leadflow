@@ -29,8 +29,8 @@ const adminNav = [
     icon: "layout-template",
   },
   {
-    href: "/admin/funnel-arsenal",
-    label: "Funnel Arsenal",
+    href: "/admin/funnel-marketplace",
+    label: "Funnel Marketplace",
     icon: "layout-template",
   },
   {

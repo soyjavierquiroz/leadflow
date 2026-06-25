@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { RequireRoles } from '../auth/roles.decorator';
 import type { CreateSystemFunnelArsenalTemplateDto } from './dto/create-system-funnel-arsenal-template.dto';
@@ -13,6 +13,22 @@ export class SystemFunnelArsenalController {
   @Get()
   listTemplates() {
     return this.funnelArsenalService.listSystemTemplates();
+  }
+
+  @Get(':assetSlug/preview')
+  previewTemplate(
+    @Param('assetSlug') assetSlug: string,
+    @Query('step') stepSlug?: string,
+  ) {
+    return this.funnelArsenalService.getSystemPreviewRuntime(
+      assetSlug,
+      stepSlug,
+    );
+  }
+
+  @Get(':assetSlug')
+  getTemplate(@Param('assetSlug') assetSlug: string) {
+    return this.funnelArsenalService.getSystemTemplate(assetSlug);
   }
 
   @Post()

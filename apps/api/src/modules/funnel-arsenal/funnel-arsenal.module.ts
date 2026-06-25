@@ -4,10 +4,15 @@ import { FunnelArsenalController } from './funnel-arsenal.controller';
 import { FunnelArsenalService } from './funnel-arsenal.service';
 import { FunnelMasterClonerService } from './funnel-master-cloner.service';
 import { SystemFunnelArsenalController } from './system-funnel-arsenal.controller';
+import { SystemFunnelMarketplaceController } from './system-funnel-marketplace.controller';
 
 @Module({
   imports: [CommercialProfileModule],
-  controllers: [FunnelArsenalController, SystemFunnelArsenalController],
+  controllers: [
+    FunnelArsenalController,
+    SystemFunnelArsenalController,
+    SystemFunnelMarketplaceController,
+  ],
   providers: [FunnelArsenalService, FunnelMasterClonerService],
   exports: [FunnelArsenalService, FunnelMasterClonerService],
 })

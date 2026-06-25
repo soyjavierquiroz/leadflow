@@ -1,17 +1,5 @@
-import { SystemFunnelArsenalClient } from "@/components/system/system-funnel-arsenal-client";
-import { getSystemFunnelArsenalTemplates } from "@/lib/system-funnel-arsenal";
-import { logCriticalSsrError } from "@/lib/ssr-debug";
+import { redirect } from "next/navigation";
 
 export default async function AdminFunnelArsenalPage() {
-  try {
-    const templates = await getSystemFunnelArsenalTemplates();
-
-    return <SystemFunnelArsenalClient initialTemplates={templates} />;
-  } catch (error) {
-    logCriticalSsrError(error, {
-      page: "/admin/funnel-arsenal",
-      operation: "AdminFunnelArsenalPage",
-    });
-    throw error;
-  }
+  redirect("/admin/funnel-marketplace");
 }

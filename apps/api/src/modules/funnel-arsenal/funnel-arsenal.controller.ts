@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentAuthUser } from '../auth/current-auth-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireOperationalMemberAccess } from '../auth/roles.decorator';
@@ -12,6 +12,29 @@ export class FunnelArsenalController {
   @RequireOperationalMemberAccess()
   listMine(@CurrentAuthUser() user: AuthenticatedUser) {
     return this.funnelArsenalService.listForCurrentTeam(user);
+  }
+
+  @Get('me/:assetSlug/preview')
+  @RequireOperationalMemberAccess()
+  previewMine(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('assetSlug') assetSlug: string,
+    @Query('step') stepSlug?: string,
+  ) {
+    return this.funnelArsenalService.getPreviewRuntimeForCurrentTeam(
+      user,
+      assetSlug,
+      stepSlug,
+    );
+  }
+
+  @Get('me/:assetSlug')
+  @RequireOperationalMemberAccess()
+  getMine(
+    @CurrentAuthUser() user: AuthenticatedUser,
+    @Param('assetSlug') assetSlug: string,
+  ) {
+    return this.funnelArsenalService.getTemplateForCurrentTeam(user, assetSlug);
   }
 
   @Post('me/:templateKey/enable')

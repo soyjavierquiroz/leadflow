@@ -832,25 +832,50 @@ model FunnelTemplate {
 model FunnelArsenalTemplate {
   id                     String                      @id @default(uuid())
   templateKey            String                      @unique
+  assetSlug              String?                     @unique
   blueprintKey           String
   vertical               String
   industry               String?
+  subindustry            String?
   businessModel          String?
   funnelType             String?
   funnelFormat           String?
+  framework              String?
   objective              String?
   stepsCount             Int?
   language               String                      @default("es")
   country                String?
   market                 String?
+  level                  String?
+  estimatedTimeMinutes   Int?
+  tags                   String[]                    @default([])
+  coverUrl               String?
+  thumbnailUrl           String?
+  screenshotsJson        Json                        @default("[]")
+  videoPreviewUrl        String?
   label                  String
   description            String
+  headline               String?
   goal                   String
   recommendedFor         String
   cta                    String
   pathSuggestion         String
   difficulty             String
   status                 FunnelArsenalTemplateStatus @default(draft)
+  version                String                      @default("1.0.0")
+  authorName             String?
+  publishedAt            DateTime?
+  problemSolved          String?
+  idealFor               String?
+  flowSummaryJson        Json                        @default("[]")
+  compatibleBlueprints   String[]                    @default([])
+  assetsJson             Json                        @default("{}")
+  mediaJson              Json                        @default("{}")
+  historyJson            Json                        @default("[]")
+  cloneCount             Int                         @default(0)
+  activeInstallations    Int                         @default(0)
+  lastActivatedAt        DateTime?
+  favoriteCount          Int                         @default(0)
   blocksPresetKey        String?
   funnelTemplateId       String?
   sourceFunnelId         String?
@@ -859,12 +884,15 @@ model FunnelArsenalTemplate {
   updatedAt              DateTime                    @updatedAt
 
   @@index([blueprintKey, status])
+  @@index([assetSlug])
   @@index([vertical, status])
   @@index([industry, status])
   @@index([funnelType, status])
   @@index([objective, status])
   @@index([language, status])
   @@index([market, status])
+  @@index([framework, status])
+  @@index([level, status])
   @@index([sourceFunnelInstanceId])
   @@index([sourceFunnelId])
 }

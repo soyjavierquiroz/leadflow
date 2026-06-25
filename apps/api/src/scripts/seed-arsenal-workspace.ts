@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-
-const ARSENAL_WORKSPACE_SLUG = 'leadflow-arsenal';
-const ARSENAL_TEAM_CODE = 'leadflow-arsenal-masters';
+import {
+  ARSENAL_TEAM_CODE,
+  ARSENAL_WORKSPACE_SLUG,
+  ensureLeadFlowArsenalWorkspace,
+} from '../modules/funnel-arsenal/leadflow-arsenal-workspace';
 
 const isHelp = process.argv.includes('--help') || process.argv.includes('-h');
 
@@ -21,66 +23,11 @@ const main = async () => {
   const prisma = new PrismaClient();
 
   try {
-    const workspace = await prisma.workspace.upsert({
-      where: {
-        slug: ARSENAL_WORKSPACE_SLUG,
-      },
-      create: {
-        name: 'LeadFlow Arsenal',
-        slug: ARSENAL_WORKSPACE_SLUG,
-        status: 'active',
-        accountType: 'enterprise',
-        timezone: 'UTC',
-        defaultCurrency: 'USD',
-        primaryLocale: 'es',
-        primaryDomain: null,
-        emailNotificationsEnabled: false,
-      },
-      update: {
-        name: 'LeadFlow Arsenal',
-        status: 'active',
-        accountType: 'enterprise',
-        emailNotificationsEnabled: false,
-      },
-      select: {
-        id: true,
-        slug: true,
-      },
-    });
-
-    const team = await prisma.team.upsert({
-      where: {
-        workspaceId_code: {
-          workspaceId: workspace.id,
-          code: ARSENAL_TEAM_CODE,
-        },
-      },
-      create: {
-        workspaceId: workspace.id,
-        name: 'LeadFlow Arsenal Masters',
-        code: ARSENAL_TEAM_CODE,
-        status: 'active',
-        teamType: 'department',
-        isActive: true,
-        description:
-          'Internal technical team for master funnel authoring. Not commercial ownership.',
-      },
-      update: {
-        name: 'LeadFlow Arsenal Masters',
-        status: 'active',
-        teamType: 'department',
-        isActive: true,
-        description:
-          'Internal technical team for master funnel authoring. Not commercial ownership.',
-      },
-      select: {
-        id: true,
-        code: true,
-      },
-    });
+    const { workspaceId, teamId } =
+      await ensureLeadFlowArsenalWorkspace(prisma);
 
     console.log(
-      `LeadFlow Arsenal workspace ready: workspace=${workspace.slug} (${workspace.id}), team=${team.code} (${team.id})`,
+      `LeadFlow Arsenal workspace ready: workspace=${ARSENAL_WORKSPACE_SLUG} (${workspaceId}), team=${ARSENAL_TEAM_CODE} (${teamId})`,
     );
   } finally {
     await prisma.$disconnect();
