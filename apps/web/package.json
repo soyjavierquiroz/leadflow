@@ -4,17 +4,19 @@
   "private": true,
   "scripts": {
     "prisma:generate": "prisma generate --schema ../api/prisma/schema.prisma",
-    "predev": "pnpm --filter @leadflow/mail build",
-    "prebuild": "pnpm --filter @leadflow/mail build && pnpm run prisma:generate && pnpm --filter kurukin-video-player-pkg build",
+    "predev": "pnpm --filter @leadflow/mail build && pnpm --filter @leadflow/account-model build",
+    "prebuild": "pnpm --filter @leadflow/mail build && pnpm --filter @leadflow/account-model build && pnpm run prisma:generate && pnpm --filter kurukin-video-player-pkg build",
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 3000",
     "lint": "eslint .",
+    "pretest": "pnpm --filter @leadflow/account-model build",
     "test": "vitest run",
-    "pretypecheck": "pnpm --filter @leadflow/mail build && pnpm run prisma:generate",
+    "pretypecheck": "pnpm --filter @leadflow/mail build && pnpm --filter @leadflow/account-model build && pnpm run prisma:generate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@leadflow/account-model": "workspace:*",
     "@leadflow/mail": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",

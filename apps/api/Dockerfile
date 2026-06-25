@@ -11,10 +11,12 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/kurukin-video-player-pkg/package.json packages/kurukin-video-player-pkg/package.json
+COPY packages/shared/account-model/package.json packages/shared/account-model/package.json
 COPY packages/shared/mail/package.json packages/shared/mail/package.json
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 FROM deps AS builder
+COPY packages/shared/account-model packages/shared/account-model
 COPY . .
 RUN pnpm --filter @leadflow/api build
 
@@ -34,6 +36,8 @@ COPY --from=builder /workspace/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /workspace/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /workspace/apps/api/prisma ./apps/api/prisma
 COPY --from=builder /workspace/apps/api/scripts ./apps/api/scripts
+COPY --from=builder /workspace/packages/shared/account-model/package.json ./packages/shared/account-model/package.json
+COPY --from=builder /workspace/packages/shared/account-model/dist ./packages/shared/account-model/dist
 COPY --from=builder /workspace/packages/shared/mail/package.json ./packages/shared/mail/package.json
 COPY --from=builder /workspace/packages/shared/mail/node_modules ./packages/shared/mail/node_modules
 COPY --from=builder /workspace/packages/shared/mail/dist ./packages/shared/mail/dist

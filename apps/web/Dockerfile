@@ -11,6 +11,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY packages/kurukin-video-player-pkg/package.json packages/kurukin-video-player-pkg/package.json
+COPY packages/shared/account-model/package.json packages/shared/account-model/package.json
 COPY packages/shared/mail/package.json packages/shared/mail/package.json
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
@@ -25,6 +26,7 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET=$NEXT_PUBLIC_SAAS_CUSTOMER_CNAME_TARGET
 ENV NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=$NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN
+COPY packages/shared/account-model packages/shared/account-model
 COPY . .
 RUN pnpm --filter @leadflow/web build
 
@@ -52,6 +54,8 @@ ENV NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN=$NEXT_PUBLIC_SAAS_FALLBACK_ORIGIN
 COPY --from=builder /workspace/apps/web/.next/standalone ./
 COPY --from=builder /workspace/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /workspace/apps/web/public ./apps/web/public
+COPY --from=builder /workspace/packages/shared/account-model/package.json ./packages/shared/account-model/package.json
+COPY --from=builder /workspace/packages/shared/account-model/dist ./packages/shared/account-model/dist
 COPY --from=builder /workspace/packages/shared/mail/package.json ./packages/shared/mail/package.json
 COPY --from=builder /workspace/packages/shared/mail/dist ./packages/shared/mail/dist
 EXPOSE 3000
