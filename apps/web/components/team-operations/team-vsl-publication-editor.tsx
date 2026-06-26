@@ -44,6 +44,7 @@ import {
   readStepLayoutOverride,
   type StepLayoutOverrideValue,
 } from "@/lib/public-step-layout";
+import { getCustomDomainPathSuggestion } from "@/lib/publication-path-suggestions";
 import { OperationBanner } from "@/components/team-operations/operation-banner";
 import { availableFunnelThemes, resolveFunnelThemeId } from "@/lib/funnel-theme-registry";
 import { webPublicConfig } from "@/lib/public-env";
@@ -1345,6 +1346,10 @@ export function TeamVslPublicationEditor({
   const selectedDomain = activeDomains.find(
     (domain) => domain.id === selectedDomainId,
   );
+  const suggestedCustomDomainPath = getCustomDomainPathSuggestion({
+    currentPathPrefix: pathPrefix,
+    selectedDomainHost: selectedDomain?.host,
+  });
   const selectedTemplate = visibleTemplateOptions.find(
     (template) => template.id === selectedTemplateId,
   );
@@ -2320,6 +2325,17 @@ export function TeamVslPublicationEditor({
                 placeholder="/"
                 className={inputClassName}
               />
+              {suggestedCustomDomainPath &&
+              suggestedCustomDomainPath !== pathPrefix.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setPathPrefix(suggestedCustomDomainPath)}
+                  className="inline-flex w-fit items-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-500/15 dark:text-emerald-200"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Usar ruta recomendada: {suggestedCustomDomainPath}
+                </button>
+              ) : null}
             </label>
 
             <label className="grid gap-2">

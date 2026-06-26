@@ -101,6 +101,63 @@ const isSignedUrl = (value: string) => {
   }
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const rewriteFlowGraphNodeKeys = (
+  flowGraph: Prisma.JsonValue | null | undefined,
+  stepIdMap: Map<string, string>,
+): JsonValue => {
+  if (!isRecord(flowGraph)) {
+    return sanitizeAndRewriteJson(flowGraph, stepIdMap);
+  }
+
+  const rewrittenGraph = sanitizeAndRewriteJson(
+    flowGraph,
+    stepIdMap,
+  ) as Record<string, JsonValue | undefined>;
+  const sourceNodes = isRecord(flowGraph.nodes) ? flowGraph.nodes : null;
+
+  if (!sourceNodes) {
+    return rewrittenGraph as JsonValue;
+  }
+
+  const rewrittenNodes: Record<string, JsonValue> = {};
+
+  for (const [oldNodeKey, node] of Object.entries(sourceNodes)) {
+    const nodeRecord = isRecord(node) ? node : null;
+    const sourceStepId =
+      typeof nodeRecord?.stepId === 'string' ? nodeRecord.stepId : null;
+    const newNodeKey =
+      stepIdMap.get(oldNodeKey) ??
+      (sourceStepId ? stepIdMap.get(sourceStepId) : undefined) ??
+      oldNodeKey;
+    const rewrittenNode = sanitizeAndRewriteJson(
+      node as Prisma.JsonValue,
+      stepIdMap,
+    );
+
+    if (isRecord(rewrittenNode)) {
+      rewrittenNodes[newNodeKey] = {
+        ...rewrittenNode,
+        stepId: newNodeKey,
+      } as JsonValue;
+      continue;
+    }
+
+    rewrittenNodes[newNodeKey] = rewrittenNode;
+  }
+
+  return {
+    ...rewrittenGraph,
+    entryStepId:
+      typeof flowGraph.entryStepId === 'string'
+        ? stepIdMap.get(flowGraph.entryStepId) ?? flowGraph.entryStepId
+        : rewrittenGraph.entryStepId,
+    nodes: rewrittenNodes,
+  } as JsonValue;
+};
+
 const sanitizeAndRewriteJson = (
   value: Prisma.JsonValue | null | undefined,
   stepIdMap: Map<string, string>,
@@ -121,6 +178,16 @@ const sanitizeAndRewriteJson = (
     Object.entries(value)
       .filter(([key]) => !isSecretKey(key))
       .map(([key, entryValue]) => {
+        if (key === 'flowGraph') {
+          return [
+            key,
+            rewriteFlowGraphNodeKeys(
+              entryValue as Prisma.JsonValue,
+              stepIdMap,
+            ),
+          ];
+        }
+
         if (
           typeof entryValue === 'string' &&
           (stepReferenceKeys.has(key) || stepIdMap.has(entryValue))

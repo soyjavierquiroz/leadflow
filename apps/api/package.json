@@ -25,6 +25,7 @@
     "seed:funnel-arsenal:prod": "node dist/apps/api/src/scripts/seed-funnel-arsenal.js",
     "seed:master-health-wellness": "ts-node src/scripts/seed-master-health-wellness.ts",
     "seed:master-health-wellness:prod": "node dist/apps/api/src/scripts/seed-master-health-wellness.js",
+    "repair:funnel-flowgraph-node-keys": "ts-node src/scripts/repair-funnel-flowgraph-node-keys.ts",
     "funnel:tabula-rasa": "node scripts/tabula-rasa-reset.js",
     "funnel:rehydrate-master": "node scripts/rehydrate-master-template.js",
     "ad-wheels:force-migrate": "ts-node src/scripts/force-migrate.ts",

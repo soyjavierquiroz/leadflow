@@ -18,12 +18,34 @@ describe('FunnelMasterClonerService', () => {
           structuralType: 'multi_step_conversion',
           conversionContract: {
             flowGraph: {
-              edges: [
-                {
-                  sourceStepId: 'source-step-a',
-                  targetStepId: 'source-step-b',
+              version: 1,
+              entryStepId: 'source-step-a',
+              defaultOutcome: 'submit_success',
+              nodes: {
+                'source-step-a': {
+                  stepId: 'source-step-a',
+                  slug: 'inicio',
+                  stepType: 'landing',
+                  role: 'entry',
+                  meta: {
+                    title: 'Inicio',
+                  },
+                  exits: {
+                    submit_success: {
+                      outcome: 'submit_success',
+                      toStepId: 'source-step-b',
+                    },
+                  },
                 },
-              ],
+                'source-step-b': {
+                  stepId: 'source-step-b',
+                  slug: 'gracias',
+                  stepType: 'thank_you',
+                  role: 'thank_you',
+                  isTerminal: true,
+                  exits: {},
+                },
+              },
             },
             metaCapiToken: 'do-not-copy',
           },
@@ -45,6 +67,25 @@ describe('FunnelMasterClonerService', () => {
             description: 'Source description',
             config: {
               currentStepId: 'source-step-a',
+              flowGraph: {
+                version: 1,
+                entryStepId: 'source-step-a',
+                nodes: {
+                  'source-step-a': {
+                    stepId: 'source-step-a',
+                    exits: {
+                      submit_success: {
+                        outcome: 'submit_success',
+                        toStepId: 'source-step-b',
+                      },
+                    },
+                  },
+                  'source-step-b': {
+                    stepId: 'source-step-b',
+                    exits: {},
+                  },
+                },
+              },
               webhookSecret: 'secret',
             },
             stages: ['captured', 'qualified'],
@@ -141,6 +182,31 @@ describe('FunnelMasterClonerService', () => {
     expect(clonedStepB).toBeTruthy();
     expect(clonedStepA).not.toBe('source-step-a');
     expect(clonedStepB).not.toBe('source-step-b');
+    expect(tx.funnel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          config: expect.objectContaining({
+            currentStepId: clonedStepA,
+            flowGraph: expect.objectContaining({
+              entryStepId: clonedStepA,
+              nodes: expect.objectContaining({
+                [clonedStepA]: expect.objectContaining({
+                  stepId: clonedStepA,
+                  exits: expect.objectContaining({
+                    submit_success: expect.objectContaining({
+                      toStepId: clonedStepB,
+                    }),
+                  }),
+                }),
+                [clonedStepB]: expect.objectContaining({
+                  stepId: clonedStepB,
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    );
     expect(tx.funnelInstance.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -151,20 +217,45 @@ describe('FunnelMasterClonerService', () => {
           trackingProfileId: null,
           handoffStrategyId: null,
           conversionContract: expect.objectContaining({
-            flowGraph: {
-              edges: [
-                {
-                  sourceStepId: clonedStepA,
-                  targetStepId: clonedStepB,
-                },
-              ],
-            },
+            flowGraph: expect.objectContaining({
+              entryStepId: clonedStepA,
+              nodes: expect.objectContaining({
+                [clonedStepA]: expect.objectContaining({
+                  stepId: clonedStepA,
+                  meta: {
+                    title: 'Inicio',
+                  },
+                  exits: expect.objectContaining({
+                    submit_success: expect.objectContaining({
+                      toStepId: clonedStepB,
+                    }),
+                  }),
+                }),
+                [clonedStepB]: expect.objectContaining({
+                  stepId: clonedStepB,
+                  isTerminal: true,
+                  exits: {},
+                }),
+              }),
+            }),
           }),
           settingsJson: expect.not.objectContaining({
             metaPixelId: expect.anything(),
           }),
         }),
       }),
+    );
+    const clonedInstancePayload =
+      tx.funnelInstance.create.mock.calls[0][0].data.conversionContract;
+    expect(Object.keys(clonedInstancePayload.flowGraph.nodes)).toEqual([
+      clonedStepA,
+      clonedStepB,
+    ]);
+    expect(clonedInstancePayload.flowGraph.nodes).not.toHaveProperty(
+      'source-step-a',
+    );
+    expect(clonedInstancePayload.flowGraph.nodes).not.toHaveProperty(
+      'source-step-b',
     );
     expect(tx.funnelStep.create).toHaveBeenCalledWith(
       expect.objectContaining({
