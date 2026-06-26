@@ -84,6 +84,10 @@ type FunnelInstanceMutationScope = {
   teamId?: string | null;
 };
 
+type FunnelInstanceMutationOptions = {
+  funnelId?: string | null;
+};
+
 @Injectable()
 export class FunnelGraphMutationService {
   private readonly logger = new Logger(FunnelGraphMutationService.name);
@@ -120,6 +124,7 @@ export class FunnelGraphMutationService {
     scope: FunnelInstanceMutationScope,
     funnelInstanceId: string,
     input: AddFlowNodeInput,
+    options: FunnelInstanceMutationOptions = {},
   ): Promise<ValidateFlowGraphResult> {
     const role = this.normalizeRole(input.role);
     const stepType = this.normalizeStepType(input.stepType, role, input.templateKey);
@@ -143,8 +148,9 @@ export class FunnelGraphMutationService {
       const funnelInstance = await tx.funnelInstance.findFirst({
         where: {
           id: funnelInstanceId,
-          workspaceId: scope.workspaceId,
+          ...(scope.workspaceId ? { workspaceId: scope.workspaceId } : {}),
           ...(scope.teamId ? { teamId: scope.teamId } : {}),
+          ...(options.funnelId ? { funnelId: options.funnelId } : {}),
         },
         include: {
           steps: {
@@ -299,6 +305,7 @@ export class FunnelGraphMutationService {
     scope: FunnelInstanceMutationScope,
     funnelInstanceId: string,
     input: ConnectFlowNodesInput,
+    options: FunnelInstanceMutationOptions = {},
   ): Promise<FlowGraphMutationResult> {
     const fromStepId = this.normalizeStepId(input.fromStepId, 'fromStepId');
     const toStepId = this.normalizeStepId(input.toStepId, 'toStepId');
@@ -333,7 +340,7 @@ export class FunnelGraphMutationService {
           },
         },
       };
-    });
+    }, options);
 
     return this.syncAndLint(result);
   }
@@ -342,6 +349,7 @@ export class FunnelGraphMutationService {
     scope: FunnelInstanceMutationScope,
     funnelInstanceId: string,
     input: DisconnectFlowExitInput,
+    options: FunnelInstanceMutationOptions = {},
   ): Promise<FlowGraphMutationResult> {
     const fromStepId = this.normalizeStepId(input.fromStepId, 'fromStepId');
     const outcome = this.normalizeOutcome(input.outcome);
@@ -369,7 +377,7 @@ export class FunnelGraphMutationService {
           },
         },
       };
-    });
+    }, options);
 
     return this.syncAndLint(result);
   }
@@ -378,6 +386,7 @@ export class FunnelGraphMutationService {
     scope: FunnelInstanceMutationScope,
     funnelInstanceId: string,
     stepId: string,
+    options: FunnelInstanceMutationOptions = {},
   ): Promise<FlowGraphMutationResult> {
     const normalizedStepId = this.normalizeStepId(stepId, 'stepId');
 
@@ -386,6 +395,7 @@ export class FunnelGraphMutationService {
         tx,
         scope,
         funnelInstanceId,
+        options,
       );
       const graph = this.toFlowGraph(
         funnelInstance.conversionContract as Prisma.JsonValue,
@@ -447,6 +457,7 @@ export class FunnelGraphMutationService {
     funnelInstanceId: string,
     stepId: string,
     input: UpdateFlowNodeInput,
+    options: FunnelInstanceMutationOptions = {},
   ): Promise<FlowGraphMutationResult> {
     const normalizedStepId = this.normalizeStepId(stepId, 'stepId');
     const requestedSlug =
@@ -457,6 +468,7 @@ export class FunnelGraphMutationService {
         tx,
         scope,
         funnelInstanceId,
+        options,
       );
       const graph = this.toFlowGraph(
         funnelInstance.conversionContract as Prisma.JsonValue,
@@ -524,12 +536,14 @@ export class FunnelGraphMutationService {
     scope: FunnelInstanceMutationScope,
     funnelInstanceId: string,
     mutate: (graph: FlowGraphV1) => FlowGraphV1,
+    options: FunnelInstanceMutationOptions = {},
   ) {
     return this.prisma.$transaction(async (tx) => {
       const funnelInstance = await this.findFunnelInstanceForMutation(
         tx,
         scope,
         funnelInstanceId,
+        options,
       );
       const graph = this.toFlowGraph(
         funnelInstance.conversionContract as Prisma.JsonValue,
@@ -550,12 +564,14 @@ export class FunnelGraphMutationService {
     tx: Prisma.TransactionClient,
     scope: FunnelInstanceMutationScope,
     funnelInstanceId: string,
+    options: FunnelInstanceMutationOptions = {},
   ) {
     const funnelInstance = await tx.funnelInstance.findFirst({
       where: {
         id: funnelInstanceId,
-        workspaceId: scope.workspaceId,
+        ...(scope.workspaceId ? { workspaceId: scope.workspaceId } : {}),
         ...(scope.teamId ? { teamId: scope.teamId } : {}),
+        ...(options.funnelId ? { funnelId: options.funnelId } : {}),
       },
       include: {
         steps: {

@@ -750,6 +750,10 @@ export function TeamVslPublicationEditor({
   );
   const isSystemFunnelDraft =
     mode === "system" && Boolean(initialFunnel) && !publicationId;
+  const isInternalMasterFunnel =
+    isSystemFunnelDraft &&
+    asRecord(initialFunnel?.settingsJson)?.source ===
+      "funnel_marketplace_master";
   const activeDomains = useMemo(
     () => domains.filter((domain) => domain.status === "active"),
     [domains],
@@ -1323,7 +1327,7 @@ export function TeamVslPublicationEditor({
 
   const publicationBlockerMessage =
     isSystemFunnelDraft && stepRecords.length === 0
-      ? "Este funnel no tiene pasos. Agrega al menos un paso antes de publicarlo."
+      ? "Este funnel no tiene pasos. Agrega al menos un paso antes de guardarlo."
       : null;
   const isPublishing = isPending || isSaving;
   const isSaveDisabled =
@@ -1331,9 +1335,9 @@ export function TeamVslPublicationEditor({
     isLoadingExisting ||
     uploadingRowIndex !== null ||
     !funnelName.trim() ||
-    !selectedDomainId ||
+    (!isInternalMasterFunnel && !selectedDomainId) ||
     !selectedTemplateId ||
-    !pathPrefix.trim() ||
+    (!isInternalMasterFunnel && !pathPrefix.trim()) ||
     Boolean(publicationBlockerMessage) ||
     Boolean(parsedBlocks.error) ||
     Boolean(mediaValidation);
@@ -1725,7 +1729,7 @@ export function TeamVslPublicationEditor({
       return;
     }
 
-    if (!selectedDomainId) {
+    if (!selectedDomainId && !isInternalMasterFunnel) {
       setErrorMessage("Selecciona un dominio activo antes de publicar.");
       return;
     }
@@ -1814,7 +1818,19 @@ export function TeamVslPublicationEditor({
             [response.step.id]: buildStepDraft(response.step),
           }));
           if (!funnelInstanceId) {
-            throw new Error("El funnel operativo no tiene instancia para publicar.");
+            throw new Error(
+              isInternalMasterFunnel
+                ? "El Master Funnel no tiene instancia para guardar."
+                : "El funnel operativo no tiene instancia para publicar.",
+            );
+          }
+
+          if (isInternalMasterFunnel) {
+            setSuccessMessage("Master Funnel guardado para edición interna.");
+            startTransition(() => {
+              router.refresh();
+            });
+            return;
           }
 
           const publicationResponse =

@@ -6,10 +6,11 @@ import { FUNNEL_INSTANCE_REPOSITORY } from '../shared/domain.tokens';
 import { TemplatesModule } from '../templates/templates.module';
 import { FunnelInstancesController } from './funnel-instances.controller';
 import { FunnelInstancesService } from './funnel-instances.service';
+import { SystemFunnelInstancesController } from './system-funnel-instances.controller';
 
 @Module({
   imports: [RuntimeContextModule, TemplatesModule],
-  controllers: [FunnelInstancesController],
+  controllers: [FunnelInstancesController, SystemFunnelInstancesController],
   providers: [
     FunnelInstancesService,
     FunnelGraphMutationService,

@@ -257,6 +257,19 @@ export function StepManagerSidebar({
     localGraph?.entryStepId ?? orderedNodes[0]?.stepId ?? "",
   );
   const activeStepId = controlledActiveStepId ?? internalActiveStepId;
+  const buildGraphPath = (suffix: string) => {
+    if (mode === "system" && teamId && funnelId && funnelInstanceId) {
+      return `/system/tenants/${encodeURIComponent(
+        teamId,
+      )}/funnels/${encodeURIComponent(funnelId)}/instances/${encodeURIComponent(
+        funnelInstanceId,
+      )}/graph/${suffix}`;
+    }
+
+    return `/funnel-instances/${encodeURIComponent(
+      funnelInstanceId ?? "",
+    )}/graph/${suffix}`;
+  };
   const status = runtimeHealthStatus ?? stepManagerReport.status;
   const StatusIcon = statusConfig[status].icon;
   const issueCount = stepManagerReport.issues.length;
@@ -310,7 +323,7 @@ export function StepManagerSidebar({
       try {
         const response = await teamOperationRequest<{
           graph: FlowGraphV1;
-        }>(`/funnel-instances/${encodeURIComponent(funnelInstanceId)}/graph/nodes`, {
+        }>(buildGraphPath("nodes"), {
           method: "POST",
           body: JSON.stringify({
             role: option.role,
@@ -352,7 +365,7 @@ export function StepManagerSidebar({
       try {
         const response = await teamOperationRequest<{
           graph: FlowGraphV1;
-        }>(`/funnel-instances/${encodeURIComponent(funnelInstanceId)}/graph/edges`, {
+        }>(buildGraphPath("edges"), {
           method: "PATCH",
           body: JSON.stringify({
             fromStepId: previousNode.stepId,
@@ -384,9 +397,7 @@ export function StepManagerSidebar({
         const response = await teamOperationRequest<{
           graph: FlowGraphV1;
         }>(
-          `/funnel-instances/${encodeURIComponent(
-            funnelInstanceId,
-          )}/graph/nodes/${encodeURIComponent(node.stepId)}`,
+          buildGraphPath(`nodes/${encodeURIComponent(node.stepId)}`),
           {
             method: "DELETE",
           },
@@ -486,9 +497,7 @@ export function StepManagerSidebar({
         const response = await teamOperationRequest<{
           graph: FlowGraphV1;
         }>(
-          `/funnel-instances/${encodeURIComponent(
-            funnelInstanceId,
-          )}/graph/nodes/${encodeURIComponent(node.stepId)}`,
+          buildGraphPath(`nodes/${encodeURIComponent(node.stepId)}`),
           {
             method: "PATCH",
             body: JSON.stringify({
