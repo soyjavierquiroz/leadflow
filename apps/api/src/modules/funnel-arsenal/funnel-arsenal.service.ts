@@ -4,7 +4,11 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { FunnelArsenalTemplateStatus, Prisma } from '@prisma/client';
+import {
+  FunnelArsenalTemplateStatus,
+  LibraryAssetVersionStatus,
+  Prisma,
+} from '@prisma/client';
 import {
   getBusinessBlueprintByKey,
   getFunnelArsenalTemplateByKey,
@@ -74,6 +78,7 @@ type ArsenalTemplateDefinition = FunnelArsenalTemplate & {
   funnelTemplateId?: string | null;
   sourceFunnelId?: string | null;
   sourceFunnelInstanceId?: string | null;
+  libraryAssetVersionId?: string | null;
 };
 
 type ArsenalTemplateView = ArsenalTemplateDefinition & {
@@ -389,12 +394,22 @@ export class FunnelArsenalService {
       });
     }
 
-    if (record.sourceFunnelInstanceId) {
-      return this.resolveExistingMasterFunnelResponse(record);
+    const template = await this.resolveLibraryVersionForTemplate(
+      this.mapDbTemplate(record),
+      {
+        requirePublished: false,
+      },
+    );
+
+    if (template.sourceFunnelInstanceId) {
+      return this.resolveExistingMasterFunnelResponse(
+        record,
+        template.sourceFunnelInstanceId,
+        template.sourceFunnelId,
+      );
     }
 
     const arsenal = await ensureLeadFlowArsenalWorkspace(this.prisma);
-    const template = this.mapDbTemplate(record);
     const name = this.optionalText(dto.name) ?? `${template.label} — Master`;
     const baseTemplateCode = this.optionalText(dto.baseTemplateCode);
 
@@ -483,6 +498,33 @@ export class FunnelArsenalService {
         },
       });
 
+      if (latest.libraryAssetVersionId) {
+        await tx.libraryFunnelVersion.upsert({
+          where: {
+            assetVersionId: latest.libraryAssetVersionId,
+          },
+          create: {
+            assetVersionId: latest.libraryAssetVersionId,
+            sourceFunnelInstanceId: master.id,
+            sourceFunnelId: master.funnelId,
+            stepsCount: template.stepsCount,
+            framework: template.framework,
+            difficulty: template.difficulty,
+            estimatedMinutes: template.estimatedTimeMinutes,
+            flowSummary: toInputJson(template.flowSummary),
+          },
+          update: {
+            sourceFunnelInstanceId: master.id,
+            sourceFunnelId: master.funnelId,
+            stepsCount: template.stepsCount,
+            framework: template.framework,
+            difficulty: template.difficulty,
+            estimatedMinutes: template.estimatedTimeMinutes,
+            flowSummary: toInputJson(template.flowSummary),
+          },
+        });
+      }
+
       return {
         sourceFunnelInstanceId: master.id,
         sourceFunnelId: master.funnelId,
@@ -529,7 +571,14 @@ export class FunnelArsenalService {
       });
     }
 
-    return this.buildPreviewRuntime(this.mapDbTemplate(record), stepSlug);
+    const template = await this.resolveLibraryVersionForTemplate(
+      this.mapDbTemplate(record),
+      {
+        requirePublished: true,
+      },
+    );
+
+    return this.buildPreviewRuntime(template, stepSlug);
   }
 
   async getPreviewRuntimeForCurrentTeam(
@@ -537,13 +586,19 @@ export class FunnelArsenalService {
     assetSlug: string,
     stepSlug?: string,
   ) {
-    const template = await this.getTemplateForCurrentTeam(user, assetSlug);
+    const template = await this.resolveLibraryVersionForTemplate(
+      await this.getTemplateForCurrentTeam(user, assetSlug),
+      {
+        requirePublished: true,
+      },
+    );
 
     return this.buildPreviewRuntime(template, stepSlug);
   }
 
   async createSystemTemplate(dto: CreateSystemFunnelArsenalTemplateDto) {
     await this.assertSourceFunnelInstanceExists(dto.sourceFunnelInstanceId);
+    await this.assertLibraryAssetVersionExists(dto.libraryAssetVersionId);
     const data = this.buildSystemTemplateData(dto, {
       requireAllFields: true,
     }) as Prisma.FunnelArsenalTemplateUncheckedCreateInput;
@@ -573,6 +628,7 @@ export class FunnelArsenalService {
     }
 
     await this.assertSourceFunnelInstanceExists(dto.sourceFunnelInstanceId);
+    await this.assertLibraryAssetVersionExists(dto.libraryAssetVersionId);
     const data = this.buildSystemTemplateData(dto, {
       requireAllFields: false,
     }) as Prisma.FunnelArsenalTemplateUncheckedUpdateInput;
@@ -695,7 +751,13 @@ export class FunnelArsenalService {
     });
 
     if (dbTemplates.length > 0) {
-      return dbTemplates.map((template) => this.mapDbTemplate(template));
+      return Promise.all(
+        dbTemplates.map((template) =>
+          this.resolveLibraryVersionForTemplate(this.mapDbTemplate(template), {
+            requirePublished: false,
+          }),
+        ),
+      );
     }
 
     return getFunnelArsenalTemplatesForBlueprint(blueprintKey).map((template) =>
@@ -714,7 +776,9 @@ export class FunnelArsenalService {
     });
 
     if (dbTemplate) {
-      return this.mapDbTemplate(dbTemplate);
+      return this.resolveLibraryVersionForTemplate(this.mapDbTemplate(dbTemplate), {
+        requirePublished: true,
+      });
     }
 
     const staticTemplate = getFunnelArsenalTemplateByKey(templateKey);
@@ -883,6 +947,12 @@ export class FunnelArsenalService {
     if ('sourceFunnelInstanceId' in dto) {
       data.sourceFunnelInstanceId = this.nullableText(
         dto.sourceFunnelInstanceId,
+      );
+    }
+
+    if ('libraryAssetVersionId' in dto) {
+      data.libraryAssetVersionId = this.nullableText(
+        dto.libraryAssetVersionId,
       );
     }
 
@@ -1098,6 +1168,7 @@ export class FunnelArsenalService {
       funnelTemplateId: null,
       sourceFunnelId: null,
       sourceFunnelInstanceId: null,
+      libraryAssetVersionId: null,
     };
   }
 
@@ -1164,6 +1235,7 @@ export class FunnelArsenalService {
       funnelTemplateId: record.funnelTemplateId,
       sourceFunnelId: record.sourceFunnelId,
       sourceFunnelInstanceId: record.sourceFunnelInstanceId,
+      libraryAssetVersionId: record.libraryAssetVersionId,
       sourceFunnelInstanceLabel:
         options?.sourceFunnelInstanceLabel ?? undefined,
       builderUrl: options?.builderUrl ?? undefined,
@@ -1174,10 +1246,12 @@ export class FunnelArsenalService {
 
   private async resolveExistingMasterFunnelResponse(
     record: DbFunnelArsenalTemplate,
+    sourceFunnelInstanceId = record.sourceFunnelInstanceId,
+    sourceFunnelId = record.sourceFunnelId,
   ): Promise<MarketplaceMasterFunnelResponse> {
     const source = await this.prisma.funnelInstance.findUnique({
       where: {
-        id: record.sourceFunnelInstanceId!,
+        id: sourceFunnelInstanceId!,
       },
       select: {
         id: true,
@@ -1194,10 +1268,17 @@ export class FunnelArsenalService {
       });
     }
 
-    if (record.sourceFunnelId !== source.funnelId) {
+    if (
+      record.sourceFunnelInstanceId !== source.id ||
+      record.sourceFunnelId !== source.funnelId ||
+      sourceFunnelId !== source.funnelId
+    ) {
       await this.prisma.funnelArsenalTemplate.update({
         where: { id: record.id },
-        data: { sourceFunnelId: source.funnelId },
+        data: {
+          sourceFunnelInstanceId: source.id,
+          sourceFunnelId: source.funnelId,
+        },
       });
     }
 
@@ -1283,6 +1364,133 @@ export class FunnelArsenalService {
           'sourceFunnelInstanceId must point to an existing FunnelInstance.',
       });
     }
+  }
+
+  private async assertLibraryAssetVersionExists(
+    libraryAssetVersionId: string | null | undefined,
+  ) {
+    const normalized = this.nullableText(libraryAssetVersionId);
+
+    if (!normalized) {
+      return;
+    }
+
+    const version = await this.prisma.libraryAssetVersion.findUnique({
+      where: {
+        id: normalized,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!version) {
+      throw new BadRequestException({
+        code: 'LIBRARY_ASSET_VERSION_NOT_FOUND',
+        field: 'libraryAssetVersionId',
+        message:
+          'libraryAssetVersionId must point to an existing LibraryAssetVersion.',
+      });
+    }
+  }
+
+  private async resolveLibraryVersionForTemplate(
+    template: ArsenalTemplateDefinition,
+    options: {
+      requirePublished: boolean;
+    },
+  ): Promise<ArsenalTemplateDefinition> {
+    if (!template.libraryAssetVersionId) {
+      return template;
+    }
+
+    const version = await this.prisma.libraryAssetVersion.findUnique({
+      where: {
+        id: template.libraryAssetVersionId,
+      },
+      include: {
+        asset: true,
+        funnelVersion: true,
+        media: {
+          orderBy: [{ mediaType: 'asc' }, { sortOrder: 'asc' }],
+        },
+        compatibility: true,
+      },
+    });
+
+    if (!version) {
+      if (!options.requirePublished) {
+        return template;
+      }
+
+      throw new BadRequestException({
+        code: 'LIBRARY_ASSET_VERSION_NOT_FOUND',
+        field: 'libraryAssetVersionId',
+        message:
+          'This marketplace asset points to a missing LibraryAssetVersion.',
+      });
+    }
+
+    if (version.status !== LibraryAssetVersionStatus.published) {
+      if (!options.requirePublished) {
+        return template;
+      }
+
+      throw new BadRequestException({
+        code: 'LIBRARY_ASSET_VERSION_NOT_PUBLISHED',
+        field: 'libraryAssetVersionId',
+        message:
+          'Only published LibraryAssetVersion records can be previewed or activated.',
+      });
+    }
+
+    const libraryDifficulty = version.funnelVersion?.difficulty;
+    const difficulty = (
+      libraryDifficulty &&
+      ['basic', 'intermediate', 'advanced'].includes(libraryDifficulty)
+        ? libraryDifficulty
+        : template.difficulty
+    ) as FunnelArsenalTemplate['difficulty'];
+
+    return {
+      ...template,
+      version: version.version,
+      publishedAt: version.publishedAt ?? template.publishedAt,
+      sourceFunnelId:
+        version.funnelVersion?.sourceFunnelId ?? template.sourceFunnelId,
+      sourceFunnelInstanceId:
+        version.funnelVersion?.sourceFunnelInstanceId ??
+        template.sourceFunnelInstanceId,
+      stepsCount: version.funnelVersion?.stepsCount ?? template.stepsCount,
+      framework: version.funnelVersion?.framework ?? template.framework,
+      difficulty,
+      level: libraryDifficulty ?? template.level,
+      estimatedTimeMinutes:
+        version.funnelVersion?.estimatedMinutes ??
+        template.estimatedTimeMinutes,
+      flowSummary:
+        (version.funnelVersion?.flowSummary as JsonValue | undefined) ??
+        template.flowSummary,
+      assets: {
+        ...(typeof template.assets === 'object' &&
+        template.assets !== null &&
+        !Array.isArray(template.assets)
+          ? (template.assets as Record<string, JsonValue>)
+          : {}),
+        libraryAssetId: version.assetId,
+        libraryAssetSlug: version.asset.slug,
+        libraryAssetTitle: version.asset.title,
+      },
+      media:
+        version.media.length > 0
+          ? (version.media.map((media) => ({
+              type: media.mediaType,
+              url: media.url,
+              altText: media.altText,
+              sortOrder: media.sortOrder,
+            })) as JsonValue)
+          : template.media,
+    };
   }
 
   private async findTemplateRecordBySlug(assetSlug: string) {

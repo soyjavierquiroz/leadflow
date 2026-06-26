@@ -34,6 +34,11 @@ const adminNav = [
     icon: "layout-template",
   },
   {
+    href: "/admin/library",
+    label: "LeadFlow Library",
+    icon: "layers-3",
+  },
+  {
     href: "/admin/estructuras",
     label: "Estructuras",
     icon: "network",

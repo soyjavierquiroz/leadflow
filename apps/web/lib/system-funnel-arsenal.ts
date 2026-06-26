@@ -57,6 +57,7 @@ export type SystemFunnelArsenalTemplate = {
   funnelTemplateId?: string | null;
   sourceFunnelId?: string | null;
   sourceFunnelInstanceId?: string | null;
+  libraryAssetVersionId?: string | null;
   sourceFunnelInstanceLabel?: string | null;
   builderUrl?: string | null;
   createdAt?: string;

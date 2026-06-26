@@ -21,6 +21,7 @@ import { HybridFunnelPublicationsModule } from '../hybrid-funnel-publications/hy
 import { IncomingWebhooksModule } from '../incoming-webhooks/incoming-webhooks.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { KloserModule } from '../kloser/kloser.module';
+import { LeadflowLibraryModule } from '../library/leadflow-library.module';
 import { LeadsModule } from '../leads/leads.module';
 import { MessagingAutomationModule } from '../messaging-automation/messaging-automation.module';
 import { PublicFunnelRuntimeModule } from '../public-funnel-runtime/public-funnel-runtime.module';
@@ -62,6 +63,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     IncomingWebhooksModule,
     KloserModule,
     KnowledgeModule,
+    LeadflowLibraryModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,
@@ -99,6 +101,7 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     IncomingWebhooksModule,
     KloserModule,
     KnowledgeModule,
+    LeadflowLibraryModule,
     PublicFunnelRuntimeModule,
     RotationPoolsModule,
     VisitorsModule,

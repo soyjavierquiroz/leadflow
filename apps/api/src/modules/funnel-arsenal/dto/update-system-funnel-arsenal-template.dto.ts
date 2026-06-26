@@ -50,4 +50,5 @@ export class UpdateSystemFunnelArsenalTemplateDto implements Partial<CreateSyste
   readonly funnelTemplateId?: string | null;
   readonly sourceFunnelId?: string | null;
   readonly sourceFunnelInstanceId?: string | null;
+  readonly libraryAssetVersionId?: string | null;
 }

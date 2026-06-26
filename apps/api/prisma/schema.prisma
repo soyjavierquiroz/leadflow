@@ -130,6 +130,59 @@ enum FunnelArsenalTemplateStatus {
   archived
 }
 
+enum LibraryCollectionStatus {
+  draft
+  active
+  archived
+}
+
+enum LibraryAssetType {
+  funnel
+  funnel_pack
+  block
+  section
+  theme
+  brand_kit
+  ai_agent
+  prompt_pack
+  automation
+  crm_playbook
+  whatsapp_flow
+  email_sequence
+  other
+}
+
+enum LibraryOwnerType {
+  system
+}
+
+enum LibraryVisibility {
+  private
+  internal
+  public
+}
+
+enum LibraryAssetStatus {
+  draft
+  active
+  archived
+}
+
+enum LibraryAssetVersionStatus {
+  draft
+  published
+  archived
+}
+
+enum LibraryMediaType {
+  thumbnail
+  cover
+  gallery
+  video
+  gif
+  icon
+}
+
 enum FunnelInstanceStatus {
   draft
   active
@@ -377,18 +430,18 @@ enum EventAggregateType {
 }
 
 model Workspace {
-  id                        String                @id @default(uuid())
+  id                        String                   @id @default(uuid())
   name                      String
-  slug                      String                @unique
+  slug                      String                   @unique
   status                    WorkspaceStatus
   accountType               AccountType              @default(team)
   timezone                  String
   defaultCurrency           String
   primaryLocale             String
   primaryDomain             String?
-  emailNotificationsEnabled Boolean               @default(true)
-  createdAt                 DateTime              @default(now())
-  updatedAt                 DateTime              @updatedAt
+  emailNotificationsEnabled Boolean                  @default(true)
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
   teams                     Team[]
   sponsors                  Sponsor[]
   funnels                   Funnel[]
@@ -418,24 +471,24 @@ model Workspace {
 }
 
 model Team {
-  id                    String                @id @default(uuid())
+  id                    String                   @id @default(uuid())
   workspaceId           String
   name                  String
   code                  String
   logoUrl               String?
   status                TeamStatus
   teamType              TeamType                 @default(commercial_team)
-  isActive              Boolean               @default(true)
+  isActive              Boolean                  @default(true)
   lastAssignedUserId    String?
   subscriptionExpiresAt DateTime?
   description           String?
   managerUserId         String?
-  maxSeats              Int                   @default(10)
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  workspace             Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  maxSeats              Int                      @default(10)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  workspace             Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sponsors              Sponsor[]
-  funnels               Funnel[]              @relation("TeamDefaultFunnels")
+  funnels               Funnel[]                 @relation("TeamDefaultFunnels")
   domains               Domain[]
   funnelInstances       FunnelInstance[]
   funnelSteps           FunnelStep[]
@@ -463,23 +516,23 @@ model Team {
 }
 
 model Sponsor {
-  id                              String               @id @default(uuid())
+  id                              String                  @id @default(uuid())
   workspaceId                     String
   teamId                          String
   displayName                     String
-  publicSlug                      String?              @unique
+  publicSlug                      String?                 @unique
   status                          SponsorStatus
-  isActive                        Boolean              @default(false)
+  isActive                        Boolean                 @default(false)
   avatarUrl                       String?
   email                           String?
   phone                           String?
   availabilityStatus              AvailabilityStatus
   routingWeight                   Int
   memberPortalEnabled             Boolean
-  createdAt                       DateTime             @default(now())
-  updatedAt                       DateTime             @updatedAt
-  workspace                       Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  team                            Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
+  workspace                       Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                            Team                    @relation(fields: [teamId], references: [id], onDelete: Cascade)
   rotationMembers                 RotationMember[]
   adWheelParticipants             AdWheelParticipant[]
   adWheelTurns                    AdWheelTurn[]
@@ -490,10 +543,10 @@ model Sponsor {
   channelInstances                ChannelInstance[]
   automationDispatches            AutomationDispatch[]
   leadNotes                       LeadNote[]
-  attributedCrmAssignments        CrmLeadAssignment[]  @relation("CrmAssignmentAttributedSponsor")
-  assignedCrmAssignments          CrmLeadAssignment[]  @relation("CrmAssignmentAssignedSponsor")
-  acceptedCrmAssignments          CrmLeadAssignment[]  @relation("CrmAssignmentAcceptedSponsor")
-  conversationOwnerCrmAssignments CrmLeadAssignment[]  @relation("CrmAssignmentConversationOwnerSponsor")
+  attributedCrmAssignments        CrmLeadAssignment[]     @relation("CrmAssignmentAttributedSponsor")
+  assignedCrmAssignments          CrmLeadAssignment[]     @relation("CrmAssignmentAssignedSponsor")
+  acceptedCrmAssignments          CrmLeadAssignment[]     @relation("CrmAssignmentAcceptedSponsor")
+  conversationOwnerCrmAssignments CrmLeadAssignment[]     @relation("CrmAssignmentConversationOwnerSponsor")
   actorCrmAssignmentEvents        CrmAssignmentEvent[]
   crmOutreachQueue                CrmOutreachQueue[]
   vanityShortLink                 SponsorVanityShortLink?
@@ -829,6 +882,144 @@ model FunnelTemplate {
   funnelInstances          FunnelInstance[]
 }
 
+model LibraryCollection {
+  id          String                  @id @default(uuid())
+  slug        String                  @unique
+  title       String
+  description String?
+  assetType   LibraryAssetType?
+  status      LibraryCollectionStatus @default(active)
+  sortOrder   Int                     @default(0)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  assets      LibraryAsset[]
+
+  @@index([status, sortOrder])
+}
+
+model LibraryAsset {
+  id           String                @id @default(uuid())
+  collectionId String
+  slug         String
+  title        String
+  description  String?
+  assetType    LibraryAssetType
+  ownerType    LibraryOwnerType      @default(system)
+  visibility   LibraryVisibility     @default(internal)
+  status       LibraryAssetStatus    @default(draft)
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  collection   LibraryCollection     @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  versions     LibraryAssetVersion[]
+  tags         LibraryAssetTag[]
+
+  @@unique([collectionId, slug])
+  @@index([slug])
+  @@index([assetType, status])
+  @@index([visibility, status])
+}
+
+model LibraryAssetVersion {
+  id                           String                    @id @default(uuid())
+  assetId                      String
+  version                      String
+  status                       LibraryAssetVersionStatus @default(draft)
+  publishedAt                  DateTime?
+  publishedBy                  String?
+  changeLog                    String?
+  sourceReferenceId            String?
+  previewConfig                Json                      @default("{}")
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @updatedAt
+  asset                        LibraryAsset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  funnelVersion                LibraryFunnelVersion?
+  media                        LibraryMedia[]
+  compatibility                LibraryCompatibility[]
+  legacyFunnelArsenalTemplates FunnelArsenalTemplate[]
+
+  @@unique([assetId, version])
+  @@index([assetId, status])
+  @@index([sourceReferenceId])
+}
+
+model LibraryTag {
+  id        String            @id @default(uuid())
+  slug      String            @unique
+  label     String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  assets    LibraryAssetTag[]
+}
+
+model LibraryAssetTag {
+  assetId String
+  tagId   String
+  asset   LibraryAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  tag     LibraryTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, tagId])
+  @@index([tagId])
+}
+
+model LibraryCompatibility {
+  id             String              @id @default(uuid())
+  assetVersionId String
+  vertical       String?
+  industry       String?
+  businessModel  String?
+  blueprint      String?
+  country        String?
+  language       String?
+  accountType    String?
+  market         String?
+  createdAt      DateTime            @default(now())
+  assetVersion   LibraryAssetVersion @relation(fields: [assetVersionId], references: [id], onDelete: Cascade)
+
+  @@index([assetVersionId])
+  @@index([vertical, industry])
+  @@index([businessModel])
+  @@index([blueprint])
+  @@index([country, language])
+  @@index([accountType])
+  @@index([market])
+}
+
+model LibraryMedia {
+  id             String              @id @default(uuid())
+  assetVersionId String
+  mediaType      LibraryMediaType
+  url            String
+  altText        String?
+  sortOrder      Int                 @default(0)
+  metadataJson   Json                @default("{}")
+  createdAt      DateTime            @default(now())
+  assetVersion   LibraryAssetVersion @relation(fields: [assetVersionId], references: [id], onDelete: Cascade)
+
+  @@index([assetVersionId, mediaType, sortOrder])
+}
+
+model LibraryFunnelVersion {
+  id                     String              @id @default(uuid())
+  assetVersionId         String              @unique
+  sourceFunnelInstanceId String?
+  sourceFunnelId         String?
+  stepsCount             Int?
+  framework              String?
+  difficulty             String?
+  estimatedMinutes       Int?
+  flowSummary            Json                @default("[]")
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  assetVersion           LibraryAssetVersion @relation(fields: [assetVersionId], references: [id], onDelete: Cascade)
+
+  @@index([sourceFunnelInstanceId])
+  @@index([sourceFunnelId])
+  @@index([framework])
+  @@index([difficulty])
+}
+
 model FunnelArsenalTemplate {
   id                     String                      @id @default(uuid())
   templateKey            String                      @unique
@@ -880,8 +1071,10 @@ model FunnelArsenalTemplate {
   funnelTemplateId       String?
   sourceFunnelId         String?
   sourceFunnelInstanceId String?
+  libraryAssetVersionId  String?
   createdAt              DateTime                    @default(now())
   updatedAt              DateTime                    @updatedAt
+  libraryAssetVersion    LibraryAssetVersion?        @relation(fields: [libraryAssetVersionId], references: [id], onDelete: SetNull)
 
   @@index([blueprintKey, status])
   @@index([assetSlug])
@@ -895,6 +1088,7 @@ model FunnelArsenalTemplate {
   @@index([level, status])
   @@index([sourceFunnelInstanceId])
   @@index([sourceFunnelId])
+  @@index([libraryAssetVersionId])
 }
 
 model FunnelInstance {
@@ -1248,10 +1442,10 @@ model TrackedLink {
 }
 
 model FunnelEvent {
-  id                  String   @id @default(uuid())
-  eventId             String   @unique
+  id                  String             @id @default(uuid())
+  eventId             String             @unique
   eventName           String
-  eventVersion        String   @default("1.0")
+  eventVersion        String             @default("1.0")
   eventFamily         String
   source              String
   workspaceId         String
@@ -1269,10 +1463,10 @@ model FunnelEvent {
   attributionJson     Json?
   payloadJson         Json
   occurredAt          DateTime
-  receivedAt          DateTime @default(now())
+  receivedAt          DateTime           @default(now())
   correlationId       String?
-  dedupeKey           String?  @unique
-  createdAt           DateTime @default(now())
+  dedupeKey           String?            @unique
+  createdAt           DateTime           @default(now())
   workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team                Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
   domain              Domain?            @relation(fields: [domainId], references: [id], onDelete: SetNull)
@@ -1396,30 +1590,30 @@ model CrmAssignmentEvent {
 }
 
 model CrmOutreachQueue {
-  id                String                @id @default(uuid())
-  workspaceId       String                @map("workspace_id")
-  teamId            String                @map("team_id")
-  leadId            String                @map("lead_id")
-  sponsorId         String                @map("sponsor_id")
-  intentType        CrmOutreachIntentType @map("intent_type")
-  status            CrmOutreachStatus
-  scheduledAt       DateTime?             @map("scheduled_at")
-  randomizedDelayMs Int?                  @map("randomized_delay_ms")
-  payloadJson       Json?                 @map("payload_json")
-  retryCount        Int                   @default(0) @map("retry_count")
-  lastAttemptAt     DateTime?             @map("last_attempt_at")
-  nextRetryAt       DateTime?             @map("next_retry_at")
-  failureReason     Json?                 @map("failure_reason")
-  externalMissionId String?               @map("external_mission_id")
-  externalHandoffStatus String?           @map("external_handoff_status")
-  lastHandoffAt     DateTime?             @map("last_handoff_at")
-  lastHandoffError  Json?                 @map("last_handoff_error")
-  createdAt         DateTime              @default(now()) @map("created_at")
-  updatedAt         DateTime              @updatedAt @map("updated_at")
-  workspace         Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  team              Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  lead              Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  sponsor           Sponsor               @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  id                    String                @id @default(uuid())
+  workspaceId           String                @map("workspace_id")
+  teamId                String                @map("team_id")
+  leadId                String                @map("lead_id")
+  sponsorId             String                @map("sponsor_id")
+  intentType            CrmOutreachIntentType @map("intent_type")
+  status                CrmOutreachStatus
+  scheduledAt           DateTime?             @map("scheduled_at")
+  randomizedDelayMs     Int?                  @map("randomized_delay_ms")
+  payloadJson           Json?                 @map("payload_json")
+  retryCount            Int                   @default(0) @map("retry_count")
+  lastAttemptAt         DateTime?             @map("last_attempt_at")
+  nextRetryAt           DateTime?             @map("next_retry_at")
+  failureReason         Json?                 @map("failure_reason")
+  externalMissionId     String?               @map("external_mission_id")
+  externalHandoffStatus String?               @map("external_handoff_status")
+  lastHandoffAt         DateTime?             @map("last_handoff_at")
+  lastHandoffError      Json?                 @map("last_handoff_error")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+  workspace             Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team                  Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  lead                  Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sponsor               Sponsor               @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, teamId, status, scheduledAt], map: "crm_outreach_queue_scope_status_schedule_idx")
   @@index([workspaceId, teamId, status, nextRetryAt], map: "crm_outreach_queue_scope_status_retry_idx")

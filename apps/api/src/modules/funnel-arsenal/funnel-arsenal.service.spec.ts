@@ -990,4 +990,143 @@ describe('FunnelArsenalService', () => {
       service.getSystemPreviewRuntime('health-wellness-evaluation'),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
+
+  it('resolves marketplace preview source from a published Library funnel version', async () => {
+    const commercialProfileService = buildCommercialProfileService(null);
+    const prisma = {
+      funnelArsenalTemplate: {
+        findFirst: jest.fn().mockResolvedValue({
+          ...dbHealthTemplate,
+          assetSlug: 'health-wellness-evaluation',
+          sourceFunnelInstanceId: null,
+          libraryAssetVersionId: 'library-version-1',
+        }),
+      },
+      libraryAssetVersion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'library-version-1',
+          assetId: 'library-asset-1',
+          version: '2.0.0',
+          status: 'published',
+          publishedAt: new Date('2026-06-26T00:00:00.000Z'),
+          asset: {
+            id: 'library-asset-1',
+            slug: 'health-wellness-evaluation',
+            title: 'Evaluación de bienestar',
+          },
+          funnelVersion: {
+            sourceFunnelInstanceId: 'library-master-instance-1',
+            sourceFunnelId: 'library-master-funnel-1',
+            stepsCount: 1,
+            framework: 'diagnostic',
+            difficulty: 'basic',
+            estimatedMinutes: 7,
+            flowSummary: [],
+          },
+          media: [],
+          compatibility: [],
+        }),
+      },
+      funnelInstance: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'library-master-instance-1',
+          name: 'Library Master',
+          code: 'library-master',
+          status: 'active',
+          structuralType: 'generic',
+          conversionContract: {},
+          settingsJson: {},
+          mediaMap: {},
+          team: {
+            id: 'arsenal-team-1',
+            name: 'LeadFlow Arsenal',
+            description: null,
+          },
+          template: {
+            id: 'template-1',
+            code: 'library-template',
+            name: 'Library Template',
+            version: 1,
+            funnelType: 'library_funnel',
+            blocksJson: [],
+            mediaMap: {},
+            settingsJson: {},
+            allowedOverridesJson: {},
+          },
+          steps: [
+            {
+              id: 'step-1',
+              slug: 'captura',
+              stepType: 'landing',
+              position: 0,
+              isEntryStep: true,
+              isConversionStep: false,
+              blocksJson: [],
+              mediaMap: {},
+              settingsJson: {},
+            },
+          ],
+        }),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(
+      service.getSystemPreviewRuntime('health-wellness-evaluation'),
+    ).resolves.toMatchObject({
+      funnel: {
+        id: 'library-master-instance-1',
+      },
+      currentStep: {
+        id: 'step-1',
+      },
+    });
+    expect(prisma.funnelInstance.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'library-master-instance-1',
+        },
+      }),
+    );
+  });
+
+  it('rejects marketplace preview when the associated Library version is not published', async () => {
+    const commercialProfileService = buildCommercialProfileService(null);
+    const prisma = {
+      funnelArsenalTemplate: {
+        findFirst: jest.fn().mockResolvedValue({
+          ...dbHealthTemplate,
+          assetSlug: 'health-wellness-evaluation',
+          sourceFunnelInstanceId: 'legacy-master-instance-1',
+          libraryAssetVersionId: 'library-version-1',
+        }),
+      },
+      libraryAssetVersion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'library-version-1',
+          status: 'draft',
+          asset: {
+            id: 'library-asset-1',
+            slug: 'health-wellness-evaluation',
+            title: 'Evaluación de bienestar',
+          },
+          funnelVersion: null,
+          media: [],
+          compatibility: [],
+        }),
+      },
+    };
+    const service = buildService(prisma, commercialProfileService);
+
+    await expect(
+      service.getSystemPreviewRuntime('health-wellness-evaluation'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'LIBRARY_ASSET_VERSION_NOT_PUBLISHED',
+      }),
+    });
+    await expect(
+      service.getSystemPreviewRuntime('health-wellness-evaluation'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });

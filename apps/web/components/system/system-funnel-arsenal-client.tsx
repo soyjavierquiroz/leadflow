@@ -44,6 +44,7 @@ type FormState = {
   funnelTemplateId: string;
   sourceFunnelId: string;
   sourceFunnelInstanceId: string;
+  libraryAssetVersionId: string;
 };
 
 const emptyFormState: FormState = {
@@ -71,6 +72,7 @@ const emptyFormState: FormState = {
   funnelTemplateId: "",
   sourceFunnelId: "",
   sourceFunnelInstanceId: "",
+  libraryAssetVersionId: "",
 };
 
 const primaryButtonClassName =
@@ -105,6 +107,7 @@ const toFormState = (template: SystemFunnelArsenalTemplate): FormState => ({
   funnelTemplateId: template.funnelTemplateId ?? "",
   sourceFunnelId: template.sourceFunnelId ?? "",
   sourceFunnelInstanceId: template.sourceFunnelInstanceId ?? "",
+  libraryAssetVersionId: template.libraryAssetVersionId ?? "",
 });
 
 const toPayload = (formState: FormState) => ({
@@ -122,6 +125,7 @@ const toPayload = (formState: FormState) => ({
   funnelTemplateId: formState.funnelTemplateId || null,
   sourceFunnelId: formState.sourceFunnelId || null,
   sourceFunnelInstanceId: formState.sourceFunnelInstanceId || null,
+  libraryAssetVersionId: formState.libraryAssetVersionId || null,
 });
 
 const sortTemplates = (templates: SystemFunnelArsenalTemplate[]) =>
@@ -463,6 +467,18 @@ export function SystemFunnelArsenalClient({
         </label>
 
         <label className="text-sm font-medium text-app-text">
+          Library AssetVersion ID
+          <input
+            className={fieldClassName}
+            value={formState.libraryAssetVersionId}
+            onChange={(event) =>
+              updateField("libraryAssetVersionId", event.target.value)
+            }
+            placeholder="Opcional"
+          />
+        </label>
+
+        <label className="text-sm font-medium text-app-text">
           Source FunnelInstance ID
           <input
             className={fieldClassName}
@@ -641,6 +657,12 @@ export function SystemFunnelArsenalClient({
               <div className="rounded-xl border border-app-border bg-app-surface px-3 py-2">
                 <dt className="font-semibold text-app-text">CTA</dt>
                 <dd className="mt-1">{template.cta}</dd>
+              </div>
+              <div className="rounded-xl border border-app-border bg-app-surface px-3 py-2">
+                <dt className="font-semibold text-app-text">Library version</dt>
+                <dd className="mt-1 break-all">
+                  {template.libraryAssetVersionId ?? "Sin asociar"}
+                </dd>
               </div>
               <div className="rounded-xl border border-app-border bg-app-surface px-3 py-2">
                 <dt className="font-semibold text-app-text">Source</dt>
