@@ -267,6 +267,12 @@ export class FunnelArsenalService {
             },
           );
 
+        if (!cloned.publicationId || !cloned.pathPrefix) {
+          throw new Error(
+            'Funnel Arsenal enable expected the master clone to create a publication.',
+          );
+        }
+
         return {
           id: cloned.publicationId,
           pathPrefix: cloned.pathPrefix,

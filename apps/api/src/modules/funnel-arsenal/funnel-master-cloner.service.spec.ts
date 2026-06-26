@@ -241,4 +241,106 @@ describe('FunnelMasterClonerService', () => {
       }),
     );
   });
+
+  it('can deep clone an internal master without creating a publication or domain target', async () => {
+    const tx = {
+      funnelInstance: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'source-instance-1',
+          workspaceId: 'source-workspace',
+          teamId: 'source-team',
+          templateId: 'source-template-1',
+          funnelId: 'source-funnel-1',
+          name: 'Source funnel',
+          code: 'source-code',
+          thumbnailUrl: null,
+          status: 'active',
+          structuralType: 'multi_step_conversion',
+          conversionContract: {},
+          settingsJson: {},
+          mediaMap: {},
+          template: {
+            id: 'source-template-1',
+          },
+          funnel: {
+            id: 'source-funnel-1',
+            description: null,
+            config: {},
+            stages: ['captured'],
+            entrySources: ['form'],
+          },
+          steps: [
+            {
+              id: 'source-step-a',
+              stepType: 'landing',
+              slug: 'inicio',
+              position: 1,
+              isEntryStep: true,
+              isConversionStep: false,
+              blocksJson: [{ type: 'hero' }],
+              mediaMap: {},
+              settingsJson: {},
+            },
+            {
+              id: 'source-step-b',
+              stepType: 'thank_you',
+              slug: 'gracias',
+              position: 2,
+              isEntryStep: false,
+              isConversionStep: true,
+              blocksJson: [{ type: 'thanks' }],
+              mediaMap: {},
+              settingsJson: {},
+            },
+          ],
+        }),
+        create: jest.fn().mockResolvedValue({ id: 'cloned-instance-1' }),
+      },
+      team: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'target-team',
+          workspaceId: 'target-workspace',
+          name: 'LeadFlow Arsenal Masters',
+          code: 'leadflow-arsenal-masters',
+        }),
+      },
+      domain: {
+        findFirst: jest.fn(),
+        upsert: jest.fn(),
+      },
+      funnelPublication: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      funnel: {
+        create: jest.fn().mockResolvedValue({ id: 'cloned-funnel-1' }),
+      },
+      funnelStep: {
+        create: jest.fn().mockResolvedValue({ id: 'unused' }),
+      },
+    };
+    const service = new FunnelMasterClonerService({} as PrismaService);
+
+    await expect(
+      service.cloneMasterFunnelInstanceToTeamInTransaction(tx as never, {
+        sourceFunnelInstanceId: 'source-instance-1',
+        targetWorkspaceId: 'target-workspace',
+        targetTeamId: 'target-team',
+        templateKey: 'health-wellness-evaluation',
+        instanceCode: 'marketplace-health-wellness-evaluation-master',
+        createPublication: false,
+      }),
+    ).resolves.toMatchObject({
+      funnelId: 'cloned-funnel-1',
+      funnelInstanceId: 'cloned-instance-1',
+      publicationId: null,
+      publicUrl: null,
+      pathPrefix: null,
+    });
+
+    expect(tx.domain.findFirst).not.toHaveBeenCalled();
+    expect(tx.domain.upsert).not.toHaveBeenCalled();
+    expect(tx.funnelPublication.findFirst).not.toHaveBeenCalled();
+    expect(tx.funnelPublication.create).not.toHaveBeenCalled();
+  });
 });

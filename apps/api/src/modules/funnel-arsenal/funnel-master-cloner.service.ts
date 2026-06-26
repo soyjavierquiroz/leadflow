@@ -31,14 +31,15 @@ type CloneMasterFunnelInstanceToTeamParams = {
   templateLabel?: string;
   templateDescription?: string;
   instanceCode?: string;
+  createPublication?: boolean;
 };
 
 type CloneMasterFunnelInstanceToTeamResult = {
   funnelId: string;
   funnelInstanceId: string;
-  publicationId: string;
-  publicUrl?: string;
-  pathPrefix: string;
+  publicationId: string | null;
+  publicUrl?: string | null;
+  pathPrefix: string | null;
   stepIdMap: Record<string, string>;
 };
 
@@ -205,12 +206,15 @@ export class FunnelMasterClonerService {
       });
     }
 
-    const publicationTarget = await this.resolvePublicationTarget(tx, {
-      workspaceId: params.targetWorkspaceId,
-      teamId: params.targetTeamId,
-      teamSlug: targetTeam.code || targetTeam.name,
-      requestedPath: params.requestedPath,
-    });
+    const shouldCreatePublication = params.createPublication !== false;
+    const publicationTarget = shouldCreatePublication
+      ? await this.resolvePublicationTarget(tx, {
+          workspaceId: params.targetWorkspaceId,
+          teamId: params.targetTeamId,
+          teamSlug: targetTeam.code || targetTeam.name,
+          requestedPath: params.requestedPath,
+        })
+      : null;
     const stepIdMap = this.reserveStepIdMap(source.steps);
     const stepIdLookup = new Map(Object.entries(stepIdMap));
     const instanceName =
@@ -323,6 +327,17 @@ export class FunnelMasterClonerService {
           ),
         },
       });
+    }
+
+    if (!publicationTarget) {
+      return {
+        funnelId: funnel.id,
+        funnelInstanceId: funnelInstance.id,
+        publicationId: null,
+        publicUrl: null,
+        pathPrefix: null,
+        stepIdMap,
+      };
     }
 
     const publication = await tx.funnelPublication.create({
